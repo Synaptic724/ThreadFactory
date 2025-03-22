@@ -12,7 +12,11 @@ from typing import (
     Optional,
     TypeVar,
 )
+<<<<<<<< HEAD:Threading/Stack.py
 from Threading.List import ConcurrentList
+========
+from src.ThreadFactory.Threading.List import ConcurrentList
+>>>>>>>> 65d817d (refactor: update import paths and rename Threading to ThreadFactory):src/ThreadFactory/Threading/Stack.py
 
 _T = TypeVar("_T")
 

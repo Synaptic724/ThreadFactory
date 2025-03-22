@@ -1,9 +1,7 @@
 import unittest
 import threading
 import random
-import time
-import copy
-from Threading.Queue import ConcurrentQueue, Empty
+from src.ThreadFactory.Threading.Queue import ConcurrentQueue, Empty
 
 class TestConcurrentQueue(unittest.TestCase):
 
@@ -91,7 +89,7 @@ class TestConcurrentQueue(unittest.TestCase):
         """
         Test copy() and deepcopy() produce correct separate objects.
         """
-        from copy import copy, deepcopy
+        from copy import deepcopy
         q = ConcurrentQueue([{"x": 1}, {"y": 2}])
 
         q_copy = q.copy()
