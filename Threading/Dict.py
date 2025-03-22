@@ -1,6 +1,5 @@
 import threading
-import atomics
-from copy import deepcopy, copy
+from copy import deepcopy
 import functools
 import warnings
 from typing import (
@@ -23,19 +22,18 @@ _V = TypeVar("_V")
 
 class ConcurrentDict(Generic[_K, _V]):
     """
-    A thread-safe dictionary implementation using an underlying Python dict,
-    a reentrant lock for synchronization, and an atomic counter for fast,
-    lock-free retrieval of the number of items.
+    A thread-safe dictionary implementation using:
+      - An underlying Python dict
+      - A reentrant lock (RLock) for synchronization
 
-    This class mimics many of the behaviors of a native Python dict,
-    including common utility methods. It is designed for Python 3.13+ No-GIL
-    environments (though it will work fine in standard Python as well).
+    This class mimics many behaviors of a native Python dict, including
+    common utility methods. It is designed for Python 3.13+ No-GIL
+    environments (though it will also work fine in standard Python).
     """
 
     def __init__(
         self,
-        initial: Optional[Union[Mapping[_K, _V], Iterable[Tuple[_K, _V]]]] = None,
-        width: int = 8
+        initial: Optional[Union[Mapping[_K, _V], Iterable[Tuple[_K, _V]]]] = None
     ) -> None:
         """
         Initialize the ConcurrentDict.
@@ -44,29 +42,14 @@ class ConcurrentDict(Generic[_K, _V]):
             initial (Mapping[_K, _V] or Iterable of (_K, _V), optional):
                 Initial data for the dictionary. Can be another dictionary,
                 or an iterable of (key, value) pairs.
-            width (int, optional):
-                Bit width for the atomic counter (default is 8 for 64-bit).
-                This parameter controls the maximum value the counter can hold.
-                A width of 8 bits allows a maximum count of 2**8 - 1 = 255,
-                while a width of 16 allows 2**16 - 1 = 65535, and so on.
-                Choosing a smaller width can save memory, but it limits the
-                total number of items the bag can hold. If the counter
-                reaches its maximum value, further additions will wrap around
-                (behaving like modulo arithmetic), potentially leading to
-                incorrect results for the total count. The default of 8 is
-                generally sufficient for moderately sized bags.
         """
         if initial is None:
             initial = {}
         # Convert 'initial' to a dict:
-        # - If it's already a dict-like object with .keys(), we call dict(...) on it.
+        # - If it's already dict-like, dict(...) copies it.
         # - If it's an iterable of (key, value) pairs, dict(...) will handle that as well.
         self._dict: Dict[_K, _V] = dict(initial)
         self._lock: threading.RLock = threading.RLock()
-
-        # Atomic counter to track the size of the dictionary
-        self.counter = atomics.atomic(width=width, atype=atomics.INT)
-        self.counter.store(len(self._dict))
 
     def __getitem__(self, key: _K) -> _V:
         """
@@ -86,21 +69,18 @@ class ConcurrentDict(Generic[_K, _V]):
 
     def __setitem__(self, key: _K, value: _V) -> None:
         """
-        Set the item for the specified key, updating the atomic counter
-        if the key did not previously exist.
+        Set the item for the specified key.
 
         Args:
             key (_K): The key to set.
             value (_V): The new value to store.
         """
         with self._lock:
-            if key not in self._dict:
-                self.counter.fetch_add(1)
             self._dict[key] = value
 
     def __delitem__(self, key: _K) -> None:
         """
-        Delete an item by key, updating the atomic counter.
+        Delete an item by key.
 
         Args:
             key (_K): The key to delete.
@@ -110,7 +90,6 @@ class ConcurrentDict(Generic[_K, _V]):
         """
         with self._lock:
             del self._dict[key]
-            self.counter.fetch_sub(1)
 
     def __contains__(self, key: object) -> bool:
         """
@@ -127,12 +106,13 @@ class ConcurrentDict(Generic[_K, _V]):
 
     def __len__(self) -> int:
         """
-        Return the number of items, using the atomic counter.
+        Return the number of items in the dictionary.
 
         Returns:
             int: The number of key-value pairs in the dict.
         """
-        return self.counter.load()
+        with self._lock:
+            return len(self._dict)
 
     def __bool__(self) -> bool:
         """
@@ -141,7 +121,7 @@ class ConcurrentDict(Generic[_K, _V]):
         Returns:
             bool: True if there is at least one item, False otherwise.
         """
-        return self.counter.load() != 0
+        return len(self) != 0
 
     def __iter__(self) -> Iterator[_K]:
         """
@@ -205,7 +185,6 @@ class ConcurrentDict(Generic[_K, _V]):
         """
         with self._lock:
             self._dict.clear()
-            self.counter.store(0)
 
     def get(self, key: _K, default: Optional[_V] = None) -> Optional[_V]:
         """
@@ -238,9 +217,7 @@ class ConcurrentDict(Generic[_K, _V]):
         """
         with self._lock:
             if key in self._dict:
-                value = self._dict.pop(key)
-                self.counter.fetch_sub(1)
-                return value
+                return self._dict.pop(key)
             if default is not None:
                 return default  # type: ignore
             raise KeyError(key)
@@ -259,9 +236,7 @@ class ConcurrentDict(Generic[_K, _V]):
         with self._lock:
             if not self._dict:
                 raise KeyError("popitem(): dictionary is empty")
-            key, value = self._dict.popitem()
-            self.counter.fetch_sub(1)
-            return key, value
+            return self._dict.popitem()
 
     def setdefault(self, key: _K, default: Optional[_V] = None) -> Optional[_V]:
         """
@@ -276,12 +251,7 @@ class ConcurrentDict(Generic[_K, _V]):
             _V or None: The existing or newly set value.
         """
         with self._lock:
-            if key in self._dict:
-                return self._dict[key]
-            else:
-                self._dict[key] = default  # type: ignore
-                self.counter.fetch_add(1)
-                return default
+            return self._dict.setdefault(key, default)
 
     def update(
         self,
@@ -307,20 +277,14 @@ class ConcurrentDict(Generic[_K, _V]):
             if hasattr(other, "keys"):
                 # Mapping-like
                 for k in other.keys():  # type: ignore
-                    if k not in self._dict:
-                        self.counter.fetch_add(1)
                     self._dict[k] = other[k]  # type: ignore
             else:
                 # Iterable of (key, value)
                 for k, v in other:  # type: ignore
-                    if k not in self._dict:
-                        self.counter.fetch_add(1)
                     self._dict[k] = v
 
             # Process additional kwargs
             for k, v in kwargs.items():
-                if k not in self._dict:
-                    self.counter.fetch_add(1)
                 self._dict[k] = v
 
     def keys(self) -> List[_K]:
@@ -420,7 +384,7 @@ class ConcurrentDict(Generic[_K, _V]):
     def batch_update(self, func: Callable[[Dict[_K, _V]], None]) -> None:
         """
         Perform a batch update on the dict under a single lock acquisition.
-        This method allows multiple operations to be performed atomically.
+        This allows multiple operations to be performed atomically.
 
         Args:
             func (Callable[[Dict[_K, _V]], None]):
@@ -429,8 +393,6 @@ class ConcurrentDict(Generic[_K, _V]):
         """
         with self._lock:
             func(self._dict)
-            self.counter.store(len(self._dict))
-
 
     def map(self, func: Callable[[_K, _V], Tuple[_K, _V]]) -> "ConcurrentDict[_K, _V]":
         """
@@ -443,12 +405,6 @@ class ConcurrentDict(Generic[_K, _V]):
 
         Returns:
             ConcurrentDict[_K, _V]: A new dictionary with transformed pairs.
-
-        Example:
-            def increment_value(k, v):
-                return (k, v+1)
-
-            new_dict = concurrent_dict.map(increment_value)
         """
         with self._lock:
             new_items: List[Tuple[_K, _V]] = []
@@ -482,7 +438,7 @@ class ConcurrentDict(Generic[_K, _V]):
         initial: Optional[Any] = None
     ) -> Any:
         """
-        Apply a function of two arguments cumulatively to the items of the dict
+        Apply a function of two arguments cumulatively to the dict items
         (in some iteration order).
 
         Args:
@@ -511,7 +467,6 @@ class ConcurrentDict(Generic[_K, _V]):
         if not items_copy and initial is None:
             raise TypeError("reduce() of empty ConcurrentDict with no initial value")
 
-        # Wrap the user function to clarify we're passing (acc, (k, v))
         def pairwise_reduce(acc: Any, kv: Tuple[_K, _V]) -> Any:
             return func(acc, kv)
 
@@ -519,41 +474,3 @@ class ConcurrentDict(Generic[_K, _V]):
             return functools.reduce(pairwise_reduce, items_copy)
         else:
             return functools.reduce(pairwise_reduce, items_copy, initial)
-
-    def atomic_update(self, key: _K, func: Callable[[_V], _V]) -> None:
-        """
-        Atomically update the element at the given key using a function.
-
-        Args:
-            key (_K): The dictionary key to update.
-            func (Callable[[_V], _V]):
-                A function that takes the current value and returns a new value.
-
-        Raises:
-            KeyError: If the key does not exist.
-            TypeError: If func is not callable.
-        """
-        with self._lock:
-            if not callable(func):
-                raise TypeError("func must be callable")
-            if key not in self._dict:
-                raise KeyError(f"Key '{key}' does not exist for atomic update.")
-            self._dict[key] = func(self._dict[key])
-
-    def atomic_swap(self, key1: _K, key2: _K) -> None:
-        """
-        Atomically swap the values for two given keys.
-
-        Args:
-            key1 (_K): The first key.
-            key2 (_K): The second key.
-
-        Raises:
-            KeyError: If either key does not exist.
-        """
-        with self._lock:
-            if key1 not in self._dict:
-                raise KeyError(f"Key '{key1}' does not exist for atomic swap.")
-            if key2 not in self._dict:
-                raise KeyError(f"Key '{key2}' does not exist for atomic swap.")
-            self._dict[key1], self._dict[key2] = self._dict[key2], self._dict[key1]

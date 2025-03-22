@@ -5,20 +5,34 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "AtomicThreading"
 version = "0.1.0"
-description = "A high-performance thread-safe data structure library for Python 3.13+ no-GIL."
+description = "A high-performance thread-safe data structure and concurrency library for Python 3.13+ (no-GIL)."
 readme = "README.md"
 requires-python = ">=3.13"
-license = { file = "LICENSE" } # MIT
+license = { file = "LICENSE" }
 authors = [
-    { name="Mark Geleta", email="your@email.com" }
+    { name = "Mark Geleta", email = "your@email.com" }
 ]
-keywords = ["concurrent", "thread-safe", "no-GIL", "parallel", "atomic", "free-threading", "high-performance"]
+keywords = [
+    "concurrent",
+    "parallel",
+    "thread-safe",
+    "no-GIL",
+    "atomic",
+    "free-threading",
+    "high-performance"
+]
 classifiers = [
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
     "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent"
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Distributed Computing",
+    "Topic :: System :: Networking",
+    "Topic :: Utilities"
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/Synaptic724/AtomicThreading"
-"Bug Tracker" = "https://github.com/Synaptic724/AtomicThreading/issues"
+Homepage = "https://github.com/Synaptic724/AtomicThreading"
+Issues = "https://github.com/Synaptic724/AtomicThreading/issues"

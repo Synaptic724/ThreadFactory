@@ -196,23 +196,6 @@ class TestConcurrentList(unittest.TestCase):
         # reduce without initial
         self.assertEqual(clist.reduce(lambda acc, x: acc + x), 10)
 
-    def test_atomic_update_and_swap(self):
-        clist = ConcurrentList([10, 20, 30])
-
-        def increment(x):
-            return x + 1
-
-        clist.atomic_update(1, increment)
-        self.assertEqual(clist[1], 21)
-
-        with self.assertRaises(IndexError):
-            clist.atomic_update(10, increment)
-
-        clist.atomic_swap(0, 2)
-        self.assertEqual(list(clist), [30, 21, 10])
-
-        with self.assertRaises(IndexError):
-            clist.atomic_swap(0, 99)
 
     def test_concurrency_basic(self):
         """

@@ -1,5 +1,4 @@
 import threading
-import atomics
 from copy import deepcopy
 import functools
 import warnings
@@ -22,44 +21,30 @@ class ConcurrentBag(Generic[_T]):
     A thread-safe multiset ("bag") implementation using:
     - a dict from item -> integer count
     - a reentrant lock for synchronization
-    - an atomic counter for fast, lock-free retrieval of the total number of items
 
     Items can appear multiple times, unlike a standard set. This class
     is designed for Python 3.13+ No-GIL environments (though it will
     work fine in standard Python as well).
     """
 
-    def __init__(self, initial: Optional[List[_T]] = None, width: int = 8) -> None:
+    def __init__(self, initial: Optional[List[_T]] = None) -> None:
         """
         Initialize the ConcurrentBag.
 
         Args:
             initial (list of _T, optional):
-                A list (or iterable turned into a list) of initial items to add to the bag.
-            width (int, optional):
-                Bit width for the atomic counter (default is 8 for 64-bit).
-                This parameter controls the maximum value the counter can hold.
-                A width of 8 bits allows a maximum count of 2**8 - 1 = 255,
-                while a width of 16 allows 2**16 - 1 = 65535, and so on.
-                Choosing a smaller width can save memory, but it limits the
-                total number of items the bag can hold. If the counter
-                reaches its maximum value, further additions will wrap around
-                (behaving like modulo arithmetic), potentially leading to
-                incorrect results for the total count. The default of 8 is
-                generally sufficient for moderately sized bags.
+                A list (or iterable turned into a list) of initial items
+                to add to the bag.
         """
         if initial is None:
             initial = []
         self._lock = threading.RLock()
         # Dictionary to store item -> count
         self._bag: Dict[_T, int] = {}
-        self.counter = atomics.atomic(width=width, atype=atomics.INT)
-        self.counter.store(0)
 
         # Add initial items
         for item in initial:
             self._bag[item] = self._bag.get(item, 0) + 1
-        self.counter.store(sum(self._bag.values()))
 
     def add(self, item: _T) -> None:
         """
@@ -70,7 +55,6 @@ class ConcurrentBag(Generic[_T]):
         """
         with self._lock:
             self._bag[item] = self._bag.get(item, 0) + 1
-            self.counter.fetch_add(1)
 
     def remove(self, item: _T) -> None:
         """
@@ -83,7 +67,6 @@ class ConcurrentBag(Generic[_T]):
             if item not in self._bag or self._bag[item] == 0:
                 raise KeyError(f"Item {item!r} not in ConcurrentBag")
             self._bag[item] -= 1
-            self.counter.fetch_sub(1)
             if self._bag[item] == 0:
                 del self._bag[item]
 
@@ -96,7 +79,6 @@ class ConcurrentBag(Generic[_T]):
             if item not in self._bag or self._bag[item] == 0:
                 return
             self._bag[item] -= 1
-            self.counter.fetch_sub(1)
             if self._bag[item] == 0:
                 del self._bag[item]
 
@@ -121,8 +103,6 @@ class ConcurrentBag(Generic[_T]):
                 del self._bag[item]
             else:
                 self._bag[item] = count - 1
-
-            self.counter.fetch_sub(1)
             return item
 
     def clear(self) -> None:
@@ -131,13 +111,13 @@ class ConcurrentBag(Generic[_T]):
         """
         with self._lock:
             self._bag.clear()
-            self.counter.store(0)
 
     def __len__(self) -> int:
         """
         Return the total number of items in the bag (the sum of all counts).
         """
-        return self.counter.load()
+        with self._lock:
+            return sum(self._bag.values())
 
     def __bool__(self) -> bool:
         """
@@ -146,7 +126,7 @@ class ConcurrentBag(Generic[_T]):
         Returns:
             bool: True if there's at least one item, False otherwise.
         """
-        return self.counter.load() != 0
+        return len(self) != 0
 
     def __contains__(self, item: object) -> bool:
         """
@@ -223,7 +203,6 @@ class ConcurrentBag(Generic[_T]):
         with self._lock:
             new_bag = ConcurrentBag()
             new_bag._bag = dict(self._bag)
-            new_bag.counter.store(sum(self._bag.values()))
         return new_bag
 
     def __copy__(self) -> "ConcurrentBag[_T]":
@@ -248,7 +227,6 @@ class ConcurrentBag(Generic[_T]):
         with self._lock:
             new_bag = ConcurrentBag()
             new_bag._bag = deepcopy(self._bag, memo)
-            new_bag.counter.store(sum(new_bag._bag.values()))
         return new_bag
 
     def to_concurrent_dict(self) -> 'ConcurrentDict[_T, int]':
@@ -273,7 +251,6 @@ class ConcurrentBag(Generic[_T]):
         """
         with self._lock:
             func(self._bag)
-            self.counter.store(sum(self._bag.values()))
 
     def map(self, func: Callable[[_T], _T]) -> "ConcurrentBag[_T]":
         """
@@ -295,7 +272,6 @@ class ConcurrentBag(Generic[_T]):
                 new_dict[new_item] = new_dict.get(new_item, 0) + count
         new_bag = ConcurrentBag()
         new_bag._bag = new_dict
-        new_bag.counter.store(sum(new_dict.values()))
         return new_bag
 
     def filter(self, predicate: Callable[[_T], bool]) -> "ConcurrentBag[_T]":
@@ -316,7 +292,6 @@ class ConcurrentBag(Generic[_T]):
                     new_dict[item] = count
         new_bag = ConcurrentBag()
         new_bag._bag = new_dict
-        new_bag.counter.store(sum(new_dict.values()))
         return new_bag
 
     def reduce(
@@ -360,61 +335,3 @@ class ConcurrentBag(Generic[_T]):
             return functools.reduce(func, expanded_items)
         else:
             return functools.reduce(func, expanded_items, initial)
-
-    def atomic_update(self, item: _T, func: Callable[[int], int]) -> None:
-        """
-        Atomically update the count of the given item using a function.
-
-        The function must take the current count for `item` (or 0 if item is not present)
-        and return the new count. If the new count is <= 0, the item is removed entirely.
-
-        Args:
-            item (_T): The item whose count should be updated.
-            func (Callable[[int], int]):
-                A function taking the current count for `item` and returning the new count.
-
-        Raises:
-            TypeError: If func is not callable.
-        """
-        if not callable(func):
-            raise TypeError("func must be callable")
-
-        with self._lock:
-            old_count = self._bag.get(item, 0)
-            new_count = func(old_count)
-
-            # Update the total item count by the difference
-            diff = new_count - old_count
-
-            if new_count > 0:
-                self._bag[item] = new_count
-            else:
-                # If new count is 0 or negative, remove item
-                if item in self._bag:
-                    del self._bag[item]
-            self.counter.fetch_add(diff)  # This could be negative or positive
-
-    def atomic_swap(self, item1: _T, item2: _T) -> None:
-        """
-        Atomically swap the counts of two items.
-
-        For example, if item1 appears 5 times and item2 appears 2 times,
-        after swap item1 will appear 2 times and item2 will appear 5 times.
-
-        Args:
-            item1 (_T): The first item.
-            item2 (_T): The second item.
-        """
-        with self._lock:
-            count1 = self._bag.get(item1, 0)
-            count2 = self._bag.get(item2, 0)
-            if count1 == 0 and item1 in self._bag:
-                del self._bag[item1]
-            else:
-                self._bag[item1] = count2
-
-            if count2 == 0 and item2 in self._bag:
-                del self._bag[item2]
-            else:
-                self._bag[item2] = count1
-            # The total sum of counts is unchanged, so no need to adjust self.counter.

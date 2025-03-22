@@ -1,9 +1,7 @@
 import threading
-import atomics
 from collections import deque
 from copy import deepcopy
 import functools
-import warnings
 from typing import (
     Any,
     Callable,
@@ -11,7 +9,6 @@ from typing import (
     Generic,
     Iterable,
     Iterator,
-    List,
     Optional,
     TypeVar,
 )
@@ -33,8 +30,7 @@ class ConcurrentQueue(Generic[_T]):
 
     def __init__(
         self,
-        initial: Optional[Iterable[_T]] = None,
-        width: int = 8
+        initial: Optional[Iterable[_T]] = None
     ) -> None:
         """
         Initialize the ConcurrentQueue.
@@ -42,26 +38,11 @@ class ConcurrentQueue(Generic[_T]):
         Args:
             initial (Iterable[_T], optional):
                 An iterable of initial items. Defaults to an empty list if None is given.
-            width (int, optional):
-                Bit width for the atomic counter (default is 8 for 64-bit).
-                This parameter controls the maximum value the counter can hold.
-                A width of 8 bits allows a maximum count of 2**8 - 1 = 255,
-                while a width of 16 allows 2**16 - 1 = 65535, and so on.
-                Choosing a smaller width can save memory, but it limits the
-                total number of items the bag can hold. If the counter
-                reaches its maximum value, further additions will wrap around
-                (behaving like modulo arithmetic), potentially leading to
-                incorrect results for the total count. The default of 8 is
-                generally sufficient for moderately sized bags.
         """
         if initial is None:
             initial = []
         self._lock: threading.RLock = threading.RLock()
         self._deque: Deque[_T] = deque(initial)
-
-        # Atomic counter to track the size (i.e., number of items)
-        self.counter = atomics.atomic(width=width, atype=atomics.INT)
-        self.counter.store(len(self._deque))
 
     def enqueue(self, item: _T) -> None:
         """
@@ -72,7 +53,6 @@ class ConcurrentQueue(Generic[_T]):
         """
         with self._lock:
             self._deque.append(item)
-            self.counter.fetch_add(1)
 
     def dequeue(self) -> _T:
         """
@@ -87,9 +67,7 @@ class ConcurrentQueue(Generic[_T]):
         with self._lock:
             if not self._deque:
                 raise IndexError("dequeue from empty ConcurrentQueue")
-            item = self._deque.popleft()
-            self.counter.fetch_sub(1)
-            return item
+            return self._deque.popleft()
 
     def peek(self) -> _T:
         """
@@ -113,7 +91,7 @@ class ConcurrentQueue(Generic[_T]):
         Returns:
             int: The current size of the queue.
         """
-        return self.counter.load()
+        return len(self._deque)
 
     def __bool__(self) -> bool:
         """
@@ -122,7 +100,7 @@ class ConcurrentQueue(Generic[_T]):
         Returns:
             bool: True if non-empty, False otherwise.
         """
-        return self.counter.load() != 0
+        return len(self._deque) != 0
 
     def __iter__(self) -> Iterator[_T]:
         """
@@ -141,7 +119,6 @@ class ConcurrentQueue(Generic[_T]):
         """
         with self._lock:
             self._deque.clear()
-            self.counter.store(0)
 
     def __repr__(self) -> str:
         """
@@ -199,8 +176,7 @@ class ConcurrentQueue(Generic[_T]):
             concurrent_list.ConcurrentList[_T]:
                 A concurrent list containing all items currently in the queue.
         """
-        # We assume that `concurrent_list` is already imported from your `Threading` package
-        # and that concurrent_list.ConcurrentList is a valid class.
+
         with self._lock:
             return ConcurrentList(list(self._deque))
 
@@ -216,9 +192,6 @@ class ConcurrentQueue(Generic[_T]):
         """
         with self._lock:
             func(self._deque)
-            self.counter.store(len(self._deque))
-
-    # ---------- Optional Functional Methods (similar to map/filter/reduce) ----------
 
     def map(self, func: Callable[[_T], Any]) -> "ConcurrentQueue[Any]":
         """

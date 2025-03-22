@@ -128,30 +128,6 @@ class TestConcurrentBag(unittest.TestCase):
         with self.assertRaises(TypeError):
             empty_bag.reduce(lambda acc, x: acc + x)
 
-    def test_atomic_update(self):
-        bag = ConcurrentBag(['apple', 'apple', 'banana'])
-
-        def increment(count):
-            return count + 3
-
-        bag.atomic_update('apple', increment)
-
-        self.assertEqual(bag.count_of('apple'), 5)
-        self.assertEqual(len(bag), 6)
-
-        # Decrease count to zero -> remove item
-        bag.atomic_update('banana', lambda c: 0)
-        self.assertNotIn('banana', bag)
-
-    def test_atomic_swap(self):
-        bag = ConcurrentBag(['apple', 'apple', 'banana'])
-
-        # Swap counts
-        bag.atomic_swap('apple', 'banana')
-
-        self.assertEqual(bag.count_of('apple'), 1)
-        self.assertEqual(bag.count_of('banana'), 2)
-
     def test_len_and_bool(self):
         bag = ConcurrentBag()
         self.assertEqual(len(bag), 0)

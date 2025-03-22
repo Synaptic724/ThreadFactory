@@ -150,31 +150,6 @@ class TestConcurrentDict(unittest.TestCase):
         with self.assertRaises(TypeError):
             empty.reduce(reducer)
 
-    def test_atomic_update(self):
-        d = ConcurrentDict[str, int]({"a": 10})
-
-        def increment(x):
-            return x + 5
-
-        d.atomic_update("a", increment)
-        self.assertEqual(d["a"], 15)
-
-        with self.assertRaises(KeyError):
-            d.atomic_update("z", increment)
-
-        with self.assertRaises(TypeError):
-            d.atomic_update("a", "not callable")
-
-    def test_atomic_swap(self):
-        d = ConcurrentDict[str, int]({"a": 1, "b": 2})
-        d.atomic_swap("a", "b")
-
-        self.assertEqual(d["a"], 2)
-        self.assertEqual(d["b"], 1)
-
-        with self.assertRaises(KeyError):
-            d.atomic_swap("a", "z")
-
     def test_context_manager_direct_access(self):
         d = ConcurrentDict[str, int]({"a": 1})
 
@@ -273,31 +248,6 @@ class TestConcurrentDictStress(unittest.TestCase):
         # Sanity check: no key should have a negative count or cause issues
         self.assertGreaterEqual(len(d), 0)
 
-    def test_high_contention_atomic_updates(self):
-        """
-        Test atomic_update under extreme contention on a single key.
-        """
-        d = ConcurrentDict[str, int]({"counter": 0})
-        num_threads = 50
-        increments_per_thread = 10_000
-
-        def incrementer():
-            for _ in range(increments_per_thread):
-                d.atomic_update("counter", lambda x: x + 1)
-
-        threads = [threading.Thread(target=incrementer) for _ in range(num_threads)]
-
-        start_time = time.time()
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-        elapsed = time.time() - start_time
-
-        expected_total = num_threads * increments_per_thread
-        self.assertEqual(d["counter"], expected_total)
-        print(f"High contention atomic_update completed in {elapsed:.4f}s")
-
     def test_parallel_batch_updates_and_swaps(self):
         """
         Heavy parallel batch_update and atomic_swap on a shared dict.
@@ -321,14 +271,9 @@ class TestConcurrentDictStress(unittest.TestCase):
 
                 d.batch_update(batch)
 
-        def swap_worker():
-            for _ in range(iterations):
-                d.atomic_swap("b", "c")
-
         threads = []
         for _ in range(num_threads // 2):
             threads.append(threading.Thread(target=batch_worker))
-            threads.append(threading.Thread(target=swap_worker))
 
         for t in threads:
             t.start()
