@@ -1,7 +1,7 @@
 import unittest
 import threading
 import random
-from src.Threading.Queue import ConcurrentQueue, Empty
+from src.ThreadFactory.Threading.Queue import ConcurrentQueue, Empty
 
 class TestConcurrentQueue(unittest.TestCase):
 

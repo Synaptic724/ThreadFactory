@@ -52,12 +52,12 @@ def _detect_nogil_mode() -> None:
 
 _detect_nogil_mode()
 
-from src.Threading.Bag import ConcurrentBag
-from src.Threading.Dict import ConcurrentDict
-from src.Threading.List import ConcurrentList
-from src.Threading.Queue import ConcurrentQueue
-from src.Threading.Stack import ConcurrentStack
-from src.Threading.Concurrent import Concurrent
+from src.ThreadFactory.Threading.Bag import ConcurrentBag
+from src.ThreadFactory.Threading.Dict import ConcurrentDict
+from src.ThreadFactory.Threading.List import ConcurrentList
+from src.ThreadFactory.Threading.Queue import ConcurrentQueue
+from src.ThreadFactory.Threading.Stack import ConcurrentStack
+from src.ThreadFactory.Threading.Concurrent import Concurrent
 
 __all__ = [
     "ConcurrentBag",

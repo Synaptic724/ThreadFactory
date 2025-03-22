@@ -1,6 +1,6 @@
 import unittest
 import threading
-from src.Threading import ConcurrentDict
+from src.ThreadFactory import ConcurrentDict
 import random
 
 class TestConcurrentDict(unittest.TestCase):

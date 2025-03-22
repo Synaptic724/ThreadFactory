@@ -1,7 +1,7 @@
 import threading
 from copy import deepcopy
 import functools
-from src.Threading.Dict import ConcurrentDict
+from src.ThreadFactory.Threading.Dict import ConcurrentDict
 from typing import (
     Any,
     Callable,
