@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 license = { file = "LICENSE" }
 authors = [
-    { name = "Mark Geleta", email = "your@email.com" }
+    { name = "Mark Geleta", email = "SynapticAISystems@gmail.com" }
 ]
 keywords = [
     "concurrent",
