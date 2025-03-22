@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ThreadFactory"
-version = "1.0.1"
+version = "1.0.0"
 description = "A high-performance thread-safe data structure and concurrency library for Python 3.13+ (no-GIL)."
 readme = "README.md"
 requires-python = ">=3.13"
-license = "MIT"
+license = { file = "LICENSE" }
 
 authors = [
     { name = "Mark Geleta", email = "SynapticAISystems@gmail.com" }
@@ -38,6 +38,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: Implementation :: CPython",
+    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
@@ -58,9 +59,9 @@ Issues = "https://github.com/Synaptic724/ThreadFactory/issues"
 Documentation = "https://github.com/Synaptic724/ThreadFactory#readme"
 
 [tool.setuptools]
-package-dir = { "" = "src" }
+package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["ThreadFactory*"]
-exclude = ["Tests"]
+include = ["ThreadFactory"]
+exclude = ["tests"]
