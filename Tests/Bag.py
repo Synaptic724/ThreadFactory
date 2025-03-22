@@ -1,6 +1,6 @@
 import unittest
 import threading
-from Threading.Bag import ConcurrentBag  # Update this import to match your module structure
+from Threading.Bag import ConcurrentBag, Empty
 
 class TestConcurrentBag(unittest.TestCase):
 
@@ -41,7 +41,7 @@ class TestConcurrentBag(unittest.TestCase):
 
         bag.pop()  # empty it completely
 
-        with self.assertRaises(KeyError):
+        with self.assertRaises(Empty):
             bag.pop()
 
     def test_clear(self):

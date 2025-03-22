@@ -3,7 +3,7 @@ import threading
 import random
 import time
 import copy
-from Threading.Queue import ConcurrentQueue  # <-- Adjust your actual import path
+from Threading.Queue import ConcurrentQueue, Empty
 
 class TestConcurrentQueue(unittest.TestCase):
 
@@ -27,7 +27,7 @@ class TestConcurrentQueue(unittest.TestCase):
         self.assertEqual(len(q), 0)
 
         # Dequeue from empty queue
-        with self.assertRaises(IndexError):
+        with self.assertRaises(Empty):
             q.dequeue()
 
     def test_peek(self):
@@ -41,7 +41,7 @@ class TestConcurrentQueue(unittest.TestCase):
 
         # Peek from an empty queue
         q.clear()
-        with self.assertRaises(IndexError):
+        with self.assertRaises(Empty):
             q.peek()
 
     def test_len_bool(self):

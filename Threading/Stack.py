@@ -16,6 +16,10 @@ from Threading.List import ConcurrentList
 
 _T = TypeVar("_T")
 
+class Empty(Exception):
+    """ Exception raised by Stack when its empty. """
+    def __init__(self, *args, **kwargs): # real signature unknown
+        pass
 
 class ConcurrentStack(Generic[_T]):
     """
@@ -66,7 +70,7 @@ class ConcurrentStack(Generic[_T]):
         """
         with self._lock:
             if not self._deque:
-                raise IndexError("pop from empty ConcurrentStack")
+                raise Empty("pop from empty ConcurrentStack")
             return self._deque.pop()
 
     def peek(self) -> _T:
@@ -81,7 +85,7 @@ class ConcurrentStack(Generic[_T]):
         """
         with self._lock:
             if not self._deque:
-                raise IndexError("peek from empty ConcurrentStack")
+                raise Empty("peek from empty ConcurrentStack")
             return self._deque[-1]
 
     def __len__(self) -> int:

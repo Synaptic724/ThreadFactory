@@ -14,6 +14,12 @@ from typing import (
 )
 from Threading.List import ConcurrentList
 
+class Empty(Exception):
+    """ Exception raised by Queue.get(block=0)/get_nowait(). """
+    def __init__(self, *args, **kwargs): # real signature unknown
+        pass
+
+
 # We'll use a generic type variable for items stored in the queue.
 _T = TypeVar("_T")
 
@@ -66,7 +72,7 @@ class ConcurrentQueue(Generic[_T]):
         """
         with self._lock:
             if not self._deque:
-                raise IndexError("dequeue from empty ConcurrentQueue")
+                raise Empty("dequeue from empty ConcurrentQueue")
             return self._deque.popleft()
 
     def peek(self) -> _T:
@@ -81,7 +87,7 @@ class ConcurrentQueue(Generic[_T]):
         """
         with self._lock:
             if not self._deque:
-                raise IndexError("peek from empty ConcurrentQueue")
+                raise Empty("peek from empty ConcurrentQueue")
             return self._deque[0]
 
     def __len__(self) -> int:
