@@ -14,6 +14,11 @@ from typing import (
     TypeVar
 )
 
+class Empty(Exception):
+    """ Exception raised by Bag when its empty. """
+    def __init__(self, *args, **kwargs):
+        pass
+
 _T = TypeVar("_T")
 
 class ConcurrentBag(Generic[_T]):
@@ -94,7 +99,7 @@ class ConcurrentBag(Generic[_T]):
         """
         with self._lock:
             if not self._bag:
-                raise KeyError("pop from empty ConcurrentBag")
+                raise Empty("pop from empty ConcurrentBag")
 
             # Remove an arbitrary item. (dict iteration order is arbitrary in <3.7,
             # but typically insertion order in 3.7+, which is fine for a bag.)
@@ -139,7 +144,7 @@ class ConcurrentBag(Generic[_T]):
             bool: True if at least one occurrence is present, else False.
         """
         with self._lock:
-            return (item in self._bag)
+            return item in self._bag
 
     def count_of(self, item: _T) -> int:
         """

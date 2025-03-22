@@ -2,13 +2,6 @@ import unittest
 from Threading.Concurrent import Concurrent
 import time
 
-# Import your 'parallel' class here, for example:
-# from your_module_name import parallel
-
-# For demonstration, I'll just assume 'parallel' is in the same file or you can do:
-# from parallel_lib import parallel
-
-
 class TestParallel(unittest.TestCase):
     def test_for_basic_sum(self):
         """

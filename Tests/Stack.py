@@ -3,7 +3,7 @@ import threading
 import random
 import time
 import copy
-from Threading.Stack import ConcurrentStack  # <-- Adjust your actual import path
+from Threading.Stack import ConcurrentStack, Empty
 
 class TestConcurrentStack(unittest.TestCase):
 
@@ -27,7 +27,7 @@ class TestConcurrentStack(unittest.TestCase):
         self.assertEqual(len(s), 0)
 
         # Pop from empty stack
-        with self.assertRaises(IndexError):
+        with self.assertRaises(Empty):
             s.pop()
 
     def test_peek(self):
@@ -41,7 +41,7 @@ class TestConcurrentStack(unittest.TestCase):
 
         # Peek from an empty stack
         s.clear()
-        with self.assertRaises(IndexError):
+        with self.assertRaises(Empty):
             s.peek()
 
     def test_len_bool(self):

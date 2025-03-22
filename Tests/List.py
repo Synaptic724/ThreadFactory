@@ -1,8 +1,6 @@
 import unittest
 import threading
-import time
-import copy
-from Threading.List import ConcurrentList  # Adjust to your actual module import
+from Threading.List import ConcurrentList
 
 
 class TestConcurrentList(unittest.TestCase):
