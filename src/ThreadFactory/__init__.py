@@ -52,7 +52,6 @@ def _detect_nogil_mode() -> None:
 
 _detect_nogil_mode()
 
-<<<<<<<< HEAD:src/ThreadFactory/__init__.py
 from .Threading.Bag import ConcurrentBag
 from .Threading.Dict import ConcurrentDict
 from .Threading.List import ConcurrentList
@@ -60,14 +59,6 @@ from .Threading.Queue import ConcurrentQueue
 from .Threading.Stack import ConcurrentStack
 from .Threading.Concurrent import Concurrent
 from .utils.exceptions import Empty
-========
-from src.ThreadFactory.Threading.Bag import ConcurrentBag
-from src.ThreadFactory.Threading.Dict import ConcurrentDict
-from src.ThreadFactory.Threading.List import ConcurrentList
-from src.ThreadFactory.Threading.Queue import ConcurrentQueue
-from src.ThreadFactory.Threading.Stack import ConcurrentStack
-from src.ThreadFactory.Threading.Concurrent import Concurrent
->>>>>>>> 65d817d (refactor: update import paths and rename Threading to ThreadFactory):__init__.py
 
 __all__ = [
     "ConcurrentBag",
