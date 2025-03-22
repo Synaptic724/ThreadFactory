@@ -58,7 +58,10 @@ Repository = "https://github.com/Synaptic724/ThreadFactory"
 Issues = "https://github.com/Synaptic724/ThreadFactory/issues"
 Documentation = "https://github.com/Synaptic724/ThreadFactory#readme"
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["Threading"]
-exclude = ["Tests"]
+include = ["ThreadFactory"]
+exclude = ["tests"]
