@@ -3,116 +3,117 @@ import threading
 import random
 import time
 import copy
-from Threading.Queue import ConcurrentQueue  # <-- Adjust your actual import path
+from Threading.Stack import ConcurrentStack  # <-- Adjust your actual import path
 
-class TestConcurrentQueue(unittest.TestCase):
+class TestConcurrentStack(unittest.TestCase):
 
-    def test_basic_enqueue_dequeue(self):
+    def test_basic_push_pop(self):
         """
-        Test the basic enqueue/dequeue behavior with a few items.
+        Test the basic push/pop behavior with a few items.
         """
-        q = ConcurrentQueue([1, 2])
-        self.assertEqual(len(q), 2)
+        s = ConcurrentStack([1, 2])
+        self.assertEqual(len(s), 2)
 
-        q.enqueue(3)
-        self.assertEqual(len(q), 3)
-        self.assertFalse(q.dequeue() == None)
+        s.push(3)
+        self.assertEqual(len(s), 3)
+        self.assertIsNotNone(s.pop(), "Pop should return an item")
 
-        first_item = q.dequeue()
-        self.assertIn(first_item, [1, 2, 3], "Dequeued item should be one of the original items.")
-        self.assertEqual(len(q), 1)
+        top_item = s.pop()
+        self.assertIn(top_item, [1, 2, 3], "Popped item should be one of the original items.")
+        self.assertEqual(len(s), 1)
 
         # Last item
-        self.assertNotEqual(q.dequeue(), None)
-        self.assertEqual(len(q), 0)
+        self.assertIsNotNone(s.pop(), "Should be able to pop the last item")
+        self.assertEqual(len(s), 0)
 
-        # Dequeue from empty queue
+        # Pop from empty stack
         with self.assertRaises(IndexError):
-            q.dequeue()
+            s.pop()
 
     def test_peek(self):
         """
-        Test that peek returns the front item without removing it.
+        Test that peek returns the top item without removing it.
         """
-        q = ConcurrentQueue(["apple", "banana"])
-        front = q.peek()
-        self.assertEqual(front, "apple")
-        self.assertEqual(len(q), 2, "Peek should not remove the item.")
+        s = ConcurrentStack(["apple", "banana"])
+        top = s.peek()
+        self.assertEqual(top, "banana", "Peek should return the last (top) item in the stack.")
+        self.assertEqual(len(s), 2, "Peek should not remove the item.")
 
-        # Peek from an empty queue
-        q.clear()
+        # Peek from an empty stack
+        s.clear()
         with self.assertRaises(IndexError):
-            q.peek()
+            s.peek()
 
     def test_len_bool(self):
         """
         Test __len__ and __bool__.
         """
-        q = ConcurrentQueue()
-        self.assertEqual(len(q), 0)
-        self.assertFalse(q)
+        s = ConcurrentStack()
+        self.assertEqual(len(s), 0)
+        self.assertFalse(s)
 
-        q.enqueue(42)
-        self.assertEqual(len(q), 1)
-        self.assertTrue(q)
+        s.push(42)
+        self.assertEqual(len(s), 1)
+        self.assertTrue(s)
 
     def test_iter(self):
         """
-        Test iterating over the queue returns a snapshot of current items.
+        Test iterating over the stack returns a snapshot of current items.
+        NOTE: By default, iteration goes from bottom to top in the underlying deque.
         """
-        q = ConcurrentQueue([1, 2, 3])
-        items = list(q)
+        s = ConcurrentStack([1, 2, 3])
+        items = list(s)
         self.assertEqual(items, [1, 2, 3])
 
         # confirm modifications after iteration don't affect that snapshot
-        q.enqueue(4)
-        self.assertEqual(len(q), 4)
+        s.push(4)
+        self.assertEqual(len(s), 4)
 
     def test_clear(self):
         """
-        Test clearing the queue removes all items.
+        Test clearing the stack removes all items.
         """
-        q = ConcurrentQueue([10, 20, 30])
-        q.clear()
-        self.assertEqual(len(q), 0)
-        self.assertFalse(q)
+        s = ConcurrentStack([10, 20, 30])
+        s.clear()
+        self.assertEqual(len(s), 0)
+        self.assertFalse(s)
 
     def test_repr_str(self):
         """
         Test __repr__ and __str__ contain the items.
         """
-        q = ConcurrentQueue(["alpha", "beta"])
-        r = repr(q)
-        s = str(q)
+        s = ConcurrentStack(["alpha", "beta"])
+        r = repr(s)
+        st = str(s)
         self.assertIn("alpha", r)
-        self.assertIn("beta", s)
+        self.assertIn("beta", st)
 
     def test_copy_and_deepcopy(self):
         """
         Test copy() and deepcopy() produce correct separate objects.
         """
-        from copy import copy, deepcopy
-        q = ConcurrentQueue([{"x": 1}, {"y": 2}])
+        from copy import deepcopy
+        s = ConcurrentStack([{"y": 2}, {"x": 1}])
 
-        q_copy = q.copy()
-        q_deep = deepcopy(q)
+        s_copy = s.copy()
+        s_deep = deepcopy(s)
 
-        self.assertEqual(len(q_copy), 2)
-        self.assertEqual(len(q_deep), 2)
+        self.assertEqual(len(s_copy), 2)
+        self.assertEqual(len(s_deep), 2)
 
         # modify the original
-        q.dequeue()[ "x" ] = 999  # the front dict
+        s.pop()["x"] = 999  # the top dict
         # shallow copy sees that change, deep copy does not
-        self.assertEqual(q_copy.peek()["x"], 999)
-        self.assertEqual(q_deep.peek()["x"], 1)
+        self.assertEqual(s_copy.peek()["x"], 999)
+        self.assertEqual(s_deep.peek()["x"], 1)
 
     def test_to_concurrent_list(self):
         """
-        Test converting the queue to a ConcurrentList.
+        Test converting the stack to a ConcurrentList.
         (Requires that concurrent_list.ConcurrentList is available).
         """
-        q = ConcurrentQueue([10, 20, 30])
-        clist = q.to_concurrent_list()  # Might need your actual import
+        s = ConcurrentStack([10, 20, 30])
+        clist = s.to_concurrent_list()  # Adjust your import path if needed
         self.assertEqual(len(clist), 3)
         self.assertEqual(list(clist), [10, 20, 30])
 
@@ -120,60 +121,61 @@ class TestConcurrentQueue(unittest.TestCase):
         """
         Test batch_update can be used for multiple atomic mutations.
         """
-        q = ConcurrentQueue(["apple", "banana"])
+        s = ConcurrentStack(["apple", "banana"])
 
-        def remove_and_enqueue(deq):
+        def remove_and_push(deq):
             deq.clear()
             deq.append("cherry")
             deq.append("date")
 
-        q.batch_update(remove_and_enqueue)
-        self.assertEqual(len(q), 2)
-        self.assertIn("cherry", q)
-        self.assertIn("date", q)
+        s.batch_update(remove_and_push)
+        self.assertEqual(len(s), 2)
+        # The order is bottom->top in the deque, so "date" is the top
+        self.assertIn("cherry", s)
+        self.assertIn("date", s)
 
     def test_map_filter_reduce(self):
         """
         Test map/filter/reduce functional methods.
         """
-        q = ConcurrentQueue([1, 2, 3, 4])
+        s = ConcurrentStack([1, 2, 3, 4])
 
-        mapped = q.map(lambda x: x * 2)
+        mapped = s.map(lambda x: x * 2)
         self.assertEqual(len(mapped), 4)
         self.assertEqual(list(mapped), [2, 4, 6, 8])
 
-        filtered = q.filter(lambda x: x % 2 == 0)
+        filtered = s.filter(lambda x: x % 2 == 0)
         self.assertEqual(len(filtered), 2)
         self.assertEqual(list(filtered), [2, 4])
 
-        total = q.reduce(lambda acc, x: acc + x, 0)
+        total = s.reduce(lambda acc, x: acc + x, 0)
         self.assertEqual(total, 10)
 
         # reduce with no initial
-        total_no_init = q.reduce(lambda acc, x: acc + x)
+        total_no_init = s.reduce(lambda acc, x: acc + x)
         self.assertEqual(total_no_init, 10)
 
     def test_producer_consumer_threads(self):
         """
         Simulate multiple producer and consumer threads for concurrency stress.
         """
-        q = ConcurrentQueue()
+        s = ConcurrentStack()
         producers = 5
         consumers = 5
         items_per_thread = 1000
 
         def producer(thread_id):
             for i in range(items_per_thread):
-                q.enqueue((thread_id, i))
+                s.push((thread_id, i))
 
         def consumer():
             consumed = 0
             while consumed < items_per_thread:
                 try:
-                    item = q.dequeue()
+                    s.pop()
                     consumed += 1
                 except IndexError:
-                    # queue might be empty at times
+                    # stack might be empty at times
                     pass
 
         threads = []
@@ -189,26 +191,26 @@ class TestConcurrentQueue(unittest.TestCase):
 
         # We expect total items = producers * items_per_thread
         # but each consumer tries to consume items_per_thread,
-        # which might run out the queue early => any leftover are partial
-        # We'll confirm the queue is eventually empty or near-empty
-        remaining = len(q)
+        # which might run out the stack early => any leftover are partial
+        # We'll confirm the stack is eventually empty or near-empty
+        remaining = len(s)
         self.assertLessEqual(remaining, producers * items_per_thread)
 
     def test_concurrent_batch_updates(self):
         """
         Ensure multiple threads can call batch_update concurrently without errors.
         """
-        q = ConcurrentQueue([1, 2, 3, 4, 5])
+        s = ConcurrentStack([1, 2, 3, 4, 5])
 
         def updater():
             def batched(d):
-                # remove one item if any
+                # remove one item if any (pop from right)
                 if d:
-                    d.popleft()
+                    d.pop()
                 # add a new item
                 d.append(999)
             for _ in range(100):
-                q.batch_update(batched)
+                s.batch_update(batched)
 
         threads = [threading.Thread(target=updater) for _ in range(5)]
         for t in threads:
@@ -217,23 +219,23 @@ class TestConcurrentQueue(unittest.TestCase):
             t.join()
 
         # We can't predict the final state exactly, but it should never go negative
-        self.assertGreaterEqual(len(q), 0)
+        self.assertGreaterEqual(len(s), 0)
 
     def test_concurrent_map_filter(self):
         """
-        Multiple threads do map() and filter() to produce new queues,
-        ensuring no crash or data race with the source queue.
+        Multiple threads do map() and filter() to produce new stacks,
+        ensuring no crash or data race with the source stack.
         """
-        q = ConcurrentQueue(range(100))
-        new_queues = []
+        s = ConcurrentStack(range(100))
+        new_stacks = []
 
         def mapper():
-            mq = q.map(lambda x: x * 2)
-            new_queues.append(mq)
+            ms = s.map(lambda x: x * 2)
+            new_stacks.append(ms)
 
         def filterer():
-            fq = q.filter(lambda x: x % 2 == 0)
-            new_queues.append(fq)
+            fs = s.filter(lambda x: x % 2 == 0)
+            new_stacks.append(fs)
 
         threads = []
         for _ in range(5):
@@ -245,43 +247,43 @@ class TestConcurrentQueue(unittest.TestCase):
         for t in threads:
             t.join()
 
-        # We just ensure no crash, new queues exist
-        self.assertGreater(len(new_queues), 0)
+        # We just ensure no crash, new stacks exist
+        self.assertGreater(len(new_stacks), 0)
 
     def test_random_operations(self):
         """
-        Perform random enqueues, dequeues, batch updates, and concurrency
+        Perform random pushes, pops, batch updates, and concurrency
         to test overall thread safety under chaotic usage.
         """
-        q = ConcurrentQueue()
+        s = ConcurrentStack()
         num_threads = 10
         ops_per_thread = 2000
 
         def random_op():
             for _ in range(ops_per_thread):
-                op_type = random.choice(["enqueue", "dequeue", "batch", "peek"])
-                if op_type == "enqueue":
-                    q.enqueue(random.randint(0, 1000))
-                elif op_type == "dequeue":
+                op_type = random.choice(["push", "pop", "batch", "peek"])
+                if op_type == "push":
+                    s.push(random.randint(0, 1000))
+                elif op_type == "pop":
                     try:
-                        q.dequeue()
+                        s.pop()
                     except IndexError:
                         pass
                 elif op_type == "peek":
                     try:
-                        q.peek()
+                        s.peek()
                     except IndexError:
                         pass
                 else:  # "batch"
-                    def do_batch(deq):
-                        if deq and random.random() < 0.5:
+                    def do_batch(d):
+                        if d and random.random() < 0.5:
                             try:
-                                deq.popleft()
+                                d.pop()
                             except IndexError:
                                 pass
                         if random.random() < 0.5:
-                            deq.append(random.randint(0, 1000))
-                    q.batch_update(do_batch)
+                            d.append(random.randint(0, 1000))
+                    s.batch_update(do_batch)
 
         threads = [threading.Thread(target=random_op) for _ in range(num_threads)]
         for t in threads:
@@ -290,4 +292,4 @@ class TestConcurrentQueue(unittest.TestCase):
             t.join()
 
         # no crash => success
-        self.assertGreaterEqual(len(q), 0)
+        self.assertGreaterEqual(len(s), 0)

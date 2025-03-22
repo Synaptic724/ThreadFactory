@@ -227,8 +227,3 @@ class TestConcurrentBag(unittest.TestCase):
 
         # 10 threads each incremented apple by 1
         self.assertEqual(bag.count_of('apple'), 20)
-
-
-# If you want to run these tests directly:
-# if __name__ == '__main__':
-#     unittest.main()
