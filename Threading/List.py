@@ -570,17 +570,3 @@ class ConcurrentList(Generic[_T]):
                 self._list[index1], self._list[index2] = self._list[index2], self._list[index1]
             else:
                 raise IndexError("ConcurrentList index out of range for atomic swap")
-
-
-if __name__ == "__main__":
-    # Example usage
-    clist = ConcurrentList([0, 1, 2, 3, 4, 5])
-    clist[1] = 100
-    print(f"0 + {clist}")
-
-    clist[2:4] = [200, 300, 400]
-    print(f"1 + {clist}")
-
-    # Replace slice with single item
-    clist[2:5] = 999
-    print(f"2 + {clist}")
