@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "AtomicThreading"
-version = "0.1.0"
+name = "ThreadFactory"
+version = "1.0.0"
 description = "A high-performance thread-safe data structure and concurrency library for Python 3.13+ (no-GIL)."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -17,9 +17,12 @@ keywords = [
     "parallel",
     "thread-safe",
     "no-GIL",
-    "atomic",
+    "ThreadFactory",
+    "threading",
+    "threadfactory",
     "free-threading",
-    "high-performance"
+    "high-performance",
+    "freethreading"
 ]
 classifiers = [
     "Programming Language :: Python :: 3.13",
@@ -34,5 +37,5 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Synaptic724/AtomicThreading"
-Issues = "https://github.com/Synaptic724/AtomicThreading/issues"
+Homepage = "https://github.com/Synaptic724/ThreadFactory"
+Issues = "https://github.com/Synaptic724/ThreadFactory/issues"

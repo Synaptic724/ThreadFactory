@@ -1,13 +1,13 @@
-# AtomicThreading
+# ThreadFactory
 
 High-performance **thread-safe** (No-GIL–friendly) data structures and parallel operations for Python 3.13+.
 
 > **NOTE**  
-> This library is designed and tested against Python 3.13+ in No-GIL mode. It also works under the standard GIL runtime in Python 3.x, but you won't get the same concurrency benefits.
-
+> ThreadFactory is designed and tested against Python 3.13+ in **No-GIL** mode.  
+> It also works under the standard GIL runtime in Python 3.x, but you won't get the same concurrency benefits.
 ---
 
-## Features
+## 🚀 Features
 
 ### 1. ConcurrentBag  
 - A thread-safe “multiset” collection that allows duplicates.  
@@ -34,17 +34,26 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 - Ideal for last-in, first-out (LIFO) workloads.  
 - Built on `deque` for fast appends and pops.
 
-### 6. Parallel (TPL-like)  
+### 6. Parallel Utilities (TPL-like)  
 - `parallel_for`, `parallel_foreach`, `parallel_invoke`, `parallel_map`.  
+- Pure thread-based concurrency (No-GIL optimized), not tied to asyncio or multiprocessing.  
 - Flexible chunking, concurrency control, local state usage, early exit on exception, and more.  
 - Inspired by .NET's Task Parallel Library (TPL).
 
 ---
 
-## Installation
+## ⚙️ Installation
 
-1. **Clone** this repository or download the source code.
-2. **Create** a Python 3.13+ virtual environment designed for NoGIL/Free Threading:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+### Option 1: Clone and Install Locally (Recommended for Development)
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/threadfactory.git
+cd threadfactory
+
+# Create a Python 3.13+ virtual environment (No-GIL/Free Threading recommended)
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+
+# Install the library in editable mode
+pip install threadfactory
