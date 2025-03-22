@@ -63,5 +63,5 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["ThreadFactory"]
-exclude = ["tests"]
+include = ["ThreadFactory*"]  # <- pick up the whole ThreadFactory package, including submodules
+exclude = ["Tests"]
