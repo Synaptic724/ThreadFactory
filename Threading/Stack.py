@@ -24,8 +24,8 @@ class Empty(Exception):
 class ConcurrentStack(Generic[_T]):
     """
     A thread-safe LIFO stack implementation using an underlying deque,
-    a reentrant lock for synchronization, and an atomic counter for fast,
-    lock-free retrieval of the number of items.
+    a reentrant lock for synchronization, and an atomic counter for fast
+    retrieval of the number of items.
 
     This class mimics common stack behaviors (push, pop, peek, etc.).
     It is designed for Python 3.13+ No-GIL environments (though it will

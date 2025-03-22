@@ -144,7 +144,7 @@ class ConcurrentBag(Generic[_T]):
             bool: True if at least one occurrence is present, else False.
         """
         with self._lock:
-            return (item in self._bag)
+            return item in self._bag
 
     def count_of(self, item: _T) -> int:
         """

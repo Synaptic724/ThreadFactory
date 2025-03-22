@@ -20,14 +20,13 @@ class Empty(Exception):
         pass
 
 
-# We'll use a generic type variable for items stored in the queue.
 _T = TypeVar("_T")
 
 class ConcurrentQueue(Generic[_T]):
     """
     A thread-safe FIFO queue implementation using an underlying deque,
-    a reentrant lock for synchronization, and an atomic counter for fast,
-    lock-free retrieval of the number of items.
+    a reentrant lock for synchronization, and an atomic counter for fast
+    retrieval of the number of items.
 
     This class mimics common queue behaviors (enqueue, dequeue, peek, etc.).
     It is designed for Python 3.13+ No-GIL environments (though it will

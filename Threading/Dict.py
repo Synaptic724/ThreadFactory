@@ -219,7 +219,7 @@ class ConcurrentDict(Generic[_K, _V]):
             if key in self._dict:
                 return self._dict.pop(key)
             if default is not None:
-                return default  # type: ignore
+                return default
             raise KeyError(key)
 
     def popitem(self) -> Tuple[_K, _V]:
