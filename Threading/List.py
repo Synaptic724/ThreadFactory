@@ -1,6 +1,5 @@
 import threading
-import atomics
-from copy import deepcopy, copy
+from copy import deepcopy
 import functools
 import warnings
 from typing import Any, Callable, Iterable, Optional, List, TypeVar, Generic
@@ -18,29 +17,15 @@ class ConcurrentList(Generic[_T]):
     It is designed for Python 3.13+ No-GIL environments.
     """
 
-    def __init__(self, initial: Optional[Iterable[_T]] = None, width: int = 8) -> None:
+    def __init__(self, initial: Optional[Iterable[_T]] = None) -> None:
         """
         Initialize the ConcurrentList.
 
         Args:
             initial (Iterable[_T], optional): An iterable to initialize the list.
-            width (int, optional):
-                Bit width for the atomic counter (default is 8 for 64-bit).
-                This parameter controls the maximum value the counter can hold.
-                A width of 8 bits allows a maximum count of 2**8 - 1 = 255,
-                while a width of 16 allows 2**16 - 1 = 65535, and so on.
-                Choosing a smaller width can save memory, but it limits the
-                total number of items the bag can hold. If the counter
-                reaches its maximum value, further additions will wrap around
-                (behaving like modulo arithmetic), potentially leading to
-                incorrect results for the total count. The default of 8 is
-                generally sufficient for moderately sized bags.
         """
         self._lock = threading.RLock()
         self._list: List[_T] = list(initial) if initial else []
-        # Atomic counter to track the length of the list.
-        self.counter = atomics.atomic(width=width, atype=atomics.INT)
-        self.counter.store(len(self._list))
 
     def __getitem__(self, index: int | slice) -> _T | List[_T]:
         """
@@ -103,36 +88,30 @@ class ConcurrentList(Generic[_T]):
                     # You could also just raise TypeError here if you prefer stricter behavior
                     value_list = [value]  # type: ignore
                 self._list[index] = value_list
-                diff = len(value_list) - len(old_slice)
-                if diff > 0:
-                    self.counter.fetch_add(diff)
-                elif diff < 0:
-                    self.counter.fetch_sub(-diff)
 
     def __delitem__(self, index: int | slice) -> None:
         """
-        Delete an item or slice from the list and update the counter.
+        Delete an item or slice from the list.
 
-        If ``index`` is an integer, deletes the single element at that index.
-        If ``index`` is a slice, deletes all elements in that slice.
+        If `index` is an integer, deletes the single element at that index.
+        If `index` is a slice, deletes all elements in that slice.
 
         Args:
-            index (int or slice): The index or slice.
+            index (int or slice): The index or slice to delete.
 
         Raises:
-            IndexError: If the index is out of range.
+            IndexError: If the index is out of range (for int index).
         """
         with self._lock:
-            if isinstance(index, int):
-                try:
-                    del self._list[index]
-                    self.counter.fetch_sub(1)
-                except IndexError:
-                    raise IndexError("ConcurrentList index out of range")
-            else:
-                removed = self._list[index]
+            try:
                 del self._list[index]
-                self.counter.fetch_sub(len(removed))
+            except IndexError:
+                # Only raise a custom message for int index, slices behave differently
+                if isinstance(index, int):
+                    raise IndexError("ConcurrentList index out of range")
+                else:
+                    # Re-raise slice-related errors (could be ValueError or IndexError)
+                    raise
 
     def append(self, item: _T) -> None:
         """
@@ -143,7 +122,6 @@ class ConcurrentList(Generic[_T]):
         """
         with self._lock:
             self._list.append(item)
-            self.counter.fetch_add(1)
 
     def extend(self, items: Iterable[_T]) -> None:
         """
@@ -156,11 +134,8 @@ class ConcurrentList(Generic[_T]):
             TypeError: If items is not iterable (e.g., if it's None).
         """
         with self._lock:
-            added = 0
             for x in items:
                 self._list.append(x)
-                added += 1
-            self.counter.fetch_add(added)
 
     def insert(self, index: int, item: _T) -> None:
         """
@@ -176,7 +151,6 @@ class ConcurrentList(Generic[_T]):
         with self._lock:
             # Python's list.insert clamps the index if out of range, but you can raise if you prefer
             self._list.insert(index, item)
-            self.counter.fetch_add(1)
 
     def remove(self, item: _T) -> None:
         """
@@ -191,7 +165,6 @@ class ConcurrentList(Generic[_T]):
         with self._lock:
             try:
                 self._list.remove(item)
-                self.counter.fetch_sub(1)
             except ValueError:
                 raise ValueError(f"'{item}' not in ConcurrentList")
 
@@ -212,9 +185,7 @@ class ConcurrentList(Generic[_T]):
             if not self._list:
                 raise IndexError("pop from empty ConcurrentList")
             try:
-                result = self._list.pop(index)
-                self.counter.fetch_sub(1)
-                return result
+                return self._list.pop(index)
             except IndexError:
                 raise IndexError("ConcurrentList index out of range for pop")
 
@@ -224,7 +195,6 @@ class ConcurrentList(Generic[_T]):
         """
         with self._lock:
             self._list.clear()
-            self.counter.store(0)
 
     def __len__(self) -> int:
         """
@@ -233,7 +203,7 @@ class ConcurrentList(Generic[_T]):
         Returns:
             int: The current size of the list.
         """
-        return self.counter.load()
+        return len(self._list)
 
     def __iter__(self) -> Iterable[_T]:
         """
@@ -302,7 +272,7 @@ class ConcurrentList(Generic[_T]):
         """
         Return True if the list is non-empty.
         """
-        return self.counter.load() != 0
+        return len(self._list) != 0
 
     def __reversed__(self) -> Iterable[_T]:
         """
@@ -341,7 +311,6 @@ class ConcurrentList(Generic[_T]):
             raise TypeError("can't multiply sequence by non-int of type '{}'".format(type(n).__name__))
         with self._lock:
             self._list *= n
-            self.counter.store(len(self._list))
         return self
 
     def __mul__(self, n: int) -> 'ConcurrentList[_T]':
@@ -461,7 +430,6 @@ class ConcurrentList(Generic[_T]):
         """
         with self._lock:
             func(self._list)
-            self.counter.store(len(self._list))
 
     def sort(self, key: Optional[Callable[[_T], Any]] = None, reverse: bool = False) -> None:
         """
@@ -528,45 +496,3 @@ class ConcurrentList(Generic[_T]):
             return functools.reduce(func, snapshot)
         else:
             return functools.reduce(func, snapshot, initial)
-
-    def atomic_update(self, index: int, func: Callable[[_T], _T]) -> None:
-        """
-        Atomically update the element at the given index using a function.
-
-        Args:
-            index (int): The index of the element to update.
-            func (Callable[[_T], _T]): A function that takes the current value and returns a new value.
-
-        Raises:
-            IndexError: If the index is out of range.
-            TypeError: If index is not an integer or func is not callable.
-        """
-        with self._lock:
-            if not isinstance(index, int):
-                raise TypeError("index must be an integer")
-            if not callable(func):
-                raise TypeError("func must be callable")
-            if 0 <= index < len(self._list):
-                self._list[index] = func(self._list[index])
-            else:
-                raise IndexError("ConcurrentList index out of range for atomic update")
-
-    def atomic_swap(self, index1: int, index2: int) -> None:
-        """
-        Atomically swap the elements at two given indices.
-
-        Args:
-            index1 (int): The first index.
-            index2 (int): The second index.
-
-        Raises:
-            IndexError: If either index is out of range.
-            TypeError: If either index is not an integer.
-        """
-        with self._lock:
-            if not isinstance(index1, int) or not isinstance(index2, int):
-                raise TypeError("indices must be integers")
-            if 0 <= index1 < len(self._list) and 0 <= index2 < len(self._list):
-                self._list[index1], self._list[index2] = self._list[index2], self._list[index1]
-            else:
-                raise IndexError("ConcurrentList index out of range for atomic swap")
