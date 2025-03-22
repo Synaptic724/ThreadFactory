@@ -10,7 +10,7 @@ def _detect_nogil_mode() -> None:
     """
     if sys.version_info < (3, 13):
         warnings.warn(
-            "AtomicThreading is designed for Python 3.13+ (ideally no-GIL). "
+            "AtomicThreading is designed for Python 3.13+. "
             f"You are running Python {sys.version_info.major}.{sys.version_info.minor}.",
             UserWarning
         )
@@ -20,9 +20,6 @@ def _detect_nogil_mode() -> None:
     except AttributeError:
         GIL_ENABLED = True
 
-    # A rough check: many custom no-GIL builds include '-nogil' or 'nogil' in sys.version
-    # or might be invoked with '-Xgil=0'
-    version_str = sys.version.lower()
     if not GIL_ENABLED:
         # We can't be absolutely certain, but let's warn anyway:
         warnings.warn(
@@ -38,6 +35,7 @@ from Threading.Bag import ConcurrentBag
 from Threading.Dict import ConcurrentDict
 from Threading.List import ConcurrentList
 from Threading.Queue import ConcurrentQueue
+from Threading.Stack import ConcurrentStack
 from Threading.Parallel import Parallel
 
 __all__ = [
@@ -45,5 +43,6 @@ __all__ = [
     "ConcurrentDict",
     "ConcurrentList",
     "ConcurrentQueue",
-    "Parallel"
+    "Parallel",
+    "ConcurrentStack"
 ]

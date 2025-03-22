@@ -17,27 +17,27 @@ from typing import (
 )
 from Threading.List import ConcurrentList
 
-# We'll use a generic type variable for items stored in the queue.
 _T = TypeVar("_T")
 
-class ConcurrentQueue(Generic[_T]):
+
+class ConcurrentStack(Generic[_T]):
     """
-    A thread-safe FIFO queue implementation using an underlying deque,
+    A thread-safe LIFO stack implementation using an underlying deque,
     a reentrant lock for synchronization, and an atomic counter for fast,
     lock-free retrieval of the number of items.
 
-    This class mimics common queue behaviors (enqueue, dequeue, peek, etc.).
+    This class mimics common stack behaviors (push, pop, peek, etc.).
     It is designed for Python 3.13+ No-GIL environments (though it will
     work fine in standard Python as well).
     """
 
     def __init__(
-        self,
-        initial: Optional[Iterable[_T]] = None,
-        width: int = 8
+            self,
+            initial: Optional[Iterable[_T]] = None,
+            width: int = 8
     ) -> None:
         """
-        Initialize the ConcurrentQueue.
+        Initialize the ConcurrentStack.
 
         Args:
             initial (Iterable[_T], optional):
@@ -48,11 +48,11 @@ class ConcurrentQueue(Generic[_T]):
                 A width of 8 bits allows a maximum count of 2**8 - 1 = 255,
                 while a width of 16 allows 2**16 - 1 = 65535, and so on.
                 Choosing a smaller width can save memory, but it limits the
-                total number of items the bag can hold. If the counter
+                total number of items the stack can hold. If the counter
                 reaches its maximum value, further additions will wrap around
                 (behaving like modulo arithmetic), potentially leading to
                 incorrect results for the total count. The default of 8 is
-                generally sufficient for moderately sized bags.
+                generally sufficient for moderately sized stacks.
         """
         if initial is None:
             initial = []
@@ -63,61 +63,61 @@ class ConcurrentQueue(Generic[_T]):
         self.counter = atomics.atomic(width=width, atype=atomics.INT)
         self.counter.store(len(self._deque))
 
-    def enqueue(self, item: _T) -> None:
+    def push(self, item: _T) -> None:
         """
-        Add an item to the end of the queue (FIFO).
+        Push an item onto the top of the stack (LIFO).
 
         Args:
-            item (_T): The item to enqueue.
+            item (_T): The item to push.
         """
         with self._lock:
             self._deque.append(item)
             self.counter.fetch_add(1)
 
-    def dequeue(self) -> _T:
+    def pop(self) -> _T:
         """
-        Remove and return an item from the front of the queue.
+        Remove and return an item from the top of the stack.
 
         Raises:
-            IndexError: If the queue is empty.
+            IndexError: If the stack is empty.
 
         Returns:
-            _T: The item dequeued.
+            _T: The item popped.
         """
         with self._lock:
             if not self._deque:
-                raise IndexError("dequeue from empty ConcurrentQueue")
-            item = self._deque.popleft()
+                raise IndexError("pop from empty ConcurrentStack")
+            item = self._deque.pop()
             self.counter.fetch_sub(1)
             return item
 
     def peek(self) -> _T:
         """
-        Return (but do not remove) the item at the front of the queue.
+        Return (but do not remove) the item at the top of the stack.
 
         Raises:
-            IndexError: If the queue is empty.
+            IndexError: If the stack is empty.
 
         Returns:
-            _T: The item at the front of the queue.
+            _T: The item at the top of the stack.
         """
         with self._lock:
             if not self._deque:
-                raise IndexError("peek from empty ConcurrentQueue")
-            return self._deque[0]
+                raise IndexError("peek from empty ConcurrentStack")
+            return self._deque[-1]
 
     def __len__(self) -> int:
         """
-        Return the number of items in the queue, using the atomic counter.
+        Return the number of items in the stack, using the atomic counter.
 
         Returns:
-            int: The current size of the queue.
+            int: The current size of the stack.
         """
         return self.counter.load()
 
     def __bool__(self) -> bool:
         """
-        Return True if the queue is non-empty.
+        Return True if the stack is non-empty.
 
         Returns:
             bool: True if non-empty, False otherwise.
@@ -127,17 +127,18 @@ class ConcurrentQueue(Generic[_T]):
     def __iter__(self) -> Iterator[_T]:
         """
         Return an iterator over a shallow copy of the internal deque.
-        This prevents issues if the queue is modified during iteration.
+        This prevents issues if the stack is modified during iteration.
 
-        Returns:
-            Iterator[_T]: An iterator over the items in the queue snapshot.
+        Note: The iteration order here will be from bottom to top (front of the deque
+        to the back of the deque), which is effectively left-to-right in the underlying
+        deque. Adjust if you want top-to-bottom iteration.
         """
         with self._lock:
             return iter(list(self._deque))
 
     def clear(self) -> None:
         """
-        Remove all items from the queue.
+        Remove all items from the stack.
         """
         with self._lock:
             self._deque.clear()
@@ -145,7 +146,7 @@ class ConcurrentQueue(Generic[_T]):
 
     def __repr__(self) -> str:
         """
-        Return the official string representation of the ConcurrentQueue.
+        Return the official string representation of the ConcurrentStack.
         """
         with self._lock:
             return f"{self.__class__.__name__}({list(self._deque)!r})"
@@ -157,56 +158,54 @@ class ConcurrentQueue(Generic[_T]):
         with self._lock:
             return str(list(self._deque))
 
-    def copy(self) -> "ConcurrentQueue[_T]":
+    def copy(self) -> "ConcurrentStack[_T]":
         """
-        Return a shallow copy of the ConcurrentQueue.
+        Return a shallow copy of the ConcurrentStack.
 
         Returns:
-            ConcurrentQueue[_T]: A new ConcurrentQueue with the same items.
+            ConcurrentStack[_T]: A new ConcurrentStack with the same items.
         """
         with self._lock:
-            return ConcurrentQueue(initial=list(self._deque))
+            return ConcurrentStack(initial=list(self._deque))
 
-    def __copy__(self) -> "ConcurrentQueue[_T]":
+    def __copy__(self) -> "ConcurrentStack[_T]":
         """
         Return a shallow copy (for the built-in copy.copy(...)).
 
         Returns:
-            ConcurrentQueue[_T]: A copy of this ConcurrentQueue.
+            ConcurrentStack[_T]: A copy of this ConcurrentStack.
         """
         return self.copy()
 
-    def __deepcopy__(self, memo: dict) -> "ConcurrentQueue[_T]":
+    def __deepcopy__(self, memo: dict) -> "ConcurrentStack[_T]":
         """
-        Return a deep copy of the ConcurrentQueue.
+        Return a deep copy of the ConcurrentStack.
 
         Args:
             memo (dict): Memoization dictionary for deepcopy.
 
         Returns:
-            ConcurrentQueue[_T]: A deep copy of this ConcurrentQueue.
+            ConcurrentStack[_T]: A deep copy of this ConcurrentStack.
         """
         with self._lock:
-            return ConcurrentQueue(
+            return ConcurrentStack(
                 initial=deepcopy(list(self._deque), memo)
             )
 
-    def to_concurrent_list(self) -> "concurrent_list.ConcurrentList[_T]":
+    def to_concurrent_list(self) -> "ConcurrentList[_T]":
         """
-        Return a shallow copy of the queue as a ConcurrentList.
+        Return a shallow copy of the stack as a ConcurrentList.
 
         Returns:
-            concurrent_list.ConcurrentList[_T]:
-                A concurrent list containing all items currently in the queue.
+            ConcurrentList[_T]:
+                A concurrent list containing all items currently in the stack.
         """
-        # We assume that `concurrent_list` is already imported from your `Threading` package
-        # and that concurrent_list.ConcurrentList is a valid class.
         with self._lock:
             return ConcurrentList(list(self._deque))
 
     def batch_update(self, func: Callable[[Deque[_T]], None]) -> None:
         """
-        Perform a batch update on the queue under a single lock acquisition.
+        Perform a batch update on the stack under a single lock acquisition.
         This method allows multiple operations to be performed atomically.
 
         Args:
@@ -220,37 +219,37 @@ class ConcurrentQueue(Generic[_T]):
 
     # ---------- Optional Functional Methods (similar to map/filter/reduce) ----------
 
-    def map(self, func: Callable[[_T], Any]) -> "ConcurrentQueue[Any]":
+    def map(self, func: Callable[[_T], Any]) -> "ConcurrentStack[Any]":
         """
-        Apply a function to all elements and return a new ConcurrentQueue.
+        Apply a function to all elements and return a new ConcurrentStack.
 
         Args:
             func (callable): The function to apply to each item.
 
         Returns:
-            ConcurrentQueue[Any]: A new queue with func applied to each element.
+            ConcurrentStack[Any]: A new stack with func applied to each element.
         """
         with self._lock:
             mapped = list(map(func, self._deque))
-        return ConcurrentQueue(initial=mapped)
+        return ConcurrentStack(initial=mapped)
 
-    def filter(self, func: Callable[[_T], bool]) -> "ConcurrentQueue[_T]":
+    def filter(self, func: Callable[[_T], bool]) -> "ConcurrentStack[_T]":
         """
-        Filter elements based on a function and return a new ConcurrentQueue.
+        Filter elements based on a function and return a new ConcurrentStack.
 
         Args:
             func (callable): The filter function returning True if item should be kept.
 
         Returns:
-            ConcurrentQueue[_T]: A new queue containing only elements where func(item) is True.
+            ConcurrentStack[_T]: A new stack containing only elements where func(item) is True.
         """
         with self._lock:
             filtered = list(filter(func, self._deque))
-        return ConcurrentQueue(initial=filtered)
+        return ConcurrentStack(initial=filtered)
 
     def reduce(self, func: Callable[[Any, _T], Any], initial: Optional[Any] = None) -> Any:
         """
-        Apply a function of two arguments cumulatively to the items of the queue.
+        Apply a function of two arguments cumulatively to the items of the stack.
 
         Args:
             func (Callable[[Any, _T], Any]): Function of the form func(accumulator, item).
@@ -260,18 +259,18 @@ class ConcurrentQueue(Generic[_T]):
             Any: The reduced value.
 
         Raises:
-            TypeError: If the queue is empty and no initial value is provided.
+            TypeError: If the stack is empty and no initial value is provided.
 
         Example:
             def add(acc, x):
                 return acc + x
-            total = concurrent_queue.reduce(add, 0)
+            total = concurrent_stack.reduce(add, 0)
         """
         with self._lock:
             items_copy = list(self._deque)
 
         if not items_copy and initial is None:
-            raise TypeError("reduce() of empty ConcurrentQueue with no initial value")
+            raise TypeError("reduce() of empty ConcurrentStack with no initial value")
 
         if initial is None:
             return functools.reduce(func, items_copy)
