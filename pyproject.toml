@@ -4,38 +4,76 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ThreadFactory"
-version = "1.0.0"
+version = "1.0.0"  # Consider syncing with __version__ later!
 description = "A high-performance thread-safe data structure and concurrency library for Python 3.13+ (no-GIL)."
 readme = "README.md"
 requires-python = ">=3.13"
 license = { file = "LICENSE" }
+
 authors = [
     { name = "Mark Geleta", email = "SynapticAISystems@gmail.com" }
 ]
+
+maintainers = [
+    { name = "Mark Geleta", email = "SynapticAISystems@gmail.com" }
+]
+
 keywords = [
-    "concurrent",
-    "parallel",
+    "concurrency",
+    "parallelism",
     "thread-safe",
     "no-GIL",
-    "ThreadFactory",
     "threading",
-    "threadfactory",
-    "free-threading",
+    "parallel processing",
+    "concurrent collections",
+    "multithreading",
     "high-performance",
-    "freethreading"
+    "python concurrency",
+    "free-threading",
+    "thread factory",
+    "ThreadFactory"
 ]
+
 classifiers = [
+    # Python Versions
+    "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: Implementation :: CPython",
+
+    # License & OS
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+
+    # Audience
     "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+
+    # Topics
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Libraries",
     "Topic :: System :: Distributed Computing",
     "Topic :: System :: Networking",
-    "Topic :: Utilities"
+    "Topic :: Utilities",
+
+    # Environment
+    "Environment :: Console"
 ]
+
+dependencies = []  # You can leave this empty for now, or add future deps here.
+
+# Optional: suggest extras if you add optional features later
+# [project.optional-dependencies]
+# dev = ["pytest", "black"]
 
 [project.urls]
 Homepage = "https://github.com/Synaptic724/ThreadFactory"
+Repository = "https://github.com/Synaptic724/ThreadFactory"
 Issues = "https://github.com/Synaptic724/ThreadFactory/issues"
+Documentation = "https://github.com/Synaptic724/ThreadFactory#readme"
+
+[tool.setuptools]
+packages = ["Threading"]  # Explicitly define your package directory (optional)
+
+# Optional: if you want to include your tests in the source distribution
+# [tool.setuptools.package-data]
+# "Threading" = ["tests/*"]

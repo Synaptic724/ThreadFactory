@@ -1,8 +1,30 @@
-# __init__.py
+"""
+ThreadFactory
+High-performance concurrent collections and parallel operations for Python 3.13+.
+"""
+
 import sys
 import warnings
 
-# Try to check Python version and build to see if it looks like no-GIL
+# 🚫 Exit if Python version is less than 3.8
+if sys.version_info < (3, 8):
+    sys.exit("ThreadFactory requires Python 3.8 or higher.")
+
+# ✅ Exit with warning if Python version is less than 3.13 (soft requirement)
+if sys.version_info < (3, 13):
+    warnings.warn(
+        f"ThreadFactory is optimized for Python 3.13+ (no-GIL). "
+        f"You are running Python {sys.version_info.major}.{sys.version_info.minor}.",
+        UserWarning
+    )
+
+try:
+    from importlib.metadata import version as get_version
+    __version__ = get_version("ThreadFactory")
+except Exception:
+    __version__ = "1.0.0-dev"
+
+
 def _detect_nogil_mode() -> None:
     """
     Warn if we're not on a Python 3.13+ no-GIL build.
@@ -10,7 +32,7 @@ def _detect_nogil_mode() -> None:
     """
     if sys.version_info < (3, 13):
         warnings.warn(
-            "AtomicThreading is designed for Python 3.13+. "
+            "ThreadFactory is designed for Python 3.13+. "
             f"You are running Python {sys.version_info.major}.{sys.version_info.minor}.",
             UserWarning
         )
@@ -21,16 +43,15 @@ def _detect_nogil_mode() -> None:
         GIL_ENABLED = True
 
     if GIL_ENABLED:
-        # We can't be absolutely certain, but let's warn anyway:
         warnings.warn(
-            "You are using a version of python that allows for no-GIL mode. "
-            "However you are not running in no-GIL mode. This package is designed for no-GIL mode.",
+            "You are using a Python version that allows no-GIL mode, "
+            "but are not running in no-GIL mode. "
+            "This package is designed for optimal performance with no-GIL.",
             UserWarning
         )
 
 _detect_nogil_mode()
 
-# Now import the classes you want to expose at package level
 from Threading.Bag import ConcurrentBag
 from Threading.Dict import ConcurrentDict
 from Threading.List import ConcurrentList
@@ -44,5 +65,6 @@ __all__ = [
     "ConcurrentList",
     "ConcurrentQueue",
     "Concurrent",
-    "ConcurrentStack"
+    "ConcurrentStack",
+    "__version__"
 ]
