@@ -3,22 +3,63 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "AtomicThreading"                      # Name on PyPI (unique!)
-version = "0.1.0"                             # Semantic versioning
-description = "A high-performance thread-safe data structure library for Python 3.13+ no-GIL."
-readme = "README.md"                          # Path to your README
+name = "ThreadFactory"
+version = "1.0.0"
+description = "A high-performance thread-safe data structure and concurrency library for Python 3.13+ (no-GIL)."
+readme = "README.md"
 requires-python = ">=3.13"
-license = { file = "LICENSE" }                # Use file or string (e.g., "MIT")
+license = { file = "LICENSE" }
+
 authors = [
-    { name="Mark Geleta", email="your@email.com" }
-]
-keywords = ["concurrent", "thread-safe", "no-GIL", "parallel", "atomic"]
-classifiers = [
-    "Programming Language :: Python :: 3.13",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent"
+    { name = "Mark Geleta", email = "SynapticAISystems@gmail.com" }
 ]
 
+maintainers = [
+    { name = "Mark Geleta", email = "SynapticAISystems@gmail.com" }
+]
+
+keywords = [
+    "concurrency",
+    "parallelism",
+    "thread-safe",
+    "no-GIL",
+    "threading",
+    "parallel processing",
+    "concurrent collections",
+    "multithreading",
+    "high-performance",
+    "python concurrency",
+    "free-threading",
+    "thread factory",
+    "ThreadFactory"
+]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: System :: Distributed Computing",
+    "Topic :: System :: Networking",
+    "Topic :: Utilities",
+    "Environment :: Console"
+]
+
+dependencies = []
+
 [project.urls]
-"Homepage" = "https://github.com/Synaptic724/AtomicThreading"
-"Bug Tracker" = "https://github.com/Synaptic724/AtomicThreading/issues"
+Homepage = "https://github.com/Synaptic724/ThreadFactory"
+Repository = "https://github.com/Synaptic724/ThreadFactory"
+Issues = "https://github.com/Synaptic724/ThreadFactory/issues"
+Documentation = "https://github.com/Synaptic724/ThreadFactory#readme"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["Threading"]
+exclude = ["Tests"]
+#
