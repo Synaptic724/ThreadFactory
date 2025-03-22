@@ -1,6 +1,6 @@
 import unittest
 import threading
-from Threading.List import ConcurrentList
+from src.Threading import ConcurrentList
 
 
 class TestConcurrentList(unittest.TestCase):

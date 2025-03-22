@@ -1,9 +1,7 @@
 import unittest
 import threading
 import random
-import time
-import copy
-from Threading.Stack import ConcurrentStack, Empty
+from src.Threading import ConcurrentStack, Empty
 
 class TestConcurrentStack(unittest.TestCase):
 
