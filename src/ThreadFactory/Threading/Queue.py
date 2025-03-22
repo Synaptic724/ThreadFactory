@@ -12,11 +12,7 @@ from typing import (
     Optional,
     TypeVar,
 )
-<<<<<<<< HEAD:Threading/Queue.py
-from Threading.List import ConcurrentList
-========
 from src.ThreadFactory.Threading.List import ConcurrentList
->>>>>>>> 65d817d (refactor: update import paths and rename Threading to ThreadFactory):src/ThreadFactory/Threading/Queue.py
 
 class Empty(Exception):
     """ Exception raised by Queue.get(block=0)/get_nowait(). """

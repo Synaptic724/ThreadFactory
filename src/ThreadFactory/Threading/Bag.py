@@ -1,12 +1,7 @@
 import threading
 from copy import deepcopy
 import functools
-<<<<<<<< HEAD:Threading/Bag.py
-import warnings
-from Threading.Dict import ConcurrentDict
-========
 from src.ThreadFactory.Threading.Dict import ConcurrentDict
->>>>>>>> 65d817d (refactor: update import paths and rename Threading to ThreadFactory):src/ThreadFactory/Threading/Bag.py
 from typing import (
     Any,
     Callable,
