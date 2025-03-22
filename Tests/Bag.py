@@ -78,15 +78,6 @@ class TestConcurrentBag(unittest.TestCase):
         self.assertNotIn('orange', bag_copy)
         self.assertNotIn('orange', bag_deepcopy)
 
-    def test_context_manager(self):
-        bag = ConcurrentBag(['apple', 'banana'])
-
-        with bag as internal:
-            internal['grape'] = 10
-
-        self.assertIn('grape', bag)
-        self.assertEqual(bag.count_of('grape'), 10)
-
     def test_batch_update(self):
         bag = ConcurrentBag(['apple', 'banana', 'banana'])
 

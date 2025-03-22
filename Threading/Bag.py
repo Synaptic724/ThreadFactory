@@ -251,31 +251,6 @@ class ConcurrentBag(Generic[_T]):
             new_bag.counter.store(sum(new_bag._bag.values()))
         return new_bag
 
-    def __enter__(self) -> Dict[_T, int]:
-        """
-        Enter the runtime context and acquire the lock.
-
-        WARNING:
-            Returning the internal dictionary bypasses the thread-safe interface.
-            Any modifications are not protected unless you carefully hold the lock.
-
-        Returns:
-            Dict[_T, int]: The internal map of item -> count (use with caution).
-        """
-        warnings.warn(
-            "Direct access to the internal bag via the context manager bypasses "
-            "the thread-safe interface. Use with extreme caution.",
-            UserWarning
-        )
-        self._lock.acquire()
-        return self._bag
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """
-        Exit the runtime context and release the lock.
-        """
-        self._lock.release()
-
     def to_concurrent_dict(self) -> 'ConcurrentDict[_T, int]':
         """
         Return a shallow copy of the internal dictionary (item -> count).
