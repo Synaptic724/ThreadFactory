@@ -15,27 +15,30 @@ def _detect_nogil_mode() -> None:
             UserWarning
         )
         return
+    try:
+        GIL_ENABLED = sys._is_gil_enabled()
+    except AttributeError:
+        GIL_ENABLED = True
 
     # A rough check: many custom no-GIL builds include '-nogil' or 'nogil' in sys.version
     # or might be invoked with '-Xgil=0'
     version_str = sys.version.lower()
-    if "nogil" not in version_str:
+    if not GIL_ENABLED:
         # We can't be absolutely certain, but let's warn anyway:
         warnings.warn(
-            "It doesn't look like you're running a no-GIL build of Python 3.13+. "
-            "For best concurrency, compile a no-GIL build or run with `-Xgil=0` if available. "
-            "Proceeding with standard GIL mode.",
+            "You are using a version of python that allows for no-GIL mode. "
+            "However you are not running in no-GIL mode. This package is designed for no-GIL mode.",
             UserWarning
         )
 
 _detect_nogil_mode()
 
 # Now import the classes you want to expose at package level
-from .Threading.Bag import ConcurrentBag
-from .Threading.Dict import ConcurrentDict
-from .Threading.List import ConcurrentList
-from .Threading.Queue import ConcurrentQueue
-from .Threading.Parallel import Parallel
+from Threading.Bag import ConcurrentBag
+from Threading.Dict import ConcurrentDict
+from Threading.List import ConcurrentList
+from Threading.Queue import ConcurrentQueue
+from Threading.Parallel import Parallel
 
 __all__ = [
     "ConcurrentBag",
