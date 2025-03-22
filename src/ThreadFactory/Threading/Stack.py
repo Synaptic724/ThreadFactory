@@ -12,10 +12,14 @@ from typing import (
     Optional,
     TypeVar,
 )
-from ...ThreadFactory.Threading.List import ConcurrentList
-from utils.exceptions import Empty
+from src.ThreadFactory.Threading.List import ConcurrentList
 
 _T = TypeVar("_T")
+
+class Empty(Exception):
+    """ Exception raised by Stack when its empty. """
+    def __init__(self, *args, **kwargs): # real signature unknown
+        pass
 
 class ConcurrentStack(Generic[_T]):
     """

@@ -12,8 +12,13 @@ from typing import (
     Optional,
     TypeVar,
 )
-from ...ThreadFactory.Threading.List import ConcurrentList
-from utils.exceptions import Empty
+from src.ThreadFactory.Threading.List import ConcurrentList
+
+class Empty(Exception):
+    """ Exception raised by Queue.get(block=0)/get_nowait(). """
+    def __init__(self, *args, **kwargs): # real signature unknown
+        pass
+
 
 _T = TypeVar("_T")
 
