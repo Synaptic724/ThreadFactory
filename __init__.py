@@ -20,7 +20,7 @@ def _detect_nogil_mode() -> None:
     except AttributeError:
         GIL_ENABLED = True
 
-    if not GIL_ENABLED:
+    if GIL_ENABLED:
         # We can't be absolutely certain, but let's warn anyway:
         warnings.warn(
             "You are using a version of python that allows for no-GIL mode. "
@@ -36,13 +36,13 @@ from Threading.Dict import ConcurrentDict
 from Threading.List import ConcurrentList
 from Threading.Queue import ConcurrentQueue
 from Threading.Stack import ConcurrentStack
-from Threading.Parallel import Parallel
+from Threading.Concurrent import Concurrent
 
 __all__ = [
     "ConcurrentBag",
     "ConcurrentDict",
     "ConcurrentList",
     "ConcurrentQueue",
-    "Parallel",
+    "Concurrent",
     "ConcurrentStack"
 ]
