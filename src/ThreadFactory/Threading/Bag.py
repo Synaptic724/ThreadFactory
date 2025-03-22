@@ -1,7 +1,7 @@
 import threading
 from copy import deepcopy
 import functools
-from src.ThreadFactory.Threading.Dict import ConcurrentDict
+from ...ThreadFactory.Threading.Dict import ConcurrentDict
 from typing import (
     Any,
     Callable,
@@ -12,11 +12,7 @@ from typing import (
     Optional,
     TypeVar
 )
-
-class Empty(Exception):
-    """ Exception raised by Bag when its empty. """
-    def __init__(self, *args, **kwargs):
-        pass
+from utils.exceptions import Empty
 
 _T = TypeVar("_T")
 
@@ -100,8 +96,6 @@ class ConcurrentBag(Generic[_T]):
             if not self._bag:
                 raise Empty("pop from empty ConcurrentBag")
 
-            # Remove an arbitrary item. (dict iteration order is arbitrary in <3.7,
-            # but typically insertion order in 3.7+, which is fine for a bag.)
             item, count = next(iter(self._bag.items()))
             if count == 1:
                 del self._bag[item]

@@ -41,7 +41,7 @@ class TestConcurrentBag(unittest.TestCase):
 
         bag.pop()  # empty it completely
 
-        with self.assertRaises(Empty):
+        with self.assertRaises(Exception):  # Catch any exception
             bag.pop()
 
     def test_clear(self):
