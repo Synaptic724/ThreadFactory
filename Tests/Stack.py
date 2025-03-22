@@ -293,7 +293,3 @@ class TestConcurrentStack(unittest.TestCase):
 
         # no crash => success
         self.assertGreaterEqual(len(s), 0)
-
-# If you want to run these tests directly:
-# if __name__ == "__main__":
-#     unittest.main()

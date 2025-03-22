@@ -291,7 +291,3 @@ class TestConcurrentQueue(unittest.TestCase):
 
         # no crash => success
         self.assertGreaterEqual(len(q), 0)
-
-# If you want to run these tests directly:
-# if __name__ == "__main__":
-#     unittest.main()

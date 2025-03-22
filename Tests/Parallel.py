@@ -456,8 +456,3 @@ class TestParallelEdgeCases(unittest.TestCase):
 
         # The result might or might not be appended, but let's confirm no crash occurred:
         self.assertTrue(True, "No crash. If 'results' is empty, that means the task didn't finish.")
-
-
-# If you want to run these tests directly:
-if __name__ == '__main__':
-    unittest.main()

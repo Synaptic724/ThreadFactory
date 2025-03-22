@@ -340,9 +340,3 @@ class TestConcurrentDictStress(unittest.TestCase):
         a_value = d.get("a", 0)
         self.assertGreaterEqual(a_value, iterations * (num_threads // 2) - 1000)
         print(f"Parallel batch updates and swaps done. Final a={a_value}")
-
-
-
-# Run these tests if file is executed directly
-# if __name__ == "__main__":
-#     unittest.main()

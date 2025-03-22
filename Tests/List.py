@@ -286,8 +286,3 @@ class TestConcurrentList(unittest.TestCase):
             t.join()
 
         self.assertTrue(len(clist) >= 0)  # No crash or negative
-
-
-# If running standalone:
-# if __name__ == "__main__":
-#     unittest.main()
