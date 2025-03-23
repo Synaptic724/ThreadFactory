@@ -1,5 +1,5 @@
 import unittest
-from src.thread_factory.concurrency.concurrent_core import Concurrent
+from src.thread_factory import Concurrent
 import time
 
 class TestParallel(unittest.TestCase):

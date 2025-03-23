@@ -12,8 +12,8 @@ from typing import (
     Optional,
     TypeVar,
 )
-from ...thread_factory.concurrency.concurrent_list import ConcurrentList
-from ..utils.exceptions import Empty
+from src.thread_factory.concurrency.concurrent_list import ConcurrentList
+from src.thread_factory.utils import Empty
 
 _T = TypeVar("_T")
 

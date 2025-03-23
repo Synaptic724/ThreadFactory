@@ -22,7 +22,7 @@ try:
     from importlib.metadata import version as get_version
     __version__ = get_version("thread_factory")
 except Exception:
-    __version__ = "1.0.0-dev"
+    __version__ = "1.0.2-dev"
 
 
 def _detect_nogil_mode() -> None:
@@ -52,13 +52,14 @@ def _detect_nogil_mode() -> None:
 
 _detect_nogil_mode()
 
-from .concurrency.concurrent_bag import ConcurrentBag
-from .concurrency.concurrent_dictionary import ConcurrentDict
-from .concurrency.concurrent_list import ConcurrentList
-from .concurrency.concurrent_queue import ConcurrentQueue
-from .concurrency.concurrent_stack import ConcurrentStack
-from .concurrency.concurrent_core import Concurrent
-from .utils.exceptions import Empty
+from src.thread_factory.concurrency.concurrent_bag import ConcurrentBag
+from src.thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from src.thread_factory.concurrency.concurrent_list import ConcurrentList
+from src.thread_factory.concurrency.concurrent_queue import ConcurrentQueue
+from src.thread_factory.concurrency.concurrent_stack import ConcurrentStack
+from src.thread_factory.concurrency.concurrent_core import Concurrent
+from src.thread_factory.utils.exceptions import Empty
+from src.thread_factory.threads import Worker, Dynaphore
 
 __all__ = [
     "ConcurrentBag",
@@ -68,5 +69,7 @@ __all__ = [
     "Concurrent",
     "ConcurrentStack",
     "Empty",
+    "Worker",
+    "Dynaphore",
     "__version__"
 ]

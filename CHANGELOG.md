@@ -17,6 +17,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [1.0.2] - 2025-03-23
 ### Added
 - ConcurrentStack now has remove_item() method
+- Dynaphore class for dynamic semaphore management
 
 ---
 

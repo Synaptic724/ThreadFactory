@@ -12,7 +12,7 @@ from typing import (
     Optional,
     TypeVar,
 )
-from ...thread_factory.concurrency.concurrent_list import ConcurrentList
+from .concurrent_list import ConcurrentList
 from ..utils.exceptions import Empty
 
 _T = TypeVar("_T")
