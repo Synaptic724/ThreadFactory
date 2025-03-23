@@ -4,7 +4,7 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 
 > **NOTE**  
 > ThreadFactory is designed and tested against Python 3.13+ in **No-GIL** mode.  
-> It also works under the standard GIL runtime in Python 3.x, but you won't get the same concurrency benefits.
+> This library will only function on 3.13 and higher.
 ---
 
 ## 🚀 Features
