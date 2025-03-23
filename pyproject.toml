@@ -46,7 +46,8 @@ classifiers = [
     "Topic :: System :: Distributed Computing",
     "Topic :: System :: Networking",
     "Topic :: Utilities",
-    "Environment :: Console"
+    "Environment :: Console",
+    "License :: OSI Approved :: MIT License"
 ]
 
 dependencies = []

@@ -57,3 +57,8 @@ source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 
 # Install the library in editable mode
 pip install threadfactory
+```
+
+![PyPI version](https://img.shields.io/pypi/v/ThreadFactory)
+![Python versions](https://img.shields.io/pypi/pyversions/ThreadFactory)
+![License](https://img.shields.io/pypi/l/ThreadFactory)
