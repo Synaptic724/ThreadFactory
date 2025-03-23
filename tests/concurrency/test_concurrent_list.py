@@ -1,6 +1,7 @@
-import unittest
 import threading
-from src.thread_factory import ConcurrentList
+import unittest
+
+from src.thread_factory.concurrency.concurrent_list import ConcurrentList
 
 
 class TestConcurrentList(unittest.TestCase):

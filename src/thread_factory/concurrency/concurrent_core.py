@@ -1,6 +1,6 @@
+import itertools
 import os
 import threading
-import itertools
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 from typing import (
     Any,
@@ -8,7 +8,6 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Tuple,
     TypeVar
 )
 

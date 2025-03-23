@@ -1,8 +1,6 @@
 import threading
 import time
-import ulid  # Using UUID for simplicity; you can swap for ULID later!
 from typing import Optional, Callable, Any
-from .dynaphore import Dynaphore
 
 
 class Worker(threading.Thread):

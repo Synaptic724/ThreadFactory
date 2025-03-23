@@ -1,5 +1,6 @@
-import unittest
 import threading
+import unittest
+
 from src.thread_factory import ConcurrentBag
 
 

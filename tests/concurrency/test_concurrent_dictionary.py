@@ -1,7 +1,9 @@
-import unittest
-import threading
-from src.thread_factory import ConcurrentDict
 import random
+import threading
+import unittest
+
+from src.thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+
 
 class TestConcurrentDict(unittest.TestCase):
 

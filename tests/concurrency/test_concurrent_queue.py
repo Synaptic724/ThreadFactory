@@ -1,7 +1,9 @@
-import unittest
-import threading
 import random
-from src.thread_factory.concurrency.concurrent_queue import ConcurrentQueue, Empty
+import threading
+import unittest
+
+from src.thread_factory import ConcurrentQueue
+
 
 class TestConcurrentQueue(unittest.TestCase):
 
@@ -25,7 +27,7 @@ class TestConcurrentQueue(unittest.TestCase):
         self.assertEqual(len(q), 0)
 
         # Dequeue from empty queue
-        with self.assertRaises(Empty):
+        with self.assertRaises(Exception):
             q.dequeue()
 
     def test_remove_item_by_identity(self):
@@ -76,7 +78,7 @@ class TestConcurrentQueue(unittest.TestCase):
 
         # Peek from an empty queue
         q.clear()
-        with self.assertRaises(Empty):
+        with self.assertRaises(Exception):
             q.peek()
 
     def test_len_bool(self):

@@ -1,6 +1,8 @@
-import unittest
-from src.thread_factory import Concurrent
 import time
+import unittest
+
+from src.thread_factory.concurrency.concurrent_core import Concurrent
+
 
 class TestParallel(unittest.TestCase):
     def test_for_basic_sum(self):

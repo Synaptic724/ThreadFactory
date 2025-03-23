@@ -1,7 +1,7 @@
-import threading
-from copy import deepcopy
 import functools
+import threading
 import warnings
+from copy import deepcopy
 from typing import Any, Callable, Iterable, Optional, List, TypeVar, Generic
 
 _T = TypeVar('_T')

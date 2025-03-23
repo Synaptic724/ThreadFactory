@@ -1,7 +1,7 @@
+import functools
 import threading
 from collections import deque
 from copy import deepcopy
-import functools
 from typing import (
     Any,
     Callable,
@@ -12,6 +12,7 @@ from typing import (
     Optional,
     TypeVar,
 )
+
 from src.thread_factory.concurrency.concurrent_list import ConcurrentList
 from src.thread_factory.utils import Empty
 

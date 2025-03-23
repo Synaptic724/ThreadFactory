@@ -1,6 +1,7 @@
-import threading
-import os
 import concurrent.futures
+import os
+import threading
+
 
 class ThreadFactory:
     _shared_pool = None
