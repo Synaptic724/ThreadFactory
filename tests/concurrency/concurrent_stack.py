@@ -42,6 +42,43 @@ class TestConcurrentStack(unittest.TestCase):
         with self.assertRaises(Empty):
             s.peek()
 
+    def test_remove_item_by_identity(self):
+        """
+        Test removing a specific item by identity from the queue.
+        """
+        q = ConcurrentStack()
+
+        # Create unique objects
+        task1 = {"id": 1}
+        task2 = {"id": 2}
+        task3 = {"id": 3}
+
+        q.push(task1)
+        q.push(task2)
+        q.push(task3)
+
+        # Confirm items are in the queue
+        self.assertEqual(len(q), 3)
+
+        # Remove task2
+        removed = q.remove_item(task2)
+        self.assertTrue(removed, "Expected task2 to be removed")
+
+        # task2 should no longer be present
+        remaining = list(q)
+        self.assertNotIn(task2, remaining)
+
+        # Removing again should return False
+        removed_again = q.remove_item(task2)
+        self.assertFalse(removed_again, "Expected task2 to already be gone")
+
+        # Length is now 2
+        self.assertEqual(len(q), 2)
+
+        # task1 and task3 should still be present
+        self.assertIn(task1, q)
+        self.assertIn(task3, q)
+
     def test_len_bool(self):
         """
         Test __len__ and __bool__.

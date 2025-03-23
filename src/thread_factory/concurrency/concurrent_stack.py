@@ -180,6 +180,23 @@ class ConcurrentStack(Generic[_T]):
         with self._lock:
             return ConcurrentList(list(self._deque))
 
+    def remove_item(self, item: _T) -> bool:
+        """
+        Remove the first occurrence of the item by identity (memory reference).
+
+        Args:
+            item (_T): The item to remove.
+
+        Returns:
+            bool: True if the item was found and removed, False otherwise.
+        """
+        with self._lock:
+            for i, current in enumerate(self._deque):
+                if current is item:
+                    del self._deque[i]
+                    return True
+        return False
+
     def batch_update(self, func: Callable[[Deque[_T]], None]) -> None:
         """
         Perform a batch update on the stack under a single lock acquisition.

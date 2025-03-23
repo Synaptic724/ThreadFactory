@@ -1,19 +1,27 @@
-# ThreadFactory
+# 📜 Changelog
+All notable changes to this project will be documented in this file.  
+This project adheres to [Semantic Versioning](https://semver.org/).
 
-[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory)](https://pepy.tech/projects/threadfactory)
-[![PyPI version](https://badge.fury.io/py/threadfactory.svg)](https://badge.fury.io/py/threadfactory)
-[![License](https://img.shields.io/github/license/Synaptic724/threadfactory)](https://github.com/yourusername/threadfactory/blob/main/LICENSE)
-[![Python Version](https://img.shields.io/pypi/pyversions/threadfactory)](https://pypi.org/project/threadfactory)
-
-High-performance **thread-safe** (No-GIL–friendly) data structures and parallel operations for Python 3.13+.
-
-> **NOTE**  
-> ThreadFactory is designed and tested against Python 3.13+ in **No-GIL** mode.  
-> This library will only function on 3.13 and higher.
 ---
 
-## 🚀 Features
+## [Unreleased]
+### Added
+- Thread role assignment framework (Producer, Consumer, Orchestrator)
+- ThreadSwitch logic for dynamic execution context migration
+- Queue state management using Active and Empty stacks
+- Contention mode system (0-10 scale) with dynamic tuning
+- Work stealing optimization with concurrent list handling
 
+---
+
+## [1.0.2] - 2025-03-23
+### Added
+- ConcurrentStack now has remove_item() method
+
+---
+
+## [1.0.1] - 2025-03-22
+### Added
 ### 1. ConcurrentBag  
 - A thread-safe “multiset” collection that allows duplicates.  
 - Methods like `add`, `remove`, `discard`, etc.  
@@ -44,22 +52,3 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 - Pure thread-based concurrency (No-GIL optimized), not tied to asyncio or multiprocessing.  
 - Flexible chunking, concurrency control, local state usage, early exit on exception, and more.  
 - Inspired by .NET's Task Parallel Library (TPL).
-
----
-
-## ⚙️ Installation
-
-### Option 1: Clone and Install Locally (Recommended for Development)
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/threadfactory.git
-cd threadfactory
-
-# Create a Python 3.13+ virtual environment (No-GIL/Free concurrency recommended)
-python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-
-# Install the library in editable mode
-pip install threadfactory
-```

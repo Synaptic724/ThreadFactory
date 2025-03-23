@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ThreadFactory"
 version = "1.0.1"
-description = "A high-performance thread-safe data structure and concurrency library for Python 3.13+ (no-GIL)."
+description = "High-performance thread-safe (No-GIL–friendly) data structures and parallel operations for Python 3.13+."
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
