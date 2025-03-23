@@ -1,7 +1,7 @@
 import threading
 from copy import deepcopy
 import functools
-from ...ThreadFactory.Threading.Dict import ConcurrentDict
+from ...thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from typing import (
     Any,
     Callable,
@@ -12,7 +12,7 @@ from typing import (
     Optional,
     TypeVar
 )
-from utils.exceptions import Empty
+from ..utils.exceptions import Empty
 
 _T = TypeVar("_T")
 

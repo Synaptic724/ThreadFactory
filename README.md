@@ -1,5 +1,10 @@
 # ThreadFactory
 
+[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory)](https://pepy.tech/projects/threadfactory)
+[![PyPI version](https://badge.fury.io/py/threadfactory.svg)](https://badge.fury.io/py/threadfactory)
+[![License](https://img.shields.io/github/license/Synaptic724/threadfactory)](https://github.com/yourusername/threadfactory/blob/main/LICENSE)
+[![Python Version](https://img.shields.io/pypi/pyversions/threadfactory)](https://pypi.org/project/threadfactory)
+
 High-performance **thread-safe** (No-GIL–friendly) data structures and parallel operations for Python 3.13+.
 
 > **NOTE**  
@@ -51,14 +56,10 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 git clone https://github.com/yourusername/threadfactory.git
 cd threadfactory
 
-# Create a Python 3.13+ virtual environment (No-GIL/Free Threading recommended)
+# Create a Python 3.13+ virtual environment (No-GIL/Free concurrency recommended)
 python -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 
 # Install the library in editable mode
 pip install threadfactory
 ```
-
-![PyPI version](https://img.shields.io/pypi/v/ThreadFactory)
-![Python versions](https://img.shields.io/pypi/pyversions/ThreadFactory)
-![License](https://img.shields.io/pypi/l/ThreadFactory)

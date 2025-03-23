@@ -1,6 +1,6 @@
 """
-ThreadFactory
-High-performance concurrent collections and parallel operations for Python 3.13+.
+thread_factory
+High-performance concurrency collections and parallel operations for Python 3.13+.
 """
 
 import sys
@@ -8,19 +8,19 @@ import warnings
 
 # 🚫 Exit if Python version is less than 3.13
 if sys.version_info < (3, 13):
-    sys.exit("ThreadFactory requires Python 3.13 or higher.")
+    sys.exit("thread_factory requires Python 3.13 or higher.")
 
 # ✅ Exit with warning if Python version is less than 3.13 (soft requirement)
 if sys.version_info < (3, 13):
     warnings.warn(
-        f"ThreadFactory is optimized for Python 3.13+ (no-GIL). "
+        f"thread_factory is optimized for Python 3.13+ (no-GIL). "
         f"You are running Python {sys.version_info.major}.{sys.version_info.minor}.",
         UserWarning
     )
 
 try:
     from importlib.metadata import version as get_version
-    __version__ = get_version("ThreadFactory")
+    __version__ = get_version("thread_factory")
 except Exception:
     __version__ = "1.0.0-dev"
 
@@ -32,7 +32,7 @@ def _detect_nogil_mode() -> None:
     """
     if sys.version_info < (3, 13):
         warnings.warn(
-            "ThreadFactory is designed for Python 3.13+. "
+            "thread_factory is designed for Python 3.13+. "
             f"You are running Python {sys.version_info.major}.{sys.version_info.minor}.",
             UserWarning
         )
@@ -52,12 +52,12 @@ def _detect_nogil_mode() -> None:
 
 _detect_nogil_mode()
 
-from .Threading.Bag import ConcurrentBag
-from .Threading.Dict import ConcurrentDict
-from .Threading.List import ConcurrentList
-from .Threading.Queue import ConcurrentQueue
-from .Threading.Stack import ConcurrentStack
-from .Threading.Concurrent import Concurrent
+from .concurrency.concurrent_bag import ConcurrentBag
+from .concurrency.concurrent_dictionary import ConcurrentDict
+from .concurrency.concurrent_list import ConcurrentList
+from .concurrency.concurrent_queue import ConcurrentQueue
+from .concurrency.concurrent_stack import ConcurrentStack
+from .concurrency.concurrent_core import Concurrent
 from .utils.exceptions import Empty
 
 __all__ = [

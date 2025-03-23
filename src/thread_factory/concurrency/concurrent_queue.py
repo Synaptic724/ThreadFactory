@@ -12,8 +12,8 @@ from typing import (
     Optional,
     TypeVar,
 )
-from ...ThreadFactory.Threading.List import ConcurrentList
-from utils.exceptions import Empty
+from ...thread_factory.concurrency.concurrent_list import ConcurrentList
+from ..utils.exceptions import Empty
 
 _T = TypeVar("_T")
 
@@ -174,7 +174,7 @@ class ConcurrentQueue(Generic[_T]):
 
         Returns:
             concurrent_list.ConcurrentList[_T]:
-                A concurrent list containing all items currently in the queue.
+                A concurrency list containing all items currently in the queue.
         """
 
         with self._lock:
@@ -220,6 +220,23 @@ class ConcurrentQueue(Generic[_T]):
         with self._lock:
             filtered = list(filter(func, self._deque))
         return ConcurrentQueue(initial=filtered)
+
+    def remove_item(self, item: _T) -> bool:
+        """
+        Remove the first occurrence of the item by identity (memory reference).
+
+        Args:
+            item (_T): The item to remove.
+
+        Returns:
+            bool: True if the item was found and removed, False otherwise.
+        """
+        with self._lock:
+            for i, current in enumerate(self._deque):
+                if current is item:
+                    del self._deque[i]
+                    return True
+        return False
 
     def reduce(self, func: Callable[[Any, _T], Any], initial: Optional[Any] = None) -> Any:
         """

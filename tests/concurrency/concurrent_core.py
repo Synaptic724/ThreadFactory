@@ -1,5 +1,5 @@
 import unittest
-from src.ThreadFactory.Threading.Concurrent import Concurrent
+from src.thread_factory.concurrency.concurrent_core import Concurrent
 import time
 
 class TestParallel(unittest.TestCase):
@@ -349,7 +349,7 @@ class TestParallelEdgeCases(unittest.TestCase):
         )
 
         self.assertEqual(sum(sums), sum(range(1000)),
-                         "ThreadFactory local-state summation should match the expected total.")
+                         "thread_factory local-state summation should match the expected total.")
 
     def test_foreach_streaming_chunk_size_one(self):
         """

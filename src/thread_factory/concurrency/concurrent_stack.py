@@ -12,8 +12,8 @@ from typing import (
     Optional,
     TypeVar,
 )
-from ...ThreadFactory.Threading.List import ConcurrentList
-from utils.exceptions import Empty
+from ...thread_factory.concurrency.concurrent_list import ConcurrentList
+from ..utils.exceptions import Empty
 
 _T = TypeVar("_T")
 
@@ -175,7 +175,7 @@ class ConcurrentStack(Generic[_T]):
 
         Returns:
             ConcurrentList[_T]:
-                A concurrent list containing all items currently in the stack.
+                A concurrency list containing all items currently in the stack.
         """
         with self._lock:
             return ConcurrentList(list(self._deque))

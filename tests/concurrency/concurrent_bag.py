@@ -1,6 +1,6 @@
 import unittest
 import threading
-from src.ThreadFactory import ConcurrentBag, Empty
+from src.thread_factory import ConcurrentBag, Empty
 
 class TestConcurrentBag(unittest.TestCase):
 
@@ -155,7 +155,7 @@ class TestConcurrentBag(unittest.TestCase):
     def test_concurrent_add_and_remove(self):
         """
         Simulate multiple threads adding and removing items from the bag.
-        This tests for thread-safety under concurrent access.
+        This tests for thread-safety under concurrency access.
         """
         bag = ConcurrentBag()
 
