@@ -59,7 +59,10 @@ cd threadfactory
 # Create a Python 3.13+ virtual environment (No-GIL/Free concurrency recommended)
 python -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+```
 
+### Option 2: Install the library from PyPI
+```bash
 # Install the library in editable mode
 pip install threadfactory
 ```

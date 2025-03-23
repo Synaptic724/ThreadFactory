@@ -1,5 +1,6 @@
 import threading
 import time
+import ulid
 from typing import Optional, Callable, Any
 
 
@@ -21,7 +22,7 @@ class Worker(threading.Thread):
         super().__init__()
         self.factory = factory
         self.work_queue = work_queue
-        self.thread_id = thread_id or str(uuid.uuid4())  # Replace with ULID if needed
+        self.thread_id = thread_id or str(ulid.ULID())  # Replace with ULID if needed
         self.state = 'IDLE'  # Other states: ACTIVE, STEALING, TERMINATING
         self.completed_work = 0
         self.daemon = True  # Kill thread on program exit (optional)
@@ -77,3 +78,24 @@ class Worker(threading.Thread):
     def __repr__(self):
         return f"<Worker id={self.thread_id} state={self.state} completed={self.completed_work}>"
 
+
+
+
+# Create a ULID instance
+my_ulid = str(ulid.ULID())
+#
+# # Get timestamp in seconds (float)
+# print(my_ulid.timestamp)
+#
+# # Get milliseconds
+# print(my_ulid.milliseconds)
+#
+# # Get datetime (timezone-aware UTC)
+# print(my_ulid.datetime)
+
+
+# Parse the string into a ULID object
+parsed_ulid = ulid.ULID.from_str(my_ulid)
+
+print(parsed_ulid)
+print(parsed_ulid.datetime)
