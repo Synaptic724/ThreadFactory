@@ -268,3 +268,48 @@ class TestConcurrentList(unittest.TestCase):
             t.join()
 
         self.assertTrue(len(clist) >= 0)  # No crash or negative
+
+
+    def test_update_with_iterable(self):
+        # Create an initial ConcurrentList
+        clist = ConcurrentList([1, 2, 3])
+
+        # Another iterable to update from
+        other_items = [4, 5, 6]
+
+        # Perform the update
+        clist.update(other_items)
+
+        # Assert the list now contains the old and new items
+        expected_result = [1, 2, 3, 4, 5, 6]
+        self.assertEqual(clist.to_list(), expected_result)
+
+    def test_update_with_empty_iterable(self):
+        # Create an initial ConcurrentList
+        clist = ConcurrentList([1, 2, 3])
+
+        # Empty iterable
+        other_items = []
+
+        # Perform the update
+        clist.update(other_items)
+
+        # Assert the list is unchanged
+        expected_result = [1, 2, 3]
+        self.assertEqual(clist.to_list(), expected_result)
+
+    def test_update_with_generator(self):
+        # Create an initial ConcurrentList
+        clist = ConcurrentList([10, 20])
+
+        # A generator as an iterable
+        def gen():
+            for i in range(3):
+                yield i * 10
+
+        # Perform the update
+        clist.update(gen())
+
+        # Assert the result
+        expected_result = [10, 20, 0, 10, 20]
+        self.assertEqual(clist.to_list(), expected_result)

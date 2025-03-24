@@ -334,3 +334,14 @@ class ConcurrentBag(Generic[_T]):
             return functools.reduce(func, expanded_items)
         else:
             return functools.reduce(func, expanded_items, initial)
+
+    def update(self, other: "ConcurrentBag[_T]") -> None:
+        """
+        Update the bag with the items from another bag, adding their counts.
+
+        Args:
+            other (ConcurrentBag[_T]): Another bag to merge into this one.
+        """
+        with self._lock:
+            for item, count in other._bag.items():
+                self._bag[item] = self._bag.get(item, 0) + count

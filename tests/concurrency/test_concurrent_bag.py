@@ -205,3 +205,31 @@ class TestConcurrentBag(unittest.TestCase):
 
         # 10 threads each incremented apple by 1
         self.assertEqual(bag.count_of('apple'), 20)
+
+
+    def test_update_merges_counts(self):
+        # Create two bags
+        bag1 = ConcurrentBag(['apple', 'banana', 'apple'])  # apple x2, banana x1
+        bag2 = ConcurrentBag(['banana', 'cherry', 'cherry'])  # banana x1, cherry x2
+
+        # Check initial counts
+        self.assertEqual(bag1.count_of('apple'), 2)
+        self.assertEqual(bag1.count_of('banana'), 1)
+        self.assertEqual(bag1.count_of('cherry'), 0)
+
+        self.assertEqual(bag2.count_of('banana'), 1)
+        self.assertEqual(bag2.count_of('cherry'), 2)
+        self.assertEqual(bag2.count_of('apple'), 0)
+
+        # Update bag1 with bag2
+        bag1.update(bag2)
+
+        # Validate merged counts in bag1
+        self.assertEqual(bag1.count_of('apple'), 2)
+        self.assertEqual(bag1.count_of('banana'), 2)
+        self.assertEqual(bag1.count_of('cherry'), 2)
+
+        # Validate bag2 remains unchanged
+        self.assertEqual(bag2.count_of('apple'), 0)
+        self.assertEqual(bag2.count_of('banana'), 1)
+        self.assertEqual(bag2.count_of('cherry'), 2)

@@ -496,3 +496,14 @@ class ConcurrentList(Generic[_T]):
             return functools.reduce(func, snapshot)
         else:
             return functools.reduce(func, snapshot, initial)
+
+
+    def update(self, other: Iterable[_T]) -> None:
+        """
+        Update the list with elements from another iterable.
+
+        Args:
+            other (Iterable[_T]): The iterable to update from.
+        """
+        with self._lock:
+            self._list.extend(other)

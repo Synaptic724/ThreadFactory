@@ -4,53 +4,62 @@ import threading
 class Dynaphore(threading.Semaphore):
     """
     A dynamic semaphore that can increase or decrease the number of permits at runtime.
-
-    Inherits from threading.Semaphore but adds dynamic scaling of available permits.
-    Suitable for systems requiring adaptive concurrency limits.
+    Exposes the internal Condition for wait/notify and provides dynamic scaling.
     """
 
     def __init__(self, value: int = 1):
-        """
-        Initialize the Dynaphore.
-
-        Args:
-            value (int): The initial number of permits. Must be >= 0.
-        """
         super().__init__(value)
 
-    def increase_permits(self, n: int) -> None:
+    @property
+    def condition(self) -> threading.Condition:
         """
-        Dynamically increase the number of available permits by `n`.
+        Expose the internal Condition object.
+        Allows external threads to wait on complex conditions.
+        """
+        return self._cond
 
-        Args:
-            n (int): The number of permits to add. Must be >= 0.
-
-        Raises:
-            ValueError: If `n` is negative.
+    def increase_permits(self, n: int = 1) -> None:
+        """
+        Dynamically increase available permits and notify waiting threads.
         """
         if n < 0:
             raise ValueError("Cannot increase permits by a negative value")
 
         with self._cond:
             self._value += n
-            # Wake up threads waiting on acquire()
+            print(f"[Dynaphore] Increased permits by {n}, total permits: {self._value}")
             for _ in range(n):
                 self._cond.notify()
 
-    def decrease_permits(self, n: int) -> None:
+    def decrease_permits(self, n: int = 1) -> None:
         """
-        Dynamically decrease the number of available permits by `n`.
-
-        Args:
-            n (int): The number of permits to subtract. Must be >= 0.
-
-        Raises:
-            ValueError: If `n` is greater than the current number of permits or negative.
+        Dynamically decrease available permits.
         """
         if n < 0:
             raise ValueError("Cannot decrease permits by a negative value")
 
         with self._cond:
             if n > self._value:
-                raise ValueError("Cannot decrease permits: n exceeds the current number of permits")
+                raise ValueError("Cannot decrease more permits than available")
             self._value -= n
+            print(f"[Dynaphore] Decreased permits by {n}, total permits: {self._value}")
+
+    def wait_for_permit(self, timeout: float = None) -> bool:
+        """
+        Wait until a permit is available, using the internal condition.
+        """
+        with self._cond:
+            result = self._cond.wait_for(lambda: self._value > 0, timeout=timeout)
+            if result:
+                self._value -= 1  # Reserve the permit
+                print(f"[Dynaphore] Permit acquired! Remaining permits: {self._value}")
+            else:
+                print(f"[Dynaphore] Timed out waiting for permit.")
+            return result
+
+    def release_permit(self, n: int = 1):
+        """
+        Release a permit (same as release, but more explicit).
+        """
+        self.release(n)
+        print(f"[Dynaphore] Permit released! Total permits: {self._value}")

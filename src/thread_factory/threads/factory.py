@@ -40,4 +40,4 @@ class ThreadFactory:
     def _detect_cores():
         return os.cpu_count() or 4
 
-concurrent.futures.ThreadPoolExecutor = ThreadPoolManager
+#concurrent.futures.ThreadPoolExecutor = ThreadPoolManager

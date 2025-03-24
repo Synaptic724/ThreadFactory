@@ -1,7 +1,22 @@
+import datetime
 import threading
 import time
 import ulid
-from typing import Optional, Callable, Any
+from typing import Callable, Any
+
+
+class Records:
+    def __init__(self):
+        self.records: list[ulid] = []  # Track completed work
+
+    def add(self, record):
+        self.records.append(record)
+
+    def __repr__(self):
+        return f"<Records count={len(self.records)}>"
+
+    def __len__(self):
+        return len(self.records)
 
 
 class Worker(threading.Thread):
@@ -12,7 +27,7 @@ class Worker(threading.Thread):
     - Can switch between execution contexts (ThreadSwitch)
     """
 
-    def __init__(self, factory: Any, work_queue: Any, thread_id: Optional[str] = None):
+    def __init__(self, factory: Any, work_queue: Any):
         """
         Args:
             factory (Any): Reference to the ThreadFactory managing this worker.
@@ -22,11 +37,10 @@ class Worker(threading.Thread):
         super().__init__()
         self.factory = factory
         self.work_queue = work_queue
-        self.thread_id = thread_id or str(ulid.ULID())  # Replace with ULID if needed
+        self.thread_id = str(ulid.ULID())  # Replace with ULID if needed
         self.state = 'IDLE'  # Other states: ACTIVE, STEALING, TERMINATING
-        self.completed_work = 0
-        self.daemon = True  # Kill thread on program exit (optional)
-
+        self.daemon = True  # Kill thread on program exi
+        self.records = Records()
         self.shutdown_flag = threading.Event()
 
     def run(self):
@@ -78,24 +92,20 @@ class Worker(threading.Thread):
     def __repr__(self):
         return f"<Worker id={self.thread_id} state={self.state} completed={self.completed_work}>"
 
+    def get_creation_datetime(self) -> datetime.datetime:
+        """
+        Return the creation time of this worker using ULID timestamp.
 
+        Returns:
+            datetime: Timestamp of worker creation.
+        """
+        return ulid.ULID.from_str(self.thread_id).datetime
 
+    def get_creation_timestamp(self) -> float:
+        """
+        Return the creation time of this worker using ULID timestamp (epoch time in seconds).
 
-# Create a ULID instance
-my_ulid = str(ulid.ULID())
-#
-# # Get timestamp in seconds (float)
-# print(my_ulid.timestamp)
-#
-# # Get milliseconds
-# print(my_ulid.milliseconds)
-#
-# # Get datetime (timezone-aware UTC)
-# print(my_ulid.datetime)
-
-
-# Parse the string into a ULID object
-parsed_ulid = ulid.ULID.from_str(my_ulid)
-
-print(parsed_ulid)
-print(parsed_ulid.datetime)
+        Returns:
+            float: Timestamp in seconds since epoch.
+        """
+        return ulid.ULID.from_str(self.thread_id).timestamp
