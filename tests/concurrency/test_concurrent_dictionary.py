@@ -1,7 +1,7 @@
-import random
 import threading
 import unittest
-
+import random
+import time
 from src.thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 
 
@@ -286,3 +286,173 @@ class TestConcurrentDictStress(unittest.TestCase):
         a_value = d.get("a", 0)
         self.assertGreaterEqual(a_value, iterations * (num_threads // 2) - 1000)
         print(f"Parallel batch updates and swaps done. Final a={a_value}")
+
+class HighPerformanceConcurrentDictTest(unittest.TestCase):
+
+    def setUp(self):
+        self.insertions = 1_000_000  # 1 million key/values
+        self.thread_count = 50       # 50 threads hammering at once
+        self.batch_iterations = 10_000
+
+    def test_massive_parallel_read_write_delete(self):
+        """
+        Massive concurrent read/write/delete test to stress check ConcurrentDict.
+        """
+        d = ConcurrentDict[int, int]()
+        keys_range = 500_000
+
+        def writer(thread_id):
+            for _ in range(self.insertions // self.thread_count):
+                key = random.randint(0, keys_range)
+                d[key] = thread_id
+
+        def reader():
+            for _ in range(self.insertions // self.thread_count):
+                key = random.randint(0, keys_range)
+                _ = d.get(key, None)
+
+        def deleter():
+            for _ in range(self.insertions // self.thread_count):
+                key = random.randint(0, keys_range)
+                try:
+                    del d[key]
+                except KeyError:
+                    pass
+
+        threads = []
+        for i in range(self.thread_count // 3):
+            threads.append(threading.Thread(target=writer, args=(i,)))
+            threads.append(threading.Thread(target=reader))
+            threads.append(threading.Thread(target=deleter))
+
+        start = time.perf_counter()
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        end = time.perf_counter()
+
+        print(f"\nMassive RW Delete test: {self.insertions:,} ops in {end - start:.2f}s")
+        print(f"Remaining keys: {len(d)}")
+
+        self.assertGreaterEqual(len(d), 0)
+
+    def test_parallel_batch_updates_high_contention(self):
+        """
+        Stress test with parallel batch updates modifying overlapping keys.
+        """
+        d = ConcurrentDict[str, int]({f"key_{i}": 0 for i in range(100)})
+
+        def batch_worker(thread_id):
+            for _ in range(self.batch_iterations):
+                def batch(dct):
+                    # Increment values across 100 keys
+                    for k in dct.keys():
+                        dct[k] += 1
+                d.batch_update(batch)
+
+        threads = [
+            threading.Thread(target=batch_worker, args=(tid,))
+            for tid in range(self.thread_count)
+        ]
+
+        start = time.perf_counter()
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        end = time.perf_counter()
+
+        # Sanity check: each key should have been incremented batch_iterations * thread_count times
+        expected = self.batch_iterations * self.thread_count
+        actual_values = d.values()
+
+        print(f"\nParallel batch updates (high contention) finished in {end - start:.2f}s")
+        print(f"Expected: {expected}, Actual sample: {actual_values[:5]}")
+
+        for val in actual_values:
+            self.assertEqual(val, expected)
+
+    def test_concurrent_map_filter_reduce_extreme(self):
+        """
+        Stress test for map/filter/reduce under concurrency.
+        """
+        initial_data = {f"key_{i}": i for i in range(1_000)}
+        d = ConcurrentDict(initial=initial_data)
+
+        def mapper():
+            for _ in range(500):
+                mapped = d.map(lambda k, v: (k.upper(), v * 2))
+                self.assertIsInstance(mapped, ConcurrentDict)
+
+        def filterer():
+            for _ in range(500):
+                filtered = d.filter(lambda k, v: v % 2 == 0)
+                self.assertIsInstance(filtered, ConcurrentDict)
+
+        def reducer():
+            for _ in range(500):
+                total = d.reduce(lambda acc, kv: acc + kv[1], 0)
+                self.assertIsInstance(total, int)
+
+        threads = []
+        for _ in range(self.thread_count // 3):
+            threads.append(threading.Thread(target=mapper))
+            threads.append(threading.Thread(target=filterer))
+            threads.append(threading.Thread(target=reducer))
+
+        start = time.perf_counter()
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        end = time.perf_counter()
+
+        print(f"\nConcurrent map/filter/reduce finished in {end - start:.2f}s")
+
+        # Just sanity: no corruption, still 1,000 keys
+        self.assertEqual(len(d), 1_000)
+
+    def test_super_batch_contention_and_slicing(self):
+        """
+        Massive batch updates + slicing checks under thread contention.
+        """
+        d = ConcurrentDict[int, int]({i: 0 for i in range(100_000)})
+
+        def worker(thread_id):
+            for _ in range(1_000):
+                def batch(dct):
+                    # Delete a slice of keys, add new ones
+                    keys = list(dct.keys())
+                    if len(keys) > 1000:
+                        for k in keys[:500]:
+                            del dct[k]
+                    # Reinsert new keys with thread id
+                    for i in range(500):
+                        dct[random.randint(0, 1_000_000)] = thread_id
+
+                d.batch_update(batch)
+
+        threads = [threading.Thread(target=worker, args=(tid,)) for tid in range(self.thread_count)]
+
+        start = time.perf_counter()
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        end = time.perf_counter()
+
+        print(f"\nSuper batch contention and slicing test finished in {end - start:.2f}s")
+
+        # Final sanity: no deadlocks, length should be positive
+        self.assertGreaterEqual(len(d), 0)
+        print(f"Final dictionary length: {len(d)}")

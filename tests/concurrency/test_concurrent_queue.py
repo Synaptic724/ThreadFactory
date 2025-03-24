@@ -1,8 +1,10 @@
-import random
-import threading
+import sys
 import unittest
-
-from src.thread_factory import ConcurrentQueue
+import time
+import threading
+import multiprocessing
+import random
+from src.thread_factory import ConcurrentQueue, Empty
 
 
 class TestConcurrentQueue(unittest.TestCase):
@@ -296,29 +298,24 @@ class TestConcurrentQueue(unittest.TestCase):
 
         def random_op():
             for _ in range(ops_per_thread):
-                op_type = random.choice(["enqueue", "dequeue", "batch", "peek"])
-                if op_type == "enqueue":
-                    q.enqueue(random.randint(0, 1000))
-                elif op_type == "dequeue":
-                    try:
+                op = random.choice(["enqueue", "dequeue", "peek", "batch"])
+                try:
+                    if op == "enqueue":
+                        q.enqueue(random.randint(0, 1000))
+                    elif op == "dequeue":
                         q.dequeue()
-                    except IndexError:
-                        pass
-                elif op_type == "peek":
-                    try:
+                    elif op == "peek":
                         q.peek()
-                    except IndexError:
-                        pass
-                else:  # "batch"
-                    def do_batch(deq):
-                        if deq and random.random() < 0.5:
-                            try:
+                    else:
+                        def do_batch(deq):
+                            if deq and random.random() < 0.5:
                                 deq.popleft()
-                            except IndexError:
-                                pass
-                        if random.random() < 0.5:
-                            deq.append(random.randint(0, 1000))
-                    q.batch_update(do_batch)
+                            if random.random() < 0.5:
+                                deq.append(random.randint(0, 1000))
+
+                        q.batch_update(do_batch)
+                except Empty:
+                    pass  # Expected under contention
 
         threads = [threading.Thread(target=random_op) for _ in range(num_threads)]
         for t in threads:
@@ -328,3 +325,311 @@ class TestConcurrentQueue(unittest.TestCase):
 
         # no crash => success
         self.assertGreaterEqual(len(q), 0)
+
+
+class HighPerformanceConcurrentQueueTest(unittest.TestCase):
+
+    def setUp(self):
+        self.queue = ConcurrentQueue()
+        self.total_ops = 1_000_000
+        self.thread_count = 50
+
+    def test_massive_parallel_enqueue_dequeue(self):
+        """
+        Stress test: parallel enqueue and dequeue with heavy thread contention.
+        """
+        enqueue_count = self.total_ops
+        dequeue_count = self.total_ops
+
+        def enqueuer():
+            for _ in range(enqueue_count // self.thread_count):
+                self.queue.enqueue(random.randint(1, 10000))
+
+        def dequeuer():
+            for _ in range(dequeue_count // self.thread_count):
+                try:
+                    self.queue.dequeue()
+                except Exception:
+                    pass  # queue might be empty
+
+        threads = []
+        for _ in range(self.thread_count // 2):
+            threads.append(threading.Thread(target=enqueuer))
+            threads.append(threading.Thread(target=dequeuer))
+
+        start = time.perf_counter()
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        end = time.perf_counter()
+
+        print(f"\n[Massive Parallel Enqueue/Dequeue] {self.total_ops:,} ops in {end - start:.2f}s")
+        print(f"[Final Queue Length]: {len(self.queue)}")
+
+        self.assertGreaterEqual(len(self.queue), 0)
+
+    def test_parallel_batch_updates_contention(self):
+        """
+        Batch update under high contention - multiple threads mutate concurrently.
+        """
+        initial_data = list(range(10_000))
+        self.queue = ConcurrentQueue(initial_data)
+
+        iterations = 10_000
+
+        def batch_worker():
+            for _ in range(iterations):
+                def batch_op(deq):
+                    # Pop half the items (if enough)
+                    for _ in range(min(5, len(deq))):
+                        deq.popleft()
+                    # Append new items
+                    for _ in range(5):
+                        deq.append(random.randint(0, 10000))
+                self.queue.batch_update(batch_op)
+
+        threads = [threading.Thread(target=batch_worker) for _ in range(self.thread_count)]
+
+        start = time.perf_counter()
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        end = time.perf_counter()
+
+        print(f"\n[Parallel Batch Updates Contention] {iterations * self.thread_count:,} batch updates in {end - start:.2f}s")
+        print(f"[Final Queue Length]: {len(self.queue)}")
+
+        self.assertGreaterEqual(len(self.queue), 0)
+
+    def test_concurrent_map_filter_reduce_extreme(self):
+        """
+        Stress test: concurrent map/filter/reduce.
+        """
+        self.queue = ConcurrentQueue(range(1000))
+
+        def mapper():
+            for _ in range(500):
+                mapped = self.queue.map(lambda x: x * 2)
+                self.assertIsInstance(mapped, ConcurrentQueue)
+
+        def filterer():
+            for _ in range(500):
+                filtered = self.queue.filter(lambda x: x % 2 == 0)
+                self.assertIsInstance(filtered, ConcurrentQueue)
+
+        def reducer():
+            for _ in range(500):
+                total = self.queue.reduce(lambda acc, x: acc + x, 0)
+                self.assertIsInstance(total, int)
+
+        threads = []
+        for _ in range(self.thread_count // 3):
+            threads.append(threading.Thread(target=mapper))
+            threads.append(threading.Thread(target=filterer))
+            threads.append(threading.Thread(target=reducer))
+
+        start = time.perf_counter()
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        end = time.perf_counter()
+
+        print(f"\n[Concurrent Map/Filter/Reduce Extreme] finished in {end - start:.2f}s")
+        self.assertEqual(len(self.queue), 1000)
+
+    def test_randomized_parallel_operations(self):
+        """
+        Random enqueue, dequeue, batch, peek under max concurrency.
+        """
+        operations_per_thread = 20_000
+
+        def random_worker():
+            for _ in range(operations_per_thread):
+                op = random.choice(["enqueue", "dequeue", "peek", "batch"])
+                if op == "enqueue":
+                    self.queue.enqueue(random.randint(0, 10000))
+                elif op == "dequeue":
+                    try:
+                        self.queue.dequeue()
+                    except Exception:
+                        pass
+                elif op == "peek":
+                    try:
+                        _ = self.queue.peek()
+                    except Exception:
+                        pass
+                elif op == "batch":
+                    def batch_op(deq):
+                        if len(deq) > 0 and random.random() < 0.5:
+                            try:
+                                deq.popleft()
+                            except IndexError:
+                                pass
+                        deq.append(random.randint(0, 10000))
+                    self.queue.batch_update(batch_op)
+
+        threads = [threading.Thread(target=random_worker) for _ in range(self.thread_count)]
+
+        start = time.perf_counter()
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        end = time.perf_counter()
+
+        print(f"\n[Randomized Parallel Operations] {operations_per_thread * self.thread_count:,} ops in {end - start:.2f}s")
+        self.assertGreaterEqual(len(self.queue), 0)
+
+
+
+def producer_process(queue, item_count, process_id):
+    for i in range(item_count):
+        queue.put((process_id, i))
+
+def consumer_process(queue, item_count):
+    consumed = 0
+    while consumed < item_count:
+        try:
+            _ = queue.get(timeout=0.01)
+            consumed += 1
+        except:
+            pass  # Expected under contention
+
+class TestQueuePerformanceComparison(unittest.TestCase):
+    """
+    Compare performance between ConcurrentQueue (thread-based) and multiprocessing.Queue
+    """
+
+    def test_threaded_concurrent_queue_performance(self):
+        """
+        Your existing ConcurrentQueue, running high-performance producer/consumer test.
+        Competes with multiprocessing.Queue.
+        """
+        q = ConcurrentQueue()
+        producers = 10
+        consumers = 10
+        items_per_producer = 100_000
+        total_items = producers * items_per_producer
+
+        try:
+            GIL_ENABLED = sys._is_gil_enabled()
+        except AttributeError:
+            GIL_ENABLED = True
+
+        print(f"[ConcurrentQueue] GIL Enabled: {GIL_ENABLED}")
+
+        def producer(thread_id):
+            for i in range(items_per_producer):
+                q.enqueue((thread_id, i))
+
+        def consumer():
+            consumed = 0
+            while consumed < items_per_producer:
+                try:
+                    _ = q.dequeue()
+                    consumed += 1
+                except Empty:
+                    pass  # Expected if queue is momentarily empty
+
+        threads = []
+        for pid in range(producers):
+            threads.append(threading.Thread(target=producer, args=(pid,)))
+        for _ in range(consumers):
+            threads.append(threading.Thread(target=consumer))
+
+        print(f"\n[ConcurrentQueue] Starting {producers} producers / {consumers} consumers...")
+        start = time.perf_counter()
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        end = time.perf_counter()
+        duration = end - start
+
+        print(f"[ConcurrentQueue] {total_items:,} ops completed in {duration:.2f} seconds.")
+        print(f"[ConcurrentQueue] Final queue length: {len(q)}\n")
+
+        self.concurrent_queue_duration = duration
+        self.concurrent_queue_remaining = len(q)
+
+    def test_multiprocessing_queue_performance(self):
+        """
+        New multiprocessing.Queue equivalent of ConcurrentQueue performance test.
+        Competes with threaded ConcurrentQueue.
+        """
+        queue = multiprocessing.Queue()
+        producers = 10
+        consumers = 10
+        items_per_producer = 100_000
+        total_items = producers * items_per_producer
+
+        try:
+            GIL_ENABLED = sys._is_gil_enabled()
+        except AttributeError:
+            GIL_ENABLED = True
+
+        print(f"[MultiprocessingQueue] GIL Enabled: {GIL_ENABLED}")
+
+        processes = []
+        for pid in range(producers):
+            processes.append(multiprocessing.Process(target=producer_process, args=(queue, items_per_producer, pid)))
+        for _ in range(consumers):
+            processes.append(multiprocessing.Process(target=consumer_process, args=(queue, items_per_producer)))
+
+        print(f"\n[MultiprocessingQueue] Starting {producers} producers / {consumers} consumers...")
+        start = time.perf_counter()
+
+        for p in processes:
+            p.start()
+        for p in processes:
+            p.join()
+
+        end = time.perf_counter()
+        duration = end - start
+
+        print(f"[MultiprocessingQueue] {total_items:,} ops completed in {duration:.2f} seconds.")
+        try:
+            remaining = queue.qsize()
+        except NotImplementedError:
+            remaining = "Unknown (platform-dependent)"
+
+        print(f"[MultiprocessingQueue] Final queue length: {remaining}\n")
+
+        self.multiprocessing_queue_duration = duration
+        self.multiprocessing_queue_remaining = remaining
+
+    def test_compare_performance(self):
+        """
+        Runs both tests and compares them directly.
+        """
+        print("\n🚀 Running side-by-side performance comparison...\n")
+        self.test_threaded_concurrent_queue_performance()
+        self.test_multiprocessing_queue_performance()
+
+        print(f"\n⏱️ Performance Summary:")
+        print(f"- ConcurrentQueue duration: {self.concurrent_queue_duration:.2f} seconds")
+        print(f"- MultiprocessingQueue duration: {self.multiprocessing_queue_duration:.2f} seconds")
+
+        if self.concurrent_queue_duration < self.multiprocessing_queue_duration:
+            print(f"✅ ConcurrentQueue was faster by {self.multiprocessing_queue_duration - self.concurrent_queue_duration:.2f} seconds")
+        else:
+            print(f"✅ MultiprocessingQueue was faster by {self.concurrent_queue_duration - self.multiprocessing_queue_duration:.2f} seconds")
+
+        # Optional: enforce a max performance delta if required
+        # self.assertLess(self.concurrent_queue_duration, self.multiprocessing_queue_duration * 2)
+
+

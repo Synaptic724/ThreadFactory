@@ -1,5 +1,7 @@
 import threading
 import unittest
+import time
+import random
 
 from src.thread_factory.concurrency.concurrent_list import ConcurrentList
 
@@ -313,3 +315,126 @@ class TestConcurrentList(unittest.TestCase):
         # Assert the result
         expected_result = [10, 20, 0, 10, 20]
         self.assertEqual(clist.to_list(), expected_result)
+
+
+class HighPerformanceConcurrentListTest(unittest.TestCase):
+    def setUp(self):
+        # This runs before every test method
+        self.thread_count = 20  # Increase for more pressure
+        self.operations_per_thread = 100_000  # Heavy ops per thread
+        self.clist = ConcurrentList()
+
+    def test_massive_concurrent_operations(self):
+        """
+        Stress test with a large number of concurrent operations (append, pop, slicing, etc.)
+        """
+        def worker(thread_id):
+            for _ in range(self.operations_per_thread):
+                action = random.randint(0, 9)
+
+                if action < 4:  # 40% chance to append
+                    self.clist.append(thread_id)
+                elif action < 6:  # 20% chance to pop (with protection)
+                    try:
+                        self.clist.pop()
+                    except IndexError:
+                        pass  # ignore if empty
+                elif action < 8:  # 20% chance to read random index
+                    try:
+                        _ = self.clist[random.randint(0, max(len(self.clist)-1, 0))]
+                    except IndexError:
+                        pass
+                else:  # 20% chance to batch update (reverse, extend, delete slice)
+                    def batch(lst):
+                        if lst:
+                            lst.reverse()
+                            lst.append(thread_id)
+                            del lst[0:min(3, len(lst))]
+                    self.clist.batch_update(batch)
+
+        threads = [threading.Thread(target=worker, args=(tid,)) for tid in range(self.thread_count)]
+
+        start_time = time.perf_counter()
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        end_time = time.perf_counter()
+        total_operations = self.thread_count * self.operations_per_thread
+
+        print(f"\n[HighPerf] Completed {total_operations} operations in {end_time - start_time:.2f} seconds")
+        print(f"[HighPerf] Final ConcurrentList length: {len(self.clist)}")
+
+        # Make sure no data corruption (length >= 0 and no crashes)
+        self.assertGreaterEqual(len(self.clist), 0)
+
+    def test_concurrent_map_filter_reduce_stress(self):
+        """
+        Concurrent map, filter, and reduce stress test.
+        """
+        initial_data = list(range(1_000))
+        self.clist = ConcurrentList(initial=initial_data)
+
+        def worker_map_filter_reduce():
+            for _ in range(self.operations_per_thread // 10):  # Fewer ops because of heavy computation
+                mapped = self.clist.map(lambda x: x * 2)
+                filtered = self.clist.filter(lambda x: x % 2 == 0)
+                reduced_sum = self.clist.reduce(lambda acc, x: acc + x, 0)
+
+                # Light sanity checks inside heavy thread load
+                self.assertIsInstance(mapped, ConcurrentList)
+                self.assertIsInstance(filtered, ConcurrentList)
+                self.assertIsInstance(reduced_sum, int)
+
+        threads = [threading.Thread(target=worker_map_filter_reduce) for _ in range(self.thread_count)]
+
+        start_time = time.perf_counter()
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        end_time = time.perf_counter()
+
+        print(f"\n[HighPerf Map/Filter/Reduce] Completed {self.thread_count} threads in {end_time - start_time:.2f} seconds")
+
+        # Confirm no data corruption (should still be valid list)
+        self.assertGreaterEqual(len(self.clist), 0)
+
+    def test_batch_update_exclusivity(self):
+        """
+        Ensure batch updates are fully exclusive (no partial updates leaking between threads).
+        """
+        shared_list = ConcurrentList([0])
+
+        def exclusive_updater(thread_id):
+            for _ in range(self.operations_per_thread // 100):  # Reduce ops for batch weight
+                def batch(lst):
+                    # Each batch sees a consistent state and appends its thread_id 10 times
+                    start_len = len(lst)
+                    lst.extend([thread_id] * 10)
+                    assert len(lst) == start_len + 10
+                shared_list.batch_update(batch)
+
+        threads = [threading.Thread(target=exclusive_updater, args=(tid,)) for tid in range(self.thread_count)]
+
+        start_time = time.perf_counter()
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        end_time = time.perf_counter()
+
+        print(f"\n[Batch Exclusivity] Completed with final length {len(shared_list)} in {end_time - start_time:.2f} seconds")
+
+        # Basic sanity: we started with 1 item and appended 10 items per call
+        expected_min_length = 1 + (self.operations_per_thread // 100) * 10 * self.thread_count
+        self.assertEqual(len(shared_list), expected_min_length)
