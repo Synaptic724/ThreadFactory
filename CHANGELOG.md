@@ -16,10 +16,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [1.0.2] - 2025-03-23
 ### Added
-- ConcurrentStack now has remove_item() method
 - Dynaphore class for dynamic semaphore management
 - Added Update method to ConcurrentBag and ConcurrentList for bulk updates using iterables
+- Added Remove method for ConcurrentQueue and ConcurrentStack
+- Added performance testing in unittests for ConcurrentQueue for user testing if desired via clone
 
+### Fixes
+- Imports changed from relative to absolute
 ---
 
 ## [1.0.1] - 2025-03-22
