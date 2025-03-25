@@ -2,7 +2,7 @@ import random
 import threading
 import unittest
 
-from src.thread_factory import ConcurrentStack, Empty
+from thread_factory import ConcurrentStack, Empty
 
 
 class TestConcurrentStack(unittest.TestCase):

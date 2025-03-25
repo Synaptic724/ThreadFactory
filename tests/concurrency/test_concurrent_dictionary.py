@@ -2,7 +2,7 @@ import threading
 import unittest
 import random
 import time
-from src.thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory import ConcurrentDict
 
 
 class TestConcurrentDict(unittest.TestCase):

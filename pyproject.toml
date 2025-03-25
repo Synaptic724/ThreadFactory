@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ThreadFactory"
+name = "threadfactory"
 version = "1.0.1"
 description = "High-performance thread-safe (No-GIL–friendly) data structures and parallel operations for Python 3.13+."
 readme = "README.md"

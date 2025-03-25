@@ -2,7 +2,7 @@ import unittest
 import threading
 import time
 import random
-from src.thread_factory import Dynaphore
+from thread_factory import Dynaphore
 
 class TestDynaphore(unittest.TestCase):
 

@@ -3,7 +3,7 @@ import unittest
 import time
 import random
 
-from src.thread_factory.concurrency.concurrent_list import ConcurrentList
+from thread_factory import ConcurrentList
 
 
 class TestConcurrentList(unittest.TestCase):

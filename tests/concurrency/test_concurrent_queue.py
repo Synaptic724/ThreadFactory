@@ -4,7 +4,7 @@ import time
 import threading
 import multiprocessing
 import random
-from src.thread_factory import ConcurrentQueue, Empty
+from thread_factory import ConcurrentQueue, Empty
 
 
 class TestConcurrentQueue(unittest.TestCase):
@@ -520,7 +520,7 @@ class TestQueuePerformanceComparison(unittest.TestCase):
         q = ConcurrentQueue()
         producers = 10
         consumers = 10
-        items_per_producer = 100_000
+        items_per_producer = 100000
         total_items = producers * items_per_producer
 
         try:
@@ -574,7 +574,7 @@ class TestQueuePerformanceComparison(unittest.TestCase):
         queue = multiprocessing.Queue()
         producers = 10
         consumers = 10
-        items_per_producer = 100_000
+        items_per_producer = 100000
         total_items = producers * items_per_producer
 
         try:

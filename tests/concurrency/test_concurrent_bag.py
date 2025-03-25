@@ -1,7 +1,7 @@
 import threading
 import unittest
 
-from src.thread_factory import ConcurrentBag
+from thread_factory import ConcurrentBag
 
 
 class TestConcurrentBag(unittest.TestCase):
