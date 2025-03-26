@@ -41,7 +41,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         """
         Test the basic enqueue/dequeue behavior with a few items.
         """
-        cb = ConcurrentBuffer(1,1,contention_level=1, single_producer_mode = True, initial =[1, 2])
+        cb = ConcurrentBuffer(1, initial =[1, 2])
         self.assertEqual(len(cb), 2)
 
         cb.enqueue(3)
@@ -65,7 +65,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         Test removing a specific item by identity from the ConcurrentBuffer.
         We replicate 'remove_item' logic by a custom helper function.
         """
-        cb = ConcurrentBuffer(1,1,contention_level=1)
+        cb = ConcurrentBuffer(1)
         # Create unique objects
         task1 = {"id": 1}
         task2 = {"id": 2}
@@ -97,7 +97,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         """
         Test that peek returns the earliest (approximate FIFO) item without removing it.
         """
-        cb = ConcurrentBuffer(1,1,contention_level=1, single_producer_mode = True, initial=["apple", "banana"])
+        cb = ConcurrentBuffer(1, initial=["apple", "banana"])
         front = cb.peek_oldest()
         # Not strictly guaranteed "apple" if concurrency is wild,
         # but under single-thread usage it's near-FIFO.
@@ -113,7 +113,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         """
         Test __len__ and __bool__.
         """
-        cb = ConcurrentBuffer(1,1, contention_level=1)
+        cb = ConcurrentBuffer(1)
         self.assertEqual(len(cb), 0)
         self.assertFalse(cb)
 
@@ -125,7 +125,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         """
         Test iterating over the buffer returns a snapshot of current items.
         """
-        cb = ConcurrentBuffer(1,1,contention_level=1, single_producer_mode = True, initial=[1, 2, 3])
+        cb = ConcurrentBuffer(1, initial=[1, 2, 3])
         items = list(cb)
         # They might be in a slightly different order if concurrency were involved,
         # but single-threaded, they'll often come out in insertion order.
@@ -138,7 +138,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         """
         Test clearing the buffer removes all items.
         """
-        cb = ConcurrentBuffer(1,1,contention_level=1, single_producer_mode = True, initial=[10, 20, 30])
+        cb = ConcurrentBuffer(1, initial=[10, 20, 30])
         cb.clear()
         self.assertEqual(len(cb), 0)
         self.assertFalse(cb)
@@ -147,7 +147,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         """
         Test __repr__ and __str__ contain useful info.
         """
-        cb = ConcurrentBuffer(1,1,contention_level=1, single_producer_mode = True, initial=["alpha", "beta"])
+        cb = ConcurrentBuffer(1, initial=["alpha", "beta"])
         r = repr(cb)
         s = str(cb)
         # The exact formatting might differ, but check for keywords
@@ -160,7 +160,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         Test copy() and deepcopy() produce correct separate objects.
         """
         from copy import deepcopy
-        cb = ConcurrentBuffer(1,1,contention_level=1, single_producer_mode = True, initial=[{"x": 1}, {"y": 2}])
+        cb = ConcurrentBuffer(1, initial=[{"x": 1}, {"y": 2}])
 
         cb_copy = cb.copy()
         cb_deep = deepcopy(cb)
@@ -189,7 +189,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         """
         Test batch_update can be used for multiple atomic mutations.
         """
-        cb = ConcurrentBuffer(1,1,contention_level=1, single_producer_mode = True, initial=["apple", "banana"])
+        cb = ConcurrentBuffer(1, initial=["apple", "banana"])
 
         def remove_and_enqueue(lst):
             lst.clear()
@@ -205,7 +205,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         """
         Test map/filter/reduce functional methods.
         """
-        cb = ConcurrentBuffer(1,1,contention_level=1, single_producer_mode = True, initial=[1, 2, 3, 4])
+        cb = ConcurrentBuffer(1, initial=[1, 2, 3, 4])
 
         mapped = cb.map(lambda x: x * 2)
         self.assertEqual(len(mapped), 4)
@@ -226,7 +226,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         """
         Simulate multiple producer and consumer threads for concurrency stress.
         """
-        cb = ConcurrentBuffer(5,5,contention_level=5)
+        cb = ConcurrentBuffer(10)
         producers = 5
         consumers = 5
         items_per_thread = 1000
@@ -264,7 +264,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         """
         Ensure multiple threads can call batch_update concurrently without errors.
         """
-        cb = ConcurrentBuffer(1,1,contention_level=1, single_producer_mode = True, initial=[1, 2, 3, 4, 5])
+        cb = ConcurrentBuffer(1, initial=[1, 2, 3, 4, 5])
 
         def updater():
             def batched(item_list):
@@ -290,7 +290,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         Multiple threads do map() and filter() to produce new buffers,
         ensuring no crash or data race with the source buffer.
         """
-        cb = ConcurrentBuffer(1,1,contention_level=1, single_producer_mode = True, initial=range(100))
+        cb = ConcurrentBuffer(1, initial=range(100))
         new_buffers = []
 
         def mapper():
@@ -319,7 +319,7 @@ class TestConcurrentBuffer(unittest.TestCase):
         Perform random enqueues, dequeues, batch updates, and concurrency
         to test overall thread safety under chaotic usage.
         """
-        cb = ConcurrentBuffer(5,5,contention_level=4)
+        cb = ConcurrentBuffer(10)
         num_threads = 10
         ops_per_thread = 200
 
@@ -357,7 +357,7 @@ class TestConcurrentBuffer(unittest.TestCase):
 class HighPerformanceConcurrentBufferTest(unittest.TestCase):
 
     def setUp(self):
-        self.buffer = ConcurrentBuffer(5,5,contention_level=5)
+        self.buffer = ConcurrentBuffer(15)
         self.total_ops = 1_000_000
         self.thread_count = 10
 
@@ -404,7 +404,7 @@ class HighPerformanceConcurrentBufferTest(unittest.TestCase):
         Batch update under high contention - multiple threads mutate concurrently.
         """
         initial_data = list(range(10_000))
-        self.buffer = ConcurrentBuffer(25,25,contention_level=5, single_producer_mode = True, initial=initial_data)
+        self.buffer = ConcurrentBuffer(25,initial=initial_data)
 
         iterations = 1
 
@@ -440,7 +440,7 @@ class HighPerformanceConcurrentBufferTest(unittest.TestCase):
         """
         Stress test: concurrent map/filter/reduce.
         """
-        self.buffer = ConcurrentBuffer(5,5,contention_level=5, single_producer_mode = True, initial=range(1000))
+        self.buffer = ConcurrentBuffer(5, initial=range(1000))
 
         def mapper():
             for _ in range(500):
@@ -550,10 +550,10 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         High-performance producer/consumer test using threads and ConcurrentBuffer.
         Similar to test_threaded_concurrent_queue_performance.
         """
-        self.buffer = ConcurrentBuffer(10,10,contention_level=1)
-        producers = 10
-        consumers = 10
-        self.items_per_producer = 100_000
+        self.buffer = ConcurrentBuffer(20)
+        producers = 20
+        consumers = 20
+        self.items_per_producer = 200_000
         total_items = producers * self.items_per_producer
 
         try:
@@ -605,9 +605,9 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         Compare with multiprocessing.Queue, using processes for parallelism.
         """
         queue = multiprocessing.Queue()
-        producers = 10
-        consumers = 10
-        items_per_producer = 100_000
+        producers = 20
+        consumers = 20
+        items_per_producer = 200_000
         total_items = producers * items_per_producer
 
         try:
@@ -658,9 +658,9 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         """
         from thread_factory import ConcurrentQueue
         q = ConcurrentQueue()
-        producers = 10
-        consumers = 10
-        items_per_producer = 100_000
+        producers = 20
+        consumers = 20
+        items_per_producer = 200_000
         total_items = producers * items_per_producer
 
         try:

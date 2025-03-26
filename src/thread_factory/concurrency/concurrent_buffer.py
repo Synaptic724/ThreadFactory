@@ -93,52 +93,21 @@ class ConcurrentBuffer(Generic[_T]):
 
     def __init__(
         self,
-        consumer_count: int,
-        producer_count: int,
-        contention_level: int = 5,
-        single_producer_mode: bool = False,
+        number_of_shards: int = 6,
         initial: Optional[Iterable[_T]] = None,
     ) -> None:
         if initial is None:
             initial = []
-        if single_producer_mode:
-            producer_count = 1
-            self.single_producer = threading.get_native_id()
-        else:
-            self.single_producer = False
 
-        num_shards = ConcurrentBuffer.detect_shard_count(consumer_count, producer_count, contention_level)
-        self._length_array = array("Q", [0] * num_shards)  # holds the length of each shard
-        self._time_array = array("Q", [0] * num_shards)    # holds the timestamp for each shard
+        self._length_array = array("Q", [0] * number_of_shards)  # holds the length of each shard
+        self._time_array = array("Q", [0] * number_of_shards)    # holds the timestamp for each shard
 
-        self._shards: List[_Shard[_T]] = [_Shard(self._length_array, self._time_array, i) for i in range(num_shards)]
-        self._num_shards = num_shards
-        self._consumer_count = consumer_count
-        self._producer_count = producer_count
-        self._concurrency_level = contention_level
-
-        if single_producer_mode:
-            self.producer_thread_assignments = {True: self._shards}
-        else:
-            self.producer_thread_assignments = {x: [] for x in range(self._num_shards)}
-        self.consumer_thread_assignments = {x: [] for x in range(self._num_shards)}
+        self._shards: List[_Shard[_T]] = [_Shard(self._length_array, self._time_array, i) for i in range(number_of_shards)]
+        self._num_shards = number_of_shards
 
         # Distribute initial items (randomly) to shards
         for item in initial:
             self.enqueue(item)
-
-    @staticmethod
-    def detect_shard_count(consumer_count: int, producer_count: int, contention_level: int) -> int:
-        if consumer_count is None or producer_count is None:
-            raise ValueError("ConsumerCount and ProducerCount must be set")
-        if contention_level == 0 or producer_count == 0 or consumer_count == 0:
-            raise ValueError("ConcurrencyLevel, ProducerCount and ConsumerCount must be set")
-        if 3 <= contention_level <= 7:
-            return max(consumer_count, producer_count)
-        if 1 <= contention_level <= 2:
-            return min(consumer_count, producer_count)
-        if 8 <= contention_level <= 10:
-            return consumer_count * producer_count
 
     def enqueue(self, item: _T) -> None:
         shard_idx = random.randint(0, self._num_shards - 1)
@@ -203,12 +172,8 @@ class ConcurrentBuffer(Generic[_T]):
     def copy(self) -> "ConcurrentBuffer[_T]":
         items_copy = list(self)
         return ConcurrentBuffer(
-            initial=items_copy,
-            producer_count=self._producer_count,
-            consumer_count=self._consumer_count,
-            contention_level=self._concurrency_level,
-            single_producer_mode=bool(self.single_producer),
-        )
+            number_of_shards=self._num_shards,
+            initial=items_copy)
 
     def __copy__(self) -> "ConcurrentBuffer[_T]":
         return self.copy()
@@ -217,13 +182,10 @@ class ConcurrentBuffer(Generic[_T]):
         with threading.Lock():
             all_items = list(self)
             deep_items = deepcopy(all_items, memo)
-        return ConcurrentBuffer(
-            initial=deep_items,
-            producer_count=self._producer_count,
-            consumer_count=self._consumer_count,
-            contention_level=self._concurrency_level,
-            single_producer_mode=bool(self.single_producer),
-        )
+            return ConcurrentBuffer(
+                number_of_shards=self._num_shards,
+                initial=deep_items)
+
 
     def to_concurrent_list(self) -> "ConcurrentList[_T]":
         items_copy = list(self)
@@ -241,23 +203,14 @@ class ConcurrentBuffer(Generic[_T]):
         items_copy = list(self)
         mapped = list(map(func, items_copy))
         return ConcurrentBuffer(
-            initial=mapped,
-            producer_count=self._producer_count,
-            consumer_count=self._consumer_count,
-            contention_level=self._concurrency_level,
-            single_producer_mode=bool(self.single_producer),
-        )
+            number_of_shards=self._num_shards,
+            initial=mapped)
 
     def filter(self, func: Callable[[_T], bool]) -> "ConcurrentBuffer[_T]":
         items_copy = list(self)
         filtered = list(filter(func, items_copy))
-        return ConcurrentBuffer(
-            initial=filtered,
-            producer_count=self._producer_count,
-            consumer_count=self._consumer_count,
-            contention_level=self._concurrency_level,
-            single_producer_mode=bool(self.single_producer),
-        )
+        return ConcurrentBuffer(number_of_shards=self._num_shards,
+            initial=filtered)
 
     def remove_item(self, item: _T) -> bool:
         found = False
