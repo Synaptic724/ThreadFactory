@@ -14,9 +14,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.0.2] - 2025-03-23
-### Added
-- Dynaphore class for dynamic semaphore management
+## [1.1.0] - 2025-03-23
+### Classes Added
+### 1. Dynaphore
+- A dynamic semaphore class that allows for dynamic tuning of semaphore limits.
+- Supports increase and decrease of semaphore limits at runtime.
+
+### Added Features
 - Added Update method to ConcurrentBag and ConcurrentList for bulk updates using iterables
 - Added Remove method for ConcurrentQueue and ConcurrentStack
 - Added performance testing in unittests for ConcurrentQueue for user testing if desired via clone

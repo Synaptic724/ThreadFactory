@@ -18,11 +18,16 @@ if sys.version_info < (3, 13):
         UserWarning
     )
 
+DEBUG_MODE = False
+
 try:
     from importlib.metadata import version as get_version
     __version__ = get_version("thread_factory")
 except Exception:
-    __version__ = "1.0.2-dev"
+    if DEBUG_MODE:
+        __version__ = "1.1.0-dev"
+    else:
+        __version__ = "1.1.0"
 
 
 def _detect_nogil_mode() -> None:
@@ -58,6 +63,7 @@ from src.thread_factory.concurrency.concurrent_list import ConcurrentList
 from src.thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from src.thread_factory.concurrency.concurrent_stack import ConcurrentStack
 from src.thread_factory.concurrency.concurrent_core import Concurrent
+from src.thread_factory.concurrency.concurrent_buffer import ConcurrentBuffer
 from src.thread_factory.utils.exceptions import Empty
 from src.thread_factory.threads import Worker, Dynaphore
 
@@ -68,6 +74,7 @@ __all__ = [
     "ConcurrentQueue",
     "Concurrent",
     "ConcurrentStack",
+    "ConcurrentBuffer",
     "Empty",
     "Worker",
     "Dynaphore",

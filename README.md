@@ -1,9 +1,17 @@
 # ThreadFactory
 
-[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory)](https://pepy.tech/projects/threadfactory)
 [![PyPI version](https://badge.fury.io/py/threadfactory.svg)](https://badge.fury.io/py/threadfactory)
 [![License](https://img.shields.io/github/license/Synaptic724/threadfactory)](https://github.com/yourusername/threadfactory/blob/main/LICENSE)
 [![Python Version](https://img.shields.io/pypi/pyversions/threadfactory)](https://pypi.org/project/threadfactory)
+
+[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory/month)](https://pepy.tech/projects/threadfactory)
+[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory/week)](https://pepy.tech/projects/threadfactory)
+[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory)](https://pepy.tech/projects/threadfactory)
+
+<!--[![Build Status](https://travis-ci.com/Synaptic724/threadfactory.svg?branch=main)](https://travis-ci.com/Synaptic724/threadfactory) -->
+<!--[![Coverage Status](https://coveralls.io/repos/github/Synaptic724/threadfactory/badge.svg?branch=main)](https://coveralls.io/github/Synaptic724/threadfactory?branch=main) -->
+<!--[![Documentation Status](https://readthedocs.org/projects/threadfactory/badge/?version=latest)](https://threadfactory.readthedocs.io/en/latest/?badge=latest) -->
+<!--[![CodeFactor](https://www.codefactor.io/repository/github/synaptic724/threadfactory/badge)](https://www.codefactor.io/repository/github/synaptic724/threadfactory) -->
 
 High-performance **thread-safe** (No-GIL–friendly) data structures and parallel operations for Python 3.13+.
 
@@ -14,6 +22,9 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 
 ## 🚀 Features
 
+
+
+## Concurrent Data Structures
 ### 1. ConcurrentBag  
 - A thread-safe “multiset” collection that allows duplicates.  
 - Methods like `add`, `remove`, `discard`, etc.  
@@ -40,7 +51,9 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 - Ideal for last-in, first-out (LIFO) workloads.  
 - Built on `deque` for fast appends and pops.
 
-### 6. Parallel Utilities (TPL-like)  
+
+## Parallel Operations
+### 1. Parallel Utilities (TPL-like)  
 - `parallel_for`, `parallel_foreach`, `parallel_invoke`, `parallel_map`.  
 - Pure thread-based concurrency (No-GIL optimized), not tied to asyncio or multiprocessing.  
 - Flexible chunking, concurrency control, local state usage, early exit on exception, and more.  

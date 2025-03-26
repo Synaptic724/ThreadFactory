@@ -7,8 +7,10 @@ class Dynaphore(threading.Semaphore):
     Exposes the internal Condition for wait/notify and provides dynamic scaling.
     """
 
-    def __init__(self, value: int = 1):
+    def __init__(self, value: int = 1, re_entrant: bool = False):
         super().__init__(value)
+        if re_entrant:
+            self._cond = threading.Condition(threading.RLock())
 
     @property
     def condition(self) -> threading.Condition:
