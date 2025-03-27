@@ -12,7 +12,7 @@ from typing import (
     Iterator,
     List,
     Optional,
-    TypeVar,
+    TypeVar, Generator,
 )
 from array import array
 
@@ -114,7 +114,7 @@ class _Shard(Generic[_T]):
                 raise Empty("peek from empty ConcurrentBuffer")
             return copy(self._queue[0][1])
 
-    def __iter__(self) -> List[Any]:
+    def __iter__(self) -> Iterator[Any]:
         """
         Returns a list containing all items in this shard.
 
@@ -122,7 +122,8 @@ class _Shard(Generic[_T]):
             List[Any]: A list of items in the shard.
         """
         with self._lock:
-            return [item for (_, item) in self._queue]
+            return iter([item for (_, item) in self._queue])
+
 
     def clear(self) -> None:
         """Removes all items from this shard and resets its length and timestamp."""

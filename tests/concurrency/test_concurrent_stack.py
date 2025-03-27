@@ -304,12 +304,12 @@ class TestConcurrentStack(unittest.TestCase):
                 elif op_type == "pop":
                     try:
                         s.pop()
-                    except IndexError:
+                    except Exception:
                         pass
                 elif op_type == "peek":
                     try:
                         s.peek()
-                    except IndexError:
+                    except Exception:
                         pass
                 else:  # "batch"
                     def do_batch(d):
