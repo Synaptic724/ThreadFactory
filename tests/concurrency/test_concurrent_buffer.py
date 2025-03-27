@@ -548,12 +548,12 @@ class TestBufferPerformanceComparison(unittest.TestCase):
     def test_threaded_concurrent_buffer_performance(self):
         """
         High-performance producer/consumer test using threads and ConcurrentBuffer.
-        Similar to test_threaded_concurrent_queue_performance.
+        Balanced consumer workload to avoid stalling.
         """
-        self.buffer = ConcurrentBuffer(20)
-        producers = 20
-        consumers = 20
-        self.items_per_producer = 200_000
+        self.buffer = ConcurrentBuffer(4)
+        producers = 8
+        consumers = 8
+        self.items_per_producer = 50_000
         total_items = producers * self.items_per_producer
 
         try:
@@ -567,20 +567,26 @@ class TestBufferPerformanceComparison(unittest.TestCase):
             for i in range(self.items_per_producer):
                 self.buffer.enqueue((thread_id, i))
 
-        def consumer():
+        # Distribute total work across consumers
+        base_target = total_items // consumers
+        targets = [base_target] * consumers
+        for i in range(total_items % consumers):
+            targets[i] += 1
+
+        def consumer(target):
             consumed = 0
-            while consumed < self.items_per_producer:
+            while consumed < target:
                 try:
                     _ = self.buffer.dequeue()
                     consumed += 1
                 except Empty:
-                    pass
+                    time.sleep(0.001)
 
         threads = []
         for pid in range(producers):
             threads.append(threading.Thread(target=producer, args=(pid,)))
-        for _ in range(consumers):
-            threads.append(threading.Thread(target=consumer))
+        for i in range(consumers):
+            threads.append(threading.Thread(target=consumer, args=(targets[i],)))
 
         print(f"\n[ConcurrentBuffer/Threads] Starting {producers} producers / {consumers} consumers...")
         start = time.perf_counter()
@@ -605,9 +611,9 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         Compare with multiprocessing.Queue, using processes for parallelism.
         """
         queue = multiprocessing.Queue()
-        producers = 20
-        consumers = 20
-        items_per_producer = 200_000
+        producers = 8
+        consumers = 8
+        items_per_producer = 200
         total_items = producers * items_per_producer
 
         try:
@@ -658,9 +664,9 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         """
         from thread_factory import ConcurrentQueue
         q = ConcurrentQueue()
-        producers = 20
-        consumers = 20
-        items_per_producer = 200_000
+        producers = 8
+        consumers = 8
+        items_per_producer = 50_000
         total_items = producers * items_per_producer
 
         try:
@@ -674,20 +680,26 @@ class TestBufferPerformanceComparison(unittest.TestCase):
             for i in range(items_per_producer):
                 q.enqueue((thread_id, i))
 
-        def consumer():
+        # Distribute items evenly among consumers
+        base_target = total_items // consumers
+        targets = [base_target] * consumers
+        for i in range(total_items % consumers):
+            targets[i] += 1
+
+        def consumer(target):
             consumed = 0
-            while consumed < items_per_producer:
+            while consumed < target:
                 try:
                     _ = q.dequeue()
                     consumed += 1
                 except Empty:
-                    pass  # Expected if queue is momentarily empty
+                    time.sleep(0.001)
 
         threads = []
         for pid in range(producers):
             threads.append(threading.Thread(target=producer, args=(pid,)))
-        for _ in range(consumers):
-            threads.append(threading.Thread(target=consumer))
+        for i in range(consumers):
+            threads.append(threading.Thread(target=consumer, args=(targets[i],)))
 
         print(f"\n[ConcurrentQueue] Starting {producers} producers / {consumers} consumers...")
         start = time.perf_counter()

@@ -1,5 +1,6 @@
 import functools
 import threading
+import time
 from collections import deque
 from copy import deepcopy
 from typing import (
@@ -65,10 +66,14 @@ class ConcurrentStack(Generic[_T]):
         Returns:
             _T: The item popped.
         """
-        with self._lock:
-            if not self._deque:
-                raise Empty("pop from empty ConcurrentStack")
-            return self._deque.pop()
+        try:
+            with self._lock:
+                if not self._deque:
+                    raise Empty("pop from empty ConcurrentStack")
+                return self._deque.pop()
+        except Empty:
+            time.sleep(0.001)
+            raise
 
     def peek(self) -> _T:
         """

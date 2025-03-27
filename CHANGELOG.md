@@ -20,6 +20,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - A dynamic semaphore class that allows for dynamic tuning of semaphore limits.
 - Supports increase and decrease of semaphore limits at runtime.
 
+### 2. ConcurrentBuffer
+- This class is a thread-safe buffer that allows for concurrent read and write operations.
+- It is not FIFO or LIFO, but rather a simple buffer that can be used for any purpose.
+- It operates well under low to moderate contention and outperforms other collections in this scenario.
+- For high contention, consider using a dedicated collection like ConcurrentQueue or ConcurrentStack.
+
 ### Added Features
 - Added Update method to ConcurrentBag and ConcurrentList for bulk updates using iterables
 - Added Remove method for ConcurrentQueue and ConcurrentStack
@@ -27,6 +33,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixes
 - Imports changed from relative to absolute
+- Added small sleep timer to ConcurrentStack and ConcurrentQueue to provide backpressure time.sleep(0.001)
 ---
 
 ## [1.0.1] - 2025-03-22

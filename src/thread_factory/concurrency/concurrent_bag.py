@@ -1,5 +1,6 @@
 import functools
 import threading
+import time
 from copy import deepcopy
 from typing import (
     Any,
@@ -93,16 +94,20 @@ class ConcurrentBag(Generic[_T]):
         Returns:
             _T: An item that was removed.
         """
-        with self._lock:
-            if not self._bag:
-                raise Empty("pop from empty ConcurrentBag")
+        try:
+            with self._lock:
+                if not self._bag:
+                    raise Empty("pop from empty ConcurrentBag")
 
-            item, count = next(iter(self._bag.items()))
-            if count == 1:
-                del self._bag[item]
-            else:
-                self._bag[item] = count - 1
-            return item
+                item, count = next(iter(self._bag.items()))
+                if count == 1:
+                    del self._bag[item]
+                else:
+                    self._bag[item] = count - 1
+                return item
+        except Empty:
+            time.sleep(0.001)
+            raise
 
     def clear(self) -> None:
         """
