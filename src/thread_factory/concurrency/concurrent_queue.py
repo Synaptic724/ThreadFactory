@@ -56,7 +56,7 @@ class ConcurrentQueue(Generic[_T]):
         with self._lock:
             self._deque.append(item)
 
-    def dequeue(self) -> _T:
+    def dequeue1(self) -> _T:
         """
         Remove and return an item from the front of the queue.
 
@@ -72,8 +72,23 @@ class ConcurrentQueue(Generic[_T]):
                     raise Empty("dequeue from empty ConcurrentQueue")
                 return self._deque.popleft()
         except Empty:
-            time.sleep(0.10)
+            #time.sleep(0.001)
             raise
+
+    def dequeue(self) -> _T:
+        """
+        Remove and return an item from the front of the queue.
+
+        Raises:
+            IndexError: If the queue is empty.
+
+        Returns:
+            _T: The item dequeued.
+        """
+        with self._lock:
+            if not self._deque:
+                raise Empty("dequeue from empty ConcurrentQueue")
+            return self._deque.popleft()
 
     def peek(self) -> _T:
         """

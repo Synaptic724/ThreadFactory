@@ -147,9 +147,10 @@ class ConcurrentBuffer(Generic[_T]):
 
     **NOTE**: This buffer is not designed for high-contention scenarios.
     ConcurrentQueue or ConcurrentStack Outperforms this object in high-contention scenarios.
+    DO NOT EXCEED 20 THREADS OVERALL (for producer and consumer pattern) WHEN USING THIS OBJECT.
 
-    4-6 Shards have given quite good results in most scenarios with under 10 threads, it can
-    outperform the ConcurrentQueue in some scenarios by 2x
+    Please follow the rule of dividing the number of threads by 2 for the producer and consumer pattern
+    to obtain shard count. For example, if you have 10 threads, you should use 5 shards.
     """
 
     def __init__(
@@ -183,13 +184,12 @@ class ConcurrentBuffer(Generic[_T]):
 
     def enqueue(self, item: _T) -> None:
         """
-        Adds a new item to the buffer. The item is randomly assigned to one of the internal shards.
+        Adds a new item to the buffer. The item is to the queue with the least length.
 
         Args:
             item (_T): The item to add.
         """
-        # Choose a random shard to enqueue the item into. This helps distribute the load.
-        shard_idx = random.randint(0, self._num_shards - 1)
+        shard_idx = min(range(self._num_shards), key=lambda i: self._length_array[i])
         shard = self._shards[shard_idx]
         shard.enqueue_item(item)
 

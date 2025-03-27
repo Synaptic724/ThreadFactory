@@ -14,7 +14,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.1.0] - 2025-03-23
+## [1.1.0] - 2025-03-26
 ### Classes Added
 ### 1. Dynaphore
 - A dynamic semaphore class that allows for dynamic tuning of semaphore limits.

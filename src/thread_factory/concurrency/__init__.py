@@ -6,6 +6,7 @@ from src.thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from src.thread_factory.concurrency.concurrent_stack import ConcurrentStack
 from src.thread_factory.concurrency.concurrent_buffer import ConcurrentBuffer
 
+
 __all__ = [
     "ConcurrentBag",
     "ConcurrentDict",
