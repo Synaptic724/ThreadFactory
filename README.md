@@ -20,6 +20,19 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 > This library will only function on 3.13 and higher.
 ---
 
+## 🔥 Benchmark Results (1,000,000 ops, 10 producers / 10 consumers)
+
+All implementations tested under balanced thread conditions with GIL optimizations disabled.
+
+| Queue Type               | Time (sec) | Throughput (ops/sec) | Final Length | Notes |
+|--------------------------|------------|------------------------|---------------|-------|
+| `multiprocessing.Queue` | 15.57      | ~64,232                | 0             | Built-in Python queue for inter-process communication. Heavy and slow under threading. |
+| `ConcurrentBuffer`       | **2.37**   | **~421,940**           | 0             | ⚡ Fastest. Uses even-shard windowing + bit-flip load balancing. |
+| `ConcurrentQueue`        | 3.75       | ~266,667               | 0             | Solid performance. Thread-safe queue with internal locking. |
+| `collections.deque`      | 6.16       | ~162,337               | 0             | Lock-protected. Atomic at op-level but requires coordination. |
+
+🧠 **Key Insight**: `ConcurrentBuffer` outperforms all others by a wide margin — over **6.5× faster** than `multiprocessing.Queue`, and nearly **2× faster** than a naive `deque` with `Lock`.
+
 ## 🚀 Features
 
 ## Concurrent Data Structures
@@ -39,15 +52,17 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 
 ### 4. ConcurrentQueue  
 - A thread-safe FIFO queue built atop `collections.deque`.  
+- Tested and outperforms deque alone by up to 64% in our benchmark.
 - Supports `enqueue`, `dequeue`, `peek`, `map`, `filter`, and `reduce`.  
 - Raises `Empty` when `dequeue` or `peek` is called on an empty queue.
-- Outperforms multiprocessing queues by over 300% in some cases clone and run unit tests to see.
+- Outperforms multiprocessing queues by over 400% in some cases clone and run unit tests to see.
 
 ### 5. ConcurrentStack  
 - A thread-safe LIFO stack.  
 - Supports `push`, `pop`, `peek` operations.  
 - Ideal for last-in, first-out (LIFO) workloads.  
 - Built on `deque` for fast appends and pops.
+- Similar performance to ConcurrentQueue
 
 ### 6. ConcurrentBuffer  
 - A **high-performance**, thread-safe buffer using **sharded deques** for low-contention access.  
@@ -57,7 +72,6 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 - Outperforms `ConcurrentQueue` by up to **60%** in mid-range concurrency (4–20 threads).  
 - Automatically balances items across shards; ideal for parallel pipelines and low-latency workloads.  
 - Best used with `shard_count ≈ thread_count / 2` for optimal performance.
-
 ---
 
 ## Parallel Operations

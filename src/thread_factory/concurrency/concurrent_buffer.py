@@ -154,9 +154,9 @@ class ConcurrentBuffer(Generic[_T]):
     """
 
     def __init__(
-        self,
-        number_of_shards: int = 4,
-        initial: Optional[Iterable[_T]] = None,
+            self,
+            number_of_shards: int = 4,
+            initial: Optional[Iterable[_T]] = None,
     ) -> None:
         """
         Initializes a new ConcurrentBuffer.
@@ -168,30 +168,42 @@ class ConcurrentBuffer(Generic[_T]):
         if initial is None:
             initial = []
 
-        # Shared array to store the current length of each shard. Using an array for efficiency.
+        if number_of_shards < 1:
+            raise ValueError("number_of_shards must be at least 1")
+        if number_of_shards > 1 and number_of_shards % 2 != 0:
+            raise ValueError("number_of_shards must be even if greater than 1")
+
         self._length_array = array("Q", [0] * number_of_shards)
-        # Shared array to store the timestamp of the earliest item in each shard.
         self._time_array = array("Q", [0] * number_of_shards)
-
-        # Create the internal shards. Each shard gets a reference to the shared length and time arrays.
-        self._shards: List[_Shard[_T]] = [_Shard(self._length_array, self._time_array, i) for i in range(number_of_shards)]
-        # The total number of shards.
+        self._shards: List[_Shard[_T]] = [
+            _Shard(self._length_array, self._time_array, i)
+            for i in range(number_of_shards)
+        ]
         self._num_shards = number_of_shards
+        self._mid = number_of_shards // 2
+        self._left_range = range(0, self._mid)
+        self._right_range = range(self._mid, number_of_shards)
 
-        # Distribute initial items (randomly) to shards to balance the load.
+        self._shard_indices = list(range(number_of_shards))
+
         for item in initial:
             self.enqueue(item)
 
     def enqueue(self, item: _T) -> None:
         """
-        Adds a new item to the buffer. The item is to the queue with the least length.
+        Adds a new item to the buffer.
 
         Args:
-            item (_T): The item to add.
+            item (_T): The item to add
         """
-        shard_idx = min(range(self._num_shards), key=lambda i: self._length_array[i])
-        shard = self._shards[shard_idx]
-        shard.enqueue_item(item)
+        if self._num_shards == 1:
+            shard_idx = 0
+        else:
+            flip = time.monotonic_ns() & 1
+            scan_range = self._left_range if flip == 0 else self._right_range
+            shard_idx = min(scan_range, key=lambda i: self._length_array[i])
+
+        self._shards[shard_idx].enqueue_item(item)
 
     def dequeue(self) -> _T:
         """
