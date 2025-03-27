@@ -58,6 +58,7 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 - Automatically balances items across shards; ideal for parallel pipelines and low-latency workloads.  
 - Best used with `shard_count ≈ thread_count / 2` for optimal performance.
 
+---
 
 ## Parallel Operations
 ### 1. Parallel Utilities (TPL-like)  

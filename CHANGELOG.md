@@ -13,6 +13,16 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Work stealing optimization with concurrent list handling
 
 ---
+## [1.2.0] - 2025-03-26
+### Classes Added
+- None
+
+### Added Features
+- None
+
+### Fixes
+- None
+---
 
 ## [1.1.0] - 2025-03-26
 ### Classes Added
