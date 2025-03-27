@@ -1,5 +1,4 @@
 import functools
-import random
 import threading
 import time
 from collections import deque
@@ -422,7 +421,7 @@ class ConcurrentBuffer(Generic[_T]):
 
     def reduce(self, func: Callable[[Any, _T], Any], initial: Optional[Any] = None) -> Any:
         """
-        Applies a function of two arguments cumulatively to the items of the buffer, from left to right, so as to reduce the buffer to a single value.
+        Applies a function of two arguments cumulatively to the items of the buffer, from left to right, to reduce the buffer to a single value.
 
         Args:
             func (Callable[[Any, _T], Any]): The function to apply.
