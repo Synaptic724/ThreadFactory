@@ -36,7 +36,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   These gains were achieved under balanced producer/consumer workloads (10P/10C, 1M ops).
 
 ### Fixes
-- None
+- Removed lock from peak on `ConcurrentQueue` and `ConcurrentStack` for performance improvement.
 
 ---
 

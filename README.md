@@ -18,20 +18,107 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 > **NOTE**  
 > ThreadFactory is designed and tested against Python 3.13+ in **No-GIL** mode.  
 > This library will only function on 3.13 and higher.
+> 
+> All benchmarks below are available if you clone the library and run the tests.
 ---
 
-## 🔥 Benchmark Results (1,000,000 ops, 10 producers / 10 consumers)
+## 🔥 Benchmark Results (1,000,000 ops — 10 Producers / 10 Consumers)
 
-All implementations tested under balanced thread conditions with GIL optimizations disabled.
+| Queue Type               | Time (sec) | Throughput (ops/sec) | Notes                                                                                      |
+|--------------------------|------------|----------------------|--------------------------------------------------------------------------------------------|
+| `multiprocessing.Queue`  | 12.53      | ~79,779              | Standard multiprocessing queue. Slow under threads due to process-safe locks.              |
+| `ConcurrentBuffer`(ThreadFactory) | **2.34**   | **~427,350**         | ⚡Fastest. Bit-flip balanced with even-shard windowing. |
+| `ConcurrentQueue` (ThreadFactory) | 3.72       | ~268,817             | Fast. Thread-safe with internal adaptive locking.                                          |
+| `collections.deque`      | 6.49       | ~154,085             | Reliable baseline. Internal lock-guarded deque with simple contention handling.            |
 
-| Queue Type               | Time (sec) | Throughput (ops/sec) | Final Length | Notes |
-|--------------------------|------------|------------------------|---------------|-------|
-| `multiprocessing.Queue` | 15.57      | ~64,232                | 0             | Built-in Python queue for inter-process communication. Heavy and slow under threading. |
-| `ConcurrentBuffer`       | **2.37**   | **~421,940**           | 0             | ⚡ Fastest. Uses even-shard windowing + bit-flip load balancing. |
-| `ConcurrentQueue`        | 3.75       | ~266,667               | 0             | Solid performance. Thread-safe queue with internal locking. |
-| `collections.deque`      | 6.16       | ~162,337               | 0             | Lock-protected. Atomic at op-level but requires coordination. |
+### 💡 Observations:
+- `ConcurrentBuffer` is **5.35× faster** than `multiprocessing.Queue`.
+- `ConcurrentBuffer` is **~1.85× faster** than `deque`.
+- `ConcurrentQueue` maintains good performance but is consistently beaten by `ConcurrentBuffer`.
+- All queues emptied correctly (`final buffer length = 0`).
 
-🧠 **Key Insight**: `ConcurrentBuffer` outperforms all others by a wide margin — over **6.5× faster** than `multiprocessing.Queue`, and nearly **2× faster** than a naive `deque` with `Lock`.
+
+---
+
+## 🔥 Benchmark Results (2,000,000 ops — 20 Producers / 10 Consumers)
+
+| Queue Type               | Time (sec) | Throughput (ops/sec) | Notes                                                                             |
+|--------------------------|------------|----------------------|-----------------------------------------------------------------------------------|
+| `multiprocessing.Queue`  | 25.57      | ~78,295              | Standard multiprocessing queue. Slow under threads due to process-safe locks.     |
+| `ConcurrentBuffer`(ThreadFactory) | 10.70      | ~186,916             | Bit-flip balanced with even-shard windowing. Optimized for thread-only workloads. |
+| `ConcurrentQueue` (ThreadFactory) | **7.19** | **~278,164** | ⚡ Fastest. Thread-safe with internal adaptive locking.                            |
+| `collections.deque`      | 11.67      | ~171,379             | Reliable baseline. Internal lock-guarded deque with simple contention handling.   |
+
+### 💡 Observations:
+- `ConcurrentQueue` was the fastest in this benchmark.
+- `ConcurrentQueue` is **~3.56× faster** than `multiprocessing.Queue`.
+- `ConcurrentQueue` is **~1.68× faster** than `deque`.
+- `ConcurrentBuffer` performed well but was beaten by `ConcurrentQueue` in this test with a higher producer count.
+- All queues emptied correctly (`final buffer length = 0` or `final queue length = 0`).
+
+---
+
+## 🔥 Benchmark Results (1,000,000 ops — 10 Producers / 20 Consumers)
+
+| Queue Type               | Time (sec) | Throughput (ops/sec) | Notes                                                                             |
+|--------------------------|------------|----------------------|-----------------------------------------------------------------------------------|
+| `multiprocessing.Queue`  | 12.63      | ~79,177              | Standard multiprocessing queue. Slow under threads due to process-safe locks.     |
+| `ConcurrentBuffer`(ThreadFactory) | 9.54       | ~104,822             | Bit-flip balanced with even-shard windowing. Optimized for thread-only workloads. |
+| `ConcurrentQueue` (ThreadFactory) | **5.35** | **~186,916** | ⚡ Fastest.. Thread-safe with internal adaptive locking.                               |
+| `collections.deque`      | 9.55       | ~104,712             | Reliable baseline. Internal lock-guarded deque with simple contention handling.   |
+
+### 💡 Observations:
+- `ConcurrentQueue` was the fastest in this benchmark with a higher number of consumers.
+- `ConcurrentQueue` is **~2.36× faster** than `multiprocessing.Queue`.
+- `ConcurrentQueue` is **~1.77× faster** than `ConcurrentBuffer`.
+- `ConcurrentQueue` is **~1.78× faster** than `deque`.
+- All queues emptied correctly (`final buffer length = 0` or `final queue length = 0`).
+
+---
+
+## 🔥 Benchmark Results (10,000,000 ops — 10 producers / 10 consumers)
+
+| Queue Type                  | Time (sec) | Throughput (ops/sec) | Notes                                                                                   |
+|-----------------------------|------------|----------------------|-----------------------------------------------------------------------------------------|
+| `multiprocessing.Queue`      | 119.99     | ~83,336              | Built-in for inter-process communication. Very slow under threads.                      |
+| `ConcurrentBuffer` (ThreadFactory) | **23.27**      | **~429,651**            | ⚡ Fastest. Even-shard windowing + bit-flip balancing. Excellent for medium concurrency. |
+| `ConcurrentQueue` (ThreadFactory)  | 37.87      | ~264,014              | Solid. Thread-safe queue with internal locking.                                         |
+| `collections.deque`          | 64.16      | ~155,876              | Internal lock-protected `deque`. Requires explicit coordination.                        |
+
+
+### ✅ Highlights:
+- `ConcurrentBuffer` outperformed `multiprocessing.Queue` by **96.72 seconds**.
+- `ConcurrentBuffer` outperformed `ConcurrentQueue` by **14.6 seconds**.
+- `ConcurrentBuffer` outperformed `collections.deque` by **40.89 seconds**.
+
+### 💡 Observations:
+- `ConcurrentBuffer` continues to be the best performer under moderate concurrency.
+- `ConcurrentQueue` maintains a consistent performance but is outperformed by `ConcurrentBuffer`.
+- All queues emptied correctly (`final buffer length = 0`).
+---
+## 🔥 Benchmark Results (20,000,000 ops — 20 Producers / 20 Consumers)
+
+| Queue Type                       | Time (sec) | Throughput (ops/sec) | Notes                                                                                  |
+|----------------------------------|------------|----------------------|----------------------------------------------------------------------------------------|
+| `multiprocessing.Queue`           | 249.92     | ~80,020              | Standard multiprocessing queue. Slow when used with threads.                           |
+| `ConcurrentBuffer` (ThreadFactory, 10 shards) | 138.64     | ~144,270             | Bit-flip balancing + even-shard windowing. Recommended for <= 20 threads.              |
+| `ConcurrentBuffer` (ThreadFactory, 20 shards) | 173.89     | ~115,010             | Higher shard count causes overhead. Performs worse than 10 shards in this scenario.    |
+| `ConcurrentQueue` (ThreadFactory) | **77.69**  | **~257,450**         | ⚡ Fastest. Adaptive locking, designed for high-throughput producer/consumer workloads. |
+| `collections.deque`       | 190.91     | ~104,771             | Internal lock-protected `deque`. Suffers from coordination overhead under contention.  |
+
+### ✅ Notes:
+- `ConcurrentBuffer` performs better with **10 shards** than **20 shards** at this concurrency level.
+- `ConcurrentQueue` continues to be the most stable performer under moderate-to-high thread counts.
+- `multiprocessing.Queue` remains unfit for threaded-only workloads due to its heavy IPC-oriented design.
+
+### 💡 Observations:
+- **Shard count** tuning in `ConcurrentBuffer` is crucial — too many shards can reduce performance.
+- **Bit-flip balancing** in `ConcurrentBuffer` helps under moderate concurrency but hits diminishing returns with excessive sharding.
+- `ConcurrentQueue` is proving to be the general-purpose winner for most balanced threaded workloads.
+- For **~40 threads**, `ConcurrentBuffer` shows ~**25% drop** when doubling the number of shards due to increased dequeue complexity.
+- All queues emptied correctly (`final buffer length = 0`).
+
+---
 
 ## 🚀 Features
 
@@ -71,7 +158,7 @@ All implementations tested under balanced thread conditions with GIL optimizatio
 - **Timestamp-based ordering** ensures approximate FIFO behavior across shards.  
 - Outperforms `ConcurrentQueue` by up to **60%** in mid-range concurrency (4–20 threads).  
 - Automatically balances items across shards; ideal for parallel pipelines and low-latency workloads.  
-- Best used with `shard_count ≈ thread_count / 2` for optimal performance.
+- Best used with `shard_count ≈ thread_count / 2` for optimal performance, but keep shards at or below 10.
 ---
 
 ## Parallel Operations
