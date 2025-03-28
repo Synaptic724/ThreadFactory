@@ -7,8 +7,8 @@ High-performance thread-safe (No-GIL-friendly) data structures for Python 3.13+.
    :maxdepth: 2
    :caption: Contents:
 
-   modules
-
+   concurrency
+   utils
 
 Indices and tables
 ==================
