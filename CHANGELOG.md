@@ -13,6 +13,32 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Work stealing optimization with concurrent list handling
 
 ---
+## [1.1.1] - 2025-03-26
+
+### Classes Added
+- None
+
+### Added Features
+- **Performance Boost**: Optimized `ConcurrentBuffer` with a window-based enqueue strategy that alternates between even shard groups.  
+  This improves enqueue performance by approximately **16%** in benchmark tests, reducing per-op overhead while maintaining fairness.  
+  The change is **low risk**, adds no complexity to consumer logic, and preserves the original contract of approximate FIFO behavior.
+
+- **Shard Consistency Enforcement**:  
+  `ConcurrentBuffer` now requires an **even number of shards** (≥ 2) to activate the performance windowing strategy.  
+  This constraint ensures predictable behavior and optimal split-point targeting during high-frequency enqueue operations.  
+  A single shard is still supported, but odd shard counts >1 will now raise a `ValueError`.
+
+- **Benchmark-Validated**: Internal benchmarks confirm that `ConcurrentBuffer` now outperforms:
+  - `multiprocessing.Queue` by **>6×**
+  - `collections.deque` (with Lock) by **~2.6×**
+  - `ConcurrentQueue` by **~60%**
+
+  These gains were achieved under balanced producer/consumer workloads (10P/10C, 1M ops).
+
+### Fixes
+- Removed lock from peak on `ConcurrentQueue` and `ConcurrentStack` for performance improvement.
+
+---
 
 ## [1.1.0] - 2025-03-26
 ### Classes Added

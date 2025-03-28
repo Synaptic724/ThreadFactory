@@ -18,16 +18,16 @@ if sys.version_info < (3, 13):
         UserWarning
     )
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 try:
     from importlib.metadata import version as get_version
     __version__ = get_version("thread_factory")
 except Exception:
     if DEBUG_MODE:
-        __version__ = "1.1.0-dev"
+        __version__ = "1.2.0-dev"
     else:
-        __version__ = "1.1.0"
+        __version__ = "1.2.0"
 
 
 def _detect_nogil_mode() -> None:

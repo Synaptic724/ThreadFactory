@@ -66,14 +66,10 @@ class ConcurrentStack(Generic[_T]):
         Returns:
             _T: The item popped.
         """
-        try:
-            with self._lock:
-                if not self._deque:
-                    raise Empty("pop from empty ConcurrentStack")
-                return self._deque.pop()
-        except Empty:
-            time.sleep(0.001)
-            raise
+        with self._lock:
+            if not self._deque:
+                raise Empty("pop from empty ConcurrentStack")
+            return self._deque.pop()
 
     def peek(self) -> _T:
         """
@@ -85,10 +81,9 @@ class ConcurrentStack(Generic[_T]):
         Returns:
             _T: The item at the top of the stack.
         """
-        with self._lock:
-            if not self._deque:
-                raise Empty("peek from empty ConcurrentStack")
-            return self._deque[-1]
+        if not self._deque:
+            raise Empty("peek from empty ConcurrentStack")
+        return self._deque[-1]
 
     def __len__(self) -> int:
         """

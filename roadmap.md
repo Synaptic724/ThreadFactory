@@ -1,12 +1,13 @@
 # 🗺️ ThreadFactory Roadmap
 
-## ✅ v1.0 Release (Now)
+## ✅ v1.1 Release (Now)
 - Core thread-safe collections:
   - `ConcurrentList`
   - `ConcurrentDict`
   - `ConcurrentBag`
   - `ConcurrentQueue`
   - `ConcurrentStack`
+  - `ConcurrentBuffer`
 - Parallel utilities:
   - `parallel_for`
   - `parallel_map`
