@@ -35,9 +35,9 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         High-performance producer/consumer test using threads and ConcurrentBuffer.
         Balanced consumer workload to avoid stalling.
         """
-        self.buffer = ConcurrentBuffer(10)
+        self.buffer = ConcurrentBuffer(4)
         producers = 10
-        consumers = 10
+        consumers = 20
         self.items_per_producer = 100000
         total_items = producers * self.items_per_producer
 
@@ -99,7 +99,7 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         """
         queue = multiprocessing.Queue()
         producers = 10
-        consumers = 10
+        consumers = 20
         items_per_producer = 100_000
         total_items = producers * items_per_producer
 
@@ -162,7 +162,7 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         from thread_factory import ConcurrentQueue
         q = ConcurrentQueue()
         producers = 10
-        consumers = 10
+        consumers = 20
         items_per_producer = 100000
         total_items = producers * items_per_producer
 
@@ -225,7 +225,7 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         q = deque()
 
         producers = 10
-        consumers = 10
+        consumers = 20
         items_per_producer = 100000
         total_items = producers * items_per_producer
 
