@@ -5,92 +5,104 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ---
 
 ## [Unreleased]
+
 ### Added
-- Thread role assignment framework (Producer, Consumer, Orchestrator)
-- ThreadSwitch logic for dynamic execution context migration
-- Queue state management using Active and Empty stacks
-- Contention mode system (0-10 scale) with dynamic tuning
-- Work stealing optimization with concurrent list handling
+- Thread role assignment framework (Producer, Consumer, Orchestrator).
+- ThreadSwitch logic for dynamic execution context migration.
+- Queue state management using Active and Empty stacks.
+- Contention mode system (0-10 scale) with dynamic tuning.
+- Work stealing optimization with concurrent list handling.
 
 ---
-## [1.1.1] - 2025-03-26
+
+## [1.1.1] - 2025-03-30
 
 ### Classes Added
-- None
+
+#### 1. ConcurrentCollection  
+- An unordered, thread-safe alternative to `ConcurrentBuffer`.  
+- Optimized for high-concurrency scenarios where strict FIFO is not required.  
+- Uses fair circular scans seeded by bit-mixed monotonic clocks to distribute dequeues evenly.  
+- Benchmarks (10 producers / 20 consumers, 2M ops) show **~5.6% higher throughput** than `ConcurrentBuffer`:  
+    - **ConcurrentCollection**: 108,235 ops/sec  
+    - **ConcurrentBuffer**: 102,494 ops/sec  
+    - Better scaling under thread contention.
 
 ### Added Features
-- **Performance Boost**: Optimized `ConcurrentBuffer` with a window-based enqueue strategy that alternates between even shard groups.  
-  This improves enqueue performance by approximately **16%** in benchmark tests, reducing per-op overhead while maintaining fairness.  
-  The change is **low risk**, adds no complexity to consumer logic, and preserves the original contract of approximate FIFO behavior.
 
-- **Shard Consistency Enforcement**:  
-  `ConcurrentBuffer` now requires an **even number of shards** (≥ 2) to activate the performance windowing strategy.  
-  This constraint ensures predictable behavior and optimal split-point targeting during high-frequency enqueue operations.  
-  A single shard is still supported, but odd shard counts >1 will now raise a `ValueError`.
+- **Performance Boost**  
+    Optimized `ConcurrentBuffer` with a window-based enqueue strategy alternating between even shard groups.  
+    Improves enqueue performance by reducing per-operation overhead while preserving approximate FIFO behavior.  
+    The change is **low risk**, adds no consumer complexity, and maintains API compatibility.
 
-- **Benchmark-Validated**: Internal benchmarks confirm that `ConcurrentBuffer` now outperforms:
-  - `multiprocessing.Queue` by **>6×**
-  - `collections.deque` (with Lock) by **~2.6×**
-  - `ConcurrentQueue` by **~60%**
+- **Shard Consistency Enforcement**  
+    `ConcurrentBuffer` now requires an **even number of shards** (≥2) to enable the windowing strategy.  
+    Odd shard counts (>1) will now raise a `ValueError`.  
+    Single shard mode is still supported.
 
-  These gains were achieved under balanced producer/consumer workloads (10P/10C, 1M ops).
+- **Benchmark-Validated**  
+    Internal benchmarks confirm `ConcurrentBuffer` improvements:
+    - **6× faster** than `multiprocessing.Queue`.
+    - **~2.6× faster** than `collections.deque` (with Lock).
+    - **~60% faster** than `ConcurrentQueue`.
+    - Tests performed under balanced workloads (10 Producers / 10 Consumers, 1M operations).
 
 ### Fixes
-- Removed lock from peak on `ConcurrentQueue` and `ConcurrentStack` for performance improvement.
+- Removed lock from `peek()` in `ConcurrentQueue` and `ConcurrentStack` to improve performance.
 
 ---
 
 ## [1.1.0] - 2025-03-26
-### Classes Added
-### 1. Dynaphore
-- A dynamic semaphore class that allows for dynamic tuning of semaphore limits.
-- Supports increase and decrease of semaphore limits at runtime.
 
-### 2. ConcurrentBuffer
-- This class is a thread-safe buffer that allows for concurrent read and write operations.
-- It is not FIFO or LIFO, but rather a simple buffer that can be used for any purpose.
-- It operates well under low to moderate contention and outperforms other collections in this scenario.
-- For high contention, consider using a dedicated collection like ConcurrentQueue or ConcurrentStack.
+### Classes Added
+
+#### 1. Dynaphore  
+- A dynamic semaphore supporting runtime tuning of limits.
+
+#### 2. ConcurrentBuffer  
+- A thread-safe, general-purpose concurrent buffer.  
+- Not strictly FIFO or LIFO.  
+- Best suited for low to moderate contention.  
+- For high contention, prefer `ConcurrentQueue` or `ConcurrentStack`.
 
 ### Added Features
-- Added Update method to ConcurrentBag and ConcurrentList for bulk updates using iterables
-- Added Remove method for ConcurrentQueue and ConcurrentStack
-- Added performance testing in unittests for ConcurrentQueue for user testing if desired via clone
-
+- `update()` method for `ConcurrentBag` and `ConcurrentList` (bulk updates).
+- `remove()` method for `ConcurrentQueue` and `ConcurrentStack`.
+- Performance testing integrated into `unittest` suite.
+  
 ### Fixes
-- Imports changed from relative to absolute
-- Added small sleep timer to ConcurrentStack and ConcurrentQueue to provide backpressure time.sleep(0.001)
+- Changed imports from relative to absolute.
+- Introduced small sleep in `ConcurrentStack` and `ConcurrentQueue` (`time.sleep(0.001)`) to provide backpressure.
+
 ---
 
 ## [1.0.1] - 2025-03-22
-### Added
-### 1. ConcurrentBag  
-- A thread-safe “multiset” collection that allows duplicates.  
-- Methods like `add`, `remove`, `discard`, etc.  
-- Ideal for collections where duplicate elements matter.
 
-### 2. ConcurrentDict  
-- A thread-safe dictionary.  
-- Supports typical dict operations (`update`, `popitem`, etc.).  
-- Provides `map`, `filter`, and `reduce` for safe, bulk operations.
+### Classes Added
 
-### 3. ConcurrentList  
-- A thread-safe list supporting concurrent access and modification.  
-- Slice assignment, in-place operators (`+=`, `*=`), and advanced operations (`map`, `filter`, `reduce`).
+#### 1. ConcurrentBag  
+- Thread-safe multiset supporting duplicates.  
+- Standard methods: `add`, `remove`, `discard`, etc.
 
-### 4. ConcurrentQueue  
-- A thread-safe FIFO queue built atop `collections.deque`.  
+#### 2. ConcurrentDict  
+- Thread-safe dictionary supporting safe bulk operations.  
+- Includes `map`, `filter`, `reduce`.
+
+#### 3. ConcurrentList  
+- Thread-safe list supporting concurrent modifications.
+- Supports slice assignment, in-place operators (`+=`, `*=`), and bulk methods.
+
+#### 4. ConcurrentQueue  
+- Thread-safe FIFO queue using `deque`.  
 - Supports `enqueue`, `dequeue`, `peek`, `map`, `filter`, and `reduce`.  
-- Raises `Empty` when `dequeue` or `peek` is called on an empty queue.
+- Raises `Empty` when needed.
 
-### 5. ConcurrentStack  
-- A thread-safe LIFO stack.  
-- Supports `push`, `pop`, `peek` operations.  
-- Ideal for last-in, first-out (LIFO) workloads.  
-- Built on `deque` for fast appends and pops.
+#### 5. ConcurrentStack  
+- Thread-safe LIFO stack.  
+- Built on `deque`.  
+- `push`, `pop`, `peek` operations.
 
-### 6. Parallel Utilities (TPL-like)  
+#### 6. Parallel Utilities (TPL-like)  
 - `parallel_for`, `parallel_foreach`, `parallel_invoke`, `parallel_map`.  
-- Pure thread-based concurrency (No-GIL optimized), not tied to asyncio or multiprocessing.  
-- Flexible chunking, concurrency control, local state usage, early exit on exception, and more.  
+- Pure threading-based concurrency with optional early exit, chunking, and local state support.
 - Inspired by .NET's Task Parallel Library (TPL).

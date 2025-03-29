@@ -3,7 +3,7 @@ import sys
 import unittest
 import time
 import threading
-from thread_factory import ConcurrentBuffer, Empty
+from thread_factory import ConcurrentBuffer, Empty, ConcurrentCollection
 
 
 def producer_process_multiproc_queue(queue, item_count, process_id):
@@ -23,6 +23,11 @@ def consumer_process_multiproc_queue(queue, item_count):
             pass  # queue might be empty or a timeout can occur
 
 
+producers = 80
+consumers = 80
+items_per_producer = 10000
+total_items = producers * items_per_producer
+
 class TestBufferPerformanceComparison(unittest.TestCase):
     """
     Compare performance between:
@@ -30,17 +35,68 @@ class TestBufferPerformanceComparison(unittest.TestCase):
       2) multiprocessing.Queue with processes
     """
 
+    def threaded_concurrent_unordered_buffer_performance(self):
+        """
+        Benchmark using ConcurrentUnorderedBuffer with threads.
+        Fast unordered buffer using shard-based design.
+        """
+        buf = ConcurrentCollection(160)
+
+        try:
+            GIL_ENABLED = sys._is_gil_enabled()
+        except AttributeError:
+            GIL_ENABLED = True
+
+        print(f"[ConcurrentCollection] GIL Enabled: {GIL_ENABLED}")
+
+        def producer(thread_id):
+            for i in range(items_per_producer):
+                buf.add((thread_id, i))
+
+        # Distribute items evenly among consumers
+        base_target = total_items // consumers
+        targets = [base_target] * consumers
+        for i in range(total_items % consumers):
+            targets[i] += 1
+
+        def consumer(target):
+            consumed = 0
+            while consumed < target:
+                try:
+                    _ = buf.pop()
+                    consumed += 1
+                except Empty:
+                    pass
+
+        threads = []
+        for pid in range(producers):
+            threads.append(threading.Thread(target=producer, args=(pid,)))
+        for i in range(consumers):
+            threads.append(threading.Thread(target=consumer, args=(targets[i],)))
+
+        print(f"\n[ConcurrentCollection] Starting {producers} producers / {consumers} consumers...")
+        start = time.perf_counter()
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        end = time.perf_counter()
+        duration = end - start
+
+        print(f"[ConcurrentCollection] {total_items:,} ops completed in {duration:.2f} seconds.")
+        print(f"[ConcurrentCollection] Final buffer length: {len(buf)}\n")
+
+        self.concurrent_unordered_buffer_duration = duration
+        self.concurrent_unordered_buffer_remaining = len(buf)
+
     def threaded_concurrent_buffer_performance(self):
         """
         High-performance producer/consumer test using threads and ConcurrentBuffer.
         Balanced consumer workload to avoid stalling.
         """
-        self.buffer = ConcurrentBuffer(4)
-        producers = 10
-        consumers = 20
-        self.items_per_producer = 100000
-        total_items = producers * self.items_per_producer
-
+        self.buffer = ConcurrentBuffer(10)
         try:
             GIL_ENABLED = sys._is_gil_enabled()
         except AttributeError:
@@ -49,7 +105,7 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         print(f"[ConcurrentBuffer/Threads] GIL Enabled: {GIL_ENABLED}")
 
         def producer(thread_id):
-            for i in range(self.items_per_producer):
+            for i in range(items_per_producer):
                 self.buffer.enqueue((thread_id, i))
 
         # Distribute total work across consumers
@@ -98,10 +154,6 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         This version guarantees consumers will collectively consume exactly total_items.
         """
         queue = multiprocessing.Queue()
-        producers = 10
-        consumers = 20
-        items_per_producer = 100_000
-        total_items = producers * items_per_producer
 
         try:
             GIL_ENABLED = sys._is_gil_enabled()
@@ -161,10 +213,6 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         """
         from thread_factory import ConcurrentQueue
         q = ConcurrentQueue()
-        producers = 10
-        consumers = 20
-        items_per_producer = 100000
-        total_items = producers * items_per_producer
 
         try:
             GIL_ENABLED = sys._is_gil_enabled()
@@ -224,11 +272,6 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         from collections import deque
         q = deque()
 
-        producers = 10
-        consumers = 20
-        items_per_producer = 100000
-        total_items = producers * items_per_producer
-
         try:
             GIL_ENABLED = sys._is_gil_enabled()
         except AttributeError:
@@ -285,43 +328,47 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         """
         print("\n🚀 Running side-by-side performance comparison...\n")
         self.threaded_concurrent_buffer_performance()
-        self.multiprocessing_queue_performance()
+        self.threaded_concurrent_unordered_buffer_performance()
         self.threaded_concurrent_queue_performance()
         self.threaded_deque_performance()
+        self.multiprocessing_queue_performance()
 
-        print(f"\n⏱️ Performance Summary:")
-        print(f"- ConcurrentBuffer (Threads) duration: {self.threaded_buffer_duration:.2f} seconds")
-        print(f"- ConcurrentQueue (Threads) duration: {self.concurrent_queue_duration:.2f} seconds")
-        print(f"- multiprocessing.Queue (Processes) duration: {self.multiproc_queue_duration:.2f} seconds")
-        print(f"- collections.deque (w/ Lock) duration: {self.deque_duration:.2f} seconds")
+        print("\n⏱️ Performance Summary (including ops/sec):")
 
-        # Comparison block
-        if self.threaded_buffer_duration < self.multiproc_queue_duration:
-            diff = self.multiproc_queue_duration - self.threaded_buffer_duration
-            print(f"✅ ConcurrentBuffer/Threads was faster than multiprocessing.Queue by {diff:.2f} seconds")
-        else:
-            diff = self.threaded_buffer_duration - self.multiproc_queue_duration
-            print(f"✅ multiprocessing.Queue was faster than ConcurrentBuffer by {diff:.2f} seconds")
+        def ops_per_sec(duration):
+            return total_items / duration if duration > 0 else 0
 
-        if self.threaded_buffer_duration < self.concurrent_queue_duration:
-            diff = self.concurrent_queue_duration - self.threaded_buffer_duration
-            print(f"✅ ConcurrentBuffer/Threads was faster than ConcurrentQueue by {diff:.2f} seconds")
-        else:
-            diff = self.threaded_buffer_duration - self.concurrent_queue_duration
-            print(f"✅ ConcurrentQueue/Threads was faster than ConcurrentBuffer by {diff:.2f} seconds")
+        print(
+            f"- ConcurrentBuffer (Threads):              {self.threaded_buffer_duration:.2f} seconds ({ops_per_sec(self.threaded_buffer_duration):,.0f} ops/sec)")
+        print(
+            f"- ConcurrentCollection (Threads):    {self.concurrent_unordered_buffer_duration:.2f} seconds ({ops_per_sec(self.concurrent_unordered_buffer_duration):,.0f} ops/sec)")
+        print(
+            f"- ConcurrentQueue (Threads):               {self.concurrent_queue_duration:.2f} seconds ({ops_per_sec(self.concurrent_queue_duration):,.0f} ops/sec)")
+        print(
+            f"- multiprocessing.Queue (Processes):      {self.multiproc_queue_duration:.2f} seconds ({ops_per_sec(self.multiproc_queue_duration):,.0f} ops/sec)")
+        print(
+            f"- collections.deque (w/ Lock):             {self.deque_duration:.2f} seconds ({ops_per_sec(self.deque_duration):,.0f} ops/sec)")
 
-        if self.threaded_buffer_duration < self.deque_duration:
-            diff = self.deque_duration - self.threaded_buffer_duration
-            print(f"✅ ConcurrentBuffer/Threads was faster than deque by {diff:.2f} seconds")
-        else:
-            diff = self.threaded_buffer_duration - self.deque_duration
-            print(f"✅ deque was faster than ConcurrentBuffer by {diff:.2f} seconds")
+        print("\n✅ Winners:")
+        durations = {
+            "ConcurrentBuffer": self.threaded_buffer_duration,
+            "ConcurrentUnorderedBuffer": self.concurrent_unordered_buffer_duration,
+            "ConcurrentQueue": self.concurrent_queue_duration,
+            "multiprocessing.Queue": self.multiproc_queue_duration,
+            "collections.deque": self.deque_duration
+        }
+        sorted_durations = sorted(durations.items(), key=lambda x: x[1])
+        fastest = sorted_durations[0]
+
+        print(f"🏆 Fastest: {fastest[0]} ({fastest[1]:.2f} seconds — {ops_per_sec(fastest[1]):,.0f} ops/sec)")
+        print(f"Numbers of Producers: {producers}, Consumers: {consumers}, Items per Producer: {items_per_producer}")
 
         print("\n📦 Final Queue Sizes:")
-        print(f"[ConcurrentBuffer] Remaining items: {self.threaded_buffer_remaining}")
-        print(f"[multiprocessing.Queue] Remaining items: {self.multiproc_queue_remaining}")
-        print(f"[ConcurrentQueue] Remaining items: {self.concurrent_queue_remaining}")
-        print(f"[collections.deque] Remaining items: {self.deque_remaining}")
+        print(f"[ConcurrentBuffer]              Remaining items: {self.threaded_buffer_remaining}")
+        print(f"[ConcurrentCollection]     Remaining items: {self.concurrent_unordered_buffer_remaining}")
+        print(f"[ConcurrentQueue]               Remaining items: {self.concurrent_queue_remaining}")
+        print(f"[multiprocessing.Queue]         Remaining items: {self.multiproc_queue_remaining}")
+        print(f"[collections.deque]             Remaining items: {self.deque_remaining}")
 
 
 if __name__ == "__main__":
