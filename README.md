@@ -161,7 +161,7 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 - Designed to handle massive producer/consumer loads with better throughput than standard queues.  
 - Supports `enqueue`, `dequeue`, `peek`, `clear`, and bulk operations (`map`, `filter`, `reduce`).  
 - **Timestamp-based ordering** ensures approximate FIFO behavior across shards.  
-- Outperforms `ConcurrentQueue` by up to **60%** in mid-range concurrency (4–20 threads).  
+- Outperforms `ConcurrentQueue` by up to **60%** in mid-range concurrency in even thread Producer/Consumer configuration with 10 shards.
 - Automatically balances items across shards; ideal for parallel pipelines and low-latency workloads.  
 - Best used with `shard_count ≈ thread_count / 2` for optimal performance, but keep shards at or below 10.
 ---
