@@ -2,7 +2,8 @@ import functools
 import threading
 import warnings
 from copy import deepcopy
-from typing import Any, Callable, Iterable, Optional, List, TypeVar, Generic
+from typing import Any, Callable, Optional, List, TypeVar, Generic
+from collections.abc import Iterable, Iterator
 
 _T = TypeVar('_T')
 
@@ -205,7 +206,7 @@ class ConcurrentList(Generic[_T]):
         """
         return len(self._list)
 
-    def __iter__(self) -> Iterable[_T]:
+    def __iter__(self) -> Iterator[_T]:
         """
         Return an iterator over a shallow copy of the list.
         """

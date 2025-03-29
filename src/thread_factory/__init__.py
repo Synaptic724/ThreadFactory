@@ -76,9 +76,9 @@ __all__ = [
     "Concurrent",
     "ConcurrentStack",
     "ConcurrentBuffer",
+    "ConcurrentCollection",
     "Empty",
     "Worker",
     "Dynaphore",
-    "ConcurrentCollection",
     "__version__"
 ]

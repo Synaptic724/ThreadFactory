@@ -53,11 +53,6 @@ class Concurrent:
       you are responsible for implementing your own thread-safety mechanisms
       (e.g., locks, thread-local storage, or other synchronization primitives).
     """
-
-    # --------------------------------------------------------------------------
-    # for_loop
-    # --------------------------------------------------------------------------
-
     @staticmethod
     def for_loop(
         start: int,
@@ -156,10 +151,6 @@ class Concurrent:
             # We capture the exception to allow the main method to handle it
             raise e
 
-    # --------------------------------------------------------------------------
-    # for_each
-    # --------------------------------------------------------------------------
-
     @staticmethod
     def for_each(
         iterable: Iterable[_T],
@@ -256,10 +247,6 @@ class Concurrent:
         except Exception as e:
             raise e
 
-    # --------------------------------------------------------------------------
-    # invoke
-    # --------------------------------------------------------------------------
-
     @staticmethod
     def invoke(
         *functions: Callable[[], Any],
@@ -296,10 +283,6 @@ class Concurrent:
             return fn()
         except Exception as e:
             raise e
-
-    # --------------------------------------------------------------------------
-    # map
-    # --------------------------------------------------------------------------
 
     @staticmethod
     def map(

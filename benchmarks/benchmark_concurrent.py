@@ -23,9 +23,9 @@ def consumer_process_multiproc_queue(queue, item_count):
             pass  # queue might be empty or a timeout can occur
 
 
-producers = 80
-consumers = 80
-items_per_producer = 10000
+producers = 20
+consumers = 20
+items_per_producer = 100000
 total_items = producers * items_per_producer
 
 class TestBufferPerformanceComparison(unittest.TestCase):
@@ -35,12 +35,12 @@ class TestBufferPerformanceComparison(unittest.TestCase):
       2) multiprocessing.Queue with processes
     """
 
-    def threaded_concurrent_unordered_buffer_performance(self):
+    def threaded_concurrent_collection_performance(self):
         """
         Benchmark using ConcurrentUnorderedBuffer with threads.
         Fast unordered buffer using shard-based design.
         """
-        buf = ConcurrentCollection(160)
+        buf = ConcurrentCollection(40)
 
         try:
             GIL_ENABLED = sys._is_gil_enabled()
@@ -328,7 +328,7 @@ class TestBufferPerformanceComparison(unittest.TestCase):
         """
         print("\n🚀 Running side-by-side performance comparison...\n")
         self.threaded_concurrent_buffer_performance()
-        self.threaded_concurrent_unordered_buffer_performance()
+        self.threaded_concurrent_collection_performance()
         self.threaded_concurrent_queue_performance()
         self.threaded_deque_performance()
         self.multiprocessing_queue_performance()
