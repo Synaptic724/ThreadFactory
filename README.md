@@ -1,14 +1,15 @@
 # ThreadFactory
 
-[![PyPI version](https://badge.fury.io/py/threadfactory.svg)](https://badge.fury.io/py/threadfactory)
-[![License](https://img.shields.io/github/license/Synaptic724/threadfactory)](https://github.com/yourusername/threadfactory/blob/main/LICENSE)
-[![Python Version](https://img.shields.io/pypi/pyversions/threadfactory)](https://pypi.org/project/threadfactory)
+[![PyPI version](https://badge.fury.io/py/threadfactory.svg?v=1)](https://badge.fury.io/py/threadfactory)
+[![License](https://img.shields.io/github/license/Synaptic724/threadfactory?v=1)](https://github.com/yourusername/threadfactory/blob/main/LICENSE)
+[![Python Version](https://img.shields.io/pypi/pyversions/threadfactory?v=1)](https://pypi.org/project/threadfactory)
 
-[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory/month)](https://pepy.tech/projects/threadfactory)
-[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory/week)](https://pepy.tech/projects/threadfactory)
-[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory)](https://pepy.tech/projects/threadfactory)
+[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory/month?v=1)](https://pepy.tech/projects/threadfactory)
+[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory/week?v=1)](https://pepy.tech/projects/threadfactory)
+[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory?v=1)](https://pepy.tech/projects/threadfactory)
 
 [![Upload Python Package](https://github.com/Synaptic724/ThreadFactory/actions/workflows/python-publish.yml/badge.svg)](https://github.com/Synaptic724/ThreadFactory/actions/workflows/python-publish.yml)
+
 
 <!--[![Coverage Status](https://coveralls.io/repos/github/Synaptic724/threadfactory/badge.svg?branch=main)](https://coveralls.io/github/Synaptic724/threadfactory?branch=main) -->
 <!--[![Documentation Status](https://readthedocs.org/projects/threadfactory/badge/?version=latest)](https://threadfactory.readthedocs.io/en/latest/?badge=latest) -->
