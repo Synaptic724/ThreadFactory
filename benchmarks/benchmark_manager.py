@@ -4,8 +4,8 @@ from typing import Dict, Any, Callable, List, Optional, Tuple
 from benchmarks.benchmark_manager_strategy import ManagerStrategyFactory
 from benchmarks.benchmark_visualizer import BenchmarkVisualizer
 from src.thread_factory import ConcurrentList
-from benchmarks_builder import BenchmarkFactory
-import benchmark_strategy as bs
+from benchmarks.benchmark_builder import BenchmarkFactory
+from benchmarks import benchmark_strategy as bs
 
 
 
@@ -172,6 +172,8 @@ class BenchmarkManager:
 
 if __name__ == "__main__":
     manager = BenchmarkManager()
+
+    #TODO: Add a way for shard parameters to be set for ConcurrentBuffer and ConcurrentCollection
 
     testDict = {
         'min_producer' : 4,

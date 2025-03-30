@@ -279,6 +279,19 @@ class CollectionsDequeThreadsBenchmark(BaseBenchmark):
         })
 
 
+def producer_process(q, item_count, pid):
+    for i in range(item_count):
+        q.put((pid, i))
+
+def consumer_process(q, item_count):
+    consumed = 0
+    while consumed < item_count:
+        try:
+            _ = q.get()
+            consumed += 1
+        except:
+            pass
+
 ###############################################################################
 # multiprocessing.Queue + Processes
 ###############################################################################
@@ -297,19 +310,6 @@ class MultiprocessingQueueBenchmark(BaseBenchmark):
             targets[i] += 1
 
         processes = []
-
-        def producer_process(q, item_count, pid):
-            for i in range(item_count):
-                q.put((pid, i))
-
-        def consumer_process(q, item_count):
-            consumed = 0
-            while consumed < item_count:
-                try:
-                    _ = q.get()
-                    consumed += 1
-                except:
-                    pass
 
         # Spawn producers
         for pid in range(producers):
