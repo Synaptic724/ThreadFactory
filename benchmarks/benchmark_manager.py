@@ -1,7 +1,8 @@
 import time
 from dataclasses import dataclass, field, asdict
 from typing import Dict, Any, Callable, List, Optional, Tuple
-from benchmarks.benchmark_manager_strategy import FullTestSuiteStrategy, ManagerStrategyFactory
+from benchmarks.benchmark_manager_strategy import ManagerStrategyFactory
+from benchmarks.benchmark_visualizer import BenchmarkVisualizer
 from src.thread_factory import ConcurrentList
 from benchmarks_builder import BenchmarkFactory
 import benchmark_strategy as bs
@@ -172,26 +173,47 @@ class BenchmarkManager:
 if __name__ == "__main__":
     manager = BenchmarkManager()
 
-    # Multi-sample
-    manager.run_strategy(bs.MultiSampleStrategy(producers=2, consumers=2, items_per_producer=10000, samples=3),
-                         "concurrent_queue_threads")
+    testDict = {
+        'min_producer' : 4,
+    'max_producer' : 20,
+    'producer_step' : 2,
+    'min_consumer' : 4,
+    'max_consumer' : 20,
+    'consumer_step' : 2,
+    'min_items_per_producer' : 10000,
+    'max_items_per_producer' : 50000,
+    'items_per_producer_step' : 10000,
+    'ratios': [(4, 1), (3, 1), (2, 1), (1, 1), (1, 2), (1, 3), (1, 4)]
+    }
 
-    # -------------------------------------------------------------------------
-    # If we want to run a "full test suite" of multiple strategies:
-    suite = FullTestSuiteStrategy()
-    suite.execute(manager)  # runs 3 strategies in sequence
 
-    # Alternatively, we can use a ManagerStrategyFactory:
-    suite2 = ManagerStrategyFactory.create_strategy("minimal_test_suite")
-    suite2.execute(manager)
+    suite = ManagerStrategyFactory.create_strategy(
+        "scalable_test_suite",
+        benchmark="concurrent_buffer",
+        **testDict
+    )
+    suite.execute(manager)
 
-    # Print the summary of all recorded runs
-    #manager.print_summary()
-    print(manager.export())
+    suite = ManagerStrategyFactory.create_strategy(
+        "scalable_test_suite",
+        benchmark="concurrent_collection",
+        **testDict
+    )
+    suite.execute(manager)
 
-    # If you have a separate visualizer:
-    from benchmark_visualizer import BenchmarkVisualizer
+    suite = ManagerStrategyFactory.create_strategy(
+        "scalable_test_suite",
+        benchmark="concurrent_queue",
+        **testDict
+    )
+    suite.execute(manager)
+
+    # 3) Export + Summary
+    manager.print_summary()
+    manager.save_as_csv("benchmark_results.csv")
+    manager.save_as_json("benchmark_results.json")
+
+    # 4) Visualization
     records = manager.export()
     viz = BenchmarkVisualizer(records)
     viz.show_dual_axis_chart()
-

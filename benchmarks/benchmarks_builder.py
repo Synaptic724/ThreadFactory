@@ -57,7 +57,7 @@ class BaseBenchmark(ABC):
 ###############################################################################
 class ConcurrentBufferThreadsBenchmark(BaseBenchmark):
     def __init__(self):
-        super().__init__("concurrent_buffer_threads")
+        super().__init__("concurrent_buffer")
 
     def run_benchmark(self, callback, producers, consumers, items_per_producer):
         print(f"\n[{self.name}] GIL Enabled: {check_gil_enabled()}")
@@ -115,7 +115,7 @@ class ConcurrentBufferThreadsBenchmark(BaseBenchmark):
 ###############################################################################
 class ConcurrentCollectionThreadsBenchmark(BaseBenchmark):
     def __init__(self):
-        super().__init__("concurrent_collection_threads")
+        super().__init__("concurrent_collection")
 
     def run_benchmark(self, callback, producers, consumers, items_per_producer):
         print(f"\n[{self.name}] GIL Enabled: {check_gil_enabled()}")
@@ -172,7 +172,7 @@ class ConcurrentCollectionThreadsBenchmark(BaseBenchmark):
 ###############################################################################
 class ConcurrentQueueThreadsBenchmark(BaseBenchmark):
     def __init__(self):
-        super().__init__("concurrent_queue_threads")
+        super().__init__("concurrent_queue")
 
     def run_benchmark(self, callback, producers, consumers, items_per_producer):
         print(f"\n[{self.name}] GIL Enabled: {check_gil_enabled()}")
@@ -229,7 +229,7 @@ class ConcurrentQueueThreadsBenchmark(BaseBenchmark):
 ###############################################################################
 class CollectionsDequeThreadsBenchmark(BaseBenchmark):
     def __init__(self):
-        super().__init__("collections_deque_threads")
+        super().__init__("collections_deque")
 
     def run_benchmark(self, callback, producers, consumers, items_per_producer):
         print(f"\n[{self.name}] GIL Enabled: {check_gil_enabled()}")
@@ -350,10 +350,10 @@ class MultiprocessingQueueBenchmark(BaseBenchmark):
 ###############################################################################
 class BenchmarkFactory:
     _registered = {
-        "concurrent_buffer_threads": ConcurrentBufferThreadsBenchmark,
-        "concurrent_collection_threads": ConcurrentCollectionThreadsBenchmark,
-        "concurrent_queue_threads": ConcurrentQueueThreadsBenchmark,
-        "collections_deque_threads": CollectionsDequeThreadsBenchmark,
+        "concurrent_buffer": ConcurrentBufferThreadsBenchmark,
+        "concurrent_collection": ConcurrentCollectionThreadsBenchmark,
+        "concurrent_queue": ConcurrentQueueThreadsBenchmark,
+        "collections_deque": CollectionsDequeThreadsBenchmark,
         "multiprocessing_queue": MultiprocessingQueueBenchmark
     }
 

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Tuple
-from benchmarks.benchmark_strategy import BenchmarkStrategy
+from benchmarks.benchmark_strategy import BenchmarkStrategy, SingleRunStrategy, MultiSampleStrategy, GridStrategy, ScalableTest
 
 
 # =============================================================================
@@ -32,12 +32,6 @@ class ManagerStrategy(ABC):
 # Example: A "full test suite" that runs three different strategies
 class FullTestSuiteStrategy(ManagerStrategy):
     def build_strategies(self) -> List[Tuple[BenchmarkStrategy, str]]:
-        from benchmark_strategy import SingleRunStrategy, MultiSampleStrategy, GridStrategy
-
-        # In this example, we define 3 calls:
-        # 1) single run (2,2,1000)
-        # 2) multi-sample (2,2,1000, samples=3)
-        # 3) grid ([1,2],[1,2], 500)
         suite = [
             (SingleRunStrategy(2, 2, 1000),        "concurrent_buffer_threads"),
             (MultiSampleStrategy(2, 2, 1000, 3),   "concurrent_queue_threads"),
@@ -49,10 +43,19 @@ class FullTestSuiteStrategy(ManagerStrategy):
 # If you anticipate multiple different "manager strategies," you can define more classes:
 class MinimalTestSuiteStrategy(ManagerStrategy):
     def build_strategies(self) -> List[Tuple[BenchmarkStrategy, str]]:
-        from benchmark_strategy import SingleRunStrategy
-        # Maybe just do a single run for one concurrency test
         return [
             (SingleRunStrategy(2, 2, 1000), "concurrent_collection_threads"),
+        ]
+
+
+class ScalableTestSuiteStrategy(ManagerStrategy):
+    def __init__(self, benchmark: str, **params):
+        self.benchmark_name = benchmark
+        self.params = params
+
+    def build_strategies(self) -> List[Tuple[BenchmarkStrategy, str]]:
+        return [
+            (ScalableTest(**self.params), self.benchmark_name),
         ]
 
 
@@ -65,10 +68,11 @@ class ManagerStrategyFactory:
     _registered_strategies = {
         "full_test_suite": FullTestSuiteStrategy,
         "minimal_test_suite": MinimalTestSuiteStrategy,
+        "scalable_test_suite": ScalableTestSuiteStrategy,
     }
 
     @classmethod
-    def create_strategy(cls, name: str) -> ManagerStrategy:
+    def create_strategy(cls, name: str, **kwargs) -> ManagerStrategy:
         if name not in cls._registered_strategies:
             raise ValueError(f"No manager strategy registered under '{name}'")
-        return cls._registered_strategies[name]()
+        return cls._registered_strategies[name](**kwargs)
