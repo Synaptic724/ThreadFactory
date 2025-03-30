@@ -516,3 +516,32 @@ class HighPerformanceConcurrentBufferTest(unittest.TestCase):
         print(
             f"\n[ConcurrentBuffer Random Ops] {operations_per_thread * self.thread_count:,} ops in {end - start:.2f}s")
         self.assertGreaterEqual(len(self.buffer), 0)
+
+
+def test_dispose(self):
+    """
+    Test that dispose() correctly clears the buffer, resets arrays,
+    marks it as disposed, and is idempotent.
+    """
+    buffer = ConcurrentBuffer(number_of_shards=4, initial=['apple', 'banana', 'banana'])
+
+    # Pre-condition
+    self.assertTrue(len(buffer) > 0)
+    self.assertFalse(buffer.disposed)
+
+    # First dispose
+    buffer.dispose()
+    self.assertEqual(len(buffer), 0)
+    self.assertTrue(buffer.disposed)
+    self.assertTrue(all(v == 0 for v in buffer._length_array))
+    self.assertTrue(all(v == 0 for v in buffer._time_array))
+
+    # Second dispose (should be harmless)
+    try:
+        buffer.dispose()
+    except Exception as e:
+        self.fail(f"Calling dispose() twice raised an exception: {e}")
+
+    # Optional: still allows operations if the user calls them (up to you)
+    buffer.enqueue('apple')  # You allow this since you do not enforce disposed checks
+    self.assertIn('apple', list(buffer))

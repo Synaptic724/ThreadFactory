@@ -233,3 +233,31 @@ class TestConcurrentBag(unittest.TestCase):
         self.assertEqual(bag2.count_of('apple'), 0)
         self.assertEqual(bag2.count_of('banana'), 1)
         self.assertEqual(bag2.count_of('cherry'), 2)
+
+    def test_dispose(self):
+        """
+        Test that dispose() correctly clears the bag, marks it as disposed,
+        and is idempotent.
+        """
+        bag = ConcurrentBag(['apple', 'banana', 'banana'])
+
+        # Pre-condition
+        self.assertTrue(len(bag) > 0)
+        self.assertFalse(bag.disposed)
+
+        # First dispose
+        bag.dispose()
+        self.assertEqual(len(bag), 0)
+        self.assertTrue(bag.disposed)
+
+        # Second dispose (should be harmless)
+        try:
+            bag.dispose()
+        except Exception as e:
+            self.fail(f"Calling dispose() twice raised an exception: {e}")
+
+        # Operations still technically "work" unless you choose to enforce errors
+        # (you said you're leaving that up to the user)
+        bag.add('apple')
+        self.assertIn('apple', bag)
+        self.assertEqual(len(bag), 1)

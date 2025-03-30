@@ -4,10 +4,11 @@ import warnings
 from copy import deepcopy
 from typing import Any, Callable, Optional, List, TypeVar, Generic
 from collections.abc import Iterable, Iterator
+from src.thread_factory.utils.disposable import Disposable
 
 _T = TypeVar('_T')
 
-class ConcurrentList(Generic[_T]):
+class ConcurrentList(Generic[_T], Disposable):
     """
     A thread-safe list implementation using an underlying Python list,
     a reentrant lock for synchronization, and an atomic counter for fast,
@@ -27,6 +28,7 @@ class ConcurrentList(Generic[_T]):
         """
         self._lock = threading.RLock()
         self._list: List[_T] = list(initial) if initial else []
+        self.disposed = False
 
     def __getitem__(self, index: int | slice) -> _T | List[_T]:
         """
@@ -389,26 +391,6 @@ class ConcurrentList(Generic[_T]):
         with self._lock:
             return ConcurrentList(initial=deepcopy(self._list, memo))
 
-    def __enter__(self) -> List[_T]:
-        """
-        Enter the runtime context and acquire the lock.
-
-        Returns:
-            List[_T]: The internal list (use with extreme caution as it bypasses thread safety).
-        """
-        warnings.warn(
-            "Direct access to the internal list via the context manager bypasses the thread-safe interface. "
-            "Use with extreme caution.",
-            UserWarning
-        )
-        self._lock.acquire()
-        return self._list
-
-    def __exit__(self, exc_type: Optional[type], exc_val: Optional[BaseException], exc_tb: Optional[object]) -> None:
-        """
-        Exit the runtime context and release the lock.
-        """
-        self._lock.release()
 
     def to_list(self) -> List[_T]:
         """
@@ -508,3 +490,68 @@ class ConcurrentList(Generic[_T]):
         """
         with self._lock:
             self._list.extend(other)
+
+    # -----------------------------------------------------------------------------------
+    # Disposable Implementation
+    # -----------------------------------------------------------------------------------
+    def __enter__(self):
+        """
+        Enter the runtime context.
+
+        - Acquires the internal lock for direct access.
+        - Allows `with ConcurrentList(...) as cc:` style usage.
+        - WARNING: Using the context manager bypasses the thread-safe method interface.
+                   You are now responsible for ensuring correct multithreaded behavior.
+        """
+        warnings.warn(
+            "Direct access to the internals via the context manager bypasses "
+            "the thread-safe interface. Use with extreme caution.",
+            UserWarning
+        )
+        self._lock.acquire()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """
+        Exit the runtime context.
+
+        Responsibilities:
+          - Releases the internal lock acquired in `__enter__()`.
+          - Automatically calls `dispose()` to ensure the object is cleaned up.
+          - This pattern ensures the object is safely disposed even if an exception
+            occurs within the `with` block.
+
+        Notes:
+          - The object should be considered invalid after exiting the context.
+          - This design mimics resource safety patterns seen in systems like C#'s `IDisposable`
+            and C++ RAII.
+          - Users are free to manage `dispose()` manually if they choose not to use the
+            context manager.
+
+        Args:
+            exc_type: Exception type (if raised).
+            exc_val: Exception value (if raised).
+            exc_tb: Exception traceback (if raised).
+        """
+        self._lock.release()
+        self.dispose()
+
+    def dispose(self) -> None:
+        """
+        Dispose (clear) this ConcurrentList, releasing its contents.
+
+        Once disposed, `_disposed` becomes True and the internal dict is cleared.
+        No further usage checks are enforced, so the user must avoid calling
+        other methods after disposal.
+
+        This method is idempotent — multiple calls won't cause errors.
+        """
+        if not self.disposed:
+            with self._lock:
+                self._list.clear()
+            self.disposed = True
+        warnings.warn(
+            "Your ConcurrentList has been disposed and should not be used further. ",
+            UserWarning
+        )
+

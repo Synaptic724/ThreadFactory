@@ -157,7 +157,7 @@ class TestConcurrentList(unittest.TestCase):
         with self.assertWarns(UserWarning):
             with clist as internal_list:
                 internal_list.append(3)
-        self.assertEqual(list(clist), [1, 2, 3])
+        self.assertEqual(list(clist), 0)
 
     def test_to_list_and_batch_update(self):
         clist = ConcurrentList([10, 20, 30])
@@ -438,3 +438,34 @@ class HighPerformanceConcurrentListTest(unittest.TestCase):
         # Basic sanity: we started with 1 item and appended 10 items per call
         expected_min_length = 1 + (self.operations_per_thread // 100) * 10 * self.thread_count
         self.assertEqual(len(shared_list), expected_min_length)
+
+
+    def test_dispose(self):
+        """
+        Ensures that:
+            - dispose() clears all data.
+            - dispose() marks the ConcurrentList as disposed.
+            - dispose() is idempotent (safe to call multiple times).
+        """
+        clist = ConcurrentList(['a', 'b', 'c'])
+
+        # Initial state check
+        self.assertEqual(len(clist), 3)
+        self.assertIn('a', clist)
+        self.assertFalse(clist.disposed)
+
+        # First disposal
+        clist.dispose()
+
+        # State after disposal
+        self.assertEqual(len(clist), 0)
+        self.assertTrue(clist.disposed)
+        self.assertNotIn('a', clist)
+        self.assertNotIn('b', clist)
+        self.assertNotIn('c', clist)
+
+        # Ensure idempotency (no exception on second dispose)
+        try:
+            clist.dispose()
+        except Exception as e:
+            self.fail(f"Calling dispose() twice raised an exception: {e}")

@@ -58,6 +58,7 @@ Internal benchmarks confirm `ConcurrentBuffer` improvements:
 
 ### Fixes
 - Removed lock from `peek()` in `ConcurrentQueue` and `ConcurrentStack` to improve performance.
+- Implemented the Disposable pattern from .NET into all classes for easier resource management.
 
 ---
 
