@@ -1,4 +1,8 @@
 
+
+> **GENERAL BENCHMARKS**  
+> The below benchmarks are designed to evaluate the performance of various queue implementations under different conditions.
+
 ## 🔥 Benchmark Results (1,000,000 ops — 10 Producers / 10 Consumers)
 
 | Queue Type                                   | Time (sec) | Throughput (ops/sec) | Notes                                                                           |
