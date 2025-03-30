@@ -171,9 +171,9 @@ if __name__ == "__main__":
     'min_consumer' : 10,
     'max_consumer' : 20,
     'consumer_step' : 10,
-    'min_items_per_producer' : 10000,
-    'max_items_per_producer' : 50000,
-    'items_per_producer_step' : 10000,
+    'min_items_per_producer' : 100000,
+    'max_items_per_producer' : 500000,
+    'items_per_producer_step' : 100000,
     'ratios': [(1, 1)]
     }
 
@@ -184,12 +184,12 @@ if __name__ == "__main__":
     'min_consumer' : 10,
     'max_consumer' : 20,
     'consumer_step' : 10,
-    'min_items_per_producer' : 10000,
-    'max_items_per_producer' : 50000,
-    'items_per_producer_step' : 10000,
-    'shard_size_min:': 2,
+    'min_items_per_producer' : 100000,
+    'max_items_per_producer' : 500000,
+    'items_per_producer_step' : 100000,
+    'shard_size_min:': 10,
     'shard_size_max:': 40,
-    'shard_size_step:': 2,
+    'shard_size_step:': 10,
     'ratios': [(1, 1)]
     }
 

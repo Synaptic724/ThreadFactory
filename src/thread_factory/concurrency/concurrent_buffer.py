@@ -39,13 +39,13 @@ class _Shard(Generic[_T], Disposable):
     independently while still providing approximate global FIFO behavior.
     """
 
-    def __init__(self, len_array: array, time_array: array, index: int) -> None:
+    def __init__(self, len_array: List[int], time_array: List[int], index: int) -> None:
         """
         Initialize a new shard.
 
         Args:
-            len_array (array): Shared array (uint64) tracking the length of each shard.
-            time_array (array): Shared array (uint64) storing the timestamp of the head of each shard.
+            len_array (List): Shared array (uint64) tracking the length of each shard.
+            time_array (List): Shared array (uint64) storing the timestamp of the head of each shard.
             index (int): This shard's index within the shared arrays.
         """
         # Thread-safe lock to protect internal state of this shard.
@@ -242,8 +242,8 @@ class ConcurrentBuffer(Generic[_T], Disposable):
             raise ValueError("number_of_shards must be even if greater than 1")
 
         # Shared arrays: length per shard, timestamp of the earliest item per shard
-        self._length_array = array("Q", [0] * number_of_shards)
-        self._time_array = array("Q", [0] * number_of_shards)
+        self._length_array = list([0] * number_of_shards)
+        self._time_array = list([0] * number_of_shards)
 
         # Create the shard objects
         self._shards: List[_Shard[_T]] = [
