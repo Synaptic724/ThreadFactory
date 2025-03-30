@@ -88,10 +88,9 @@ class _Shard(Generic[_T]):
         Returns:
             _T: The front item in the shard.
         """
-        with self._lock:
-            if not self._queue:
-                raise Empty("peek from empty ConcurrentCollection shard")
-            return copy(self._queue[0])
+        if not self._queue:
+            raise Empty("peek from empty ConcurrentCollection shard")
+        return copy(self._queue[0])
 
     def __iter__(self) -> Iterator[_T]:
         """
@@ -262,7 +261,7 @@ class ConcurrentCollection(Generic[_T]):
         """
         items_copy = list(self)
         return ConcurrentCollection(
-            number_of_shards=self._num_shards,
+            total_thread_count=self._num_shards,
             initial=items_copy
         )
 
@@ -276,7 +275,7 @@ class ConcurrentCollection(Generic[_T]):
             all_items = list(self)
             deep_items = deepcopy(all_items, memo)
             return ConcurrentCollection(
-                number_of_shards=self._num_shards,
+                total_thread_count=self._num_shards,
                 initial=deep_items
             )
 
@@ -302,7 +301,7 @@ class ConcurrentCollection(Generic[_T]):
         items_copy = list(self)
         mapped = list(map(func, items_copy))
         return ConcurrentCollection(
-            number_of_shards=self._num_shards,
+            total_thread_count=self._num_shards,
             initial=mapped
         )
 
@@ -313,7 +312,7 @@ class ConcurrentCollection(Generic[_T]):
         items_copy = list(self)
         filtered = [x for x in items_copy if func(x)]
         return ConcurrentCollection(
-            number_of_shards=self._num_shards,
+            total_thread_count=self._num_shards,
             initial=filtered
         )
 

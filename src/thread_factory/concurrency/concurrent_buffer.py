@@ -22,6 +22,8 @@ from src.thread_factory.utils import Empty
 _T = TypeVar("_T")
 
 
+#TODO: Modify this class to use a list with an index instead of array.array, benchmarks show locked list is faster than array.array
+
 class _Shard(Generic[_T]):
     """
     Internal shard class holding:
