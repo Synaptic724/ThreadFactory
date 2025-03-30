@@ -157,7 +157,7 @@ class TestConcurrentList(unittest.TestCase):
         with self.assertWarns(UserWarning):
             with clist as internal_list:
                 internal_list.append(3)
-        self.assertEqual(list(clist), 0)
+        self.assertEqual(len(clist), 0)
 
     def test_to_list_and_batch_update(self):
         clist = ConcurrentList([10, 20, 30])
