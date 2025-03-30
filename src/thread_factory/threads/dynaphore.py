@@ -10,7 +10,7 @@ class Dynaphore(threading.Semaphore):
     def __init__(self, value: int = 1, re_entrant: bool = False):
         super().__init__(value)
         if re_entrant:
-            self._cond = threading.Condition(threading.RLock())
+            self._cond = threading.Condition() #This defaults to RLock instead of Lock
 
     @property
     def condition(self) -> threading.Condition:

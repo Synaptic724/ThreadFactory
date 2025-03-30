@@ -12,7 +12,7 @@ from typing import (
     Iterator,
     List,
     Optional,
-    TypeVar, Generator,
+    TypeVar,
 )
 from array import array
 
@@ -22,12 +22,13 @@ from src.thread_factory.utils import Empty
 _T = TypeVar("_T")
 
 
+#TODO: Modify this class to use a list with an index instead of array.array, benchmarks show locked list is faster than array.array
+
 class _Shard(Generic[_T]):
     """
     Internal shard class holding:
       - A local deque.
       - A lock to synchronize access.
-      - Metadata (length, head_tag) to support approximate ordering.
     """
 
     def __init__(self, len_array: array, time_array: array, index: int) -> None:
