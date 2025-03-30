@@ -4,7 +4,7 @@ import time
 import ulid
 import ctypes
 from typing import Callable, Any, Optional
-
+from src.thread_factory.utils.disposable import Disposable
 
 class Records:
     """Tracks the record of completed work items by ULID."""

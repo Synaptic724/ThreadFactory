@@ -163,34 +163,34 @@ if __name__ == "__main__":
     manager = BenchmarkManager()
 
     #TODO: Add a way for shard parameters to be set for ConcurrentBuffer and ConcurrentCollection
-
+#    'ratios': [(4, 1), (3, 1), (2, 1), (1, 1), (1, 2), (1, 3), (1, 4)]
     general_dict = {
-    'min_producer' : 4,
+    'min_producer' : 10,
     'max_producer' : 20,
-    'producer_step' : 2,
-    'min_consumer' : 4,
+    'producer_step' : 10,
+    'min_consumer' : 10,
     'max_consumer' : 20,
-    'consumer_step' : 2,
+    'consumer_step' : 10,
     'min_items_per_producer' : 10000,
     'max_items_per_producer' : 50000,
     'items_per_producer_step' : 10000,
-    'ratios': [(4, 1), (3, 1), (2, 1), (1, 1), (1, 2), (1, 3), (1, 4)]
+    'ratios': [(1, 1)]
     }
 
     concurrent_buffer_dict = {
-    'min_producer' : 4,
+    'min_producer' : 10,
     'max_producer' : 20,
-    'producer_step' : 2,
-    'min_consumer' : 4,
+    'producer_step' : 10,
+    'min_consumer' : 10,
     'max_consumer' : 20,
-    'consumer_step' : 2,
+    'consumer_step' : 10,
     'min_items_per_producer' : 10000,
     'max_items_per_producer' : 50000,
     'items_per_producer_step' : 10000,
     'shard_size_min:': 2,
     'shard_size_max:': 40,
     'shard_size_step:': 2,
-    'ratios': [(4, 1), (3, 1), (2, 1), (1, 1), (1, 2), (1, 3), (1, 4)]
+    'ratios': [(1, 1)]
     }
 
     suite = ManagerStrategyFactory.create_strategy(

@@ -1,6 +1,7 @@
 import time
 from concurrent.futures import Future
 from typing import Optional, Callable
+from src.thread_factory.utils.disposable import Disposable
 
 
 class Work(Future):
