@@ -2,14 +2,17 @@ import datetime
 import threading
 import time
 import ulid
-from typing import Callable, Any
+import ctypes
+from typing import Callable, Any, Optional
 
 
 class Records:
+    """Tracks the record of completed work items by ULID."""
     def __init__(self):
-        self.records: list[ulid] = []  # Track completed work
+        self.records: list[ulid.ULID] = []
 
     def add(self, record):
+        """Adds a ULID record of completed work."""
         self.records.append(record)
 
     def __repr__(self):
@@ -21,91 +24,118 @@ class Records:
 
 class Worker(threading.Thread):
     """
-    Managed Worker Thread.
-    - Has identity (ULID/UUID)
-    - Tracks its state and work metrics
-    - Can switch between execution contexts (ThreadSwitch)
+    Managed Worker Thread
+    ---------------------
+    - Has a unique ID (ULID)
+    - Can gracefully shut down or be forcefully killed
+    - Tracks work completion
+    - Can participate in tree / shard systems via the factory
     """
 
     def __init__(self, factory: Any, work_queue: Any):
         """
+        Initializes a new Worker thread.
+
         Args:
-            factory (Any): Reference to the ThreadFactory managing this worker.
-            work_queue (Any): Queue holding this worker's tasks.
-            thread_id (str): Optional. ULID/UUID for tracking this thread.
+            factory (Any): Reference to the parent ThreadFactory (or manager).
+            work_queue (Any): Queue-like object from which this thread will fetch work.
         """
         super().__init__()
         self.factory = factory
         self.work_queue = work_queue
-        self.thread_id = str(ulid.ULID())  # Replace with ULID if needed
-        self.state = 'IDLE'  # Other states: ACTIVE, STEALING, TERMINATING
-        self.daemon = True  # Kill thread on program exi
-        self.records = Records()
-        self.shutdown_flag = threading.Event()
+        self.worker_id = str(ulid.ULID())  # Assign unique identifier
+        self.state = 'IDLE'  # States: IDLE, ACTIVE, SWITCHED, TERMINATING
+        self.daemon = True  # Ensure thread dies when main process exits
+        self.records = Records()  # Track completed work records
+        self.shutdown_flag = threading.Event()  # For graceful shutdown signal
+        self.completed_work = 0  # Total successfully executed tasks
+        self.death_event = threading.Event()  # Optional event for external death detection
 
     def run(self):
-        """
-        Main loop for thread execution.
-        """
-        while not self.shutdown_flag.is_set():
-            try:
-                # Try to get work from its own queue first
-                task = self.work_queue.dequeue()  # Assuming your queue throws on empty
-                self.state = 'ACTIVE'
-                self._execute_task(task)
-
-            except Exception as e:
-                # No work found, try to steal
-                self.state = 'STEALING'
-                stolen_task = self.factory.steal_work(exclude_worker=self)
-                if stolen_task:
+        """Main execution loop of the worker thread."""
+        print(f"[Worker {self.worker_id}] Starting.")
+        try:
+            self.state = 'STARTING'
+            while not self.shutdown_flag.is_set():
+                try:
+                    # Main work loop: fetch and execute tasks
+                    task = self.work_queue.dequeue()  # Must be provided by external queue system
                     self.state = 'ACTIVE'
-                    self._execute_task(stolen_task)
-                else:
-                    # No work, go idle
+                    self._execute_task(task)
+                except Exception:
+                    # No task available or error -> go idle briefly
                     self.state = 'IDLE'
-                    time.sleep(0.01)  # Backoff / wait (tunable)
+                    time.sleep(0.01)
+        finally:
+            # Cleanup when thread exits (naturally or forced)
+            self.state = 'TERMINATING'
+            print(f"[Worker {self.worker_id}] Exiting.")
+            self.death_event.set()  # Signal external observers that we are gone
 
     def _execute_task(self, task: Callable):
         """
-        Execute the given task and track completion.
+        Executes a single task.
+
+        Args:
+            task (Callable): The work to execute.
         """
         try:
-            task()  # Execute callable work
+            task()
             self.completed_work += 1
         except Exception as e:
-            print(f"Worker {self.thread_id}: Task execution failed - {e}")
+            print(f"[Worker {self.worker_id}] Task failed: {e}")
 
     def stop(self):
-        """
-        Trigger graceful shutdown.
-        """
+        """Graceful shutdown signal (soft exit)."""
         self.shutdown_flag.set()
+
+    def hard_kill(self):
+        """
+        Forces the thread to raise a SystemExit inside itself (unsafe, but useful).
+
+        Notes:
+            - Dangerous if resources are mid-allocation.
+            - Threads should ideally be stopped via `stop()`.
+        """
+        if not self.is_alive():
+            print(f"[Worker {self.worker_id}] Already dead.")
+            return
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+            ctypes.c_long(self.ident),
+            ctypes.py_object(SystemExit)
+        )
+        if res == 0:
+            raise ValueError("Thread ID invalid")
+        elif res > 1:
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(self.ident, None)
+            raise SystemError("Failed to kill thread safely")
+        print(f"[Worker {self.worker_id}] Scheduled for hard kill.")
 
     def thread_switch(self, new_queue: Any):
         """
-        Switch this worker to a new execution context (queue).
+        Re-assigns the worker to a different queue (can be used for rebalancing).
         """
         self.work_queue = new_queue
         self.state = 'SWITCHED'
 
-    def __repr__(self):
-        return f"<Worker id={self.thread_id} state={self.state} completed={self.completed_work}>"
-
     def get_creation_datetime(self) -> datetime.datetime:
         """
-        Return the creation time of this worker using ULID timestamp.
-
         Returns:
-            datetime: Timestamp of worker creation.
+            datetime: The time this worker was created based on its ULID.
         """
-        return ulid.ULID.from_str(self.thread_id).datetime
+        return ulid.ULID.from_str(self.worker_id).datetime
 
     def get_creation_timestamp(self) -> float:
         """
-        Return the creation time of this worker using ULID timestamp (epoch time in seconds).
-
         Returns:
-            float: Timestamp in seconds since epoch.
+            float: Epoch timestamp derived from the ULID.
         """
-        return ulid.ULID.from_str(self.thread_id).timestamp
+        return ulid.ULID.from_str(self.worker_id).timestamp
+
+    def __del__(self):
+        """Triggered when Python's GC cleans up this object."""
+        print(f"[Worker {self.worker_id}] __del__ called.")
+        self.death_event.set()
+
+    def __repr__(self):
+        return f"<Worker id={self.worker_id} state={self.state} completed={self.completed_work}>"

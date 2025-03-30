@@ -66,7 +66,7 @@ from src.thread_factory.concurrency.concurrent_core import Concurrent
 from src.thread_factory.concurrency.concurrent_buffer import ConcurrentBuffer
 from src.thread_factory.concurrency.concurrent_collection import ConcurrentCollection
 from src.thread_factory.utils.exceptions import Empty
-from src.thread_factory.threads import Worker, Dynaphore
+from src.thread_factory.threads import Worker, Dynaphore, Records, Work
 
 __all__ = [
     "ConcurrentBag",
@@ -80,5 +80,7 @@ __all__ = [
     "Empty",
     "Worker",
     "Dynaphore",
+    "Records",
+    "Work",
     "__version__"
 ]
