@@ -35,50 +35,39 @@ class BenchmarkManager:
         # Where we store all benchmark records
         self.records: ConcurrentList[BenchmarkRecord] = ConcurrentList()
 
-    def run_benchmark(
-        self,
-        name: str,
-        producers: int,
-        consumers: int,
-        items_per_producer: int,
-        callback: Optional[Callable[[dict], None]] = None
-    ) -> None:
+    def run_benchmark(self, name: str, params: Dict[str, Any]) -> None:
         """
         Run the concurrency benchmark identified by 'name' exactly once.
-        The concurrency test is fetched from BenchmarkFactory by `name`.
         """
 
-        # If no callback provided, use a default that logs to self.records
+        producers = params["producers"]
+        consumers = params["consumers"]
+        items_per_producer = params["items_per_producer"]
+        callback = params.get("callback")
+
         if callback is None:
             def callback(data: Dict[str, Any]):
                 self._store_record(name, producers, consumers, items_per_producer, data)
         else:
-            # We'll wrap the user callback to also store a record
             user_callback = callback
 
             def callback_wrapper(data: Dict[str, Any]):
-                # First store in manager
                 self._store_record(name, producers, consumers, items_per_producer, data)
-                # Then also let the user’s callback see the data
                 user_callback(data)
 
             callback = callback_wrapper
+
+        # ✅ inject callback into params here
+        params["callback"] = callback
 
         total_ops = producers * items_per_producer
         print(f"\n🚩 Starting benchmark: {name} | {producers}P / {consumers}C | Total ops: {total_ops:,}")
 
         start_time = time.perf_counter()
 
-        # 1) Get the concurrency test from the factory
-        test = BenchmarkFactory.get_benchmark(name)
-
-        # 2) Run the test
-        test.run_benchmark(
-            callback=callback,
-            producers=producers,
-            consumers=consumers,
-            items_per_producer=items_per_producer
-        )
+        # ✅ now params has callback properly
+        test = BenchmarkFactory.get_benchmark(name, **params)
+        test.run_benchmark()
 
         end_time = time.perf_counter()
         print(f"✅ Benchmark '{name}' finished in {end_time - start_time:.2f} seconds.")
@@ -175,8 +164,8 @@ if __name__ == "__main__":
 
     #TODO: Add a way for shard parameters to be set for ConcurrentBuffer and ConcurrentCollection
 
-    testDict = {
-        'min_producer' : 4,
+    general_dict = {
+    'min_producer' : 4,
     'max_producer' : 20,
     'producer_step' : 2,
     'min_consumer' : 4,
@@ -188,32 +177,47 @@ if __name__ == "__main__":
     'ratios': [(4, 1), (3, 1), (2, 1), (1, 1), (1, 2), (1, 3), (1, 4)]
     }
 
+    concurrent_buffer_dict = {
+    'min_producer' : 4,
+    'max_producer' : 20,
+    'producer_step' : 2,
+    'min_consumer' : 4,
+    'max_consumer' : 20,
+    'consumer_step' : 2,
+    'min_items_per_producer' : 10000,
+    'max_items_per_producer' : 50000,
+    'items_per_producer_step' : 10000,
+    'shard_size_min:': 2,
+    'shard_size_max:': 40,
+    'shard_size_step:': 2,
+    'ratios': [(4, 1), (3, 1), (2, 1), (1, 1), (1, 2), (1, 3), (1, 4)]
+    }
 
     suite = ManagerStrategyFactory.create_strategy(
         "scalable_test_suite",
         benchmark="concurrent_buffer",
-        **testDict
+        **concurrent_buffer_dict
     )
     suite.execute(manager)
 
     suite = ManagerStrategyFactory.create_strategy(
         "scalable_test_suite",
         benchmark="concurrent_collection",
-        **testDict
+        **concurrent_buffer_dict
     )
     suite.execute(manager)
 
     suite = ManagerStrategyFactory.create_strategy(
         "scalable_test_suite",
         benchmark="concurrent_queue",
-        **testDict
+        **general_dict
     )
     suite.execute(manager)
 
     # 3) Export + Summary
     manager.print_summary()
-    manager.save_as_csv("benchmark_results.csv")
-    manager.save_as_json("benchmark_results.json")
+    # manager.save_as_csv("benchmark_results.csv")
+    # manager.save_as_json("benchmark_results.json")
 
     # 4) Visualization
     records = manager.export()

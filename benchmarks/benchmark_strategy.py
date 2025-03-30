@@ -29,12 +29,15 @@ class SingleRunStrategy(BenchmarkStrategy):
         self.items_per_producer = items_per_producer
 
     def run(self, manager, benchmark_name: str, callback: Callable[[dict], None]):
+        params = {
+            "producers": self.producers,
+            "consumers": self.consumers,
+            "items_per_producer": self.items_per_producer,
+            "callback": callback
+        }
         manager.run_benchmark(
             name=benchmark_name,
-            producers=self.producers,
-            consumers=self.consumers,
-            items_per_producer=self.items_per_producer,
-            callback=callback
+            params=params
         )
 
 
@@ -52,31 +55,36 @@ class MultiSampleStrategy(BenchmarkStrategy):
     def run(self, manager, benchmark_name: str, callback: Callable[[dict], None]):
         for i in range(self.samples):
             print(f"\n--- [MultiSample] Running sample {i+1}/{self.samples} ---")
+            params = {
+                "producers": self.producers,
+                "consumers": self.consumers,
+                "items_per_producer": self.items_per_producer,
+                "callback": callback
+            }
             manager.run_benchmark(
                 name=benchmark_name,
-                producers=self.producers,
-                consumers=self.consumers,
-                items_per_producer=self.items_per_producer,
-                callback=callback
+                params=params
             )
 
 
 class GridStrategy(BenchmarkStrategy):
-    def __init__(self, producer_values: List[int], consumer_values:List[int], items_per_producer: int):
+    def __init__(self, producer_values: List[int], consumer_values: List[int], items_per_producer: int):
         self.producer_values = producer_values
         self.consumer_values = consumer_values
         self.items_per_producer = items_per_producer
 
     def run(self, manager, benchmark_name: str, callback: Callable[[dict], None]):
-        # Just do the looping yourself
         for p in self.producer_values:
             for c in self.consumer_values:
+                params = {
+                    "producers": p,
+                    "consumers": c,
+                    "items_per_producer": self.items_per_producer,
+                    "callback": callback
+                }
                 manager.run_benchmark(
                     name=benchmark_name,
-                    producers=p,
-                    consumers=c,
-                    items_per_producer=self.items_per_producer,
-                    callback=callback
+                    params=params
                 )
 
 
@@ -99,14 +107,12 @@ class ScalableTest(BenchmarkStrategy):
 
         for p in range(self.min_producer, self.max_producer + 1, self.producer_step):
             for ratio_p, ratio_c in self.ratios:
-                # compute c using the ratio
                 if p % ratio_p != 0:
-                    continue  # skip if p isn't divisible by ratio_p (clean scaling)
+                    continue
 
                 c = (p // ratio_p) * ratio_c
-
                 if c <= 0:
-                    continue  # sanity check
+                    continue
 
                 for items in range(
                     self.min_items_per_producer,
@@ -115,10 +121,16 @@ class ScalableTest(BenchmarkStrategy):
                 ):
                     print(f"\n🌀 Ratio run: {p}P / {c}C | Ratio {ratio_p}:{ratio_c} | Items/Producer: {items}")
 
+                    # ✅ Build params dict
+                    params = {
+                        "producers": p,
+                        "consumers": c,
+                        "items_per_producer": items,
+                        "callback": callback
+                    }
+
+                    # ✅ Pass dict
                     manager.run_benchmark(
                         name=benchmark_name,
-                        producers=p,
-                        consumers=c,
-                        items_per_producer=items,
-                        callback=callback
+                        params=params
                     )

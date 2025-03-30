@@ -34,11 +34,7 @@ class BaseBenchmark(ABC):
 
     @abstractmethod
     def run_benchmark(
-        self,
-        callback: Callable[[Dict[str, Any]], None],
-        producers: int,
-        consumers: int,
-        items_per_producer: int
+        self
     ) -> None:
         """
         Execute the concurrency test and call 'callback' with a dictionary
@@ -56,22 +52,26 @@ class BaseBenchmark(ABC):
 # Concrete Benchmark: ConcurrentBuffer + Threads
 ###############################################################################
 class ConcurrentBufferThreadsBenchmark(BaseBenchmark):
-    def __init__(self):
+    def __init__(self, **kwargs: Dict[str, Any]):
         super().__init__("concurrent_buffer")
+        self.callback: Any = kwargs["callback"]
+        self.producers: Any = kwargs["producers"]
+        self.consumers: Any = kwargs["consumers"]
+        self.items_per_producer: Any = kwargs["items_per_producer"]
 
-    def run_benchmark(self, callback, producers, consumers, items_per_producer):
+    def run_benchmark(self):
         print(f"\n[{self.name}] GIL Enabled: {check_gil_enabled()}")
-        total_items = producers * items_per_producer
+        total_items = self.producers * self.items_per_producer
         buffer = ConcurrentBuffer(10)
 
         def producer(thread_id):
-            for i in range(items_per_producer):
+            for i in range(self.items_per_producer):
                 buffer.enqueue((thread_id, i))
 
         # Distribute total_items among consumers
-        base_target = total_items // consumers
-        targets = [base_target] * consumers
-        for i in range(total_items % consumers):
+        base_target = total_items // self.consumers
+        targets = [base_target] * self.consumers
+        for i in range(total_items % self.consumers):
             targets[i] += 1
 
         def consumer(target):
@@ -84,12 +84,12 @@ class ConcurrentBufferThreadsBenchmark(BaseBenchmark):
                     pass
 
         threads = []
-        for pid in range(producers):
+        for pid in range(self.producers):
             threads.append(threading.Thread(target=producer, args=(pid,)))
-        for i in range(consumers):
+        for i in range(self.consumers):
             threads.append(threading.Thread(target=consumer, args=(targets[i],)))
 
-        print(f"[{self.name}] Starting {producers} producers / {consumers} consumers...")
+        print(f"[{self.name}] Starting {self.producers} producers / {self.consumers} consumers...")
         start = time.perf_counter()
         for t in threads:
             t.start()
@@ -103,7 +103,7 @@ class ConcurrentBufferThreadsBenchmark(BaseBenchmark):
         print(f"[{self.name}] {total_items:,} ops completed in {duration:.2f} seconds.")
         print(f"[{self.name}] Final buffer length: {remaining}\n")
 
-        callback({
+        self.callback({
             "duration": duration,
             "remaining": remaining,
             "gil_enabled": check_gil_enabled()
@@ -114,21 +114,25 @@ class ConcurrentBufferThreadsBenchmark(BaseBenchmark):
 # ConcurrentCollection + Threads
 ###############################################################################
 class ConcurrentCollectionThreadsBenchmark(BaseBenchmark):
-    def __init__(self):
+    def __init__(self, **kwargs: Dict[str, Any]):
         super().__init__("concurrent_collection")
+        self.callback: Any = kwargs["callback"]
+        self.producers: Any = kwargs["producers"]
+        self.consumers: Any = kwargs["consumers"]
+        self.items_per_producer: Any = kwargs["items_per_producer"]
 
-    def run_benchmark(self, callback, producers, consumers, items_per_producer):
+    def run_benchmark(self):
         print(f"\n[{self.name}] GIL Enabled: {check_gil_enabled()}")
-        total_items = producers * items_per_producer
+        total_items = self.producers * self.items_per_producer
         buf = ConcurrentCollection(40)
 
         def producer(thread_id):
-            for i in range(items_per_producer):
+            for i in range(self.items_per_producer):
                 buf.add((thread_id, i))
 
-        base_target = total_items // consumers
-        targets = [base_target] * consumers
-        for i in range(total_items % consumers):
+        base_target = total_items // self.consumers
+        targets = [base_target] * self.consumers
+        for i in range(total_items % self.consumers):
             targets[i] += 1
 
         def consumer(target):
@@ -141,12 +145,12 @@ class ConcurrentCollectionThreadsBenchmark(BaseBenchmark):
                     pass
 
         threads = []
-        for pid in range(producers):
+        for pid in range(self.producers):
             threads.append(threading.Thread(target=producer, args=(pid,)))
-        for i in range(consumers):
+        for i in range(self.consumers):
             threads.append(threading.Thread(target=consumer, args=(targets[i],)))
 
-        print(f"[{self.name}] Starting {producers} producers / {consumers} consumers...")
+        print(f"[{self.name}] Starting {self.producers} producers / {self.consumers} consumers...")
         start = time.perf_counter()
         for t in threads:
             t.start()
@@ -160,7 +164,7 @@ class ConcurrentCollectionThreadsBenchmark(BaseBenchmark):
         print(f"[{self.name}] {total_items:,} ops completed in {duration:.2f} seconds.")
         print(f"[{self.name}] Final buffer length: {remaining}\n")
 
-        callback({
+        self.callback({
             "duration": duration,
             "remaining": remaining,
             "gil_enabled": check_gil_enabled()
@@ -171,21 +175,25 @@ class ConcurrentCollectionThreadsBenchmark(BaseBenchmark):
 # ConcurrentQueue + Threads
 ###############################################################################
 class ConcurrentQueueThreadsBenchmark(BaseBenchmark):
-    def __init__(self):
+    def __init__(self, **kwargs: Dict[str, Any]):
         super().__init__("concurrent_queue")
+        self.callback: Any = kwargs["callback"]
+        self.producers: Any = kwargs["producers"]
+        self.consumers: Any = kwargs["consumers"]
+        self.items_per_producer: Any = kwargs["items_per_producer"]
 
-    def run_benchmark(self, callback, producers, consumers, items_per_producer):
+    def run_benchmark(self):
         print(f"\n[{self.name}] GIL Enabled: {check_gil_enabled()}")
-        total_items = producers * items_per_producer
+        total_items = self.producers * self.items_per_producer
         q = ConcurrentQueue()
 
         def producer(thread_id):
-            for i in range(items_per_producer):
+            for i in range(self.items_per_producer):
                 q.enqueue((thread_id, i))
 
-        base_target = total_items // consumers
-        targets = [base_target] * consumers
-        for i in range(total_items % consumers):
+        base_target = total_items // self.consumers
+        targets = [base_target] * self.consumers
+        for i in range(total_items % self.consumers):
             targets[i] += 1
 
         def consumer(target):
@@ -198,12 +206,12 @@ class ConcurrentQueueThreadsBenchmark(BaseBenchmark):
                     pass
 
         threads = []
-        for pid in range(producers):
+        for pid in range(self.producers):
             threads.append(threading.Thread(target=producer, args=(pid,)))
-        for i in range(consumers):
+        for i in range(self.consumers):
             threads.append(threading.Thread(target=consumer, args=(targets[i],)))
 
-        print(f"[{self.name}] Starting {producers} producers / {consumers} consumers...")
+        print(f"[{self.name}] Starting {self.producers} producers / {self.consumers} consumers...")
         start = time.perf_counter()
         for t in threads:
             t.start()
@@ -217,7 +225,7 @@ class ConcurrentQueueThreadsBenchmark(BaseBenchmark):
         print(f"[{self.name}] {total_items:,} ops completed in {duration:.2f} seconds.")
         print(f"[{self.name}] Final queue length: {remaining}\n")
 
-        callback({
+        self.callback({
             "duration": duration,
             "remaining": remaining,
             "gil_enabled": check_gil_enabled()
@@ -228,21 +236,25 @@ class ConcurrentQueueThreadsBenchmark(BaseBenchmark):
 # collections.deque + Threads
 ###############################################################################
 class CollectionsDequeThreadsBenchmark(BaseBenchmark):
-    def __init__(self):
+    def __init__(self, **kwargs: Dict[str, Any]):
         super().__init__("collections_deque")
+        self.callback: Any = kwargs["callback"]
+        self.producers: Any = kwargs["producers"]
+        self.consumers: Any = kwargs["consumers"]
+        self.items_per_producer: Any = kwargs["items_per_producer"]
 
-    def run_benchmark(self, callback, producers, consumers, items_per_producer):
+    def run_benchmark(self):
         print(f"\n[{self.name}] GIL Enabled: {check_gil_enabled()}")
-        total_items = producers * items_per_producer
+        total_items = self.producers * self.items_per_producer
         dq = deque()
 
         def producer(thread_id):
-            for i in range(items_per_producer):
+            for i in range(self.items_per_producer):
                 dq.append((thread_id, i))
 
-        base_target = total_items // consumers
-        targets = [base_target] * consumers
-        for i in range(total_items % consumers):
+        base_target = total_items // self.consumers
+        targets = [base_target] * self.consumers
+        for i in range(total_items % self.consumers):
             targets[i] += 1
 
         def consumer(target):
@@ -253,12 +265,12 @@ class CollectionsDequeThreadsBenchmark(BaseBenchmark):
                     consumed += 1
 
         threads = []
-        for pid in range(producers):
+        for pid in range(self.producers):
             threads.append(threading.Thread(target=producer, args=(pid,)))
-        for i in range(consumers):
+        for i in range(self.consumers):
             threads.append(threading.Thread(target=consumer, args=(targets[i],)))
 
-        print(f"[{self.name}] Starting {producers} producers / {consumers} consumers...")
+        print(f"[{self.name}] Starting {self.producers} producers / {self.consumers} consumers...")
         start = time.perf_counter()
         for t in threads:
             t.start()
@@ -272,7 +284,7 @@ class CollectionsDequeThreadsBenchmark(BaseBenchmark):
         print(f"[{self.name}] {total_items:,} ops completed in {duration:.2f} seconds.")
         print(f"[{self.name}] Final deque length: {remaining}\n")
 
-        callback({
+        self.callback({
             "duration": duration,
             "remaining": remaining,
             "gil_enabled": check_gil_enabled()
@@ -296,32 +308,36 @@ def consumer_process(q, item_count):
 # multiprocessing.Queue + Processes
 ###############################################################################
 class MultiprocessingQueueBenchmark(BaseBenchmark):
-    def __init__(self):
+    def __init__(self, **kwargs: Dict[str, Any]):
         super().__init__("multiprocessing_queue")
+        self.callback: Any = kwargs["callback"]
+        self.producers: Any = kwargs["producers"]
+        self.consumers: Any = kwargs["consumers"]
+        self.items_per_producer: Any = kwargs["items_per_producer"]
 
-    def run_benchmark(self, callback, producers, consumers, items_per_producer):
+    def run_benchmark(self):
         print(f"\n[{self.name}] GIL Enabled: {check_gil_enabled()}")
-        total_items = producers * items_per_producer
+        total_items = self.producers * self.items_per_producer
         queue = multiprocessing.Queue()
 
-        base_target = total_items // consumers
-        targets = [base_target] * consumers
-        for i in range(total_items % consumers):
+        base_target = total_items // self.consumers
+        targets = [base_target] * self.consumers
+        for i in range(total_items % self.consumers):
             targets[i] += 1
 
         processes = []
 
         # Spawn producers
-        for pid in range(producers):
-            p = multiprocessing.Process(target=producer_process, args=(queue, items_per_producer, pid))
+        for pid in range(self.producers):
+            p = multiprocessing.Process(target=producer_process, args=(queue, self.items_per_producer, pid))
             processes.append(p)
 
         # Spawn consumers
-        for i in range(consumers):
+        for i in range(self.consumers):
             p = multiprocessing.Process(target=consumer_process, args=(queue, targets[i]))
             processes.append(p)
 
-        print(f"[{self.name}] Starting {producers} producers / {consumers} consumers...")
+        print(f"[{self.name}] Starting {self.producers} producers / {self.consumers} consumers...")
         start = time.perf_counter()
         for p in processes:
             p.start()
@@ -338,7 +354,7 @@ class MultiprocessingQueueBenchmark(BaseBenchmark):
         print(f"[{self.name}] {total_items:,} ops completed in {duration:.2f} seconds.")
         print(f"[{self.name}] Final queue length: {remaining}\n")
 
-        callback({
+        self.callback({
             "duration": duration,
             "remaining": remaining,
             "gil_enabled": check_gil_enabled()
@@ -358,7 +374,7 @@ class BenchmarkFactory:
     }
 
     @classmethod
-    def get_benchmark(cls, name: str) -> BaseBenchmark:
+    def get_benchmark(cls, name: str, **kwargs) -> BaseBenchmark:
         if name not in cls._registered:
             raise ValueError(f"No concurrency test for '{name}'")
-        return cls._registered[name]()
+        return cls._registered[name](**kwargs)
