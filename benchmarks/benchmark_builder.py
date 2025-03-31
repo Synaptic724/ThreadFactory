@@ -124,7 +124,7 @@ class ConcurrentCollectionThreadsBenchmark(BaseBenchmark):
     def run_benchmark(self):
         print(f"\n[{self.name}] GIL Enabled: {check_gil_enabled()}")
         total_items = self.producers * self.items_per_producer
-        buf = ConcurrentCollection(40)
+        buf = ConcurrentCollection((self.producers + self.consumers))
 
         def producer(thread_id):
             for i in range(self.items_per_producer):

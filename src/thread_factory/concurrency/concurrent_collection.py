@@ -45,7 +45,7 @@ class _Shard(Generic[_T], Disposable):
 
     __slots__ = ('disposed', '_lock', '_queue', '_length_array', '_index')
 
-    def __init__(self, len_array: list[int], index: int) -> None:
+    def __init__(self, len_array: array, index: int) -> None:
         """
         Initialize a new shard.
 
@@ -176,7 +176,7 @@ class _Shard(Generic[_T], Disposable):
         self.dispose()
 
 
-class ConcurrentCollection(Generic[_T], Disposable):
+class ConcurrentCollection(Generic[_T]):
     """
     A thread-safe, high-level collection that distributes items across multiple
     internal shards (lock-protected deques). Each shard is independently locked,
@@ -238,11 +238,11 @@ class ConcurrentCollection(Generic[_T], Disposable):
         # Store shard count
         self._num_shards = number_of_shards
 
-        # List for tracking size of each shard.
-        self._length_array: list[int] = list([0] * self._num_shards)
+        # Shared array tracking the size of each shard (using unsigned 64-bit: "Q")
+        self._length_array = array("Q", [0] * self._num_shards)
 
         # Create the shards themselves.
-        self._shards: list[_Shard[_T]] = [
+        self._shards: List[_Shard[_T]] = [
             _Shard(self._length_array, i)
             for i in range(self._num_shards)
         ]
