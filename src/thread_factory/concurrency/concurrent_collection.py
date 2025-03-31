@@ -230,7 +230,7 @@ class ConcurrentCollection(Generic[_T]):
         if number_of_shards < 1:
             raise ValueError("number_of_shards must be at least 1")
         if number_of_shards > 1 and number_of_shards % 2 != 0:
-            raise ValueError("number_of_shards must be even if greater than 1")
+            number_of_shards += 1
 
         # Indicates whether this collection has been disposed.
         self.disposed = False
