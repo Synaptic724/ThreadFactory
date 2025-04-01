@@ -23,6 +23,7 @@ from src.thread_factory.utils.disposable import Disposable
 
 _T = TypeVar("_T")
 
+#TODO : Implement per object locks to see if we can distribute contention between each call for arrays and deques
 
 class _Shard(Generic[_T], Disposable):
     """
