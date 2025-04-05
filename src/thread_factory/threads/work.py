@@ -80,7 +80,7 @@ class Work(Future, Disposable):
             self.duration_ns = self.timestamp_finished - self.timestamp_started
             self.execute_post_hooks()
 
-            if self._auto_dispose and not self.cancel_requested:
+            if self._auto_dispose:
                 self.dispose()
 
     def execute_pre_hooks(self):
@@ -120,11 +120,10 @@ class Work(Future, Disposable):
             success = super().cancel()
 
             if success:
-                if self._state == 'CANCELLED':
-                    if self._auto_dispose:
-                        self._result = None
-                        self._exception = None
-                        self.dispose()
+                if self._auto_dispose:
+                    self._result = None
+                    self._exception = None
+                    self.dispose()
 
             return success
 
