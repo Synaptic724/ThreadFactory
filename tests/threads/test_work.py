@@ -62,6 +62,20 @@ class TestWork(unittest.TestCase):
         result = asyncio.run(run_async_work())
         self.assertEqual(result, 42)
 
+
+    def test_cleanup(self):
+        def cleanup_fn():
+            return "cleanup"
+
+        work = Work(cleanup_fn, auto_dispose=False)
+        work.run()
+        result = work.result()
+        work.cleanup()
+
+        self.assertEqual(result, "cleanup")
+        self.assertEqual(work.result(), None)
+        self.assertTrue(work.disposed)
+
     def test_multiple_hooks_and_priority(self):
         state = []
 
