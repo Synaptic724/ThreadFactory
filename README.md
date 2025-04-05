@@ -13,7 +13,6 @@
 
 
 <!--[![Coverage Status](https://coveralls.io/repos/github/Synaptic724/threadfactory/badge.svg?branch=main)](https://coveralls.io/github/Synaptic724/threadfactory?branch=main) -->
-<!--[![Documentation Status](https://readthedocs.org/projects/threadfactory/badge/?version=latest)](https://threadfactory.readthedocs.io/en/latest/?badge=latest) -->
 <!--[![CodeFactor](https://www.codefactor.io/repository/github/synaptic724/threadfactory/badge)](https://www.codefactor.io/repository/github/synaptic724/threadfactory) -->
 
 High-performance **thread-safe** (No-GIL–friendly) data structures and parallel operations for Python 3.13+.
@@ -22,8 +21,9 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 > ThreadFactory is designed and tested against Python 3.13+ in **No-GIL** mode.  
 > This library will only function on 3.13 and higher.
 ---
-> All benchmark tests below are available if you clone the library and run the tests.
-> See the [Benchmark Details 🚀](general_benchmarks.md) for more benchmark stats.
+> All benchmark tests below are available if you clone the library and run the tests.  
+> See the [Benchmark Details 🚀](https://github.com/Synaptic724/ThreadFactory/blob/production/general_benchmarks.md) for more benchmark stats.
+
 
 ## 🔥 Benchmark Results (10,000,000 ops — 10 producers / 10 consumers)
 
