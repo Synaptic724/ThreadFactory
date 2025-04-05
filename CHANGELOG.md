@@ -7,16 +7,48 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- Thread role assignment framework (Producer, Consumer, Orchestrator).
-- ThreadSwitch logic for dynamic execution context migration.
-- Queue state management using Active and Empty stacks.
-- Contention mode system (0-10 scale) with dynamic tuning.
-- Work stealing optimization with concurrent list handling.
+
+#### 🧠 Work Object
+- Introduced the `Work` class: a disposable, hook-enabled, metadata-rich extension of `Future`.
+- Features:
+  - Native `await` support through `__await__` for seamless asyncio compatibility.
+  - `auto_dispose` flag to enable automatic cleanup after result or exception retrieval.
+  - Lifecycle hook system (`before`, `after`) for execution tracing and side-effect orchestration.
+  - Full metadata tracking (task ID, timing metrics, worker/queue binding, retry count).
+  - Graceful cancellation with `CancelledError` injection.
+  - Thread-safe via internal `_condition` object override.
+
+#### 🧵 Worker Prototype
+- Introduced a minimal `Worker` class for executing `Work` instances on background threads.
+- Provides early structure for future task orchestration under `ThreadFactory`.
+
+#### 🏗️ ThreadFactory Framework (WIP)
+- Scaffolded architecture for the `ThreadFactory` execution system.
+- Early goals include:
+  - Modular producer-consumer management.
+  - Queue-to-worker routing logic.
+  - Support for scaling policies and diagnostics interfaces.
+- Will form the backbone of both sync and async thread execution systems.
+
+#### 🎫 QueueAllocator
+- Added `QueueAllocator`: a ticket-based ID allocator using `ConcurrentQueue`.
+- Designed for managing worker/task/thread IDs in a pool-based system.
+- Features:
+  - Fast, thread-safe ticket acquisition and release.
+  - Validates returned IDs for correctness and range.
+  - Integrates `Disposable` lifecycle management.
+  - Full context manager support with `with` blocks.
+  - Enforces internal reuse of ticket IDs for efficient resource control.
+
+### Planned
+- `AsyncThreadFactory`: Fully `asyncio`-integrated version of `ThreadFactory`.
+- `DiagnosticsInterface`: Real-time throughput, queue, and performance tracking.
+- `Orchestrator`: Dynamic coordination of thread lifecycles, workloads, and contention resolution.
 
 
 ---
 
-## [1.2.0] - 2025-03-30
+## [1.2.0] - 2025-04-05
 
 ### Classes Added
 
