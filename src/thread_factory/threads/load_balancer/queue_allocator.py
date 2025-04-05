@@ -1,6 +1,5 @@
-from src.thread_factory.concurrency.concurrent_queue import ConcurrentQueue
-from src.thread_factory.utils.exceptions import Empty
-from src.thread_factory.utils.disposable import Disposable
+from thread_factory.concurrency import ConcurrentQueue
+from thread_factory.utils import Empty, Disposable
 
 
 class QueueAllocator(Disposable):

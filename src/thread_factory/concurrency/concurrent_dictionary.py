@@ -16,7 +16,7 @@ from typing import (
     TypeVar,
     Union,
 )
-from src.thread_factory.utils.disposable import Disposable
+from thread_factory.utils.disposable import Disposable
 _K = TypeVar("_K")
 _V = TypeVar("_V")
 

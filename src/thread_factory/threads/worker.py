@@ -4,7 +4,7 @@ import time
 import ulid
 import ctypes
 from typing import Callable, Any, Optional
-from src.thread_factory.utils.disposable import Disposable
+from thread_factory.utils import Disposable
 from enum import Enum, auto
 import asyncio
 
@@ -152,3 +152,6 @@ class Worker(threading.Thread, Disposable):
 
     def __repr__(self):
         return f"<Worker id={self.worker_id} state={self.state} completed={self.completed_work}>"
+
+    def dispose(self):
+        pass

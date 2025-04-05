@@ -14,9 +14,8 @@ from typing import (
     TypeVar,
 )
 
-from src.thread_factory.concurrency.concurrent_list import ConcurrentList
-from src.thread_factory.utils.exceptions import Empty
-from src.thread_factory.utils.disposable import Disposable
+from thread_factory.concurrency import ConcurrentList
+from thread_factory.utils import Empty, Disposable
 
 _T = TypeVar("_T")
 

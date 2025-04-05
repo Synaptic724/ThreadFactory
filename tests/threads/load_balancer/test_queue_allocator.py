@@ -1,6 +1,6 @@
 import unittest
-from src.thread_factory.threads.load_balancer.queue_allocator import QueueAllocator
-from src.thread_factory.utils.exceptions import Empty
+from thread_factory.threads.load_balancer.queue_allocator import QueueAllocator
+from thread_factory.utils import Empty
 
 
 class TestQueueAllocator(unittest.TestCase):

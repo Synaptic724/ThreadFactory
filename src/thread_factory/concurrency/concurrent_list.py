@@ -4,7 +4,7 @@ import warnings
 from copy import deepcopy
 from typing import Any, Callable, Optional, List, TypeVar, Generic
 from collections.abc import Iterable, Iterator
-from src.thread_factory.utils.disposable import Disposable
+from thread_factory.utils import Disposable
 
 _T = TypeVar('_T')
 

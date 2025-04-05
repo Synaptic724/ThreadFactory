@@ -1,5 +1,5 @@
 from threading import Condition
-from src.thread_factory.utils.disposable import Disposable
+from thread_factory.utils import Disposable
 
 
 """

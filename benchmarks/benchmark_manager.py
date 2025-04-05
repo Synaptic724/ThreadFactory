@@ -3,7 +3,7 @@ from dataclasses import dataclass, field, asdict
 from typing import Dict, Any, Callable, List, Optional, Tuple
 from benchmarks.benchmark_manager_strategy import ManagerStrategyFactory
 from benchmarks.benchmark_visualizer import BenchmarkVisualizer
-from src.thread_factory import ConcurrentList
+from thread_factory import ConcurrentList
 from benchmarks.benchmark_builder import BenchmarkFactory
 from benchmarks import benchmark_strategy as bs
 

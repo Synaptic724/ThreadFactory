@@ -2,7 +2,7 @@ import time
 import threading
 from concurrent.futures import Future
 from typing import Optional, Callable, List
-from src.thread_factory.utils.disposable import Disposable
+from thread_factory.utils import Disposable
 import asyncio
 
 class Work(Future, Disposable):

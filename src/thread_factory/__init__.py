@@ -57,16 +57,16 @@ def _detect_nogil_mode() -> None:
 
 _detect_nogil_mode()
 
-from src.thread_factory.concurrency.concurrent_bag import ConcurrentBag
-from src.thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-from src.thread_factory.concurrency.concurrent_list import ConcurrentList
-from src.thread_factory.concurrency.concurrent_queue import ConcurrentQueue
-from src.thread_factory.concurrency.concurrent_stack import ConcurrentStack
-from src.thread_factory.concurrency.concurrent_core import Concurrent
-from src.thread_factory.concurrency.concurrent_buffer import ConcurrentBuffer
-from src.thread_factory.concurrency.concurrent_collection import ConcurrentCollection
-from src.thread_factory.utils.exceptions import Empty
-from src.thread_factory.threads import Worker, Dynaphore, Records, Work
+from thread_factory.concurrency.concurrent_bag import ConcurrentBag
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.concurrency.concurrent_list import ConcurrentList
+from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
+from thread_factory.concurrency.concurrent_stack import ConcurrentStack
+from thread_factory.concurrency.concurrent_core import Concurrent
+from thread_factory.concurrency.concurrent_buffer import ConcurrentBuffer
+from thread_factory.concurrency.concurrent_collection import ConcurrentCollection
+from thread_factory.utils.exceptions import Empty
+from thread_factory.threads import Worker, Dynaphore, Records, Work
 
 __all__ = [
     "ConcurrentBag",
