@@ -522,3 +522,39 @@ class HighPerformanceConcurrentCollectionTest(unittest.TestCase):
 
         print(f"\n[ConcurrentCollection Random Ops] {operations_per_thread * self.thread_count:,} ops in {end - start:.2f}s")
         self.assertGreaterEqual(len(self.collection), 0)
+
+
+    def test_dispose(self):
+        """
+        Test that dispose() on ConcurrentCollection:
+            - Disposes all shards properly
+            - Resets the shared length array
+            - Sets the disposed flag
+            - Is idempotent (safe to call multiple times)
+        """
+        collection = ConcurrentCollection(total_thread_count=4, initial=['apple', 'banana', 'cherry'])
+
+        # Pre-condition checks
+        self.assertTrue(len(collection) > 0)
+        self.assertFalse(collection.disposed)
+        self.assertTrue(all(isinstance(s, collection._shards[0].__class__) for s in collection._shards))
+
+        # Dispose once
+        collection.dispose()
+        self.assertEqual(len(collection), 0)
+        self.assertTrue(collection.disposed)
+        self.assertTrue(all(v == 0 for v in collection._length_array))
+
+        # All shards should also be disposed
+        for shard in collection._shards:
+            self.assertTrue(shard.disposed)
+
+        # Dispose again (should not raise)
+        try:
+            collection.dispose()
+        except Exception as e:
+            self.fail(f"Calling dispose() twice raised an exception: {e}")
+
+        # Optional: if you allow post-disposal usage, test it here:
+        collection.add('grape')
+        self.assertIn('grape', list(collection))

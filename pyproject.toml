@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "threadfactory"
-version = "1.1.1"
+version = "1.2.0"
 description = "High-performance thread-safe (No-GIL–friendly) data structures and parallel operations for Python 3.13+."
-readme = "README.md"
-readme-content-type = "text/markdown"
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.13"
 license = "MIT"
+
 
 authors = [
     { name = "Mark Geleta", email = "SynapticAISystems@gmail.com" }
@@ -50,7 +50,7 @@ classifiers = [
     "Environment :: Console",
 ]
 
-dependencies = []
+dependencies = ["python-ulid>=3.0.0"]
 
 [project.urls]
 Homepage = "https://github.com/Synaptic724/ThreadFactory"
@@ -64,4 +64,7 @@ package-dir = { "" = "src" }
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["thread_factory*"]
-exclude = ["tests", "Plans", "docs", "examples", "examples.*", "tests.*", "benchmarks"]
+exclude = [
+    "tests*", "docs*", "examples*", "Plans*", "benchmarks*", "benchmark_data*",
+    ".github*", ".venv*", "__pycache__", "*.egg-info"
+]

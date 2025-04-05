@@ -1,6 +1,6 @@
 import functools
 import threading
-import time
+import warnings
 from copy import deepcopy
 from typing import (
     Any,
@@ -13,16 +13,17 @@ from typing import (
     TypeVar
 )
 
-from src.thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-from src.thread_factory.utils.exceptions import Empty
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.utils.exceptions import Empty
+from thread_factory.utils.disposable import Disposable
 
 _T = TypeVar("_T")
 
-class ConcurrentBag(Generic[_T]):
+class ConcurrentBag(Generic[_T], Disposable):
     """
     A thread-safe multiset ("bag") implementation using:
     - a dict from item -> integer count
-    - a reentrant lock for synchronization
+    - an RLock for synchronization
 
     Items can appear multiple times, unlike a standard set. This class
     is designed for Python 3.13+ No-GIL environments (though it will
@@ -43,6 +44,9 @@ class ConcurrentBag(Generic[_T]):
         self._lock = threading.RLock()
         # Dictionary to store item -> count
         self._bag: Dict[_T, int] = {}
+
+        # A flag to ensure we only dispose once (idempotent)
+        self.disposed = False
 
         # Add initial items
         for item in initial:
@@ -94,20 +98,16 @@ class ConcurrentBag(Generic[_T]):
         Returns:
             _T: An item that was removed.
         """
-        try:
-            with self._lock:
-                if not self._bag:
-                    raise Empty("pop from empty ConcurrentBag")
+        with self._lock:
+            if not self._bag:
+                raise Empty("pop from empty ConcurrentBag")
 
-                item, count = next(iter(self._bag.items()))
-                if count == 1:
-                    del self._bag[item]
-                else:
-                    self._bag[item] = count - 1
-                return item
-        except Empty:
-            time.sleep(0.001)
-            raise
+            item, count = next(iter(self._bag.items()))
+            if count == 1:
+                del self._bag[item]
+            else:
+                self._bag[item] = count - 1
+            return item
 
     def clear(self) -> None:
         """
@@ -167,7 +167,6 @@ class ConcurrentBag(Generic[_T]):
             _T: Items from the bag (including duplicates).
         """
         with self._lock:
-            # Take a snapshot of the items -> counts
             snapshot = list(self._bag.items())
         for item, count in snapshot:
             for _ in range(count):
@@ -210,12 +209,6 @@ class ConcurrentBag(Generic[_T]):
         return new_bag
 
     def __copy__(self) -> "ConcurrentBag[_T]":
-        """
-        For the built-in copy.copy(...).
-
-        Returns:
-            ConcurrentBag[_T]: A shallow copy of this ConcurrentBag.
-        """
         return self.copy()
 
     def __deepcopy__(self, memo: dict) -> "ConcurrentBag[_T]":
@@ -235,10 +228,11 @@ class ConcurrentBag(Generic[_T]):
 
     def to_concurrent_dict(self) -> 'ConcurrentDict[_T, int]':
         """
-        Return a shallow copy of the internal dictionary (item -> count).
+        Return a shallow copy of the internal dictionary (item -> count),
+        wrapped in a ConcurrentDict.
 
         Returns:
-            Dict[_T, int]: A standard dictionary of items to counts.
+            ConcurrentDict[_T, int]: A concurrent dictionary of items to counts.
         """
         with self._lock:
             return ConcurrentDict(self._bag)
@@ -268,8 +262,6 @@ class ConcurrentBag(Generic[_T]):
             ConcurrentBag[_T]: A new bag with the transformed items.
         """
         with self._lock:
-            # We'll create a new dict: for each (item, count),
-            # we transform 'item' to 'new_item'.
             new_dict: Dict[_T, int] = {}
             for item, count in self._bag.items():
                 new_item = func(item)
@@ -283,8 +275,8 @@ class ConcurrentBag(Generic[_T]):
         Keep only items for which `predicate(item)` is True. Return a new bag.
 
         Args:
-            predicate (Callable[[_T], bool]): A function returning True if an item
-                                              should be kept, False otherwise.
+            predicate (Callable[[_T], bool]):
+                A function returning True if an item should be kept, False otherwise.
 
         Returns:
             ConcurrentBag[_T]: A new bag containing only the items that passed the filter.
@@ -305,8 +297,7 @@ class ConcurrentBag(Generic[_T]):
     ) -> Any:
         """
         Apply a function of two arguments cumulatively to the items in the bag,
-        ignoring item multiplicities only in how we feed them into func (that is,
-        we pass items as many times as their counts).
+        passing items as many times as their counts.
 
         Args:
             func (Callable[[Any, _T], Any]): A function taking (accumulator, item).
@@ -342,7 +333,7 @@ class ConcurrentBag(Generic[_T]):
 
     def update(self, other: "ConcurrentBag[_T]") -> None:
         """
-        Update the bag with the items from another bag, adding their counts.
+        Update this bag with items from another bag, adding their counts.
 
         Args:
             other (ConcurrentBag[_T]): Another bag to merge into this one.
@@ -350,3 +341,74 @@ class ConcurrentBag(Generic[_T]):
         with self._lock:
             for item, count in other._bag.items():
                 self._bag[item] = self._bag.get(item, 0) + count
+
+    # -------------------------------------------------
+    # Disposable implementation
+    # -------------------------------------------------
+
+    def dispose(self) -> None:
+        """
+        Disposes of this ConcurrentBag, releasing all internal resources.
+
+        Responsibilities:
+          - Clears the internal bag, removing all items.
+          - Sets the `disposed` flag to True, marking this object as no longer valid.
+          - Emits a warning to notify that the object has been disposed.
+
+        Behavior:
+          - This method is idempotent: subsequent calls have no effect after the first.
+          - No automatic usage checks are enforced after disposal; it is the user's responsibility
+            to avoid further operations.
+
+        Notes:
+          - Designed for consistency with deterministic resource management patterns
+            seen in systems programming (e.g., RAII, IDisposable).
+          - Disposal does NOT release the lock itself since locks are acquired per operation.
+
+        Example:
+            with ConcurrentBag(...) as bag:
+                bag.add(42)
+            # bag is now automatically disposed and cleared
+        """
+        with self._lock:
+            if not self.disposed:
+                self._bag.clear()
+                self.disposed = True
+
+        warnings.warn(
+            "ConcurrentBag has been disposed and should not be used further.",
+            UserWarning
+        )
+
+    def __enter__(self):
+        """
+        Enter the runtime context (`with ConcurrentBag(...) as bag:`).
+
+        Responsibilities:
+          - Simply returns `self` to allow use inside a `with` block.
+          - Prepares the object for deterministic disposal via `__exit__()`.
+
+        Notes:
+          - Does NOT acquire the lock globally.
+          - Recommended only if you want automatic disposal after the block.
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exit the runtime context for this ConcurrentBag.
+
+        Responsibilities:
+          - Automatically calls `dispose()` when leaving the `with` block.
+          - Ensures the bag is cleared and marked as disposed even if an exception is raised.
+
+        Parameters:
+            exc_type (Optional[Type[BaseException]]): Exception type, if raised.
+            exc_val (Optional[BaseException]): Exception instance, if raised.
+            exc_tb (Optional[TracebackType]): Traceback, if raised.
+
+        Notes:
+          - Guarantees deterministic cleanup of the bag.
+          - After this call, the object should be treated as invalid.
+        """
+        self.dispose()

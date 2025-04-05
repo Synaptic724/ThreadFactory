@@ -16,11 +16,11 @@ from typing import (
     TypeVar,
     Union,
 )
-
+from thread_factory.utils.disposable import Disposable
 _K = TypeVar("_K")
 _V = TypeVar("_V")
 
-class ConcurrentDict(Generic[_K, _V]):
+class ConcurrentDict(Generic[_K, _V], Disposable):
     """
     A thread-safe dictionary implementation using:
       - An underlying Python dict
@@ -50,6 +50,7 @@ class ConcurrentDict(Generic[_K, _V]):
         # - If it's an iterable of (key, value) pairs, dict(...) will handle that as well.
         self._dict: Dict[_K, _V] = dict(initial)
         self._lock: threading.RLock = threading.RLock()
+        self.disposed = False
 
     def __getitem__(self, key: _K) -> _V:
         """
@@ -349,28 +350,6 @@ class ConcurrentDict(Generic[_K, _V]):
         with self._lock:
             return ConcurrentDict(initial=deepcopy(self._dict, memo))
 
-    def __enter__(self) -> Dict[_K, _V]:
-        """
-        Enter the runtime context and acquire the lock.
-
-        Returns:
-            Dict[_K, _V]: The *internal dict* (use with extreme caution,
-            as you bypass thread safety).
-        """
-        warnings.warn(
-            "Direct access to the internal dictionary via the context manager bypasses "
-            "the thread-safe interface. Use with extreme caution.",
-            UserWarning
-        )
-        self._lock.acquire()
-        return self._dict
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """
-        Exit the runtime context and release the lock.
-        """
-        self._lock.release()
-
     def to_dict(self) -> Dict[_K, _V]:
         """
         Return a shallow copy of the internal dictionary.
@@ -474,3 +453,69 @@ class ConcurrentDict(Generic[_K, _V]):
             return functools.reduce(pairwise_reduce, items_copy)
         else:
             return functools.reduce(pairwise_reduce, items_copy, initial)
+
+
+    # -----------------------------------------------------------------------------------
+    # Disposable Implementation
+    # -----------------------------------------------------------------------------------
+    def __enter__(self):
+        """
+        Enter the runtime context.
+
+        - Acquires the internal lock for direct access.
+        - Allows `with ConcurrentDictionary(...) as cc:` style usage.
+        - WARNING: Using the context manager bypasses the thread-safe method interface.
+                   You are now responsible for ensuring correct multithreaded behavior.
+        """
+        warnings.warn(
+            "Direct access to the internal dictionary via the context manager bypasses "
+            "the thread-safe interface. Use with extreme caution.",
+            UserWarning
+        )
+        self._lock.acquire()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """
+        Exit the runtime context.
+
+        Responsibilities:
+          - Releases the internal lock acquired in `__enter__()`.
+          - Automatically calls `dispose()` to ensure the object is cleaned up.
+          - This pattern ensures the object is safely disposed even if an exception
+            occurs within the `with` block.
+
+        Notes:
+          - The object should be considered invalid after exiting the context.
+          - This design mimics resource safety patterns seen in systems like C#'s `IDisposable`
+            and C++ RAII.
+          - Users are free to manage `dispose()` manually if they choose not to use the
+            context manager.
+
+        Args:
+            exc_type: Exception type (if raised).
+            exc_val: Exception value (if raised).
+            exc_tb: Exception traceback (if raised).
+        """
+        self._lock.release()
+        self.dispose()
+
+    def dispose(self) -> None:
+        """
+        Dispose (clear) this ConcurrentDict, releasing its contents.
+
+        Once disposed, `_disposed` becomes True and the internal dict is cleared.
+        No further usage checks are enforced, so the user must avoid calling
+        other methods after disposal.
+
+        This method is idempotent — multiple calls won't cause errors.
+        """
+        if not self.disposed:
+            with self._lock:
+                self._dict.clear()
+            self.disposed = True
+        warnings.warn(
+            "Your ConcurrentDictionary has been disposed and should not be used further. ",
+            UserWarning
+        )
+

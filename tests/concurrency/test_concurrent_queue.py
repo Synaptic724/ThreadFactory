@@ -493,143 +493,32 @@ class HighPerformanceConcurrentQueueTest(unittest.TestCase):
         self.assertGreaterEqual(len(self.queue), 0)
 
 
+    def test_dispose(self):
+        """
+        Ensures that:
+            - dispose() clears all queue contents.
+            - dispose() sets the disposed flag.
+            - dispose() is idempotent (calling it multiple times is safe).
+        """
+        queue = ConcurrentQueue([1, 2, 3])
 
-def producer_process(queue, item_count, process_id):
-    for i in range(item_count):
-        queue.put((process_id, i))
+        # Initial state check
+        self.assertEqual(len(queue), 3)
+        self.assertIn(1, queue)
+        self.assertFalse(queue.disposed)
 
-def consumer_process(queue, item_count):
-    consumed = 0
-    while consumed < item_count:
+        # First disposal
+        queue.dispose()
+
+        # State after disposal
+        self.assertEqual(len(queue), 0)
+        self.assertTrue(queue.disposed)
+        self.assertNotIn(1, queue)
+        self.assertNotIn(2, queue)
+        self.assertNotIn(3, queue)
+
+        # Ensure idempotency (no exception on second dispose)
         try:
-            _ = queue.get(timeout=0.01)
-            consumed += 1
-        except:
-            pass  # Expected under contention
-
-class TestQueuePerformanceComparison(unittest.TestCase):
-    """
-    Compare performance between ConcurrentQueue (thread-based) and multiprocessing.Queue
-    """
-
-    def test_threaded_concurrent_queue_performance(self):
-        """
-        Your existing ConcurrentQueue, running high-performance producer/consumer test.
-        Competes with multiprocessing.Queue.
-        """
-        q = ConcurrentQueue()
-        producers = 10
-        consumers = 10
-        items_per_producer = 100_000
-        total_items = producers * items_per_producer
-
-        try:
-            GIL_ENABLED = sys._is_gil_enabled()
-        except AttributeError:
-            GIL_ENABLED = True
-
-        print(f"[ConcurrentQueue] GIL Enabled: {GIL_ENABLED}")
-
-        def producer(thread_id):
-            for i in range(items_per_producer):
-                q.enqueue((thread_id, i))
-
-        def consumer():
-            consumed = 0
-            while consumed < items_per_producer:
-                try:
-                    _ = q.dequeue()
-                    consumed += 1
-                except Empty:
-                    pass  # Expected if queue is momentarily empty
-
-        threads = []
-        for pid in range(producers):
-            threads.append(threading.Thread(target=producer, args=(pid,)))
-        for _ in range(consumers):
-            threads.append(threading.Thread(target=consumer))
-
-        print(f"\n[ConcurrentQueue] Starting {producers} producers / {consumers} consumers...")
-        start = time.perf_counter()
-
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        end = time.perf_counter()
-        duration = end - start
-
-        print(f"[ConcurrentQueue] {total_items:,} ops completed in {duration:.2f} seconds.")
-        print(f"[ConcurrentQueue] Final queue length: {len(q)}\n")
-
-        self.concurrent_queue_duration = duration
-        self.concurrent_queue_remaining = len(q)
-
-    def test_multiprocessing_queue_performance(self):
-        """
-        New multiprocessing.Queue equivalent of ConcurrentQueue performance test.
-        Competes with threaded ConcurrentQueue.
-        """
-        queue = multiprocessing.Queue()
-        producers = 10
-        consumers = 10
-        items_per_producer = 100_000
-        total_items = producers * items_per_producer
-
-        try:
-            GIL_ENABLED = sys._is_gil_enabled()
-        except AttributeError:
-            GIL_ENABLED = True
-
-        print(f"[MultiprocessingQueue] GIL Enabled: {GIL_ENABLED}")
-
-        processes = []
-        for pid in range(producers):
-            processes.append(multiprocessing.Process(target=producer_process, args=(queue, items_per_producer, pid)))
-        for _ in range(consumers):
-            processes.append(multiprocessing.Process(target=consumer_process, args=(queue, items_per_producer)))
-
-        print(f"\n[MultiprocessingQueue] Starting {producers} producers / {consumers} consumers...")
-        start = time.perf_counter()
-
-        for p in processes:
-            p.start()
-        for p in processes:
-            p.join()
-
-        end = time.perf_counter()
-        duration = end - start
-
-        print(f"[MultiprocessingQueue] {total_items:,} ops completed in {duration:.2f} seconds.")
-        try:
-            remaining = queue.qsize()
-        except NotImplementedError:
-            remaining = "Unknown (platform-dependent)"
-
-        print(f"[MultiprocessingQueue] Final queue length: {remaining}\n")
-
-        self.multiprocessing_queue_duration = duration
-        self.multiprocessing_queue_remaining = remaining
-
-    def test_compare_performance(self):
-        """
-        Runs both tests and compares them directly.
-        """
-        print("\n🚀 Running side-by-side performance comparison...\n")
-        self.test_threaded_concurrent_queue_performance()
-        self.test_multiprocessing_queue_performance()
-
-        print(f"\n⏱️ Performance Summary:")
-        print(f"- ConcurrentQueue duration: {self.concurrent_queue_duration:.2f} seconds")
-        print(f"- MultiprocessingQueue duration: {self.multiprocessing_queue_duration:.2f} seconds")
-
-        if self.concurrent_queue_duration < self.multiprocessing_queue_duration:
-            print(f"✅ ConcurrentQueue was faster by {self.multiprocessing_queue_duration - self.concurrent_queue_duration:.2f} seconds")
-        else:
-            print(f"✅ MultiprocessingQueue was faster by {self.concurrent_queue_duration - self.multiprocessing_queue_duration:.2f} seconds")
-
-        # Optional: enforce a max performance delta if required
-        # self.assertLess(self.concurrent_queue_duration, self.multiprocessing_queue_duration * 2)
-
-
+            queue.dispose()
+        except Exception as e:
+            self.fail(f"Calling dispose() twice raised an exception: {e}")

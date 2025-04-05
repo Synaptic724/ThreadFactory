@@ -5,7 +5,7 @@ import time
 import ulid
 from collections import deque
 
-from src.thread_factory import Records, Worker  # Change to match your actual module
+from thread_factory import Records, Worker  # Change to match your actual module
 
 
 class DummyQueue:

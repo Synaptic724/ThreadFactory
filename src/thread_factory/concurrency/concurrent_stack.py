@@ -1,5 +1,6 @@
 import functools
 import threading
+import warnings
 from collections import deque
 from copy import deepcopy
 from typing import (
@@ -13,12 +14,12 @@ from typing import (
     TypeVar,
 )
 
-from src.thread_factory.concurrency.concurrent_list import ConcurrentList
-from src.thread_factory.utils.exceptions import Empty
+from thread_factory.concurrency import ConcurrentList
+from thread_factory.utils import Empty, Disposable
 
 _T = TypeVar("_T")
 
-class ConcurrentStack(Generic[_T]):
+class ConcurrentStack(Generic[_T], Disposable):
     """
     A thread-safe LIFO stack implementation using an underlying deque,
     a reentrant lock for synchronization, and an atomic counter for fast
@@ -44,6 +45,7 @@ class ConcurrentStack(Generic[_T]):
             initial = []
         self._lock: threading.RLock = threading.RLock()
         self._deque: Deque[_T] = deque(initial)
+        self.disposed = False
 
     def push(self, item: _T) -> None:
         """
@@ -267,3 +269,69 @@ class ConcurrentStack(Generic[_T]):
             return functools.reduce(func, items_copy)
         else:
             return functools.reduce(func, items_copy, initial)
+
+
+    # -----------------------------------------------------------------------------------
+    # Disposable Implementation
+    # -----------------------------------------------------------------------------------
+    def __enter__(self):
+        """
+        Enter the runtime context.
+
+        - Acquires the internal lock for direct access.
+        - Allows `with ConcurrentStack(...) as cc:` style usage.
+        - WARNING: Using the context manager bypasses the thread-safe method interface.
+                   You are now responsible for ensuring correct multithreaded behavior.
+        """
+        warnings.warn(
+            "Direct access to the internals via the context manager bypasses "
+            "the thread-safe interface. Use with extreme caution.",
+            UserWarning
+        )
+        self._lock.acquire()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """
+        Exit the runtime context.
+
+        Responsibilities:
+          - Releases the internal lock acquired in `__enter__()`.
+          - Automatically calls `dispose()` to ensure the object is cleaned up.
+          - This pattern ensures the object is safely disposed even if an exception
+            occurs within the `with` block.
+
+        Notes:
+          - The object should be considered invalid after exiting the context.
+          - This design mimics resource safety patterns seen in systems like C#'s `IDisposable`
+            and C++ RAII.
+          - Users are free to manage `dispose()` manually if they choose not to use the
+            context manager.
+
+        Args:
+            exc_type: Exception type (if raised).
+            exc_val: Exception value (if raised).
+            exc_tb: Exception traceback (if raised).
+        """
+        self._lock.release()
+        self.dispose()
+
+    def dispose(self) -> None:
+        """
+        Dispose (clear) this ConcurrentStack, releasing its contents.
+
+        Once disposed, `_disposed` becomes True and the internal dict is cleared.
+        No further usage checks are enforced, so the user must avoid calling
+        other methods after disposal.
+
+        This method is idempotent — multiple calls won't cause errors.
+        """
+        if not self.disposed:
+            with self._lock:
+                self._deque.clear()
+            self.disposed = True
+        warnings.warn(
+            "Your ConcurrentStack has been disposed and should not be used further. ",
+            UserWarning
+        )
+

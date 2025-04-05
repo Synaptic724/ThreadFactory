@@ -158,7 +158,7 @@ class TestConcurrentDict(unittest.TestCase):
             with d as inner:
                 inner["b"] = 10
 
-        self.assertEqual(d["b"], 10)
+        self.assertEqual(len(d), 0)
 
     def test_concurrent_add_remove(self):
         d = ConcurrentDict[str, int]()
@@ -456,3 +456,34 @@ class HighPerformanceConcurrentDictTest(unittest.TestCase):
         # Final sanity: no deadlocks, length should be positive
         self.assertGreaterEqual(len(d), 0)
         print(f"Final dictionary length: {len(d)}")
+
+    def test_dispose(self):
+        """
+        Ensures that dispose:
+            - Clears all data.
+            - Marks the dictionary as disposed.
+            - Is idempotent (can be called multiple times without error).
+        """
+        d = ConcurrentDict({'a': 1, 'b': 2})
+
+        # Check initial state
+        self.assertIn('a', d)
+        self.assertEqual(len(d), 2)
+        self.assertFalse(d.disposed)
+
+        # Dispose it
+        d.dispose()
+
+        # It should be marked as disposed
+        self.assertTrue(d.disposed)
+
+        # It should be cleared
+        self.assertEqual(len(d), 0)
+        self.assertNotIn('a', d)
+        self.assertNotIn('b', d)
+
+        # Calling dispose again should not fail
+        try:
+            d.dispose()
+        except Exception as e:
+            self.fail(f"Calling dispose() a second time raised an exception: {e}")

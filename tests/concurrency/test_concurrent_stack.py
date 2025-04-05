@@ -330,3 +330,34 @@ class TestConcurrentStack(unittest.TestCase):
 
         # no crash => success
         self.assertGreaterEqual(len(s), 0)
+
+
+    def test_dispose(self):
+        """
+        Ensures that:
+            - dispose() clears all queue contents.
+            - dispose() sets the disposed flag.
+            - dispose() is idempotent (calling it multiple times is safe).
+        """
+        queue = ConcurrentStack([1, 2, 3])
+
+        # Initial state check
+        self.assertEqual(len(queue), 3)
+        self.assertIn(1, queue)
+        self.assertFalse(queue.disposed)
+
+        # First disposal
+        queue.dispose()
+
+        # State after disposal
+        self.assertEqual(len(queue), 0)
+        self.assertTrue(queue.disposed)
+        self.assertNotIn(1, queue)
+        self.assertNotIn(2, queue)
+        self.assertNotIn(3, queue)
+
+        # Ensure idempotency (no exception on second dispose)
+        try:
+            queue.dispose()
+        except Exception as e:
+            self.fail(f"Calling dispose() twice raised an exception: {e}")

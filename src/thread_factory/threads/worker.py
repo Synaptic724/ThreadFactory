@@ -4,9 +4,22 @@ import time
 import ulid
 import ctypes
 from typing import Callable, Any, Optional
-
+from thread_factory.utils import Disposable
+from enum import Enum, auto
+import asyncio
 
 class Records:
+    class WorkStatus(Enum):
+        """
+        This class tracks the work that was done by the thread and its results.
+        The outcome of this class is transferred to another area in the ThreadFactory for logging.
+        """
+        COMPUTE = auto()
+        IO = auto()
+        NETWORK = auto()
+
+
+
     """Tracks the record of completed work items by ULID."""
     def __init__(self):
         self.records: list[ulid.ULID] = []
@@ -22,7 +35,7 @@ class Records:
         return len(self.records)
 
 
-class Worker(threading.Thread):
+class Worker(threading.Thread, Disposable):
     """
     Managed Worker Thread
     ---------------------
@@ -139,3 +152,6 @@ class Worker(threading.Thread):
 
     def __repr__(self):
         return f"<Worker id={self.worker_id} state={self.state} completed={self.completed_work}>"
+
+    def dispose(self):
+        pass

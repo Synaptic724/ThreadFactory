@@ -1,72 +1,72 @@
 Concurrency Module
 ==================
 
-.. automodule:: src.thread_factory.concurrency.concurrent_bag
+.. automodule:: thread_factory.concurrency.concurrent_bag
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: src.thread_factory.concurrency.concurrent_bag.ConcurrentBag
+.. autoclass:: thread_factory.concurrency.concurrent_bag.ConcurrentBag
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: src.thread_factory.concurrency.concurrent_buffer
+.. automodule:: thread_factory.concurrency.concurrent_buffer
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: src.thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer
+.. autoclass:: thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: src.thread_factory.concurrency.concurrent_core
+.. automodule:: thread_factory.concurrency.concurrent_core
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: src.thread_factory.concurrency.concurrent_core.ConcurrentCore
+.. autoclass:: thread_factory.concurrency.concurrent_core.ConcurrentCore
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: src.thread_factory.concurrency.concurrent_dictionary
+.. automodule:: thread_factory.concurrency.concurrent_dictionary
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: src.thread_factory.concurrency.concurrent_dictionary.ConcurrentDictionary
+.. autoclass:: thread_factory.concurrency.concurrent_dictionary.ConcurrentDictionary
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: src.thread_factory.concurrency.concurrent_list
+.. automodule:: thread_factory.concurrency.concurrent_list
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: src.thread_factory.concurrency.concurrent_list.ConcurrentList
+.. autoclass:: thread_factory.concurrency.concurrent_list.ConcurrentList
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: src.thread_factory.concurrency.concurrent_queue
+.. automodule:: thread_factory.concurrency.concurrent_queue
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: src.thread_factory.concurrency.concurrent_queue.ConcurrentQueue
+.. autoclass:: thread_factory.concurrency.concurrent_queue.ConcurrentQueue
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: src.thread_factory.concurrency.concurrent_stack
+.. automodule:: thread_factory.concurrency.concurrent_stack
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: src.thread_factory.concurrency.concurrent_stack.ConcurrentStack
+.. autoclass:: thread_factory.concurrency.concurrent_stack.ConcurrentStack
    :members:
    :undoc-members:
    :show-inheritance:

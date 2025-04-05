@@ -1,5 +1,5 @@
 import threading
-
+from thread_factory.utils import Disposable
 
 class Dynaphore(threading.Semaphore):
     """

@@ -1,6 +1,6 @@
-from src.thread_factory.threads.dynaphore import Dynaphore
-from src.thread_factory.threads.worker import Worker, Records
-from src.thread_factory.threads.work import Work
+from thread_factory.threads.dynaphore import Dynaphore
+from thread_factory.threads.worker import Worker, Records
+from thread_factory.threads.work import Work
 
 
 __all__ = [

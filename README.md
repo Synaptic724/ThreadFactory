@@ -71,35 +71,35 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 ## 🚀 Features
 
 ## Concurrent Data Structures
-### 1. ConcurrentBag  
+### `ConcurrentBag`  
 - A thread-safe “multiset” collection that allows duplicates.  
 - Methods like `add`, `remove`, `discard`, etc.  
 - Ideal for collections where duplicate elements matter.
 
-### 2. ConcurrentDict  
+### `ConcurrentDict`  
 - A thread-safe dictionary.  
 - Supports typical dict operations (`update`, `popitem`, etc.).  
 - Provides `map`, `filter`, and `reduce` for safe, bulk operations.
 
-### 3. ConcurrentList  
+### `ConcurrentList`  
 - A thread-safe list supporting concurrent access and modification.  
 - Slice assignment, in-place operators (`+=`, `*=`), and advanced operations (`map`, `filter`, `reduce`).
 
-### 4. ConcurrentQueue  
+### `ConcurrentQueue`  
 - A thread-safe FIFO queue built atop `collections.deque`.  
 - Tested and outperforms deque alone by up to 64% in our benchmark.
 - Supports `enqueue`, `dequeue`, `peek`, `map`, `filter`, and `reduce`.  
 - Raises `Empty` when `dequeue` or `peek` is called on an empty queue.
 - Outperforms multiprocessing queues by over 400% in some cases clone and run unit tests to see.
 
-### 5. ConcurrentStack  
+### `ConcurrentStack`  
 - A thread-safe LIFO stack.  
 - Supports `push`, `pop`, `peek` operations.  
 - Ideal for last-in, first-out (LIFO) workloads.  
 - Built on `deque` for fast appends and pops.
 - Similar performance to ConcurrentQueue
 
-### 6. ConcurrentBuffer  
+### `ConcurrentBuffer`  
 - A **high-performance**, thread-safe buffer using **sharded deques** for low-contention access.  
 - Designed to handle massive producer/consumer loads with better throughput than standard queues.  
 - Supports `enqueue`, `dequeue`, `peek`, `clear`, and bulk operations (`map`, `filter`, `reduce`).  
@@ -107,14 +107,60 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 - Outperforms `ConcurrentQueue` by up to **60%** in mid-range concurrency in even thread Producer/Consumer configuration with 10 shards.
 - Automatically balances items across shards; ideal for parallel pipelines and low-latency workloads.  
 - Best used with `shard_count ≈ thread_count / 2` for optimal performance, but keep shards at or below 10.
+
+### `ConcurrentCollection`
+- An unordered, thread-safe alternative to `ConcurrentBuffer`.
+- Optimized for high-concurrency scenarios where strict FIFO is not required.
+- Uses fair circular scans seeded by bit-mixed monotonic clocks to distribute dequeues evenly.
+- Benchmarks (10 producers / 20 consumers, 2M ops) show **~5.6% higher throughput** than `ConcurrentBuffer`:
+    - **ConcurrentCollection**: 108,235 ops/sec
+    - **ConcurrentBuffer**: 102,494 ops/sec
+    - Better scaling under thread contention.
 ---
 
-## Parallel Operations
-### 1. Parallel Utilities (TPL-like)  
-- `parallel_for`, `parallel_foreach`, `parallel_invoke`, `parallel_map`.  
-- Pure thread-based concurrency (No-GIL optimized), not tied to asyncio or multiprocessing.  
-- Flexible chunking, concurrency control, local state usage, early exit on exception, and more.  
-- Inspired by .NET's Task Parallel Library (TPL).
+## Parallel Utilities
+
+ThreadFactory provides a collection of parallel programming utilities inspired by .NET's Task Parallel Library (TPL). 
+
+### `parallel_for`
+
+- Executes a traditional `for` loop in parallel across multiple threads.
+- Accepts `start`, `stop`, and a `body` function to apply to each index.
+- Supports:
+    - Automatic chunking to balance load.
+    - Optional `local_init` / `local_finalize` for per-thread local state.
+    - Optional `stop_on_exception` to abort on the first error.
+
+### `parallel_foreach`
+
+- Executes an `action` function on each item of an iterable in parallel.
+- Supports:
+    - Both pre-known-length and streaming iterables.
+    - Optional `chunk_size` to tune batch sizes.
+    - Optional `stop_on_exception` to halt execution when an exception occurs.
+    - Efficient when processing large datasets or streaming data without loading everything into memory.
+
+### `parallel_invoke`
+
+- Executes multiple independent functions concurrently.
+- Accepts an arbitrary number of functions as arguments.
+- Returns a list of futures representing the execution of each function.
+- Optionally waits for all functions to finish (or fail).
+- Simplifies running unrelated tasks in parallel with easy error propagation.
+
+### `parallel_map`
+
+- Parallel equivalent of Python’s built-in `map()`.
+- Applies a `transform` function to each item in an iterable concurrently.
+- Maintains the order of results.
+- Automatically splits the work into chunks for efficient multi-threaded execution.
+- Returns a fully materialized list of results.
+
+### Notes
+
+- All utilities automatically default to `max_workers = os.cpu_count()` if unspecified.
+- `chunk_size` can be manually tuned or defaults to roughly `4 × #workers` for balanced performance.
+- Exceptions raised inside tasks are properly propagated to the caller.
 
 ---
 

@@ -1,6 +1,7 @@
 import functools
 import threading
 import time
+import warnings
 from collections import deque
 from copy import deepcopy, copy
 from typing import (
@@ -16,125 +17,180 @@ from typing import (
 )
 from array import array
 
-from src.thread_factory.concurrency.concurrent_list import ConcurrentList
-from src.thread_factory.utils import Empty
+from thread_factory.concurrency.concurrent_list import ConcurrentList
+from thread_factory.utils import Empty, Disposable
 
 _T = TypeVar("_T")
 
+#TODO : Implement per object locks to see if we can distribute contention between each call for arrays and deques
 
-#TODO: Modify this class to use a list with an index instead of array.array, benchmarks show locked list is faster than array.array
-
-class _Shard(Generic[_T]):
+class _Shard(Generic[_T], Disposable):
     """
-    Internal shard class holding:
-      - A local deque.
-      - A lock to synchronize access.
+    _Shard is an internal component representing a lock-protected queue (deque)
+    inside a sharded concurrent buffer.
+
+    Each shard:
+    - Maintains its own double-ended queue (deque) to store items.
+    - Tracks its length and the timestamp of its head item via shared memory arrays.
+    - Provides thread-safe enqueue, dequeue, and peek operations.
+
+    This design reduces contention by allowing multiple threads to work on separate shards
+    independently while still providing approximate global FIFO behavior.
     """
 
     def __init__(self, len_array: array, time_array: array, index: int) -> None:
         """
-        Initializes a new shard.
+        Initialize a new shard.
 
         Args:
-            len_array (array): A shared array to store the length of each shard.
-            time_array (array): A shared array to store the timestamp of the head of each shard.
-            index (int): The index of this shard within the shared arrays.
+            len_array (array): Shared array (uint64) tracking the length of each shard.
+            time_array (array): Shared array (uint64) storing the timestamp of the head of each shard.
+            index (int): This shard's index within the shared arrays.
         """
-        # Lock to protect access to the internal deque and metadata.
+        # Thread-safe lock to protect internal state of this shard.
         self._lock = threading.RLock()
-        # The internal deque to store items within this shard. Each item is stored as a tuple (timestamp, item).
-        self._queue: Deque[(tuple, _T)] = deque()
-        # Shared array holding the current length of all shards.
+        # Internal deque to hold (timestamp, item) tuples.
+        self._queue: Deque[tuple[int, _T]] = deque()
+        # Shared arrays (used by parent buffer to globally track shard states).
         self._length_array = len_array
-        # Shared array holding the timestamp of the earliest item in each shard.
         self._time_array = time_array
-        # The index of this shard in the shared arrays.
         self._index = index
+        # Flag to prevent use-after-dispose.
+        self.disposed = False
 
-    def _increase_length_value(self):
-        """Increases the length counter for this shard in the shared length array."""
+    def _increase_length_value(self) -> None:
+        """
+        Increments this shard's length counter in the shared length array.
+        Called whenever an item is enqueued.
+        """
         self._length_array[self._index] += 1
 
-    def _decrease_length_value(self):
-        """Decreases the length counter for this shard in the shared length array."""
+    def _decrease_length_value(self) -> None:
+        """
+        Decrements this shard's length counter in the shared length array.
+        Called whenever an item is dequeued.
+        """
         self._length_array[self._index] -= 1
 
-    def _set_time_value(self, value: int):
-        """Sets the timestamp for this shard in the shared time array."""
-        # FIX: write to the time array instead of the length array.
+    def _set_time_value(self, value: int) -> None:
+        """
+        Updates this shard's head timestamp in the shared time array.
+
+        Args:
+            value (int): The new timestamp value (monotonic nanoseconds)
+                         or 0 if the shard is empty.
+        """
         self._time_array[self._index] = value
 
     def dequeue_item(self) -> _T:
         """
         Removes and returns the oldest item from this shard.
 
-        Raises:
-            Empty: If the shard is empty.
-
         Returns:
-            _T: The oldest item in the shard.
+            _T: The dequeued item.
+
+        Raises:
+            Empty: If the shard is empty (race condition scenario).
         """
         with self._lock:
             if not self._queue:
                 raise Empty("dequeue from empty ConcurrentBuffer (race condition)")
+
+            # Remove the head item.
             self._decrease_length_value()
-            return_item = self._queue.popleft()
-            # Update the timestamp in the shared array if the queue is not empty
+            timestamp, item = self._queue.popleft()
+
+            # Update shard timestamp to reflect new head (or 0 if empty).
             if self._queue:
                 self._set_time_value(self._queue[0][0])
             else:
                 self._set_time_value(0)
-            # Return only the item part (index 1 of the tuple)
-            return return_item[1]
+
+            return item
 
     def enqueue_item(self, item: _T) -> None:
         """
-        Adds a new item to the end of this shard.
+        Enqueues an item into this shard.
 
         Args:
-            item (_T): The item to add.
+            item (_T): The item to enqueue.
         """
         with self._lock:
             now = time.monotonic_ns()
-            self._set_time_value(now)  # update timestamp in the time array
+            # If this is the first item, update shard timestamp.
+            if not self._queue:
+                self._set_time_value(now)
             self._queue.append((now, item))
             self._increase_length_value()
 
-    def peek(self) -> Optional[_T]:
+    def peek(self) -> _T:
         """
-        Returns the oldest item from this shard without removing it.
+        Returns the oldest item without removing it.
+
+        Returns:
+            _T: The oldest item (copied).
 
         Raises:
             Empty: If the shard is empty.
-
-        Returns:
-            Optional[_T]: The oldest item in the shard, or None if empty (though Empty exception is raised).
         """
         with self._lock:
             if not self._queue:
                 raise Empty("peek from empty ConcurrentBuffer")
+            # Return a copy of the oldest item to avoid leaking references.
             return copy(self._queue[0][1])
 
-    def __iter__(self) -> Iterator[Any]:
+    def __iter__(self) -> Iterator[_T]:
         """
-        Returns a list containing all items in this shard.
+        Returns an iterator over all items in the shard.
+
+        Items are yielded in insertion order.
+        This is a snapshot taken under lock, but iteration itself is outside the lock.
 
         Returns:
-            List[Any]: A list of items in the shard.
+            Iterator[_T]: Iterator over items.
         """
         with self._lock:
             return iter([item for (_, item) in self._queue])
 
-
     def clear(self) -> None:
-        """Removes all items from this shard and resets its length and timestamp."""
+        """
+        Removes all items from this shard and resets length and timestamp metadata.
+        """
         with self._lock:
             self._queue.clear()
             self._length_array[self._index] = 0
             self._set_time_value(0)
 
+    def dispose(self) -> None:
+        """
+        Dispose of this shard by clearing all items and marking it as unusable.
 
-class ConcurrentBuffer(Generic[_T]):
+        Notes:
+            - Safe to call multiple times (idempotent).
+            - Required to release resources when integrated with a Disposable system.
+        """
+        with self._lock:
+            if not self.disposed:
+                self._queue.clear()
+                self._length_array[self._index] = 0
+                self._set_time_value(0)
+                self.disposed = True
+
+    def __enter__(self):
+        """
+        Enter the runtime context related to this object.
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exit the runtime context related to this object.
+        Automatically disposes of the shard.
+        """
+        self.dispose()
+
+
+class ConcurrentBuffer(Generic[_T], Disposable):
     """
     A thread-safe, *mostly* FIFO buffer implementation using multiple internal
     deques (shards). Items are tagged with a timestamp upon enqueue.
@@ -143,28 +199,38 @@ class ConcurrentBuffer(Generic[_T]):
     in low to moderate contention scenarios by distributing items across
     multiple internal shards, each with its own lock.
 
-    This concurrency object does not guarantee strict FIFO ordering across shards.
-    It also performs quite well in low to moderate concurrency scenarios.
+    This concurrency object does NOT guarantee strict FIFO ordering across shards.
+    It generally performs well in moderate concurrency scenarios. For extreme
+    concurrency or high contention, consider other structures.
 
     **NOTE**: This buffer is not designed for high-contention scenarios.
-    ConcurrentQueue or ConcurrentStack Outperforms this object in high-contention scenarios.
+    ConcurrentQueue or ConcurrentStack outperform this object in heavy contention.
     DO NOT EXCEED 20 THREADS OVERALL (for producer and consumer pattern) WHEN USING THIS OBJECT.
 
-    Please follow the rule of dividing the number of threads by 2 for the producer and consumer pattern
-    to obtain shard count. For example, if you have 10 threads, you should use 5 shards.
+    The rule of thumb is to use half as many shards as total threads (producer + consumer).
+    e.g., 10 threads => 5 shards.
+
+    This class now implements a Disposable pattern, allowing you to dispose
+    of it explicitly or via a `with` statement when it's no longer needed.
     """
 
     def __init__(
-            self,
-            number_of_shards: int = 4,
-            initial: Optional[Iterable[_T]] = None,
+        self,
+        number_of_shards: int = 4,
+        initial: Optional[Iterable[_T]] = None,
     ) -> None:
         """
         Initializes a new ConcurrentBuffer.
 
         Args:
-            number_of_shards (int, optional): The number of internal shards to use. Defaults to 4.
-            initial (Optional[Iterable[_T]], optional): An optional iterable of items to initialize the buffer with. Defaults to None.
+            number_of_shards (int, optional):
+                The number of internal shards to use. Defaults to 4.
+            initial (Optional[Iterable[_T]], optional):
+                An optional iterable of items to initialize the buffer with.
+                Defaults to None.
+
+        Raises:
+            ValueError: If number_of_shards < 1 or is odd when > 1.
         """
         if initial is None:
             initial = []
@@ -174,19 +240,29 @@ class ConcurrentBuffer(Generic[_T]):
         if number_of_shards > 1 and number_of_shards % 2 != 0:
             raise ValueError("number_of_shards must be even if greater than 1")
 
+        # Shared arrays: length per shard, timestamp of the earliest item per shard
         self._length_array = array("Q", [0] * number_of_shards)
         self._time_array = array("Q", [0] * number_of_shards)
+
+        # Create the shard objects
         self._shards: List[_Shard[_T]] = [
             _Shard(self._length_array, self._time_array, i)
             for i in range(number_of_shards)
         ]
         self._num_shards = number_of_shards
+
+        # For distributing loads, half the shards in "left" range, half in "right".
         self._mid = number_of_shards // 2
         self._left_range = range(0, self._mid)
         self._right_range = range(self._mid, number_of_shards)
 
+        # Keep track of shard indices for possible scanning logic
         self._shard_indices = list(range(number_of_shards))
 
+        # Flag to ensure we only dispose once (idempotent).
+        self.disposed = False
+
+        # Initialize with any provided items
         for item in initial:
             self.enqueue(item)
 
@@ -197,9 +273,13 @@ class ConcurrentBuffer(Generic[_T]):
         Args:
             item (_T): The item to add
         """
+
         if self._num_shards == 1:
+            # Only one shard, so just enqueue there.
             shard_idx = 0
         else:
+            # Use a "flip" bit from time.monotonic_ns() to decide whether
+            # to pick from left or right range, then pick the shard with min length.
             flip = time.monotonic_ns() & 1
             scan_range = self._left_range if flip == 0 else self._right_range
             shard_idx = min(scan_range, key=lambda i: self._length_array[i])
@@ -208,7 +288,8 @@ class ConcurrentBuffer(Generic[_T]):
 
     def dequeue(self) -> _T:
         """
-        Removes and returns the oldest item from the buffer based on the timestamp.
+        Removes and returns the oldest item from the buffer based on the timestamp
+        at the head of each shard.
 
         Raises:
             Empty: If the buffer is empty.
@@ -225,9 +306,11 @@ class ConcurrentBuffer(Generic[_T]):
             if ts > 0 and (min_ts is None or ts < min_ts):
                 min_ts = ts
                 min_idx = i
-        # If no non-empty shard is found.
+
+        # If no non-empty shard is found, the buffer is empty
         if min_idx is None:
             raise Empty("dequeue from empty ConcurrentBuffer")
+
         # Dequeue the item from the shard with the oldest timestamp.
         return self._shards[min_idx].dequeue_item()
 
@@ -235,41 +318,50 @@ class ConcurrentBuffer(Generic[_T]):
         """
         Returns the oldest item from the buffer without removing it.
 
+        If an index is provided, this peeks into the specific shard. Otherwise,
+        it finds the shard with the overall oldest item.
+
         Args:
-            index (Optional[int], optional): The index of the shard to peek into. If None, peeks at the oldest item across all shards. Defaults to None.
+            index (Optional[int], optional):
+                The index of the shard to peek into. If None, returns the oldest
+                item across all shards.
 
         Raises:
-            Empty: If the buffer is empty.
+            Empty: If the buffer is empty or the specified shard is empty.
 
         Returns:
-            _T: The oldest item in the buffer.
+            _T: The oldest item in the buffer (copied).
         """
-        # If no index is provided, return the oldest item across all shards.
-        if index is None:
+
+        if index is not None:
+            # Peek the specific shard
+            return self._shards[index].peek()
+        else:
+            # Peek across all shards for the oldest item
             return self.peek_oldest()
-        return self._shards[index].peek()
 
     def peek_oldest(self) -> _T:
         """
-        Returns the oldest item from the buffer without removing it.
+        Returns the oldest item across all shards without removing it.
 
         Raises:
             Empty: If the buffer is empty.
 
         Returns:
-            _T: The oldest item in the buffer.
+            _T: The oldest item in the buffer (copied).
         """
         min_ts = None
         min_idx = None
-        # Iterate through the timestamps of the head of each shard to find the oldest.
+
+        # Iterate to find the oldest (lowest) timestamp
         for i, ts in enumerate(self._time_array):
-            # Consider only shards that are not empty (timestamp > 0).
             if ts > 0 and (min_ts is None or ts < min_ts):
                 min_ts = ts
                 min_idx = i
-        # If no non-empty shard is found.
+
         if min_idx is None:
             raise Empty("peek from empty ConcurrentBuffer")
+
         return self._shards[min_idx].peek()
 
     def __len__(self) -> int:
@@ -292,29 +384,36 @@ class ConcurrentBuffer(Generic[_T]):
 
     def __iter__(self) -> Iterator[_T]:
         """
-        Returns an iterator over all items in the buffer. The order is not guaranteed to be strictly FIFO across shards.
+        Returns an iterator over all items in the buffer. The order is not guaranteed
+        to be strictly FIFO across shards.
 
         Returns:
             Iterator[_T]: An iterator over the items.
         """
-        items_copy = []
-        # Iterate through each shard and extend the list with its items.
+        items_copy: List[_T] = []
+        # Collect items from each shard
         for shard in self._shards:
             items_copy.extend(shard.__iter__())
         return iter(items_copy)
 
     def clear(self) -> None:
-        """Removes all items from the buffer."""
+        """
+        Removes all items from the buffer.
+        """
         for shard in self._shards:
             shard.clear()
 
     def __repr__(self) -> str:
         """
-        Returns a string representation of the buffer.
+        Returns a string representation of the buffer,
+        including the total size and the timestamp of the earliest item.
 
         Returns:
-            str: A string representation including size and the timestamp of the earliest item.
+            str: A string representation.
         """
+        if self.disposed:
+            return f"<{self.__class__.__name__} [DISPOSED]>"
+
         total_len = len(self)
         valid_tags = [ts for ts in self._time_array if ts > 0]
         earliest_tag = min(valid_tags) if valid_tags else None
@@ -327,6 +426,8 @@ class ConcurrentBuffer(Generic[_T]):
         Returns:
             str: A string representation of the items.
         """
+        if self.disposed:
+            return f"<{self.__class__.__name__} [DISPOSED]>"
         all_items = list(self)
         return str(all_items)
 
@@ -340,39 +441,54 @@ class ConcurrentBuffer(Generic[_T]):
         items_copy = list(self)
         return ConcurrentBuffer(
             number_of_shards=self._num_shards,
-            initial=items_copy)
+            initial=items_copy
+        )
 
     def __copy__(self) -> "ConcurrentBuffer[_T]":
-        """Supports the copy.copy() operation."""
+        """
+        Supports the copy.copy() operation.
+        """
         return self.copy()
 
     def __deepcopy__(self, memo: dict) -> "ConcurrentBuffer[_T]":
-        """Supports the copy.deepcopy() operation."""
+        """
+        Supports the copy.deepcopy() operation.
+
+        Args:
+            memo (dict): Memoization dictionary for deepcopy.
+
+        Returns:
+            ConcurrentBuffer[_T]: A deep copy of this ConcurrentBuffer.
+        """
+        # Lock here if needed to prevent concurrent structural changes
         with threading.Lock():
             all_items = list(self)
             deep_items = deepcopy(all_items, memo)
             return ConcurrentBuffer(
                 number_of_shards=self._num_shards,
-                initial=deep_items)
+                initial=deep_items
+            )
 
     def to_concurrent_list(self) -> "ConcurrentList[_T]":
         """
         Converts the buffer's contents to a ConcurrentList.
 
         Returns:
-            ConcurrentList[_T]: A new ConcurrentList containing the same items.
+            ConcurrentList[_T]:
+                A new ConcurrentList containing the same items.
         """
         items_copy = list(self)
         return ConcurrentList(items_copy)
 
     def batch_update(self, func: Callable[[List[_T]], None]) -> None:
         """
-        Applies a function to all items in the buffer as a batch, then clears and re-enqueues the updated items.
+        Applies a function to all items in the buffer as a batch,
+        then clears and re-enqueues the updated items.
 
         Args:
-            func (Callable[[List[_T]], None]): A function that takes a list of items and modifies it in place.
+            func (Callable[[List[_T]], None]):
+                A function that takes a list of items and modifies it in place.
         """
-        # Allow batch_update regardless of producer mode.
         all_items: List[_T] = list(self)
         func(all_items)
         self.clear()
@@ -381,7 +497,8 @@ class ConcurrentBuffer(Generic[_T]):
 
     def map(self, func: Callable[[_T], Any]) -> "ConcurrentBuffer[Any]":
         """
-        Applies a function to each item in the buffer and returns a new ConcurrentBuffer with the results.
+        Applies a function to each item in the buffer and returns
+        a new ConcurrentBuffer with the transformed items.
 
         Args:
             func (Callable[[_T], Any]): The function to apply to each item.
@@ -393,11 +510,13 @@ class ConcurrentBuffer(Generic[_T]):
         mapped = list(map(func, items_copy))
         return ConcurrentBuffer(
             number_of_shards=self._num_shards,
-            initial=mapped)
+            initial=mapped
+        )
 
     def filter(self, func: Callable[[_T], bool]) -> "ConcurrentBuffer[_T]":
         """
-        Filters the items in the buffer based on a given predicate and returns a new ConcurrentBuffer with the filtered items.
+        Filters the items in the buffer based on a given predicate
+        and returns a new ConcurrentBuffer with the filtered items.
 
         Args:
             func (Callable[[_T], bool]): The predicate function to filter items.
@@ -407,8 +526,10 @@ class ConcurrentBuffer(Generic[_T]):
         """
         items_copy = list(self)
         filtered = list(filter(func, items_copy))
-        return ConcurrentBuffer(number_of_shards=self._num_shards,
-            initial=filtered)
+        return ConcurrentBuffer(
+            number_of_shards=self._num_shards,
+            initial=filtered
+        )
 
     def remove_item(self, item: _T) -> bool:
         """
@@ -435,11 +556,14 @@ class ConcurrentBuffer(Generic[_T]):
 
     def reduce(self, func: Callable[[Any, _T], Any], initial: Optional[Any] = None) -> Any:
         """
-        Applies a function of two arguments cumulatively to the items of the buffer, from left to right, to reduce the buffer to a single value.
+        Applies a function of two arguments cumulatively to the items of the buffer,
+        from left to right, to reduce the buffer to a single value.
 
         Args:
-            func (Callable[[Any, _T], Any]): The function to apply.
-            initial (Optional[Any], optional): The initial value. Defaults to None.
+            func (Callable[[Any, _T], Any]):
+                The function to apply, taking the accumulator and the current item.
+            initial (Optional[Any], optional):
+                The initial value for the accumulator. Defaults to None.
 
         Raises:
             TypeError: If the buffer is empty and no initial value is provided.
@@ -454,3 +578,85 @@ class ConcurrentBuffer(Generic[_T]):
             return functools.reduce(func, items_copy)
         else:
             return functools.reduce(func, items_copy, initial)
+
+    # -----------------------------------------------------------------------------------
+    # Disposable Implementation
+    # -----------------------------------------------------------------------------------
+
+    def dispose(self) -> None:
+        """
+        Disposes of this ConcurrentBuffer, releasing all internal resources.
+
+        Responsibilities:
+          - Disposes each internal shard by clearing their queues and resetting their counters.
+          - Resets the shared `_length_array` and `_time_array` used for shard coordination.
+          - Marks this object as disposed (`self.disposed = True`).
+
+        Behavior:
+          - This method is idempotent: multiple calls will have no adverse effects after the first.
+          - Once disposed, the buffer should be considered permanently invalid.
+          - No post-disposal protection is enforced — correct usage is left to the caller's responsibility.
+
+        Notes:
+          - A warning is emitted when disposal occurs to signal that the buffer has been destroyed.
+          - This follows the explicit resource control philosophy common in high-performance and systems programming.
+
+        Example:
+            with ConcurrentBuffer(...) as buf:
+                ...
+            # buffer is automatically disposed here
+        """
+        if not self.disposed:
+            # Dispose all shards and reset internal arrays
+            for shard in self._shards:
+                shard.dispose()
+            self._length_array = array("Q", [0] * self._num_shards)
+            self._time_array = array("Q", [0] * self._num_shards)
+            self.disposed = True
+
+            # Notify user that buffer is no longer valid
+            warnings.warn(
+                "ConcurrentBuffer has been disposed and should not be used further.",
+                UserWarning
+            )
+
+    def __enter__(self):
+        """
+        Enter the runtime context (`with ConcurrentBuffer(...) as buf:`).
+
+        Behavior:
+          - Simply returns `self`.
+          - Disposal will automatically be triggered upon exiting the `with` block.
+
+        Notes:
+          - Unlike some concurrency objects, this context manager does not acquire
+            or manage locks. It is purely for deterministic disposal.
+          - This keeps it lightweight and composable.
+
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exit the runtime context for this ConcurrentBuffer.
+
+        Responsibilities:
+          - Automatically calls `dispose()` upon exiting, regardless of whether
+            the block exits normally or via an exception.
+          - Guarantees that internal resources are released exactly once.
+
+        Parameters:
+            exc_type (Optional[Type[BaseException]]): Exception type, if raised.
+            exc_val (Optional[BaseException]): Exception instance, if raised.
+            exc_tb (Optional[TracebackType]): Traceback, if raised.
+
+        Notes:
+          - Once exited, the buffer is invalid and should not be used.
+          - This behavior is consistent with RAII and IDisposable patterns.
+
+        Example:
+            with ConcurrentBuffer(...) as buf:
+                ... # safe usage
+            # disposed automatically here
+        """
+        self.dispose()
