@@ -22,7 +22,7 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 > This library will only function on 3.13 and higher.
 ---
 > All benchmark tests below are available if you clone the library and run the tests.  
-> See the [Benchmark Details 🚀](https://github.com/Synaptic724/ThreadFactory/blob/production/general_benchmarks.md) for more benchmark stats.
+> See the [Benchmark Details 🚀](https://github.com/Synaptic724/ThreadFactory/blob/production/benchmarks/benchmark_data/general_benchmarks.md) for more benchmark stats.
 
 
 ## 🔥 Benchmark Results (10,000,000 ops — 10 producers / 10 consumers)
