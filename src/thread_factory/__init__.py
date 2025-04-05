@@ -18,7 +18,7 @@ if sys.version_info < (3, 13):
         UserWarning
     )
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 try:
     from importlib.metadata import version as get_version
