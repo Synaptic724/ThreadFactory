@@ -9,6 +9,7 @@
 [![PyPI Downloads](https://static.pepy.tech/badge/threadfactory?v=1)](https://pepy.tech/projects/threadfactory)
 
 [![Upload Python Package](https://github.com/Synaptic724/ThreadFactory/actions/workflows/python-publish.yml/badge.svg)](https://github.com/Synaptic724/ThreadFactory/actions/workflows/python-publish.yml)
+[![Docs](https://readthedocs.org/projects/threadfactory/badge/?version=latest)](https://threadfactory.readthedocs.io/en/latest/)
 
 
 <!--[![Coverage Status](https://coveralls.io/repos/github/Synaptic724/threadfactory/badge.svg?branch=main)](https://coveralls.io/github/Synaptic724/threadfactory?branch=main) -->
@@ -161,6 +162,14 @@ ThreadFactory provides a collection of parallel programming utilities inspired b
 - All utilities automatically default to `max_workers = os.cpu_count()` if unspecified.
 - `chunk_size` can be manually tuned or defaults to roughly `4 × #workers` for balanced performance.
 - Exceptions raised inside tasks are properly propagated to the caller.
+
+---
+
+## 📖 Documentation
+
+Full API reference and usage examples are available at:
+
+➡️ [https://threadfactory.readthedocs.io](https://threadfactory.readthedocs.io)
 
 ---
 

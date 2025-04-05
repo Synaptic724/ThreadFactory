@@ -56,7 +56,7 @@ dependencies = ["python-ulid>=3.0.0"]
 Homepage = "https://github.com/Synaptic724/ThreadFactory"
 Repository = "https://github.com/Synaptic724/ThreadFactory"
 Issues = "https://github.com/Synaptic724/ThreadFactory/issues"
-Documentation = "https://github.com/Synaptic724/ThreadFactory#readme"
+Documentation = "https://threadfactory.readthedocs.io/en/latest/"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
