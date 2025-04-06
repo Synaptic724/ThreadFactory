@@ -26,12 +26,12 @@ class QueueAllocator(Disposable):
         allocator.release(ticket)
     """
 
-    def __init__(self, queue_size: int = 500):
+    def __init__(self, queue_size: int = 5000):
         """
         Initialize the allocator with `queue_size` tickets.
 
         Args:
-            queue_size (int): Number of available tickets. Defaults to 500.
+            queue_size (int): Number of available tickets. Defaults to 5000.
         """
         self._queue_size = queue_size
         self._queue = ConcurrentQueue[int](initial=list(range(queue_size)))

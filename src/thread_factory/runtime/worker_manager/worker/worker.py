@@ -75,7 +75,7 @@ class Worker(threading.Thread, Disposable):
     - Supports dynamic queue switching
     """
 
-    def __init__(self, factory: Any, work_queue: Any):
+    def __init__(self, factory_id: int, factory):
         """
         Initializes a new worker instance.
 
@@ -85,7 +85,7 @@ class Worker(threading.Thread, Disposable):
         """
         super().__init__()
         self.factory = factory
-        self.work_queue = work_queue
+        self.factory_id = factory_id
         self.worker_id = str(ulid.ULID())  # Unique identifier
         self.state = 'IDLE'                # One of: IDLE, ACTIVE, SWITCHED, TERMINATING
         self.daemon = True                 # Die with main thread
@@ -196,7 +196,7 @@ class Worker(threading.Thread, Disposable):
         - Thread is marked as disposed.
         - Any future logic depending on cleanup can hook into this.
         """
-        if hasattr(self, "disposed") and self._disposed:
+        if hasattr(self, "disposed") and self.disposed:
             return
 
         self.disposed = True

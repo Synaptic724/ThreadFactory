@@ -45,7 +45,7 @@ class TestWorker(unittest.TestCase):
 
     def setUp(self):
         self.queue = DummyQueue()
-        self.worker = Worker(factory=None, work_queue=self.queue)
+        self.worker = Worker(0, factory=None)
         self.worker.daemon = False  # so unittest can detect properly
 
     def tearDown(self):
@@ -58,18 +58,6 @@ class TestWorker(unittest.TestCase):
         self.assertEqual(self.worker.completed_work, 0)
         self.assertIsInstance(self.worker.worker_id, str)
         self.assertIsInstance(self.worker.records, Records)
-
-    def test_worker_run_and_process(self):
-        # Fill queue
-        for _ in range(5):
-            self.queue.enqueue(lambda: None)  # dummy task
-
-        self.worker.start()
-        time.sleep(0.1)  # give some time to process
-
-        self.assertGreater(self.worker.completed_work, 0)
-        self.worker.stop()
-        self.worker.join()
 
     def test_worker_hard_kill(self):
         self.queue.enqueue(lambda: time.sleep(0.5))  # long-running task
@@ -90,6 +78,13 @@ class TestWorker(unittest.TestCase):
     def test_get_creation_datetime(self):
         dt = self.worker.get_creation_datetime()
         self.assertIsInstance(dt, datetime.datetime)
+
+
+    def test_disposed(self):
+        self.assertFalse(self.worker.disposed)
+        self.worker.dispose()
+        self.assertTrue(self.worker.disposed)
+        self.assertFalse(self.worker.is_alive())
 
 
 if __name__ == "__main__":

@@ -47,16 +47,33 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.2.1] - 2025-04-05
+## [1.2.1] - 2025-04-08
 
 ### Classes Added
-- `Work`: A future-compatible, extensible task container designed for expressive async and threaded workloads. Acts as a core unit in the execution system.
-- `AutoResetTimer`: A utility class that resets automatically after expiration. Ideal for retry loops or lightweight state machines.
-- `Stopwatch`: A high-resolution timing utility for measuring task durations with minimal overhead.
+- **`Work`**  
+  A future-compatible, extensible task container designed for expressive async and threaded workloads. Acts as a core unit in the execution system.
+
+- **`AutoResetTimer`**  
+  A utility class that resets automatically after expiration. Ideal for retry loops or lightweight state machines.
+
+- **`Stopwatch`**  
+  A high-resolution timing utility for measuring task durations with minimal overhead.
+
+- **`SmartCondition`**  
+  A thread synchronization primitive similar to `threading.Condition`, but enhanced with *targeted wakeups* via `factory_ids`.  
+  Supports selective `notify`, `notify_all`, and predicate-based `wait_for` with ID filtering.  
+  Built from scratch for full transparency and fine-grained thread control.
+
+- **`SwitchLock`**  
+  A dynamic semaphore built atop `SmartCondition`, enabling runtime-adjustable permits and ID-targeted thread blocking/unblocking.  
+  Serves as the foundation for trap-and-release execution models and room-based thread routing.
 
 ### Added Features
 - Integrated time-tracking capabilities through `Stopwatch` and `AutoResetTimer` to support precise performance metrics and scheduled operations.
-- Introduced first version of the `Work` abstraction for structured task submission, response handling, and optional callbacks.
+- Introduced the first version of the `Work` abstraction for structured task submission, response handling, and optional callbacks.
+- Added targeted thread trapping and wakeup mechanisms via `SmartCondition`, allowing threads to wait on logical `factory_ids` and be selectively released based on those IDs.
+- Introduced `SwitchLock` to orchestrate semaphore-like control with dynamic permit scaling and smart ID-based synchronization.  
+  Supports granular release control, timed thread suspension, and future-safe thread disposal coordination.
 
 ### Fixes
 - Updated comments for `concurrent_core` to clarify the purpose and usage.

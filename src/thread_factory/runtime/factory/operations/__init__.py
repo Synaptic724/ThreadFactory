@@ -1,4 +1,4 @@
-from thread_factory.runtime.factory.operations.work import Work
+from thread_factory.runtime.factory.operations.work.work import Work
 
 
 __all__ = [

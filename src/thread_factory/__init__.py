@@ -57,7 +57,6 @@ __all__ = [
     "ConcurrentCollection",
     "Empty",
     "Dynaphore",
-    "Work",
     "__version__"
 ]
 
