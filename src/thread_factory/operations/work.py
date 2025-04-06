@@ -6,7 +6,7 @@ from thread_factory.utils import Disposable
 
 class Work(Future, Disposable):
     """
-    🧱 Work represents a self-contained unit of execution in the ThreadFactory ecosystem.
+    Work represents a self-contained unit of execution in the ThreadFactory ecosystem.
 
     It extends `concurrent.futures.Future`, providing:
     - Lifecycle-aware execution with pre/post hooks
