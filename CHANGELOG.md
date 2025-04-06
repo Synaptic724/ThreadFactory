@@ -45,64 +45,25 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - `DiagnosticsInterface`: Real-time throughput, queue, and performance tracking.
 - `Orchestrator`: Dynamic coordination of thread lifecycles, workloads, and contention resolution.
 
-## [1.2.2] - 2025-04-05
-
-### Classes Added
-
-### Added Features
-
-### Fixes
-- Removed lock from `peek()` in `ConcurrentQueue` and `ConcurrentStack` to improve performance.
-
-### Changes
-- Updated license from MIT to Apache 2.0.
-
-
 ---
 
 ## [1.2.1] - 2025-04-05
 
 ### Classes Added
-
-#### ConcurrentCollection
-- An unordered, thread-safe alternative to `ConcurrentBuffer`.
-- Optimized for high-concurrency scenarios where strict FIFO is not required.
-- Uses fair circular scans seeded by bit-mixed monotonic clocks to distribute dequeues evenly.
-- Benchmarks (10 producers / 20 consumers, 2M ops) show **~5.6% higher throughput** than `ConcurrentBuffer`:
-    - **ConcurrentCollection**: 108,235 ops/sec
-    - **ConcurrentBuffer**: 102,494 ops/sec
-    - Better scaling under thread contention.
+- `Work`: A future-compatible, extensible task container designed for expressive async and threaded workloads. Acts as a core unit in the execution system.
+- `AutoResetTimer`: A utility class that resets automatically after expiration. Ideal for retry loops or lightweight state machines.
+- `Stopwatch`: A high-resolution timing utility for measuring task durations with minimal overhead.
 
 ### Added Features
-
-#### Benchmarking System
-- A fully modular and extensible **benchmarking suite** has been added to the project.
-    - Provides detailed throughput, latency, and concurrency tests for all concurrent classes.
-    - Supports custom strategies, ratio scaling, multi-sample tests, and grid sweeps.
-    - Results can be exported to CSV, JSON, or YAML.
-    - Pre-integrated with a visualization tool for plotting benchmark results.
-    - Available for cloned or forked projects to simplify validation and profiling of custom concurrency classes.
-
-#### Performance Boost
-- Optimized `ConcurrentBuffer` with a window-based enqueue strategy alternating between even shard groups.
-- Improves enqueue performance by reducing per-operation overhead while preserving approximate FIFO behavior.
-- The change is **low risk**, adds no consumer complexity, and maintains API compatibility.
-
-#### Shard Consistency Enforcement
-- `ConcurrentBuffer` now requires an **even number of shards** (≥2) to enable the windowing strategy.
-- Odd shard counts (>1) will now raise a `ValueError`.
-- Single shard mode is still supported.
-
-#### Benchmark-Validated
-Internal benchmarks confirm `ConcurrentBuffer` improvements:
-- **6× faster** than `multiprocessing.Queue`.
-- **~2.6× faster** than `collections.deque` (with Lock).
-- **~60% faster** than `ConcurrentQueue`.
-- Tests performed under balanced workloads (10 Producers / 10 Consumers, 1M operations).
+- Integrated time-tracking capabilities through `Stopwatch` and `AutoResetTimer` to support precise performance metrics and scheduled operations.
+- Introduced first version of the `Work` abstraction for structured task submission, response handling, and optional callbacks.
 
 ### Fixes
-- Removed lock from `peek()` in `ConcurrentQueue` and `ConcurrentStack` to improve performance.
-- Implemented the Disposable pattern from .NET into all classes for easier resource management.
+- N/A
+
+### Changes
+- Updated license from **MIT** to **Apache 2.0**, enabling stronger attribution controls and broader compliance with corporate and open-source ecosystems.
+- Updated `NOTICE` attribution to formally acknowledge third-party libraries in compliance with Apache 2.0 distribution guidelines.
 
 ---
 
