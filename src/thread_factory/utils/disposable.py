@@ -5,7 +5,7 @@ class Disposable(ABC):
     Abstract base class for all disposable objects in the system.
 
     Usage:
-        Any object that holds threads, memory, open resources, or registration
+        Any object that holds runtime, memory, open resources, or registration
         within ThreadFactory must implement this.
 
         Automatically supports context-manager usage:
@@ -32,7 +32,7 @@ class Disposable(ABC):
         Dispose must be implemented by subclasses.
         It MUST:
             - Release all allocated resources.
-            - Kill or join all running threads.
+            - Kill or join all running runtime.
             - Deregister itself from any supervisors or orchestrators.
             - Clear any persistent state to avoid memory leakage.
             - Be idempotent (safe to call multiple times).

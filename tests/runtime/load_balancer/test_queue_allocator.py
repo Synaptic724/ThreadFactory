@@ -1,5 +1,5 @@
 import unittest
-from thread_factory.threads.load_balancer.queue_allocator import QueueAllocator
+from thread_factory.runtime.load_balancer.queue_allocator import QueueAllocator
 from thread_factory.utils import Empty
 
 

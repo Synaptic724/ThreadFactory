@@ -4,7 +4,6 @@ import unittest
 
 from thread_factory import ConcurrentStack, Empty
 
-
 class TestConcurrentStack(unittest.TestCase):
 
     def test_basic_push_pop(self):
@@ -194,7 +193,7 @@ class TestConcurrentStack(unittest.TestCase):
 
     def test_producer_consumer_threads(self):
         """
-        Simulate multiple producer and consumer threads for concurrency stress.
+        Simulate multiple producer and consumer runtime for concurrency stress.
         """
         s = ConcurrentStack()
         producers = 5
@@ -235,7 +234,7 @@ class TestConcurrentStack(unittest.TestCase):
 
     def test_concurrent_batch_updates(self):
         """
-        Ensure multiple threads can call batch_update concurrently without errors.
+        Ensure multiple runtime can call batch_update concurrently without errors.
         """
         s = ConcurrentStack([1, 2, 3, 4, 5])
 
@@ -260,7 +259,7 @@ class TestConcurrentStack(unittest.TestCase):
 
     def test_concurrent_map_filter(self):
         """
-        Multiple threads do map() and filter() to produce new stacks,
+        Multiple runtime do map() and filter() to produce new stacks,
         ensuring no crash or data race with the source stack.
         """
         s = ConcurrentStack(range(100))

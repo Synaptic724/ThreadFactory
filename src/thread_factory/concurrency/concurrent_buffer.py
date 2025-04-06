@@ -34,7 +34,7 @@ class _Shard(Generic[_T], Disposable):
     - Tracks its length and the timestamp of its head item via shared memory arrays.
     - Provides thread-safe enqueue, dequeue, and peek operations.
 
-    This design reduces contention by allowing multiple threads to work on separate shards
+    This design reduces contention by allowing multiple runtime to work on separate shards
     independently while still providing approximate global FIFO behavior.
     """
 
@@ -207,8 +207,8 @@ class ConcurrentBuffer(Generic[_T], Disposable):
     ConcurrentQueue or ConcurrentStack outperform this object in heavy contention.
     DO NOT EXCEED 20 THREADS OVERALL (for producer and consumer pattern) WHEN USING THIS OBJECT.
 
-    The rule of thumb is to use half as many shards as total threads (producer + consumer).
-    e.g., 10 threads => 5 shards.
+    The rule of thumb is to use half as many shards as total runtime (producer + consumer).
+    e.g., 10 runtime => 5 shards.
 
     This class now implements a Disposable pattern, allowing you to dispose
     of it explicitly or via a `with` statement when it's no longer needed.

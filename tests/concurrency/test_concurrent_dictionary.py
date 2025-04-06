@@ -291,7 +291,7 @@ class HighPerformanceConcurrentDictTest(unittest.TestCase):
 
     def setUp(self):
         self.insertions = 1_000_000  # 1 million key/values
-        self.thread_count = 50       # 50 threads hammering at once
+        self.thread_count = 50       # 50 runtime hammering at once
         self.batch_iterations = 10_000
 
     def test_massive_parallel_read_write_delete(self):

@@ -65,7 +65,7 @@ class Worker(threading.Thread, Disposable):
         self.death_event = threading.Event()  # Optional event for external death detection
 
     def run(self):
-        """Main execution loop of the worker thread."""
+        """Main execution loop of the executors thread."""
         print(f"[Worker {self.worker_id}] Starting.")
         try:
             self.state = 'STARTING'
@@ -126,7 +126,7 @@ class Worker(threading.Thread, Disposable):
 
     def thread_switch(self, new_queue: Any):
         """
-        Re-assigns the worker to a different queue (can be used for rebalancing).
+        Re-assigns the executors to a different queue (can be used for rebalancing).
         """
         self.work_queue = new_queue
         self.state = 'SWITCHED'
@@ -134,7 +134,7 @@ class Worker(threading.Thread, Disposable):
     def get_creation_datetime(self) -> datetime.datetime:
         """
         Returns:
-            datetime: The time this worker was created based on its ULID.
+            datetime: The time this executors was created based on its ULID.
         """
         return ulid.ULID.from_str(self.worker_id).datetime
 

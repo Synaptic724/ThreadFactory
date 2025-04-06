@@ -47,7 +47,7 @@ class TestDynaphore(unittest.TestCase):
             threads.append(t)
             t.start()
 
-        # Give threads a chance to block
+        # Give runtime a chance to block
         time.sleep(0.5)
 
         # Release 10 permits so they can proceed

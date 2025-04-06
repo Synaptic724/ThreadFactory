@@ -194,7 +194,7 @@ class TestConcurrentQueue(unittest.TestCase):
 
     def test_producer_consumer_threads(self):
         """
-        Simulate multiple producer and consumer threads for concurrency stress.
+        Simulate multiple producer and consumer runtime for concurrency stress.
         """
         q = ConcurrentQueue()
         producers = 5
@@ -235,7 +235,7 @@ class TestConcurrentQueue(unittest.TestCase):
 
     def test_concurrent_batch_updates(self):
         """
-        Ensure multiple threads can call batch_update concurrently without errors.
+        Ensure multiple runtime can call batch_update concurrently without errors.
         """
         q = ConcurrentQueue([1, 2, 3, 4, 5])
 
@@ -260,7 +260,7 @@ class TestConcurrentQueue(unittest.TestCase):
 
     def test_concurrent_map_filter(self):
         """
-        Multiple threads do map() and filter() to produce new queues,
+        Multiple runtime do map() and filter() to produce new queues,
         ensuring no crash or data race with the source queue.
         """
         q = ConcurrentQueue(range(100))
@@ -374,7 +374,7 @@ class HighPerformanceConcurrentQueueTest(unittest.TestCase):
 
     def test_parallel_batch_updates_contention(self):
         """
-        Batch update under high contention - multiple threads mutate concurrently.
+        Batch update under high contention - multiple runtime mutate concurrently.
         """
         initial_data = list(range(10_000))
         self.queue = ConcurrentQueue(initial_data)

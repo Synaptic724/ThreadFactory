@@ -180,14 +180,14 @@ class ConcurrentCollection(Generic[_T]):
     """
     A thread-safe, high-level collection that distributes items across multiple
     internal shards (lock-protected deques). Each shard is independently locked,
-    so multiple threads can access different shards in parallel with minimal contention.
+    so multiple runtime can access different shards in parallel with minimal contention.
 
     Overall ordering across shards is not guaranteed to be strictly FIFO — each shard
     behaves like a small FIFO queue, but the global order is only approximate.
 
     Recommended Usage:
-      - Ideal for up to ~20 total threads (producers + consumers).
-      - For each pair of threads (producer/consumer), consider 1 shard as a rough guideline.
+      - Ideal for up to ~20 total runtime (producers + consumers).
+      - For each pair of runtime (producer/consumer), consider 1 shard as a rough guideline.
       - If heavy contention or extremely high concurrency is expected,
         consider `ConcurrentQueue` or `ConcurrentStack` instead.
 
@@ -214,7 +214,7 @@ class ConcurrentCollection(Generic[_T]):
 
         Args:
             total_thread_count (int, optional):
-                The number of threads you plan to use overall. Defaults to 1.
+                The number of runtime you plan to use overall. Defaults to 1.
                 Used to derive the shard count (same value). Must be >= 1 and
                 even if > 1.
             initial (Optional[Iterable[_T]], optional):

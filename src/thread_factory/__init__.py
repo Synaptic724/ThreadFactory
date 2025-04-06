@@ -29,6 +29,37 @@ except Exception:
     else:
         __version__ = "1.2.1"
 
+# ---- Core Concurrency Primitives ----
+from thread_factory.concurrency import (
+    ConcurrentBag, ConcurrentDict, ConcurrentList,
+    ConcurrentQueue, ConcurrentStack, Concurrent,
+    ConcurrentBuffer, ConcurrentCollection
+)
+# ---- Utilities ----
+from thread_factory.utils import Empty
+
+# ---- Runtime Primitives ----
+from thread_factory.primatives import Dynaphore
+
+# ---- Operations ----
+from thread_factory.operations import (
+    Work
+)
+
+__all__ = [
+    "ConcurrentBag",
+    "ConcurrentDict",
+    "ConcurrentList",
+    "ConcurrentQueue",
+    "Concurrent",
+    "ConcurrentStack",
+    "ConcurrentBuffer",
+    "ConcurrentCollection",
+    "Empty",
+    "Dynaphore",
+    "Work",
+    "__version__"
+]
 
 def _detect_nogil_mode() -> None:
     """
@@ -56,31 +87,3 @@ def _detect_nogil_mode() -> None:
         )
 
 _detect_nogil_mode()
-
-from thread_factory.concurrency.concurrent_bag import ConcurrentBag
-from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
-from thread_factory.concurrency.concurrent_stack import ConcurrentStack
-from thread_factory.concurrency.concurrent_core import Concurrent
-from thread_factory.concurrency.concurrent_buffer import ConcurrentBuffer
-from thread_factory.concurrency.concurrent_collection import ConcurrentCollection
-from thread_factory.utils.exceptions import Empty
-from thread_factory.threads import Worker, Dynaphore, Records, Work
-
-__all__ = [
-    "ConcurrentBag",
-    "ConcurrentDict",
-    "ConcurrentList",
-    "ConcurrentQueue",
-    "Concurrent",
-    "ConcurrentStack",
-    "ConcurrentBuffer",
-    "ConcurrentCollection",
-    "Empty",
-    "Worker",
-    "Dynaphore",
-    "Records",
-    "Work",
-    "__version__"
-]

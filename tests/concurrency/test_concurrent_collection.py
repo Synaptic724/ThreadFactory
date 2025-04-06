@@ -7,7 +7,6 @@ import random
 # Adjust imports as necessary:
 from thread_factory import ConcurrentCollection, Empty
 
-
 def remove_item_by_identity(collection: ConcurrentCollection, item):
     """
     Remove the first occurrence of `item` (by identity) from the ConcurrentCollection
@@ -231,7 +230,7 @@ class TestConcurrentCollection(unittest.TestCase):
 
     def test_producer_consumer_threads(self):
         """
-        Simulate multiple producer and consumer threads for concurrency stress.
+        Simulate multiple producer and consumer runtime for concurrency stress.
         """
         cc = ConcurrentCollection(10)
         producers = 5
@@ -268,7 +267,7 @@ class TestConcurrentCollection(unittest.TestCase):
 
     def test_concurrent_batch_updates(self):
         """
-        Ensure multiple threads can call batch_update concurrently without errors.
+        Ensure multiple runtime can call batch_update concurrently without errors.
         """
         cc = ConcurrentCollection(1, initial=[1, 2, 3, 4, 5])
 
@@ -293,7 +292,7 @@ class TestConcurrentCollection(unittest.TestCase):
 
     def test_concurrent_map_filter(self):
         """
-        Multiple threads do map() and filter() to produce new collections,
+        Multiple runtime do map() and filter() to produce new collections,
         ensuring no crash or data race with the source collection.
         """
         cc = ConcurrentCollection(1, initial=range(100))
@@ -406,7 +405,7 @@ class HighPerformanceConcurrentCollectionTest(unittest.TestCase):
 
     def test_parallel_batch_updates_contention(self):
         """
-        Batch update under high contention - multiple threads mutate concurrently.
+        Batch update under high contention - multiple runtime mutate concurrently.
         """
         initial_data = list(range(10_000))
         self.collection = ConcurrentCollection(26, initial=initial_data)

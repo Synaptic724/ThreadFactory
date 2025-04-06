@@ -200,7 +200,7 @@ class TestConcurrentList(unittest.TestCase):
 
     def test_concurrency_basic(self):
         """
-        Basic concurrency test: multiple threads appending to the list.
+        Basic concurrency test: multiple runtime appending to the list.
         """
         clist = ConcurrentList()
         num_threads = 10
@@ -220,7 +220,7 @@ class TestConcurrentList(unittest.TestCase):
 
     def test_concurrency_batch_updates(self):
         """
-        Multiple threads calling batch_update with different manipulations.
+        Multiple runtime calling batch_update with different manipulations.
         """
         clist = ConcurrentList(range(1000))
 
@@ -248,7 +248,7 @@ class TestConcurrentList(unittest.TestCase):
 
     def test_concurrency_slice_operations(self):
         """
-        Stress test with threads performing slicing assignments/deletions concurrently.
+        Stress test with runtime performing slicing assignments/deletions concurrently.
         """
         clist = ConcurrentList(range(100))
 
@@ -401,14 +401,14 @@ class HighPerformanceConcurrentListTest(unittest.TestCase):
 
         end_time = time.perf_counter()
 
-        print(f"\n[HighPerf Map/Filter/Reduce] Completed {self.thread_count} threads in {end_time - start_time:.2f} seconds")
+        print(f"\n[HighPerf Map/Filter/Reduce] Completed {self.thread_count} runtime in {end_time - start_time:.2f} seconds")
 
         # Confirm no data corruption (should still be valid list)
         self.assertGreaterEqual(len(self.clist), 0)
 
     def test_batch_update_exclusivity(self):
         """
-        Ensure batch updates are fully exclusive (no partial updates leaking between threads).
+        Ensure batch updates are fully exclusive (no partial updates leaking between runtime).
         """
         shared_list = ConcurrentList([0])
 

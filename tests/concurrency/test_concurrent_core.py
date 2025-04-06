@@ -317,7 +317,7 @@ class TestParallelEdgeCases(unittest.TestCase):
         """
         Stress test for local_init/local_body/local_finalize in parallel_for with multiple workers.
 
-        We'll sum numbers 0..999 in parallel, each worker chunk accumulates in local state,
+        We'll sum numbers 0..999 in parallel, each executors chunk accumulates in local state,
         then finalizes by appending to a global list. We do not rely on chunk_size=1 or max_workers=1
         so that concurrency is real.
 

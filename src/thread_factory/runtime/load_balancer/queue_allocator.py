@@ -9,14 +9,14 @@ class QueueAllocator(Disposable):
     Responsibilities:
     ------------------
     - Manages a pool of sequentially numbered tickets (0 .. queue_size-1)
-    - Allows threads to acquire and release ticket IDs
+    - Allows runtime to acquire and release ticket IDs
     - Ensures IDs are recycled and reused
     - Provides safe disposal and optional context manager support
 
     Notes:
     ------
     - This is designed for usage with a thread pool or task system.
-    - Tickets can be treated as thread IDs, worker IDs, or task IDs depending on the system.
+    - Tickets can be treated as thread IDs, executors IDs, or task IDs depending on the system.
 
     Example:
     --------

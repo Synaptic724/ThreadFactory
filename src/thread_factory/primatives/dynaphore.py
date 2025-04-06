@@ -16,13 +16,13 @@ class Dynaphore(threading.Semaphore):
     def condition(self) -> threading.Condition:
         """
         Expose the internal Condition object.
-        Allows external threads to wait on complex conditions.
+        Allows external runtime to wait on complex conditions.
         """
         return self._cond
 
     def increase_permits(self, n: int = 1) -> None:
         """
-        Dynamically increase available permits and notify waiting threads.
+        Dynamically increase available permits and notify waiting runtime.
         """
         if n < 0:
             raise ValueError("Cannot increase permits by a negative value")

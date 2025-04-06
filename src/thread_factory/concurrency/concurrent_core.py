@@ -44,7 +44,7 @@ class Concurrent:
       - Streaming mode in parallel_foreach to avoid loading the entire iterable into memory
       - stop_on_exception to cancel remaining chunks if an exception occurs in one chunk
       - Explicit default for max_workers using os.cpu_count()
-      - chunk_size logic that tries to create roughly 4 chunks per worker by default
+      - chunk_size logic that tries to create roughly 4 chunks per executors by default
 
     NOTICE:
       This class accepts user-defined functions and runs them concurrently.
@@ -79,7 +79,7 @@ class Concurrent:
         # Decide if we use local state:
         use_local_state = (local_init is not None) and (local_body is not None)
 
-        # Heuristic for chunk size: ~4 chunks per worker if not explicitly given
+        # Heuristic for chunk size: ~4 chunks per executors if not explicitly given
         if chunk_size is None:
             chunk_size = max(1, total // (mw * 4) or 1)
 
@@ -269,7 +269,7 @@ class Concurrent:
 
             if wait:
                 for f in as_completed(futures):
-                    # Raises any exceptions from the worker
+                    # Raises any exceptions from the executors
                     f.result()
 
         return futures
