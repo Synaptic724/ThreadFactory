@@ -68,6 +68,3 @@ exclude = [
     "tests*", "docs*", "examples*", "Plans*", "benchmarks*", "benchmark_data*",
     ".github*", ".venv*", "__pycache__", "*.egg-info", "TestIdeas"
 ]
-
-[tool.setuptools.package-data]
-"*" = ["LICENSE", "NOTICE", "README.md", "CHANGELOG.md", "THIRD_PARTY_LICENSES.md"]
