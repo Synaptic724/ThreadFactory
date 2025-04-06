@@ -59,7 +59,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Introduced first version of the `Work` abstraction for structured task submission, response handling, and optional callbacks.
 
 ### Fixes
-- N/A
+- Updated comments for `concurrent_core` to clarify the purpose and usage.
 
 ### Changes
 - Updated license from **MIT** to **Apache 2.0**, enabling stronger attribution controls and broader compliance with corporate and open-source ecosystems.

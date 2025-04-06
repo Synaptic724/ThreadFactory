@@ -1,5 +1,5 @@
 from thread_factory.primatives import Dynaphore
-from thread_factory.runtime.executors import Worker, Records
+from thread_factory.runtime.worker_manager import Worker, Records
 
 
 __all__ = [

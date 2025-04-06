@@ -1,6 +1,6 @@
 import unittest
 import time
-from thread_factory.runtime.strategies.directed_acyclic_work_graph import Node, Edge, DirectedAcyclicWorkGraph, StateObject, ExecutionContext
+from thread_factory.runtime.factory.strategies.directed_acyclic_work_graph import Node, Edge, DirectedAcyclicWorkGraph, StateObject, ExecutionContext
 
 # Assuming you have all your DAG code in a module named 'dag_module'
 # For example:

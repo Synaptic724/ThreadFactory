@@ -42,7 +42,7 @@ from thread_factory.utils import Empty
 from thread_factory.primatives import Dynaphore
 
 # ---- Operations ----
-from thread_factory.operations import (
+from thread_factory.runtime.factory.operations import (
     Work
 )
 
