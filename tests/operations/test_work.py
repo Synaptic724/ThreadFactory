@@ -45,16 +45,38 @@ class TestWork(unittest.TestCase):
             work.result()
         self.assertEqual(work.status(), "cancelled")
 
-    def test_async_await_result(self):
-        async def run_async_work():
-            work = Work(lambda: 7 * 6)
-            work.run()
-            result = await work
-            return result
+    def test_coroutine_function(self):
+        async def async_fn():
+            await asyncio.sleep(1)
+            return "done"
 
-        result = asyncio.run(run_async_work())
-        self.assertEqual(result, 42)
+        with self.assertRaises(TypeError):
+            work = Work(async_fn)
 
+
+    def test_add_callback(self):
+        async def async_fn():
+            await asyncio.sleep(1)
+            return "done"
+
+        with self.assertRaises(TypeError):
+            work = Work()
+            work.add_done_callback(async_fn)
+
+    def test_hooks_with_exceptions(self):
+        async def pre_hook_fn():
+            pass
+
+        async def post_hook_fn():
+            pass
+
+        with self.assertRaises(TypeError):
+            work = Work()
+            work.add_hook(pre_hook_fn, "before")
+
+        with self.assertRaises(TypeError):
+            work = Work()
+            work.add_hook(post_hook_fn, "before")
 
     def test_cleanup(self):
         def cleanup_fn():

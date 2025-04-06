@@ -179,7 +179,7 @@ Full API reference and usage examples are available at:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/threadfactory.git
+git clone https://github.com/Synaptic724/ThreadFactory.git
 cd threadfactory
 
 # Create a Python 3.13+ virtual environment (No-GIL/Free concurrency recommended)
