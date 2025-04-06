@@ -1,0 +1,6 @@
+include LICENSE
+include NOTICE
+include THIRD_PARTY_LICENSES.md
+include README.md
+include CHANGELOG.md
+include pyproject.toml
