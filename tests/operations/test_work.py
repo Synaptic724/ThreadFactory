@@ -9,7 +9,7 @@ class TestWork(unittest.TestCase):
 
     def test_basic_execution_and_result(self):
         def sample_fn(x, y): return x + y
-        work = Work(sample_fn, 2, 3, auto_dispose=False)
+        work = Work(sample_fn, 2, 3)
         work.run()
         self.assertEqual(work.result(), 5)
         self.assertEqual(work.status(), "completed")
@@ -21,7 +21,7 @@ class TestWork(unittest.TestCase):
 
         def fn(): return 42
 
-        work = Work(fn, auto_dispose=False)
+        work = Work(fn)
         work.add_hook(hook, "before")
         work.add_hook(hook, "after")
         work.run()
@@ -30,14 +30,14 @@ class TestWork(unittest.TestCase):
 
     def test_exception_handling(self):
         def faulty(): raise ValueError("fail")
-        work = Work(faulty, auto_dispose=False)
+        work = Work(faulty)
         work.run()
         self.assertIsInstance(work.exception(), ValueError)
         self.assertEqual(work.status(), "completed")
 
     def test_cancel_before_run(self):
         def fn(): return 99
-        work = Work(fn, auto_dispose=False)
+        work = Work(fn)
         cancelled = work.cancel()
         self.assertTrue(cancelled)
         self.assertTrue(work.cancelled())
@@ -45,16 +45,9 @@ class TestWork(unittest.TestCase):
             work.result()
         self.assertEqual(work.status(), "cancelled")
 
-    def test_auto_dispose(self):
-        def fn(): return 123
-        work = Work(fn, auto_dispose=True)
-        work.run()
-        _ = work.result()
-        self.assertTrue(work.disposed)
-
     def test_async_await_result(self):
         async def run_async_work():
-            work = Work(lambda: 7 * 6, auto_dispose=True)
+            work = Work(lambda: 7 * 6)
             work.run()
             result = await work
             return result
@@ -67,7 +60,7 @@ class TestWork(unittest.TestCase):
         def cleanup_fn():
             return "cleanup"
 
-        work = Work(cleanup_fn, auto_dispose=False)
+        work = Work(cleanup_fn)
         work.run()
         result = work.result()
         work.cleanup()
@@ -83,7 +76,7 @@ class TestWork(unittest.TestCase):
         def hook2(w, phase): state.append(f"hook2-{phase}")
         def task(): return "done"
 
-        work = Work(task, priority=10, auto_dispose=False)
+        work = Work(task, priority=10)
         work.add_hook(hook1, "before")
         work.add_hook(hook2, "after")
         work.run()

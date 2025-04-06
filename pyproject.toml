@@ -66,5 +66,5 @@ where = ["src"]
 include = ["thread_factory*"]
 exclude = [
     "tests*", "docs*", "examples*", "Plans*", "benchmarks*", "benchmark_data*",
-    ".github*", ".venv*", "__pycache__", "*.egg-info"
+    ".github*", ".venv*", "__pycache__", "*.egg-info", "TestIdeas"
 ]
