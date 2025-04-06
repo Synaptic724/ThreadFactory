@@ -2,6 +2,9 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from thread_factory.utils import Disposable
 
+# TODO: Remember that this DAG system is not adapted for parallelization. It sequentially executes work.
+
+
 class StateObject(Disposable):
     """
     Thread-safe state object that references a Directed Acyclic Graph (DAG)
