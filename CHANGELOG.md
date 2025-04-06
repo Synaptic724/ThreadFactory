@@ -45,6 +45,19 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - `DiagnosticsInterface`: Real-time throughput, queue, and performance tracking.
 - `Orchestrator`: Dynamic coordination of thread lifecycles, workloads, and contention resolution.
 
+## [1.2.2] - 2025-04-05
+
+### Classes Added
+
+### Added Features
+
+### Fixes
+- Removed lock from `peek()` in `ConcurrentQueue` and `ConcurrentStack` to improve performance.
+
+### Changes
+- Updated license from MIT to Apache 2.0.
+
+
 ---
 
 ## [1.2.1] - 2025-04-05
@@ -90,9 +103,6 @@ Internal benchmarks confirm `ConcurrentBuffer` improvements:
 ### Fixes
 - Removed lock from `peek()` in `ConcurrentQueue` and `ConcurrentStack` to improve performance.
 - Implemented the Disposable pattern from .NET into all classes for easier resource management.
-
----
-
 
 ---
 
