@@ -1,6 +1,6 @@
 import time
 from concurrent.futures import Future
-from typing import Optional, Callable, List
+from typing import Optional, Callable, List, Any
 from thread_factory.utils import Disposable
 import asyncio
 
@@ -14,7 +14,7 @@ class Work(Future, Disposable):
       - Clean cancellation support
     """
 
-    def __init__(self, fn, *args, priority: int = 0, metadata: Optional[dict] = None, **kwargs):
+    def __init__(self, fn: Callable, *args, priority: int = 0, metadata: Optional[dict] = None, **kwargs):
         """
         Initialize a new Work object.
 
@@ -26,6 +26,9 @@ class Work(Future, Disposable):
             **kwargs: Additional keyword arguments for the function.
         """
         super().__init__()
+        if not callable(fn):
+            raise TypeError(f"Expected a callable, got type '{type(fn).__name__}' instead.")
+
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
