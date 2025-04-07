@@ -5,60 +5,10 @@ import ulid
 import ctypes
 import inspect
 from typing import Callable, Any, Optional, Union
+from thread_factory.runtime.worker_manager.records.records import Records, Record
 from thread_factory.utils import Disposable
 from enum import Enum, auto
 
-
-class Records:
-    """
-    Tracks ULID records of completed work.
-
-    This object is intended to store history of executed tasks for audit/logging.
-    """
-    def __init__(self):
-        self.records: list[ulid.ULID] = []
-
-    def add(self, record: ulid.ULID):
-        """Appends a ULID for a completed task."""
-        self.records.append(record)
-
-    def __repr__(self):
-        return f"<Records count={len(self.records)}>"
-
-    def __len__(self):
-        return len(self.records)
-
-
-class WorkStatus(Enum):
-    """
-    Enum describing the type or lifecycle state of a Work item.
-
-    This combines both 'what the task is' and 'what stage it's in',
-    similar to `concurrent.futures.Future._state`.
-    """
-    # Lifecycle states (for execution tracking)
-    PENDING = auto()
-    RUNNING = auto()
-    COMPLETED = auto()
-    CANCELLED = auto()
-    FAILED = auto()
-
-class WorkerState(Enum):
-    """
-    Represents the current lifecycle and behavior of a Worker thread.
-    """
-    CREATED = auto()            # Thread object created, not started yet
-    STARTING = auto()           # Thread is initializing
-    IDLE = auto()               # No task, waiting for work
-    ACTIVE = auto()             # Executing a task
-    BLOCKED = auto()            # Waiting on lock, I/O, or dependency
-    SWITCHED = auto()           # Assigned a new queue or execution context
-    PAUSED = auto()             # Temporarily suspended (manually or automatically)
-    REBALANCING = auto()        # In the middle of a factory-controlled reassignment
-    TERMINATING = auto()        # Graceful shutdown in progress
-    KILLED = auto()             # Terminated via `hard_kill()`
-    DEAD = auto()               # Fully stopped, no longer participating
-    DISPOSED = auto()           # Disposed, no longer usable
 
 class Worker(threading.Thread, Disposable):
     """
@@ -74,6 +24,24 @@ class Worker(threading.Thread, Disposable):
     - Death signaling via `death_event` for external observers
     - Supports dynamic queue switching
     """
+
+    class WorkerState(Enum):
+        """
+        Represents the current lifecycle and behavior of a Worker thread.
+        """
+        CREATED = auto()  # Thread object created, not started yet
+        STARTING = auto()  # Thread is initializing
+        IDLE = auto()  # No task, waiting for work
+        ACTIVE = auto()  # Executing a task
+        BLOCKED = auto()  # Waiting on lock, I/O, or dependency
+        SWITCHED = auto()  # Assigned a new queue or execution context
+        PAUSED = auto()  # Temporarily suspended (manually or automatically)
+        REBALANCING = auto()  # In the middle of a factory-controlled reassignment
+        TERMINATING = auto()  # Graceful shutdown in progress
+        KILLED = auto()  # Terminated via `hard_kill()`
+        DEAD = auto()  # Fully stopped, no longer participating
+        DISPOSED = auto()  # Disposed, no longer usable
+
     def __init__(self, group=None, target=None, name=None,
                  args=(), kwargs=None, *, daemon=None, factory_id: int, factory):
         """
@@ -86,7 +54,7 @@ class Worker(threading.Thread, Disposable):
         super().__init__(group, target, name, args, kwargs, daemon=daemon)
         self.factory = factory
         self.factory_id = factory_id
-        self.worker_id = str(ulid.ULID())  # Unique identifier
+        self.unique = str(ulid.ULID())  # Unique identifier
         self.state = 'IDLE'                # One of: IDLE, ACTIVE, SWITCHED, TERMINATING
         self.daemon = True                 # Die with main thread
         self.records = Records()           # Track task completions
@@ -97,7 +65,7 @@ class Worker(threading.Thread, Disposable):
 
     def run(self):
         """Main worker loop: pulls from queue and executes work."""
-        print(f"[Worker {self.worker_id}] Starting.")
+        print(f"[Worker {self.unique}] Starting.")
         try:
             self.state = 'STARTING'
             while not self.shutdown_flag.is_set():
@@ -110,7 +78,7 @@ class Worker(threading.Thread, Disposable):
                     time.sleep(0.01)
         finally:
             self.state = 'TERMINATING'
-            print(f"[Worker {self.worker_id}] Exiting.")
+            print(f"[Worker {self.unique}] Exiting.")
             self.death_event.set()
 
     def _execute_task(self, task: Union[Callable, 'Work']):
@@ -131,10 +99,10 @@ class Worker(threading.Thread, Disposable):
             self.completed_work += 1
 
             if hasattr(task, "task_id"):
-                self.records.add(ulid.ULID.from_bytes(task.task_id.to_bytes(16, "big")))
+                self.records.add(Record(task.task_id, Record.WorkStatus.COMPLETED))
 
         except Exception as e:
-            print(f"[Worker {self.worker_id}] Task failed: {e}")
+            print(f"[Worker {self.unique}] Task failed: {e}")
 
     def stop(self):
         """Signals the worker to gracefully shut down."""
@@ -148,7 +116,7 @@ class Worker(threading.Thread, Disposable):
         Should only be used when graceful shutdown fails.
         """
         if not self.is_alive():
-            print(f"[Worker {self.worker_id}] Already dead.")
+            print(f"[Worker {self.unique}] Already dead.")
             return
 
         res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
@@ -161,7 +129,7 @@ class Worker(threading.Thread, Disposable):
             ctypes.pythonapi.PyThreadState_SetAsyncExc(self.ident, None)
             raise SystemError("Failed to kill thread cleanly.")
 
-        print(f"[Worker {self.worker_id}] Scheduled for hard kill.")
+        print(f"[Worker {self.unique}] Scheduled for hard kill.")
 
     def thread_switch(self, new_queue: Any):
         """
@@ -175,15 +143,15 @@ class Worker(threading.Thread, Disposable):
 
     def get_creation_datetime(self) -> datetime.datetime:
         """Returns the ULID-based datetime of thread creation."""
-        return ulid.ULID.from_str(self.worker_id).datetime
+        return ulid.ULID.from_str(self.unique).datetime
 
     def get_creation_timestamp(self) -> float:
         """Returns the ULID-based UNIX timestamp of thread creation."""
-        return ulid.ULID.from_str(self.worker_id).timestamp
+        return ulid.ULID.from_str(self.unique).timestamp
 
     def __del__(self):
         """Signals external observers of cleanup."""
-        print(f"[Worker {self.worker_id}] __del__ called.")
+        print(f"[Worker {self.unique}] __del__ called.")
         self.death_event.set()
 
     def dispose(self):
@@ -203,7 +171,7 @@ class Worker(threading.Thread, Disposable):
         self.shutdown_flag.set()
         self.death_event.set()
         self.state = WorkerState.DISPOSED
-        print(f"[Worker {self.worker_id}] Disposed.")
+        print(f"[Worker {self.unique}] Disposed.")
 
     def __repr__(self):
-        return f"<Worker id={self.worker_id} state={self.state} completed={self.completed_work}>"
+        return f"<Worker id={self.unique} state={self.state} completed={self.completed_work}>"

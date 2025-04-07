@@ -192,3 +192,6 @@ source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 # Install the library in editable mode
 pip install threadfactory
 ```
+
+
+⚠️ This project is not currently open to external contributions. Please feel free to report issues respectfully. See the Code of Conduct for interaction guidelines.
