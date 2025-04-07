@@ -74,8 +74,8 @@ class Worker(threading.Thread, Disposable):
     - Death signaling via `death_event` for external observers
     - Supports dynamic queue switching
     """
-
-    def __init__(self, factory_id: int, factory):
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs=None, *, daemon=None, factory_id: int, factory):
         """
         Initializes a new worker instance.
 
@@ -83,7 +83,7 @@ class Worker(threading.Thread, Disposable):
             factory (Any): Reference to the managing factory.
             work_queue (Any): Queue-like object to pull Work items from.
         """
-        super().__init__()
+        super().__init__(group, target, name, args, kwargs, daemon=daemon)
         self.factory = factory
         self.factory_id = factory_id
         self.worker_id = str(ulid.ULID())  # Unique identifier

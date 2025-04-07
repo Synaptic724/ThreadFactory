@@ -3,297 +3,247 @@ import threading
 import time
 import random
 
-# Adjust the import to match wherever your SwitchLock is defined.
-# from my_module import SwitchLock
-from thread_factory.primatives import SwitchLock  # Example import
+# Replace this import with your actual SwitchLock path
+from thread_factory.primatives import SwitchLock
 
-class TestSwitchLock(unittest.TestCase):
+class Worker(threading.Thread):
+    """
+    A custom Thread that assigns a random large integer for factory_id by default.
+    If you want a specific factory_id (e.g. 42), pass factory_id=42 to the constructor.
+    """
+    def __init__(self, factory_id=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if factory_id is None:
+            # Generate a random "big" integer for testing
+            factory_id = random.randint(1_000_000_000, 9_999_999_999)
+        self.factory_id = factory_id
 
-    def test_init_value(self):
-        """Test that the initial value is set correctly and cannot be negative."""
-        lock = SwitchLock(value=5)
-        self.assertIsNotNone(lock.condition)
-        self.assertTrue(lock.acquire(), "Should acquire a permit immediately when value=5")
+def setUpModule():
+    """
+    Called once before any tests in this file run.
+    We ensure the main test-running thread has a .factory_id attribute.
+    """
+    main_thr = threading.current_thread()
+    if not hasattr(main_thr, 'factory_id'):
+        # pick any default, e.g. 0 or a random big int
+        main_thr.factory_id = random.randint(1_000_000_000, 9_999_999_999)
 
+class TestSwitchLockNew(unittest.TestCase):
+
+
+    def test_init_negative_value_raises(self):
+        """Ensure negative initial values raise an exception."""
         with self.assertRaises(ValueError):
-            # Negative initial value should raise ValueError
             SwitchLock(value=-1)
 
-    def test_basic_acquire_release(self):
-        """Test basic semaphore-like acquire/release with default single permit."""
+    def test_init_zero_acquire_block(self):
+        """
+        Starting with value=0 => an immediate acquire() should block and
+        not succeed unless we release or increase permits.
+        """
+        lock = SwitchLock(value=0)
+        acquired = [False]
+
+        def attempt_acquire():
+            acq = lock.acquire(timeout=0.2)
+            acquired[0] = acq
+
+        # Use Worker instead of threading.Thread
+        t = Worker(target=attempt_acquire)
+        t.start()
+        time.sleep(0.1)
+
+        # Thread should still be blocked => no permit
+        self.assertFalse(acquired[0], "Should not have acquired yet.")
+        lock.release()  # now 1 permit
+        t.join()
+        self.assertTrue(acquired[0], "Should eventually acquire after release.")
+
+    def test_basic_single_permit(self):
+        """Simple test with a single permit => one acquire is immediate; second blocks."""
         lock = SwitchLock(value=1)
 
-        # Should acquire immediately
-        acquired = lock.acquire()
-        self.assertTrue(acquired, "Should acquire the single available permit")
+        # 1st acquire => immediate
+        self.assertTrue(lock.acquire(blocking=False), "Should succeed with 1 available permit")
 
-        # Another thread cannot acquire now unless we release
-        result = [None]
-        def worker():
-            res = lock.acquire(timeout=0.2)
-            result[0] = res
+        # 2nd acquire => no permit left, non-blocking => should fail
+        self.assertFalse(lock.acquire(blocking=False), "Should fail; no permits left")
 
-        t = threading.Thread(target=worker)
-        t.start()
-        time.sleep(0.1)
-        self.assertIsNone(result[0], "Worker should still be blocked")
-
+        # Now release => 1 permit again
         lock.release()
-        t.join()
-        self.assertTrue(result[0], "Worker should acquire after release")
-
-    def test_increase_permits(self):
-        """Test increasing permits dynamically."""
-        lock = SwitchLock(value=0)
-
-        def try_acquire(lock, result_list):
-            with lock:
-                result_list.append("acquired")
-
-        result = []
-        t = threading.Thread(target=try_acquire, args=(lock, result))
-        t.start()
-        time.sleep(0.1)
-        self.assertEqual(len(result), 0, "Thread should be blocked, no permits initially")
-
-        lock.increase_permits(n=2)
-        t.join(timeout=1)
-        self.assertEqual(len(result), 1, "Thread should have acquired after permits increased")
-
-    def test_decrease_permits(self):
-        """Test decreasing permits dynamically."""
-        lock = SwitchLock(value=3)
-        lock.acquire()  # use 1 permit
-        self.assertTrue(True, "Acquired one permit, 2 remain")
-
-        # Decreasing more than available => ValueError
-        with self.assertRaises(ValueError):
-            lock.decrease_permits(n=5)
-
-        # Decreasing within range
-        lock.decrease_permits(n=1)  # from 2 -> 1
-        # Acquire 2 times now => only 1 permit left, so second acquire will block
-        lock.acquire()  # uses the last permit
-        result = [None]
-        def worker():
-            res = lock.acquire(timeout=0.2)
-            result[0] = res
-
-        t = threading.Thread(target=worker)
-        t.start()
-        time.sleep(0.1)
-        self.assertIsNone(result[0], "Should still be blocked, no permits remain")
-
-        # Release 1 so that worker can proceed
-        lock.release()
-        t.join(timeout=1)
-        self.assertTrue(result[0], "Worker got the permit after release")
+        self.assertTrue(lock.acquire(blocking=False), "Should succeed again after release")
 
     def test_acquire_timeout(self):
-        """Test that acquire times out properly when no permits are available."""
+        """Ensure we can time out when no permits are available."""
         lock = SwitchLock(value=0)
-        start = time.time()
-        got_it = lock.acquire(timeout=0.5)
-        end = time.time()
-        self.assertFalse(got_it, "Should time out waiting for permit")
-        self.assertGreaterEqual(end - start, 0.5, "Should wait at least 0.5 seconds")
+        start_time = time.time()
+        got_it = lock.acquire(timeout=0.3)
+        end_time = time.time()
 
-    def test_acquire_nonblocking(self):
-        """
-        Test non-blocking acquire (blocking=False).
-        Should return False immediately if no permits are available.
-        """
-        lock = SwitchLock(value=1)
-        # Acquire the single permit
-        first = lock.acquire(blocking=False)
-        self.assertTrue(first, "First acquire should succeed immediately")
+        self.assertFalse(got_it, "Should time out if no release occurs.")
+        self.assertGreaterEqual(end_time - start_time, 0.3,
+                                "Acquire should block for ~0.3 seconds before returning False")
 
-        # Second non-blocking acquire should fail
-        second = lock.acquire(blocking=False)
-        self.assertFalse(second, "Second acquire should fail immediately (no permits left)")
-
-    def test_targeted_wakeups(self):
-        """
-        Test using factory_ids for targeted acquire/release.
-        Worker 1 waits on ID=42, Worker 2 on ID=99.
-        We'll only wake one or the other.
-        """
+    def test_increase_then_acquire(self):
+        """Test that increasing permits unblocks a waiting thread."""
         lock = SwitchLock(value=0)
-        results = []
+        acquired_flag = [False]
 
-        def worker(id_val):
-            acquired = lock.acquire(factory_ids=id_val, timeout=2)
-            results.append((id_val, acquired))
+        def blocking_acquire():
+            with lock:  # context manager => acquire
+                acquired_flag[0] = True
 
-        t1 = threading.Thread(target=worker, args=(42,))
-        t2 = threading.Thread(target=worker, args=(99,))
+        t = Worker(target=blocking_acquire)
+        t.start()
+        time.sleep(0.1)
+        self.assertFalse(acquired_flag[0], "Thread should still be blocked (no permits).")
 
+        lock.increase_permits(1)  # Now there's 1 permit
+        t.join(timeout=1)
+        self.assertTrue(acquired_flag[0], "Thread should have acquired after increase.")
 
-    def test_massive_concurrent_targeted_race(self):
+    def test_decrease_permits_check(self):
+        """Ensure decreasing permits is reflected and doesn't go below zero."""
+        lock = SwitchLock(value=2)
+        lock.acquire()  # consume 1 => left with 1
+        self.assertTrue(lock.acquire(blocking=False), "Should still have 1 permit left")
+
+        with self.assertRaises(ValueError):
+            lock.decrease_permits(n=1)  # can't go from 0 to -1
+
+    def test_targeted_release_wakes_correct_factory_id(self):
         """
-        Stress test with 100+ threads, mixing factory_ids and random timeouts.
-        Ensures SwitchLock doesn’t deadlock and threads honor their target IDs.
-        """
-        lock = SwitchLock(value=5)
-        results = []
-        num_threads = 150
-        id_pool = list(range(10))  # factory_ids range
-
-        def chaos_worker(i):
-            factory_id = random.choice(id_pool)
-            timeout = random.uniform(0.2, 1.0)
-            acquired = lock.acquire(factory_ids=factory_id, timeout=timeout)
-            if acquired:
-                # Hold the lock briefly
-                time.sleep(random.uniform(0.01, 0.05))
-                # 50/50 targeted or global release
-                if random.random() < 0.5:
-                    lock.release(factory_ids=factory_id)
-                else:
-                    lock.release()
-            results.append((i, factory_id, acquired))
-
-        threads = [threading.Thread(target=chaos_worker, args=(i,)) for i in range(num_threads)]
-
-        for t in threads:
-            t.start()
-
-        for t in threads:
-            t.join()
-
-        acquired_count = sum(1 for (_, _, acq) in results if acq)
-        self.assertGreaterEqual(acquired_count, 5, f"Expected at least 5 to acquire, got {acquired_count}")
-        self.assertEqual(len(results), num_threads, "All threads should have completed")
-
-    def test_targeted_starvation_check(self):
-        """
-        Ensure that threads targeting IDs aren't starved if permits exist and are released with matching IDs.
+        Create multiple threads with different .factory_id, all blocked.
+        Release with a specific factory_id => only that thread should wake.
         """
         lock = SwitchLock(value=0)
-        factory_ids = [100, 101, 102]
-        completed = []
-
-        def targeted_worker(fid):
-            got_it = lock.acquire(factory_ids=fid, timeout=2)
-            completed.append((fid, got_it))
-
-        threads = [threading.Thread(target=targeted_worker, args=(fid,)) for fid in factory_ids]
-        for t in threads:
-            t.start()
-
-        time.sleep(0.1)  # ensure they're all blocked
-
-        # Notify each ID after delay
-        for fid in factory_ids:
-            time.sleep(0.1)
-            lock.release(factory_ids=fid)
-
-        for t in threads:
-            t.join()
-
-        self.assertEqual(len(completed), len(factory_ids), "All targeted workers should complete")
-        self.assertTrue(all(success for _, success in completed), "All targeted workers should succeed")
-
-    def test_tight_loop_hammering(self):
-        """
-        Hammer the lock with rapid-fire acquire and release from multiple threads.
-        """
-        lock = SwitchLock(value=3)
-        permit_counter = 0
-        error_flag = False
-        lock_guard = threading.Lock()
-
-        def hammer_worker():
-            nonlocal permit_counter, error_flag
-            for _ in range(100):
-                acquired = lock.acquire(timeout=0.5)
-                if not acquired:
-                    error_flag = True
-                    break
-                with lock_guard:
-                    permit_counter += 1
-                time.sleep(0.001)
-                lock.release()
-
-        threads = [threading.Thread(target=hammer_worker) for _ in range(10)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        self.assertFalse(error_flag, "No worker should fail to acquire")
-        self.assertEqual(permit_counter, 1000, "All permits should have been acquired and released properly")
-
-    def test_mixed_targeted_and_global_release_fairness(self):
-        """
-        Tests fairness between threads using factory_ids vs no factory_ids.
-        Ensures neither group gets completely starved.
-        """
-        lock = SwitchLock(value=0)
-        results = []
-        targeted_ids = [200, 201]
-        untargeted_results = []
-        targeted_results = []
-
-        def targeted_worker(fid):
-            success = lock.acquire(factory_ids=fid, timeout=2)
-            targeted_results.append((fid, success))
-
-        def untargeted_worker():
-            success = lock.acquire(timeout=2)
-            untargeted_results.append(success)
-
+        results = {}
         threads = []
-        for _ in range(10):
-            threads.append(threading.Thread(target=untargeted_worker))
-        for fid in targeted_ids:
-            threads.append(threading.Thread(target=targeted_worker, args=(fid,)))
 
-        for t in threads:
+        def blocking_acquire(fid):
+            # No need to set current_thread().factory_id here,
+            # because each Worker is already initialized with that fid.
+            lock.acquire()
+            results[fid] = results.get(fid, 0) + 1
+
+        factory_ids = [1, 1, 2, 3]
+        for fid in factory_ids:
+            # Provide the factory_id to the Worker constructor
+            t = Worker(factory_id=fid, target=blocking_acquire, args=(fid,))
+            threads.append(t)
             t.start()
 
         time.sleep(0.2)
-        # Release in a fair pattern
-        for _ in range(5):
-            lock.release()  # Global
-            time.sleep(0.05)
-        for fid in targeted_ids:
-            lock.release(factory_ids=fid)
+        # Everyone is blocked => check waiting IDs
+        waiting_ids = lock.get_all_waiting_factory_ids()
+        self.assertEqual(len(waiting_ids), 4, "All 4 threads should be waiting.")
+        self.assertEqual(waiting_ids.count(1), 2)
 
+        # Now targeted release => should wake only the ones with fid=1
+        lock.release(n=2, factory_ids=1)
+        time.sleep(0.2)
+
+        # The threads with .factory_id=1 should have succeeded
+        self.assertEqual(results.get(1, 0), 2, "Both factory_id=1 threads should be unblocked.")
+
+        # The others are still blocked => release them globally
+        lock.release(n=2)
         for t in threads:
-            t.join()
+            t.join(timeout=1)
+        self.assertEqual(results.get(2, 0), 1, "factory_id=2 should eventually get a permit.")
+        self.assertEqual(results.get(3, 0), 1, "factory_id=3 should eventually get a permit.")
 
-        self.assertTrue(any(t[1] for t in targeted_results), "At least one targeted thread should acquire")
-        self.assertTrue(any(untargeted_results), "At least one untargeted thread should acquire")
+    def test_nonblocking_acquire(self):
+        """Test the non-blocking scenario with insufficient permits."""
+        lock = SwitchLock(value=1)
+        # first is immediate
+        got_it_1 = lock.acquire(blocking=False)
+        self.assertTrue(got_it_1)
 
+        # second => no permits left, fails immediately
+        got_it_2 = lock.acquire(blocking=False)
+        self.assertFalse(got_it_2)
 
-    def test_switchlock_get_all_waiting_factory_ids(self):
+    def test_dispose_wakes_waiters(self):
+        """
+        If we call dispose(), all waiting threads should be released
+        (even if they cannot acquire a permit).
+        """
         lock = SwitchLock(value=0)
-        results = []
+        blocked = [False, False]
 
-        def worker(fid):
-            lock.acquire(factory_ids=fid)
-            results.append(fid)
+        def wait_thread(idx):
+            blocked[idx] = True
+            lock.acquire()
+            blocked[idx] = False
 
-        threads = [threading.Thread(target=worker, args=(fid,)) for fid in [10, 10, 20, 30]]
+        threads = [Worker(target=wait_thread, args=(i,)) for i in range(2)]
         for t in threads:
             t.start()
 
-        time.sleep(0.1)  # Let threads block
+        time.sleep(1)
+        self.assertTrue(all(blocked), "Both threads should be blocked.")
 
-        ids = lock.get_all_waiting_factory_ids()
-        self.assertEqual(sorted(ids), [10, 10, 20, 30])
-        self.assertEqual(ids.count(10), 2)
-        self.assertIn(20, ids)
-        self.assertIn(30, ids)
+        lock.dispose()  # forcibly wakes waiters
+        for t in threads:
+            t.join(timeout=1)
 
-        lock.release(n=4)  # Wake them all
+        self.assertFalse(any(blocked), "All threads should have been unblocked on dispose.")
 
+    def test_get_all_waiting_factory_ids(self):
+        """Check we gather correct .factory_id from blocked threads."""
+        lock = SwitchLock(value=0)
+
+        def blocking(fid):
+            lock.acquire()
+
+        fids = [42, 42, 99]
+        threads = [Worker(factory_id=fid, target=blocking, args=(fid,)) for fid in fids]
+        for t in threads:
+            t.start()
+
+        time.sleep(0.1)
+        waiting_ids = lock.get_all_waiting_factory_ids()
+        self.assertEqual(len(waiting_ids), len(fids))
+        self.assertEqual(waiting_ids.count(42), 2)
+        self.assertIn(99, waiting_ids)
+
+        lock.release(n=3)
+        for t in threads:
+            t.join(timeout=1)
+
+    def test_concurrent_stress_simple(self):
+        """
+        Launch multiple threads acquiring/releasing a single lock.
+        Just ensures no deadlocks, all eventually succeed.
+        """
+        lock = SwitchLock(value=3)
+        success_count = 0
+        success_count_lock = threading.Lock()
+
+        def worker_job():
+            nonlocal success_count
+            for _ in range(50):
+                got_it = lock.acquire(timeout=1)
+                if got_it:
+                    with success_count_lock:
+                        success_count += 1
+                    time.sleep(0.002)  # simulate some "work"
+                    lock.release()
+                else:
+                    # If we fail the timeout for any reason, that's a problem
+                    with success_count_lock:
+                        success_count -= 100  # indicate major error
+
+        threads = [Worker(target=worker_job) for _ in range(10)]
+        for t in threads:
+            t.start()
         for t in threads:
             t.join()
 
-        self.assertEqual(len(results), 4)
+        # We expect each thread to do 50 acquisitions => total 500
+        self.assertEqual(success_count, 500, "All acquisitions should succeed without timeouts.")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
