@@ -82,9 +82,12 @@ class ConcurrentStack(Generic[_T], Disposable):
         Returns:
             _T: The item at the top of the stack.
         """
-        if not self._deque:
+        try:
+            if not self._deque:
+                raise Empty("peek from empty ConcurrentStack")
+            return self._deque[-1]
+        except IndexError:
             raise Empty("peek from empty ConcurrentStack")
-        return self._deque[-1]
 
     def __len__(self) -> int:
         """
@@ -181,6 +184,27 @@ class ConcurrentStack(Generic[_T], Disposable):
         """
         with self._lock:
             return ConcurrentList(list(self._deque))
+
+    def steal_batch(self, max_items: int = 4) -> ConcurrentList[_T]:
+        """
+        Atomically steal up to `max_items` from the head of the stack.
+
+        This is used in work-stealing contexts where idle threads pull
+        work from the front (FIFO) of another thread's stack. Returned
+        tasks are reversed to maintain correct execution order (LIFO).
+
+        Args:
+            max_items (int): Maximum number of items to steal.
+
+        Returns:
+            ConcurrentList[_T]: The stolen items, ordered for FIFO execution.
+        """
+        with self._lock:
+            stolen = []
+            for _ in range(min(max_items, len(self._deque))):
+                stolen.append(self._deque.popleft())
+            stolen.reverse()  # FIFO preservation
+            return ConcurrentList(initial=stolen)
 
     def remove_item(self, item: _T) -> bool:
         """

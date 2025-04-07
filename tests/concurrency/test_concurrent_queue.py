@@ -305,7 +305,10 @@ class TestConcurrentQueue(unittest.TestCase):
                     elif op == "dequeue":
                         q.dequeue()
                     elif op == "peek":
-                        q.peek()
+                        try:
+                            q.peek()
+                        except Empty:
+                            pass  # Expected when the queue is empty
                     else:
                         def do_batch(deq):
                             if deq and random.random() < 0.5:
@@ -491,6 +494,49 @@ class HighPerformanceConcurrentQueueTest(unittest.TestCase):
 
         print(f"\n[Randomized Parallel Operations] {operations_per_thread * self.thread_count:,} ops in {end - start:.2f}s")
         self.assertGreaterEqual(len(self.queue), 0)
+
+    def test_batch_stealing(self):
+        """
+        Test batch stealing functionality under concurrent conditions.
+        Multiple consumers will attempt to steal work from the queue in batches.
+        """
+        q = ConcurrentQueue([i for i in range(1000)])  # Initialize queue with 1000 items
+        num_consumers = 5
+        items_per_consumer = 200
+        max_steal_batch_size = 10
+
+        def consumer(consumer_id):
+            stolen = 0
+            while stolen < items_per_consumer:
+                try:
+                    # Attempt to steal a batch
+                    batch = q.steal_batch(max_steal_batch_size)
+                    stolen += len(batch)
+                    # Simulate processing of stolen work
+                    time.sleep(random.uniform(0.01, 0.05))
+                except Exception:
+                    pass  # Expecting an empty queue at times
+
+        threads = []
+        for cid in range(num_consumers):
+            threads.append(threading.Thread(target=consumer, args=(cid,)))
+
+        # Start all consumer threads
+        start = time.perf_counter()
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        end = time.perf_counter()
+
+        # Assert that no more than the initial number of items were stolen
+        self.assertEqual(len(q), 0, f"Queue should be empty after all consumers finish. {len(q)} items remaining.")
+
+        # Print out the final status
+        print(f"\n[Batch Stealing Test] {num_consumers * items_per_consumer} items stolen in {end - start:.2f}s")
 
 
     def test_dispose(self):

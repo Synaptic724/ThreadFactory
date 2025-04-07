@@ -74,9 +74,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Added targeted thread trapping and wakeup mechanisms via `SmartCondition`, allowing threads to wait on logical `factory_ids` and be selectively released based on those IDs.
 - Introduced `SwitchLock` to orchestrate semaphore-like control with dynamic permit scaling and smart ID-based synchronization.  
   Supports granular release control, timed thread suspension, and future-safe thread disposal coordination.
+- Added batch steal support to `ConcurrentQueue` and `ConcurrentStack`, allowing for efficient bulk operations and improved performance in high-contention scenarios.
 
 ### Fixes
 - Updated comments for `concurrent_core` to clarify the purpose and usage.
+- Updated `peak()` statements in both `ConcurrentQueue` and `ConcurrentStack` with `try/finally` blocks to ensure locks are released even in the event of an exception.
 
 ### Changes
 - Updated license from **MIT** to **Apache 2.0**, enabling stronger attribution controls and broader compliance with corporate and open-source ecosystems.

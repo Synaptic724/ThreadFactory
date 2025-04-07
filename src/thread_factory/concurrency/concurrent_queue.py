@@ -82,9 +82,12 @@ class ConcurrentQueue(Generic[_T], Disposable):
         Returns:
             _T: The item at the front of the queue.
         """
-        if not self._deque:
+        try:
+            if not self._deque:
+                raise Empty("peek from empty ConcurrentQueue")
+            return self._deque[0]
+        except IndexError:
             raise Empty("peek from empty ConcurrentQueue")
-        return self._deque[0]
 
     def __len__(self) -> int:
         """
@@ -170,7 +173,28 @@ class ConcurrentQueue(Generic[_T], Disposable):
                 initial=deepcopy(list(self._deque), memo)
             )
 
-    def to_concurrent_list(self) -> "concurrent_list.ConcurrentList[_T]":
+    def steal_batch(self, max_items: int = 4) -> ConcurrentList[_T]:
+        """
+        Atomically steal up to `max_items` from the tail of the queue.
+
+        This is used in work-stealing contexts where idle threads pull
+        work from the end (LIFO) of another thread's queue. Returned
+        tasks are reversed to maintain correct execution order (FIFO).
+
+        Args:
+            max_items (int): Maximum number of items to steal.
+
+        Returns:
+            ConcurrentList[_T]: The stolen items, ordered for FIFO execution.
+        """
+        with self._lock:
+            stolen = []
+            for _ in range(min(max_items, len(self._deque))):
+                stolen.append(self._deque.pop())
+            stolen.reverse()  # FIFO preservation
+            return ConcurrentList(initial=stolen)
+
+    def to_concurrent_list(self) -> "ConcurrentList[_T]":
         """
         Return a shallow copy of the queue as a ConcurrentList.
 
