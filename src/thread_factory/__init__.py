@@ -36,7 +36,7 @@ from thread_factory.concurrency import (
     ConcurrentBuffer, ConcurrentCollection
 )
 # ---- Utilities ----
-from thread_factory.utils import Empty
+from thread_factory.utils import Empty, Stopwatch, AutoResetTimer
 
 # ---- Runtime Primitives ----
 from thread_factory.primatives import Dynaphore
@@ -57,6 +57,8 @@ __all__ = [
     "ConcurrentCollection",
     "Empty",
     "Dynaphore",
+    "Stopwatch",
+    "AutoResetTimer",
     "__version__"
 ]
 

@@ -37,7 +37,7 @@ class Disposable(ABC):
             - Clear any persistent state to avoid memory leakage.
             - Be idempotent (safe to call multiple times).
         """
-        pass
+        raise NotImplementedError
 
     def cleanup(self):
         """
