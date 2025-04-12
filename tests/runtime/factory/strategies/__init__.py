@@ -1,4 +1,4 @@
-from thread_factory.runtime.factory.strategies.directed_acyclic_work_graph import DirectedAcyclicWorkGraph
+from thread_factory.runtime.strategies.factory.directed_acyclic_work_graph import DirectedAcyclicWorkGraph
 
 
 __all__ = [
