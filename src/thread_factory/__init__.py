@@ -2,9 +2,10 @@
 thread_factory
 High-performance concurrency collections and parallel operations for Python 3.13+.
 """
-
+DEBUG_MODE = True
 import sys
 import warnings
+from thread_factory.__version__ import __version__ as version
 
 # 🚫 Exit if Python version is less than 3.13
 if sys.version_info < (3, 13):
@@ -18,16 +19,9 @@ if sys.version_info < (3, 13):
         UserWarning
     )
 
-DEBUG_MODE = True
-
-try:
-    from importlib.metadata import version as get_version
-    __version__ = get_version("thread_factory")
-except Exception:
-    if DEBUG_MODE:
-        __version__ = "1.2.1-dev"
-    else:
-        __version__ = "1.2.1"
+if DEBUG_MODE:
+    version += "-dev"
+__version__ = version
 
 # ---- Core Concurrency Primitives ----
 from thread_factory.concurrency import (
