@@ -1,4 +1,4 @@
-from thread_factory.runtime.worker_manager.worker.worker import Worker, Records
+from thread_factory.runtime.worker.worker.worker import Worker, Records
 
 
 __all__ = [

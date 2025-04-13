@@ -3,7 +3,7 @@ from typing import Optional, Union, Iterable, Any, Callable
 from collections import deque
 from dataclasses import dataclass
 import time
-from thread_factory.runtime.worker_manager.worker import Worker
+from thread_factory.runtime.worker.worker import Worker
 
 @dataclass
 class Waiter:

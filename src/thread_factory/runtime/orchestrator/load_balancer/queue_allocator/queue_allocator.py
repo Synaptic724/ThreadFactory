@@ -16,7 +16,7 @@ class QueueAllocator(Disposable):
     Notes:
     ------
     - This is designed for usage with a thread pool or task system.
-    - Tickets can be treated as thread IDs, worker_manager IDs, or task IDs depending on the system.
+    - Tickets can be treated as thread IDs, worker IDs, or task IDs depending on the system.
 
     Example:
     --------

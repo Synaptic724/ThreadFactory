@@ -4,7 +4,7 @@ import time
 import ulid
 import ctypes
 from typing import Callable, Any, Union
-from thread_factory.runtime.worker_manager.monitoring.records import Records, Record
+from thread_factory.runtime.worker.monitoring.records import Records, Record
 from thread_factory.utils import Disposable
 from enum import Enum, auto
 
