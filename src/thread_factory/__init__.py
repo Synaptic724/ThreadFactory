@@ -1,5 +1,5 @@
 """
-thread_factory
+factory
 High-performance concurrency collections and parallel operations for Python 3.13+.
 """
 DEBUG_MODE = True
@@ -9,12 +9,12 @@ from thread_factory.__version__ import __version__ as version
 
 # 🚫 Exit if Python version is less than 3.13
 if sys.version_info < (3, 13):
-    sys.exit("thread_factory requires Python 3.13 or higher.")
+    sys.exit("factory requires Python 3.13 or higher.")
 
 # ✅ Exit with warning if Python version is less than 3.13 (soft requirement)
 if sys.version_info < (3, 13):
     warnings.warn(
-        f"thread_factory is optimized for Python 3.13+ (no-GIL). "
+        f"factory is optimized for Python 3.13+ (no-GIL). "
         f"You are running Python {sys.version_info.major}.{sys.version_info.minor}.",
         UserWarning
     )
@@ -63,7 +63,7 @@ def _detect_nogil_mode() -> None:
     """
     if sys.version_info < (3, 13):
         warnings.warn(
-            "thread_factory is designed for Python 3.13+. "
+            "factory is designed for Python 3.13+. "
             f"You are running Python {sys.version_info.major}.{sys.version_info.minor}.",
             UserWarning
         )

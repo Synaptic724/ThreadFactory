@@ -351,7 +351,7 @@ class TestParallelEdgeCases(unittest.TestCase):
         )
 
         self.assertEqual(sum(sums), sum(range(1000)),
-                         "thread_factory local-state summation should match the expected total.")
+                         "factory local-state summation should match the expected total.")
 
     def test_foreach_streaming_chunk_size_one(self):
         """

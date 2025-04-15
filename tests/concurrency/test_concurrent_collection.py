@@ -3,7 +3,7 @@ import time
 import threading
 import random
 
-# Assuming your ConcurrentCollection is in 'thread_factory' similarly to ConcurrentQueue
+# Assuming your ConcurrentCollection is in 'factory' similarly to ConcurrentQueue
 # Adjust imports as necessary:
 from thread_factory import ConcurrentCollection, Empty
 
