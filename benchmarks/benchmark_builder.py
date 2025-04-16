@@ -38,7 +38,7 @@ class BaseBenchmark(ABC):
     ) -> None:
         """
         Execute the concurrency test and call 'callback' with a dictionary
-        containing measurement data, e.g.:
+        containing measurement reporting, e.g.:
             {
                 "duration": ...,
                 "remaining": ...,
