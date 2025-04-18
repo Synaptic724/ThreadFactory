@@ -201,6 +201,20 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         with self._lock:
             return self._dict.get(key, default)
 
+    def lockless_get(self, key: _K, default: Optional[_V] = None) -> Optional[_V]:
+        """
+        Get the value for key without acquiring the lock.
+        This method is not thread-safe and should be used with caution.
+
+        Args:
+            key (_K): The key to look up.
+            default (_V, optional): The default if key is not found.
+
+        Returns:
+            _V or None: Value if present, else None.
+        """
+        return self._dict.get(key, default)
+
     def pop(self, key: _K, default: Optional[_V] = None) -> _V:
         """
         Remove the specified key and return its value.

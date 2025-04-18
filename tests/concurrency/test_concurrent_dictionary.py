@@ -14,6 +14,14 @@ class TestConcurrentDict(unittest.TestCase):
         self.assertEqual(d["a"], 1)
         self.assertEqual(d["b"], 2)
 
+
+    def test_set_lockless_get(self):
+        d = ConcurrentDict[str, int]()
+        d["a"] = 1
+        d["b"] = 2
+        self.assertEqual(d.lockless_get("a"), 1)
+        self.assertEqual(d.lockless_get("b"), 2)
+
     def test_len_bool(self):
         d = ConcurrentDict[str, int]()
         self.assertEqual(len(d), 0)
