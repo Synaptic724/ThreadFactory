@@ -25,8 +25,6 @@ Please see the benchmarks at the bottom of this page if interested there are mor
 
 ---
 
----
-
 ## 🧱 Philosophy: No More Technical Debt
 
 Python's Global Interpreter Lock (GIL) has been the greatest barrier to serious multithreading for decades.  
@@ -34,8 +32,9 @@ Developers were forced into awkward workarounds:
 - Clumsy multiprocessing with IPC overhead  
 - Asynchronous programming stretched beyond reason  
 - Compromises on speed, safety, and architecture
+- difficult debugging and testing because of multiprocessing
 
-**ThreadFactory exists because those days are over.**
+**ThreadFactory exists because those days are over. It's time to move forward.**
 
 With Python 3.13+ and the removal of the GIL on the horizon,  
 **true multithreaded concurrency is finally a reality** —  
@@ -197,6 +196,9 @@ especially in the new No-GIL world Python 3.13+ is unlocking.
 
 Performance under pressure.  
 Architecture built for the future.
+
+These are just our Concurrent Datastructures and not even the real thing.  
+Threadfactory is coming soon...
 
 ---
 

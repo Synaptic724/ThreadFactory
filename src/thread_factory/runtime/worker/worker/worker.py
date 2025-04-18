@@ -9,6 +9,23 @@ from thread_factory.utils import Disposable
 from enum import Enum, auto
 
 
+class WorkerState(Enum):
+    """
+    Represents the current lifecycle and behavior of a Worker thread.
+    """
+    CREATED = auto()  # Thread object created, not started yet
+    STARTING = auto()  # Thread is initializing
+    IDLE = auto()  # No task, waiting for work
+    ACTIVE = auto()  # Executing a task
+    BLOCKED = auto()  # Waiting on lock, I/O, or dependency
+    SWITCHED = auto()  # Assigned a new queue or execution context
+    PAUSED = auto()  # Temporarily suspended (manually or automatically)
+    REBALANCING = auto()  # In the middle of a factory-controlled reassignment
+    TERMINATING = auto()  # Graceful shutdown in progress
+    KILLED = auto()  # Terminated via `hard_kill()`
+    DEAD = auto()  # Fully stopped, no longer participating
+    DISPOSED = auto()  # Disposed, no longer usable
+
 class Worker(threading.Thread, Disposable):
     """
     Worker Thread
@@ -23,26 +40,8 @@ class Worker(threading.Thread, Disposable):
     - Death signaling via `death_event` for external observers
     - Supports dynamic queue switching
     """
-
-    class WorkerState(Enum):
-        """
-        Represents the current lifecycle and behavior of a Worker thread.
-        """
-        CREATED = auto()  # Thread object created, not started yet
-        STARTING = auto()  # Thread is initializing
-        IDLE = auto()  # No task, waiting for work
-        ACTIVE = auto()  # Executing a task
-        BLOCKED = auto()  # Waiting on lock, I/O, or dependency
-        SWITCHED = auto()  # Assigned a new queue or execution context
-        PAUSED = auto()  # Temporarily suspended (manually or automatically)
-        REBALANCING = auto()  # In the middle of a factory-controlled reassignment
-        TERMINATING = auto()  # Graceful shutdown in progress
-        KILLED = auto()  # Terminated via `hard_kill()`
-        DEAD = auto()  # Fully stopped, no longer participating
-        DISPOSED = auto()  # Disposed, no longer usable
-
     def __init__(self, group=None, target=None, name=None,
-                 args=(), kwargs=None, *, daemon=None, factory_id: int, factory):
+                 args=(), kwargs=None, *, daemon=None, factory_id, factory):
         """
         Initializes a new worker instance.
 

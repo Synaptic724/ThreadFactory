@@ -3,7 +3,7 @@ import threading
 import time
 import random
 from typing import List
-
+from thread_factory.runtime.worker.worker.worker import Worker
 from thread_factory.primatives import SmartCondition  # Example import
 
 class TestSmartCondition(unittest.TestCase):

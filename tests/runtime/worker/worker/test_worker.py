@@ -45,7 +45,7 @@ class TestWorker(unittest.TestCase):
 
     def setUp(self):
         self.queue = DummyQueue()
-        self.worker = Worker(0, factory=None)
+        self.worker = Worker(factory=None)
         self.worker.daemon = False  # so unittest can detect properly
 
     def tearDown(self):
@@ -56,7 +56,7 @@ class TestWorker(unittest.TestCase):
     def test_worker_initial_state(self):
         self.assertEqual(self.worker.state, "IDLE")
         self.assertEqual(self.worker.completed_work, 0)
-        self.assertIsInstance(self.worker.worker_id, str)
+        self.assertIsInstance(self.worker.unique, str)
         self.assertIsInstance(self.worker.records, Records)
 
     def test_worker_hard_kill(self):
