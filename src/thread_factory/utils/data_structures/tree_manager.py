@@ -43,7 +43,34 @@ class TreeNode(Disposable):
 
         # Here you would release any resources held by this node.
         self.disposed = True
-        # self.dispose()  <-- (REMOVED: would cause infinite recursion!)
+        if isinstance(self.metadata, dict):
+            self.metadata.clear()
+        self.children.clear()
+
+    @staticmethod
+    def find_all_abc_names_for_class(cls):
+        """
+        Iteratively finds the names of all ABCs in the inheritance hierarchy
+        of a given class using a loop. Accepts a class reference as input.
+        Returns a list of unique ABC names.
+        """
+        queue = list(cls.__bases__)
+        visited = {cls}
+        abc_names = set()
+
+        while queue:
+            base = queue.pop(0)
+            if base in visited:
+                continue
+            visited.add(base)
+
+            if isinstance(base, abc.ABCMeta):
+                abc_names.add(base.__name__)
+
+            queue.extend(base.__bases__)
+
+        return list(abc_names)
+
 
 
 class TreeManager(Disposable):
@@ -138,4 +165,5 @@ class TreeManager(Disposable):
         if self.disposed:
             return
         self.root.dispose()
+        self.root = None
         self.disposed = True

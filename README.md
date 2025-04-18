@@ -20,52 +20,42 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 > **NOTE**  
 > ThreadFactory is designed and tested against Python 3.13+ in **No-GIL** mode.  
 > This library will only function on 3.13 and higher.
+
+Please see the benchmarks at the bottom of this page if interested there are more in the repository.
+
 ---
-> All benchmark tests below are available if you clone the library and run the tests.  
-> See the [Benchmark Details 🚀](https://github.com/Synaptic724/ThreadFactory/blob/production/benchmarks/benchmark_data/general_benchmarks.md) for more benchmark stats.
 
-
-## 🔥 Benchmark Results (10,000,000 ops — 10 producers / 10 consumers)
-
-| Queue Type                                  | Time (sec) | Throughput (ops/sec) | Notes                                                                                             |
-|---------------------------------------------|------------|----------------------|---------------------------------------------------------------------------------------------------|
-| `multiprocessing.Queue`                     | 119.99     | ~83,336              | Not suited for thread-only workloads, incurs unnecessary overhead.                                |
-| `thread_factory.ConcurrentBuffer` | **23.27**      | **~429,651**            | ⚡ Dominant here. Consistent and efficient under moderate concurrency. |
-| `thread_factory.ConcurrentQueue`  | 37.87      | ~264,014              | Performs solidly. Shows stable behavior even at higher operation counts.                                                   |
-| `collections.deque`                         | 64.16      | ~155,876              | Suffers from contention. Simplicity comes at the cost of throughput.                                  |
-
-
-### ✅ Highlights:
-- `ConcurrentBuffer` outperformed `multiprocessing.Queue` by **96.72 seconds**.
-- `ConcurrentBuffer` outperformed `ConcurrentQueue` by **14.6 seconds**.
-- `ConcurrentBuffer` outperformed `collections.deque` by **40.89 seconds**.
-
-### 💡 Observations:
-- `ConcurrentBuffer` continues to be the best performer under moderate concurrency.
-- `ConcurrentQueue` maintains a consistent performance but is outperformed by `ConcurrentBuffer`.
-- All queues emptied correctly (`final length = 0`).
 ---
-## 🔥 Benchmark Results (20,000,000 ops — 20 Producers / 20 Consumers)
 
-| Queue Type                                        | Time (sec) | Throughput (ops/sec) | Notes                                                                                         |
-|---------------------------------------------------|------------|----------------------|-----------------------------------------------------------------------------------------------|
-| `multiprocessing.Queue`                           | 249.92     | ~80,020              | Severely limited by thread-unfriendly IPC locks.                                  |
-| `thread_factory.ConcurrentBuffer`      | 138.64     | ~144,270             | 	Solid under moderate producer-consumer balance. Benefits from shard windowing.    |
-| `thread_factory.ConcurrentBuffer` | 173.89     | ~115,010             | Too many shards increased internal complexity, leading to lower throughput. |
-| `thread_factory.ConcurrentQueue` | **77.69**  | **~257,450**         | ⚡ Fastest overall. Ideal for large-scale multi-producer, multi-consumer scenarios.        |
-| `collections.deque`                               | 190.91     | ~104,771             | Still usable, but scalability is poor compared to specialized implementations.         |
+## 🧱 Philosophy: No More Technical Debt
 
-### ✅ Notes:
-- `ConcurrentBuffer` performs better with **10 shards** than **20 shards** at this concurrency level.
-- `ConcurrentQueue` continues to be the most stable performer under moderate-to-high thread counts.
-- `multiprocessing.Queue` remains unfit for threaded-only workloads due to its heavy IPC-oriented design.
+Python's Global Interpreter Lock (GIL) has been the greatest barrier to serious multithreading for decades.  
+Developers were forced into awkward workarounds:  
+- Clumsy multiprocessing with IPC overhead  
+- Asynchronous programming stretched beyond reason  
+- Compromises on speed, safety, and architecture
 
-### 💡 Observations:
-- **Shard count** tuning in `ConcurrentBuffer` is crucial — too many shards can reduce performance.
-- **Bit-flip balancing** in `ConcurrentBuffer` helps under moderate concurrency but hits diminishing returns with excessive sharding.
-- `ConcurrentQueue` is proving to be the general-purpose winner for most balanced threaded workloads.
-- For **~40 threads**, `ConcurrentBuffer` shows ~**25% drop** when doubling the number of shards due to increased dequeue complexity.
-- All queues emptied correctly (`final length = 0`).
+**ThreadFactory exists because those days are over.**
+
+With Python 3.13+ and the removal of the GIL on the horizon,  
+**true multithreaded concurrency is finally a reality** —  
+but the standard library and ecosystem are not yet ready to fully exploit it.
+
+ThreadFactory is built to fill that gap:  
+- **Thread-safe, high-throughput collections** designed for free-threading.
+- **Parallel utilities** that embrace real CPU-bound concurrency, not just I/O juggling.
+- **Architectures that scale** cleanly across dozens or hundreds of cores.
+
+We are not dragging the sins of Python's past into its future.  
+We are building libraries that **treat threads as first-class citizens** —  
+where concurrency isn't feared, it's *harnessed*.
+
+No more duct tape.  
+No more IPC crutches.  
+No more pretending that "async everywhere" is a universal solution.
+
+ThreadFactory is designed for **serious concurrent systems** —  
+**high-performance, scalable, and engineered for the free-threading world Python is becoming.**
 
 ---
 
@@ -192,3 +182,67 @@ source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 # Install the library in editable mode
 pip install threadfactory
 ```
+
+
+---
+
+## 📈 Real-World Benchmarking
+
+Below are benchmark results from live multi-threaded scenarios using 10–40 real threads,  
+with millions of operations processed under load.
+
+These benchmarks aren't just numbers —  
+they are proof that **ThreadFactory's concurrent collections outperform traditional Python structures by 2x–5x**,  
+especially in the new No-GIL world Python 3.13+ is unlocking.
+
+Performance under pressure.  
+Architecture built for the future.
+
+---
+
+> All benchmark tests below are available if you clone the library and run the tests.  
+> See the [Benchmark Details 🚀](https://github.com/Synaptic724/ThreadFactory/blob/production/benchmarks/benchmark_data/general_benchmarks.md) for more benchmark stats.
+
+
+## 🔥 Benchmark Results (10,000,000 ops — 10 producers / 10 consumers)
+
+| Queue Type                                  | Time (sec) | Throughput (ops/sec) | Notes                                                                                             |
+|---------------------------------------------|------------|----------------------|---------------------------------------------------------------------------------------------------|
+| `multiprocessing.Queue`                     | 119.99     | ~83,336              | Not suited for thread-only workloads, incurs unnecessary overhead.                                |
+| `thread_factory.ConcurrentBuffer` | **23.27**      | **~429,651**            | ⚡ Dominant here. Consistent and efficient under moderate concurrency. |
+| `thread_factory.ConcurrentQueue`  | 37.87      | ~264,014              | Performs solidly. Shows stable behavior even at higher operation counts.                                                   |
+| `collections.deque`                         | 64.16      | ~155,876              | Suffers from contention. Simplicity comes at the cost of throughput.                                  |
+
+
+### ✅ Highlights:
+- `ConcurrentBuffer` outperformed `multiprocessing.Queue` by **96.72 seconds**.
+- `ConcurrentBuffer` outperformed `ConcurrentQueue` by **14.6 seconds**.
+- `ConcurrentBuffer` outperformed `collections.deque` by **40.89 seconds**.
+
+### 💡 Observations:
+- `ConcurrentBuffer` continues to be the best performer under moderate concurrency.
+- `ConcurrentQueue` maintains a consistent performance but is outperformed by `ConcurrentBuffer`.
+- All queues emptied correctly (`final length = 0`).
+---
+## 🔥 Benchmark Results (20,000,000 ops — 20 Producers / 20 Consumers)
+
+| Queue Type                                        | Time (sec) | Throughput (ops/sec) | Notes                                                                                         |
+|---------------------------------------------------|------------|----------------------|-----------------------------------------------------------------------------------------------|
+| `multiprocessing.Queue`                           | 249.92     | ~80,020              | Severely limited by thread-unfriendly IPC locks.                                  |
+| `thread_factory.ConcurrentBuffer`      | 138.64     | ~144,270             | 	Solid under moderate producer-consumer balance. Benefits from shard windowing.    |
+| `thread_factory.ConcurrentBuffer` | 173.89     | ~115,010             | Too many shards increased internal complexity, leading to lower throughput. |
+| `thread_factory.ConcurrentQueue` | **77.69**  | **~257,450**         | ⚡ Fastest overall. Ideal for large-scale multi-producer, multi-consumer scenarios.        |
+| `collections.deque`                               | 190.91     | ~104,771             | Still usable, but scalability is poor compared to specialized implementations.         |
+
+### ✅ Notes:
+- `ConcurrentBuffer` performs better with **10 shards** than **20 shards** at this concurrency level.
+- `ConcurrentQueue` continues to be the most stable performer under moderate-to-high thread counts.
+- `multiprocessing.Queue` remains unfit for threaded-only workloads due to its heavy IPC-oriented design.
+
+### 💡 Observations:
+- **Shard count** tuning in `ConcurrentBuffer` is crucial — too many shards can reduce performance.
+- **Bit-flip balancing** in `ConcurrentBuffer` helps under moderate concurrency but hits diminishing returns with excessive sharding.
+- `ConcurrentQueue` is proving to be the general-purpose winner for most balanced threaded workloads.
+- For **~40 threads**, `ConcurrentBuffer` shows ~**25% drop** when doubling the number of shards due to increased dequeue complexity.
+- All queues emptied correctly (`final length = 0`).
+
