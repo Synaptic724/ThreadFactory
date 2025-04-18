@@ -23,6 +23,7 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 
 Please see the benchmarks at the bottom of this page if interested there are more in the repository.  
 [Jump to Benchmarks 🔥](#benchmarks)
+
 ---
 
 ## 🧱 Philosophy: No More Technical Debt
