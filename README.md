@@ -26,39 +26,6 @@ Please see the benchmarks at the bottom of this page if interested there are mor
 
 ---
 
-## 🧱 Philosophy: No More Technical Debt
-
-Python's Global Interpreter Lock (GIL) has been the greatest barrier to serious multithreading for decades.  
-Developers were forced into awkward workarounds:  
-- Clumsy multiprocessing with IPC overhead  
-- Asynchronous programming stretched beyond reason  
-- Compromises on speed, safety, and architecture
-- difficult debugging and testing because of multiprocessing
-
-**ThreadFactory exists because those days are over. It's time to move forward.**
-
-With Python 3.13+ and the removal of the GIL on the horizon,  
-**true multithreaded concurrency is finally a reality** —  
-but the standard library and ecosystem are not yet ready to fully exploit it.
-
-ThreadFactory is built to fill that gap:  
-- **Thread-safe, high-throughput collections** designed for free-threading.
-- **Parallel utilities** that embrace real CPU-bound concurrency, not just I/O juggling.
-- **Architectures that scale** cleanly across dozens or hundreds of cores.
-
-We are not dragging the sins of Python's past into its future.  
-We are building libraries that **treat threads as first-class citizens** —  
-where concurrency isn't feared, it's *harnessed*.
-
-No more duct tape.  
-No more IPC crutches.  
-No more pretending that "async everywhere" is a universal solution.
-
-ThreadFactory is designed for **serious concurrent systems** —  
-**high-performance, scalable, and engineered for the free-threading world Python is becoming.**
-
----
-
 ## 🚀 Features
 
 ## Concurrent Data Structures
