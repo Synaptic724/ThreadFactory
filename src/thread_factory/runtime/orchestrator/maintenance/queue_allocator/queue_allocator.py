@@ -1,8 +1,8 @@
 from thread_factory.concurrency import ConcurrentQueue
-from thread_factory.utils import Empty, Disposable
+from thread_factory.utils import Empty, IDisposable
 
 
-class QueueAllocator(Disposable):
+class QueueAllocator(IDisposable):
     """
     QueueAllocator is a simple ticket allocator based on a single ConcurrentQueue.
 
@@ -33,9 +33,9 @@ class QueueAllocator(Disposable):
         Args:
             queue_size (int): Number of available tickets. Defaults to 5000.
         """
+        super().__init__()
         self._queue_size = queue_size
         self._queue = ConcurrentQueue[int](initial=list(range(queue_size)))
-        self.disposed = False
 
     def acquire(self) -> int:
         """
