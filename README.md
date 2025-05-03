@@ -1,12 +1,12 @@
 # ThreadFactory
 
-[![PyPI version](https://badge.fury.io/py/threadfactory.svg?v=1)](https://badge.fury.io/py/threadfactory)
-[![License](https://img.shields.io/github/license/Synaptic724/threadfactory?v=1)](https://github.com/yourusername/threadfactory/blob/main/LICENSE)
-[![Python Version](https://img.shields.io/pypi/pyversions/threadfactory?v=1)](https://pypi.org/project/threadfactory)
+[![PyPI version](https://badge.fury.io/py/threadfactory.svg)](https://badge.fury.io/py/threadfactory)
+[![License](https://img.shields.io/github/license/Synaptic724/threadfactory)](https://github.com/Synaptic724/ThreadFactory/blob/production/LICENSE)
+[![Python Version](https://img.shields.io/pypi/pyversions/threadfactory)](https://pypi.org/project/threadfactory)
 
-[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory/month?v=1)](https://pepy.tech/projects/threadfactory)
-[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory/week?v=1)](https://pepy.tech/projects/threadfactory)
-[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory?v=1)](https://pepy.tech/projects/threadfactory)
+[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory/month)](https://pepy.tech/projects/threadfactory)
+[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory/week)](https://pepy.tech/projects/threadfactory)
+[![PyPI Downloads](https://static.pepy.tech/badge/threadfactory)](https://pepy.tech/projects/threadfactory)
 
 [![Upload Python Package](https://github.com/Synaptic724/ThreadFactory/actions/workflows/python-publish.yml/badge.svg)](https://github.com/Synaptic724/ThreadFactory/actions/workflows/python-publish.yml)
 [![Docs](https://readthedocs.org/projects/threadfactory/badge/?version=latest)](https://threadfactory.readthedocs.io/en/latest/)
@@ -21,19 +21,14 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 > ThreadFactory is designed and tested against Python 3.13+ in **No-GIL** mode.  
 > This library will only function on 3.13 and higher.
 
-Please see the benchmarks at the bottom of this page if interested there are more in the repository.  
-[Jump to Benchmarks 🔥](#-benchmark-results-10000000-ops--10-producers--10-consumers)
-
+Please see the benchmarks at the bottom of this page and if you are interested there are more in the repository.  
+[Repository Benchmarks 🚀](https://github.com/Synaptic724/ThreadFactory/blob/production/benchmarks/benchmark_data/general_benchmarks.md)  
+[Jump to Benchmarks Below🔥](#-benchmark-results-10000000-ops--10-producers--10-consumers)  
 ---
 
 ## 🚀 Features
 
 ## Concurrent Data Structures
-
-### `ConcurrentBag`  
-- A thread-safe “multiset” collection that allows duplicates.  
-- Methods like `add`, `remove`, `discard`, etc.  
-- Ideal for collections where duplicate elements matter.
 
 ### `ConcurrentDict`  
 - A thread-safe dictionary.  
@@ -45,6 +40,13 @@ Please see the benchmarks at the bottom of this page if interested there are mor
 - A thread-safe list supporting concurrent access and modification.  
 - Slice assignment, in-place operators (`+=`, `*=`), and advanced operations (`map`, `filter`, `reduce`).  
 - **Freeze support**: Prevents structural modifications while enabling safe, lock-free reads (e.g., `__getitem__`, iteration, and slicing). Ideal for caching and broadcast scenarios.
+
+### `ConcurrentSet`
+- A thread-safe set implementation supporting all standard set algebra operations.
+- Supports `add`, `discard`, `remove`, and all bitwise set operations (`|`, `&`, `^`, `-`) along with their in-place forms.
+- Provides `map`, `filter`, `reduce`, and `batch_update` to safely perform bulk transformations.
+- **Freeze support**: Once frozen, the set cannot be modified — but read operations become lock-free and extremely efficient.
+- Ideal for workloads where the set is mutated during setup but then used repeatedly in a read-only context (e.g., filters, routing tables, permissions).
 
 ### `ConcurrentQueue`  
 - A thread-safe FIFO queue built atop `collections.deque`.  
@@ -78,12 +80,10 @@ Please see the benchmarks at the bottom of this page if interested there are mor
     - **ConcurrentBuffer**: 102,494 ops/sec
     - Better scaling under thread contention.
 
-### `ConcurrentSet`
-- A thread-safe set implementation supporting all standard set algebra operations.
-- Supports `add`, `discard`, `remove`, and all bitwise set operations (`|`, `&`, `^`, `-`) along with their in-place forms.
-- Provides `map`, `filter`, `reduce`, and `batch_update` to safely perform bulk transformations.
-- **Freeze support**: Once frozen, the set cannot be modified — but read operations become lock-free and extremely efficient.
-- Ideal for workloads where the set is mutated during setup but then used repeatedly in a read-only context (e.g., filters, routing tables, permissions).
+### `ConcurrentBag`  
+- A thread-safe “multiset” collection that allows duplicates.  
+- Methods like `add`, `remove`, `discard`, etc.  
+- Ideal for collections where duplicate elements matter.
 
 ---
 

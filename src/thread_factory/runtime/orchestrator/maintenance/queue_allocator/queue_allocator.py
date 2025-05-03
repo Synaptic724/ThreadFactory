@@ -72,9 +72,9 @@ class QueueAllocator(IDisposable):
         Dispose of the allocator and release internal resources.
         Safe to call multiple times.
         """
-        if not self.disposed:
+        if not self._disposed:
             self._queue.dispose()
-            self.disposed = True
+            self._disposed = True
         else:
             # Optional: make this silent instead of raising if you prefer idempotency
             raise RuntimeError("QueueAllocator already disposed.")

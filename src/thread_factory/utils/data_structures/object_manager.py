@@ -214,9 +214,9 @@ class TreeManager(IDisposable):
         """
         Disposes of the entire tree structure.
         """
-        if self.disposed:
+        if self._disposed:
             return
         self.root.dispose()
         self.root = None
-        self.disposed = True
+        self._disposed = True
 

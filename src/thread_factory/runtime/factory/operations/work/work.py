@@ -186,9 +186,9 @@ class Work(Future, IDisposable):
         Intended for memory-sensitive systems where holding references is expensive.
         """
         with self._condition:
-            if self.disposed:
+            if self._disposed:
                 return
-            self.disposed = True
+            self._disposed = True
 
             self.fn = None
             self.args = None
@@ -210,7 +210,7 @@ class Work(Future, IDisposable):
             base_repr = super().__repr__()
 
         meta = f"id={self.task_id} priority={self.priority}"
-        if self.disposed:
+        if self._disposed:
             meta += " disposed=True"
 
         return f"<Work {meta} base={base_repr}>"

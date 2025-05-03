@@ -654,10 +654,10 @@ class ConcurrentDict(Generic[_K, _V], IDisposable):
 
         This method is idempotent — multiple calls won't cause errors.
         """
-        if not self.disposed:
+        if not self._disposed:
             with self._lock:
                 self._dict.clear()
-            self.disposed = True
+            self._disposed = True
         warnings.warn(
             "Your ConcurrentDictionary has been disposed and should not be used further. ",
             UserWarning

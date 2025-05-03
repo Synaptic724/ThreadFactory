@@ -77,11 +77,13 @@ class Stopwatch(IDisposable):
         """
         Dispose of internal state. Frees stopwatch references.
         """
+        if self._disposed:
+            return
         with self._lock:
             self.start_time = None
             self.elapsed_time = 0.0
             self._clock = None
-            self.disposed = True
+            self._disposed = True
 
     def __repr__(self):
         """

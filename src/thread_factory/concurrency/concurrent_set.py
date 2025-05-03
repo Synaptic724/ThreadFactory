@@ -918,13 +918,13 @@ class ConcurrentSet(Generic[_T], IDisposable):
         # Check if the set has already been disposed. The `getattr` with a default
         # handles the case where the `disposed` attribute might not exist yet
         # during initialization or in error scenarios, although it's set in __init__.
-        if not getattr(self, "disposed", False):
+        if not getattr(self, "_disposed", False):
             # Acquire the lock before clearing the internal set and updating the flag.
             with self._lock:
                 # Clear the underlying built-in set, releasing references to its elements.
                 self._set.clear()
                 # Mark the set as disposed. This flag is checked in the outer `if`.
-                self.disposed = True
+                self._disposed = True
             # Issue a warning to inform the user that the set has been disposed.
             # This is a helpful indicator if the set is accidentally used after disposal.
             warnings.warn("Your ConcurrentSet has been disposed and should not be used further.", UserWarning)

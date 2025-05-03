@@ -64,7 +64,7 @@ class SwitchLock(IDisposable):
         # Use the condition as a context manager => automatically acquire/release its lock.
         with self._cond:
             # If the lock is disposed before we even start, we fail fast.
-            if self.disposed:
+            if self._disposed:
                 return False
 
             # -----------------------------
@@ -97,7 +97,7 @@ class SwitchLock(IDisposable):
             # We loop until a permit is available OR we time out OR we get disposed.
             while self._value == 0:
                 # If disposed in the meantime, fail.
-                if self.disposed:
+                if self._disposed:
                     return False
 
                 # If a timeout is set, check how much time remains.
@@ -113,7 +113,7 @@ class SwitchLock(IDisposable):
                     got_it = self._cond.wait()
 
                 # We woke up from waiting. Could be due to a notify, spurious wake, or disposal.
-                if self.disposed:
+                if self._disposed:
                     # If disposed, fail with False.
                     return False
                 if not got_it:
@@ -224,7 +224,7 @@ class SwitchLock(IDisposable):
         :return: List of .factory_id from all waiting threads.
                  If disposed or _cond is None, return an empty list.
         """
-        if self.disposed or self._cond is None:
+        if self._disposed or self._cond is None:
             return []
         return self._cond.get_all_waiting_factory_ids()
 
@@ -235,9 +235,9 @@ class SwitchLock(IDisposable):
 
         After dispose(), the lock is no longer valid for normal usage.
         """
-        if self.disposed:
+        if self._disposed:
             return
-        self.disposed = True
+        self._disposed = True
         # Wake up everyone so they can see that we've been disposed
         with self._cond:
             self._cond.notify_all()

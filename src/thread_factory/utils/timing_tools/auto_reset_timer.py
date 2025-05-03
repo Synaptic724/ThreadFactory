@@ -96,9 +96,9 @@ class AutoResetTimer(IDisposable):
         Dispose of the timer and stop any scheduled execution.
         This should be called to clean up the timer when no longer needed.
         """
-        if self.disposed:
+        if self._disposed:
             return
         with self._lock:
-            self.disposed = True
+            self._disposed = True
             self.stop()
             self._timer = None

@@ -46,7 +46,6 @@ class ConcurrentQueue(Generic[_T], IDisposable):
             initial = []
         self._lock: threading.RLock = threading.RLock()
         self._deque: Deque[_T] = deque(initial)
-        self.disposed = False
 
     def enqueue(self, item: _T) -> None:
         """
@@ -351,10 +350,10 @@ class ConcurrentQueue(Generic[_T], IDisposable):
 
         This method is idempotent — multiple calls won't cause errors.
         """
-        if not self.disposed:
+        if not self._disposed:
             with self._lock:
                 self._deque.clear()
-            self.disposed = True
+            self._disposed = True
         warnings.warn(
             "Your ConcurrentQueue has been disposed and should not be used further. ",
             UserWarning

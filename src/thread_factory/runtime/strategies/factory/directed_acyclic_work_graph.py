@@ -109,12 +109,12 @@ class StateObject(IDisposable):
         the object when it is no longer needed. It clears the execution data and
         removes the reference to the DAG to prevent memory leaks.
         """
-        if self.disposed:  # Prevent double disposal
+        if self._disposed:  # Prevent double disposal
             return
         with self._state_lock:  # Acquire the lock for thread-safe access during disposal
             self._execution_data.clear()  # Clear the dictionary of execution statuses
             self._dag = None  # Remove the reference to the DAG
-            self.disposed = True  # Mark the object as disposed
+            self._disposed = True  # Mark the object as disposed
         print("[StateObject] Disposal complete.")
 
 
@@ -141,7 +141,7 @@ class ExecutionContext(IDisposable):
         """
         super().__init__()  # Initialize the Disposable base class
         self.state = state  # Store a reference to the shared state object
-        self._dispose_lock = threading.RLock()  # Lock for thread-safe disposal
+        self._lock = threading.RLock()  # Lock for thread-safe disposal
 
     def execute(self):
         """
@@ -158,10 +158,10 @@ class ExecutionContext(IDisposable):
         This method ensures that the disposal logic is executed only once and
         that the reference to the StateObject is cleared.
         """
-        with self._dispose_lock:  # Acquire the lock for thread-safe disposal
-            if not self.disposed:  # Check if already disposed
+        with self._lock:  # Acquire the lock for thread-safe disposal
+            if not self._disposed:  # Check if already disposed
                 self.state = None  # Remove the reference to the StateObject
-                self.disposed = True  # Mark as disposed
+                self._disposed = True  # Mark as disposed
 
     def __enter__(self):
         """
@@ -390,7 +390,7 @@ class Node(IDisposable):
             if self._execution_context is not None:
                 self._execution_context.dispose()  # Dispose of the execution context if it exists
             self._execution_context = None  # Remove the reference to the execution context
-            self.disposed = True  # Mark the node as disposed
+            self._disposed = True  # Mark the node as disposed
 
 
 class Edge(IDisposable):
@@ -417,10 +417,10 @@ class Edge(IDisposable):
         """
         Disposes of the Edge, releasing references to the connected nodes.
         """
-        if self.dispose:  # Prevent double disposal (typo in original code, should be self.disposed)
+        if self._disposed:  # Prevent double disposal (typo in original code, should be self.disposed)
             return
         with self._edge_lock:  # Acquire the lock for thread-safe disposal
-            self.disposed = True  # Mark the edge as disposed
+            self._disposed = True  # Mark the edge as disposed
             self.from_node = None  # Remove the reference to the source node
             self.to_node = None  # Remove the reference to the destination node
 
@@ -659,7 +659,7 @@ class DirectedAcyclicWorkGraph(IDisposable):
         """
         Disposes of all nodes and edges in the DAG, releasing their resources.
         """
-        if self.disposed:  # Prevent double disposal
+        if self._disposed:  # Prevent double disposal
             return
         with self._lock:  # Acquire the lock for thread-safe disposal
             for node in self._nodes.values():
@@ -670,7 +670,7 @@ class DirectedAcyclicWorkGraph(IDisposable):
                 edge.dispose()  # Dispose of each edge
             self._edges.clear()  # Clear the list of edges
 
-            self.disposed = True  # Mark the DAG as disposed
+            self._disposed = True  # Mark the DAG as disposed
 
 
 # # Assume Node, Edge, ExecutionContext, etc. are defined

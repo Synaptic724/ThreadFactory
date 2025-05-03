@@ -369,9 +369,9 @@ class ConcurrentBag(Generic[_T], IDisposable):
             # bag is now automatically disposed and cleared
         """
         with self._lock:
-            if not self.disposed:
+            if not self._disposed:
                 self._bag.clear()
-                self.disposed = True
+                self._disposed = True
 
         warnings.warn(
             "ConcurrentBag has been disposed and should not be used further.",

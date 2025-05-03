@@ -24,7 +24,16 @@ class IDisposable(ABC):
         Constructor for IDisposable.
         This is a no-op, but can be overridden by subclasses if needed.
         """
-        self.disposed = False
+        self._disposed = False
+
+    @property
+    def disposed(self):
+        """
+        Check if the object has been disposed.
+        Returns:
+            bool: True if disposed, False otherwise.
+        """
+        return self._disposed
 
     @abstractmethod
     def dispose(self):

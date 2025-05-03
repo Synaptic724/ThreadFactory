@@ -72,9 +72,9 @@ class Dynaphore(threading.Semaphore, IDisposable):
         """
         Dispose of the Dynaphore, releasing any resources.
         """
-        if self.disposed:
+        if self._disposed:
             return
         with self._cond:
             self._cond.notify_all()
-        self.disposed = True
+        self._disposed = True
         self._cond = None

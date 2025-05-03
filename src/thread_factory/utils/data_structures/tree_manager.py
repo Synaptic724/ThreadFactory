@@ -35,14 +35,14 @@ class TreeNode(IDisposable):
         """
         Dispose of this node and all its children recursively.
         """
-        if self.disposed:
+        if self._disposed:
             return
 
         for child in self.children:
             child.dispose()
 
         # Here you would release any resources held by this node.
-        self.disposed = True
+        self._disposed = True
         if isinstance(self.metadata, dict):
             self.metadata.clear()
         self.children.clear()
@@ -162,8 +162,8 @@ class TreeManager(IDisposable):
         """
         Disposes of the entire tree structure.
         """
-        if self.disposed:
+        if self._disposed:
             return
         self.root.dispose()
         self.root = None
-        self.disposed = True
+        self._disposed = True

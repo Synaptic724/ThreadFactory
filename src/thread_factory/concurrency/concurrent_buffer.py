@@ -169,11 +169,11 @@ class _Shard(Generic[_T], IDisposable):
             - Required to release resources when integrated with a Disposable system.
         """
         with self._lock:
-            if not self.disposed:
+            if not self._disposed:
                 self._queue.clear()
                 self._length_array[self._index] = 0
                 self._set_time_value(0)
-                self.disposed = True
+                self._disposed = True
 
     def __enter__(self):
         """
@@ -408,7 +408,7 @@ class ConcurrentBuffer(Generic[_T], IDisposable):
         Returns:
             str: A string representation.
         """
-        if self.disposed:
+        if self._disposed:
             return f"<{self.__class__.__name__} [DISPOSED]>"
 
         total_len = len(self)
@@ -423,7 +423,7 @@ class ConcurrentBuffer(Generic[_T], IDisposable):
         Returns:
             str: A string representation of the items.
         """
-        if self.disposed:
+        if self._disposed:
             return f"<{self.__class__.__name__} [DISPOSED]>"
         all_items = list(self)
         return str(all_items)
@@ -603,13 +603,13 @@ class ConcurrentBuffer(Generic[_T], IDisposable):
                 ...
             # buffer is automatically disposed here
         """
-        if not self.disposed:
+        if not self._disposed:
             # Dispose all shards and reset internal arrays
             for shard in self._shards:
                 shard.dispose()
             self._length_array = array("Q", [0] * self._num_shards)
             self._time_array = array("Q", [0] * self._num_shards)
-            self.disposed = True
+            self._disposed = True
 
             # Notify user that buffer is no longer valid
             warnings.warn(

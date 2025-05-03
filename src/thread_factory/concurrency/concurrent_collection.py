@@ -43,7 +43,7 @@ class _Shard(Generic[_T], IDisposable):
         in the shared length array. Once disposed, the shard should not be reused.
     """
 
-    __slots__ = ('disposed', '_lock', '_queue', '_length_array', '_index')
+    __slots__ = ('_disposed', '_lock', '_queue', '_length_array', '_index')
 
     def __init__(self, len_array: array, index: int) -> None:
         """
@@ -156,10 +156,10 @@ class _Shard(Generic[_T], IDisposable):
         This method is idempotent; multiple calls have no further effect.
         """
         with self._lock:
-            if not self.disposed:
+            if not self._disposed:
                 self._queue.clear()
                 self._length_array[self._index] = 0
-                self.disposed = True
+                self._disposed = True
 
     def __enter__(self):
         """
@@ -551,11 +551,11 @@ class ConcurrentCollection(Generic[_T], IDisposable):
           - Unlike some patterns, this implementation does NOT prevent method calls after disposal.
             It is the user's responsibility to ensure that no further use is made of the object after it is disposed.
         """
-        if not self.disposed:
+        if not self._disposed:
             for shard in self._shards:
                 shard.dispose()
             self._length_array = array("Q", [0] * self._num_shards)
-            self.disposed = True
+            self._disposed = True
 
         warnings.warn(
             "Your ConcurrentCollection has been disposed and should not be used further. ",

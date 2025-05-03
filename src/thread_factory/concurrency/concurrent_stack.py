@@ -350,10 +350,10 @@ class ConcurrentStack(Generic[_T], IDisposable):
 
         This method is idempotent — multiple calls won't cause errors.
         """
-        if not self.disposed:
+        if not self._disposed:
             with self._lock:
                 self._deque.clear()
-            self.disposed = True
+            self._disposed = True
         warnings.warn(
             "Your ConcurrentStack has been disposed and should not be used further. ",
             UserWarning
