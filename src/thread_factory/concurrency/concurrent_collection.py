@@ -18,13 +18,13 @@ from typing import (
 from array import array
 
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.utils import Empty, Disposable
+from thread_factory.utils import Empty, IDisposable
 
 _T = TypeVar("_T")
 
 #TODO : Implement per object locks to see if we can distribute contention between each call for arrays and deques
 
-class _Shard(Generic[_T], Disposable):
+class _Shard(Generic[_T], IDisposable):
     """
     Internal shard class for storing items in a local deque with its own lock.
 
@@ -55,9 +55,7 @@ class _Shard(Generic[_T], Disposable):
             index (int):
                 This shard's position (index) in the shared length array.
         """
-        # Indicates whether this shard has been disposed.
-        self.disposed = False
-
+        super().__init__()
         # Lock to ensure thread-safe access to _queue.
         self._lock = threading.RLock()
 
@@ -176,18 +174,18 @@ class _Shard(Generic[_T], Disposable):
         self.dispose()
 
 
-class ConcurrentCollection(Generic[_T]):
+class ConcurrentCollection(Generic[_T], IDisposable):
     """
     A thread-safe, high-level collection that distributes items across multiple
     internal shards (lock-protected deques). Each shard is independently locked,
-    so multiple threads can access different shards in parallel with minimal contention.
+    so multiple runtime can access different shards in parallel with minimal contention.
 
     Overall ordering across shards is not guaranteed to be strictly FIFO — each shard
     behaves like a small FIFO queue, but the global order is only approximate.
 
     Recommended Usage:
-      - Ideal for up to ~20 total threads (producers + consumers).
-      - For each pair of threads (producer/consumer), consider 1 shard as a rough guideline.
+      - Ideal for up to ~20 total runtime (producers + consumers).
+      - For each pair of runtime (producer/consumer), consider 1 shard as a rough guideline.
       - If heavy contention or extremely high concurrency is expected,
         consider `ConcurrentQueue` or `ConcurrentStack` instead.
 
@@ -214,7 +212,7 @@ class ConcurrentCollection(Generic[_T]):
 
         Args:
             total_thread_count (int, optional):
-                The number of threads you plan to use overall. Defaults to 1.
+                The number of runtime you plan to use overall. Defaults to 1.
                 Used to derive the shard count (same value). Must be >= 1 and
                 even if > 1.
             initial (Optional[Iterable[_T]], optional):
@@ -223,6 +221,7 @@ class ConcurrentCollection(Generic[_T]):
         Raises:
             ValueError: If shard count is < 1 or is an odd number > 1.
         """
+        super().__init__()
         number_of_shards = max(1, total_thread_count)
         if initial is None:
             initial = []
@@ -231,9 +230,6 @@ class ConcurrentCollection(Generic[_T]):
             raise ValueError("number_of_shards must be at least 1")
         if number_of_shards > 1 and number_of_shards % 2 != 0:
             number_of_shards += 1
-
-        # Indicates whether this collection has been disposed.
-        self.disposed = False
 
         # Store shard count
         self._num_shards = number_of_shards

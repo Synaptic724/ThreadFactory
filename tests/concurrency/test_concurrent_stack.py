@@ -1,9 +1,9 @@
 import random
 import threading
+import time
 import unittest
 
 from thread_factory import ConcurrentStack, Empty
-
 
 class TestConcurrentStack(unittest.TestCase):
 
@@ -194,7 +194,7 @@ class TestConcurrentStack(unittest.TestCase):
 
     def test_producer_consumer_threads(self):
         """
-        Simulate multiple producer and consumer threads for concurrency stress.
+        Simulate multiple producer and consumer runtime for concurrency stress.
         """
         s = ConcurrentStack()
         producers = 5
@@ -235,7 +235,7 @@ class TestConcurrentStack(unittest.TestCase):
 
     def test_concurrent_batch_updates(self):
         """
-        Ensure multiple threads can call batch_update concurrently without errors.
+        Ensure multiple runtime can call batch_update concurrently without errors.
         """
         s = ConcurrentStack([1, 2, 3, 4, 5])
 
@@ -260,7 +260,7 @@ class TestConcurrentStack(unittest.TestCase):
 
     def test_concurrent_map_filter(self):
         """
-        Multiple threads do map() and filter() to produce new stacks,
+        Multiple runtime do map() and filter() to produce new stacks,
         ensuring no crash or data race with the source stack.
         """
         s = ConcurrentStack(range(100))
@@ -361,3 +361,47 @@ class TestConcurrentStack(unittest.TestCase):
             queue.dispose()
         except Exception as e:
             self.fail(f"Calling dispose() twice raised an exception: {e}")
+
+    def test_batch_stealing(self):
+        """
+        Test batch stealing functionality under concurrent conditions.
+        Multiple consumers will attempt to steal work from the stack in batches.
+        """
+        stack = ConcurrentStack([i for i in range(1000)])  # Initialize stack with 1000 items
+        num_consumers = 5
+        items_per_consumer = 200
+        max_steal_batch_size = 10
+
+        def consumer(consumer_id):
+            stolen = 0
+            while stolen < items_per_consumer:
+                try:
+                    # Attempt to steal a batch
+                    batch = stack.steal_batch(max_steal_batch_size)
+                    stolen += len(batch)
+                    # Simulate processing of stolen work
+                    time.sleep(random.uniform(0.01, 0.05))
+                except Exception:
+                    pass  # Expected empty stack condition at times
+
+        threads = []
+        for cid in range(num_consumers):
+            threads.append(threading.Thread(target=consumer, args=(cid,)))
+
+        # Start all consumer threads
+        start = time.perf_counter()
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        end = time.perf_counter()
+
+        # Assert that no more than the initial number of items were stolen
+        self.assertEqual(len(stack), 0, f"Stack should be empty after all consumers finish. {len(stack)} items remaining.")
+
+        # Print out the final status
+        print(f"\n[Batch Stealing Test] {num_consumers * items_per_consumer} items stolen in {end - start:.2f}s")
+

@@ -3,10 +3,9 @@ import time
 import threading
 import random
 
-# Assuming your ConcurrentBuffer is in 'thread_factory' similarly to ConcurrentQueue
+# Assuming your ConcurrentBuffer is in 'factory' similarly to ConcurrentQueue
 # Adjust imports as necessary:
 from thread_factory import ConcurrentBuffer, Empty
-
 
 def remove_item_by_identity(buffer: ConcurrentBuffer, item):
     """
@@ -222,7 +221,7 @@ class TestConcurrentBuffer(unittest.TestCase):
 
     def test_producer_consumer_threads(self):
         """
-        Simulate multiple producer and consumer threads for concurrency stress.
+        Simulate multiple producer and consumer runtime for concurrency stress.
         """
         cb = ConcurrentBuffer(10)
         producers = 5
@@ -260,7 +259,7 @@ class TestConcurrentBuffer(unittest.TestCase):
 
     def test_concurrent_batch_updates(self):
         """
-        Ensure multiple threads can call batch_update concurrently without errors.
+        Ensure multiple runtime can call batch_update concurrently without errors.
         """
         cb = ConcurrentBuffer(1, initial=[1, 2, 3, 4, 5])
 
@@ -285,7 +284,7 @@ class TestConcurrentBuffer(unittest.TestCase):
 
     def test_concurrent_map_filter(self):
         """
-        Multiple threads do map() and filter() to produce new buffers,
+        Multiple runtime do map() and filter() to produce new buffers,
         ensuring no crash or data race with the source buffer.
         """
         cb = ConcurrentBuffer(1, initial=range(100))
@@ -399,7 +398,7 @@ class HighPerformanceConcurrentBufferTest(unittest.TestCase):
 
     def test_parallel_batch_updates_contention(self):
         """
-        Batch update under high contention - multiple threads mutate concurrently.
+        Batch update under high contention - multiple runtime mutate concurrently.
         """
         initial_data = list(range(10_000))
         self.buffer = ConcurrentBuffer(26,initial=initial_data)

@@ -156,7 +156,7 @@ class TestConcurrentBag(unittest.TestCase):
 
     def test_concurrent_add_and_remove(self):
         """
-        Simulate multiple threads adding and removing items from the bag.
+        Simulate multiple runtime adding and removing items from the bag.
         This tests for thread-safety under concurrency access.
         """
         bag = ConcurrentBag()
@@ -203,7 +203,7 @@ class TestConcurrentBag(unittest.TestCase):
         for t in threads:
             t.join()
 
-        # 10 threads each incremented apple by 1
+        # 10 runtime each incremented apple by 1
         self.assertEqual(bag.count_of('apple'), 20)
 
 

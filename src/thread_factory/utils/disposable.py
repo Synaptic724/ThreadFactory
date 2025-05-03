@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 
-class Disposable(ABC):
+class IDisposable(ABC):
     """
     Abstract base class for all disposable objects in the system.
 
     Usage:
-        Any object that holds threads, memory, open resources, or registration
+        Any object that holds runtime, memory, open resources, or registration
         within ThreadFactory must implement this.
 
         Automatically supports context-manager usage:
@@ -19,12 +19,12 @@ class Disposable(ABC):
         - Optionally provide a `cleanup()` alias.
         - Handle multiple calls to `dispose()` gracefully.
     """
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.dispose()
+    def __init__(self):
+        """
+        Constructor for IDisposable.
+        This is a no-op, but can be overridden by subclasses if needed.
+        """
+        self.disposed = False
 
     @abstractmethod
     def dispose(self):
@@ -32,16 +32,9 @@ class Disposable(ABC):
         Dispose must be implemented by subclasses.
         It MUST:
             - Release all allocated resources.
-            - Kill or join all running threads.
+            - Kill or join all running runtime.
             - Deregister itself from any supervisors or orchestrators.
             - Clear any persistent state to avoid memory leakage.
             - Be idempotent (safe to call multiple times).
         """
-        pass
-
-    def cleanup(self):
-        """
-        Optional alias to dispose() to allow compatibility with systems
-        or developers expecting cleanup() as the entrypoint.
-        """
-        self.dispose()
+        raise NotImplementedError

@@ -11,6 +11,11 @@ Concurrency Module
    :undoc-members:
    :show-inheritance:
 
+.. automodule:: thread_factory.concurrency.concurrent_collection
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 .. automodule:: thread_factory.concurrency.concurrent_core
    :members:
    :undoc-members:
@@ -20,7 +25,6 @@ Concurrency Module
    :members:
    :undoc-members:
    :show-inheritance:
-
 
 .. automodule:: thread_factory.concurrency.concurrent_list
    :members:

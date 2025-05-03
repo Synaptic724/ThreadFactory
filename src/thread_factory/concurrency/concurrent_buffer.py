@@ -18,13 +18,13 @@ from typing import (
 from array import array
 
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.utils import Empty, Disposable
+from thread_factory.utils import Empty, IDisposable
 
 _T = TypeVar("_T")
 
 #TODO : Implement per object locks to see if we can distribute contention between each call for arrays and deques
 
-class _Shard(Generic[_T], Disposable):
+class _Shard(Generic[_T], IDisposable):
     """
     _Shard is an internal component representing a lock-protected queue (deque)
     inside a sharded concurrent buffer.
@@ -34,7 +34,7 @@ class _Shard(Generic[_T], Disposable):
     - Tracks its length and the timestamp of its head item via shared memory arrays.
     - Provides thread-safe enqueue, dequeue, and peek operations.
 
-    This design reduces contention by allowing multiple threads to work on separate shards
+    This design reduces contention by allowing multiple runtime to work on separate shards
     independently while still providing approximate global FIFO behavior.
     """
 
@@ -47,6 +47,7 @@ class _Shard(Generic[_T], Disposable):
             time_array (array): Shared array (uint64) storing the timestamp of the head of each shard.
             index (int): This shard's index within the shared arrays.
         """
+        super().__init__()
         # Thread-safe lock to protect internal state of this shard.
         self._lock = threading.RLock()
         # Internal deque to hold (timestamp, item) tuples.
@@ -55,8 +56,6 @@ class _Shard(Generic[_T], Disposable):
         self._length_array = len_array
         self._time_array = time_array
         self._index = index
-        # Flag to prevent use-after-dispose.
-        self.disposed = False
 
     def _increase_length_value(self) -> None:
         """
@@ -190,7 +189,7 @@ class _Shard(Generic[_T], Disposable):
         self.dispose()
 
 
-class ConcurrentBuffer(Generic[_T], Disposable):
+class ConcurrentBuffer(Generic[_T], IDisposable):
     """
     A thread-safe, *mostly* FIFO buffer implementation using multiple internal
     deques (shards). Items are tagged with a timestamp upon enqueue.
@@ -207,8 +206,8 @@ class ConcurrentBuffer(Generic[_T], Disposable):
     ConcurrentQueue or ConcurrentStack outperform this object in heavy contention.
     DO NOT EXCEED 20 THREADS OVERALL (for producer and consumer pattern) WHEN USING THIS OBJECT.
 
-    The rule of thumb is to use half as many shards as total threads (producer + consumer).
-    e.g., 10 threads => 5 shards.
+    The rule of thumb is to use half as many shards as total runtime (producer + consumer).
+    e.g., 10 runtime => 5 shards.
 
     This class now implements a Disposable pattern, allowing you to dispose
     of it explicitly or via a `with` statement when it's no longer needed.
@@ -232,6 +231,7 @@ class ConcurrentBuffer(Generic[_T], Disposable):
         Raises:
             ValueError: If number_of_shards < 1 or is odd when > 1.
         """
+        super().__init__()
         if initial is None:
             initial = []
 
@@ -258,9 +258,6 @@ class ConcurrentBuffer(Generic[_T], Disposable):
 
         # Keep track of shard indices for possible scanning logic
         self._shard_indices = list(range(number_of_shards))
-
-        # Flag to ensure we only dispose once (idempotent).
-        self.disposed = False
 
         # Initialize with any provided items
         for item in initial:

@@ -16,11 +16,16 @@ from typing import (
     TypeVar,
     Union,
 )
-from thread_factory.utils.disposable import Disposable
+from thread_factory.utils.disposable import IDisposable
+
 _K = TypeVar("_K")
 _V = TypeVar("_V")
 
-class ConcurrentDict(Generic[_K, _V], Disposable):
+
+# This class is copied from my other library ThreadFactory, I made my own implementation with freeze and updated the interface to IDisposable,
+# I also implemented tests for it to test freeze.
+
+class ConcurrentDict(Generic[_K, _V], IDisposable):
     """
     A thread-safe dictionary implementation using:
       - An underlying Python dict
@@ -29,6 +34,9 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
     This class mimics many behaviors of a native Python dict, including
     common utility methods. It is designed for Python 3.13+ No-GIL
     environments (though it will also work fine in standard Python).
+
+    The dictionary can be frozen to prevent further modifications unless
+    internal contents of dictionary are objects that are mutable.
     """
 
     def __init__(
@@ -43,6 +51,7 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
                 Initial data for the dictionary. Can be another dictionary,
                 or an iterable of (key, value) pairs.
         """
+        super().__init__()
         if initial is None:
             initial = {}
         # Convert 'initial' to a dict:
@@ -50,7 +59,33 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         # - If it's an iterable of (key, value) pairs, dict(...) will handle that as well.
         self._dict: Dict[_K, _V] = dict(initial)
         self._lock: threading.RLock = threading.RLock()
-        self.disposed = False
+        self._freeze = False
+
+    def freeze(self) -> None:
+        """
+        Freeze the dictionary to prevent further modifications.
+        This is useful for making the dictionary immutable after initialization.
+        """
+        with self._lock:
+            self._freeze = True
+
+    @property
+    def is_frozen(self) -> bool:
+        """
+        Check if the dictionary is frozen.
+
+        Returns:
+            bool: True if the dictionary is frozen, False otherwise.
+        """
+        return self._freeze
+
+    def unfreeze(self) -> None:
+        """
+        Unfreeze the dictionary to allow modifications.
+        This is useful for making the dictionary mutable again after being frozen.
+        """
+        with self._lock:
+            self._freeze = False
 
     def __getitem__(self, key: _K) -> _V:
         """
@@ -65,8 +100,25 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Raises:
             KeyError: If the key is not in the dict.
         """
-        with self._lock:
+        if self._freeze:
             return self._dict[key]
+        else:
+            with self._lock:
+                return self._dict[key]
+
+    def lockless_get(self, key: _K, default: Optional[_V] = None) -> Optional[_V]:
+        """
+        Get the value for key without acquiring the lock.
+        This method is not thread-safe and should be used with caution.
+
+        Args:
+            key (_K): The key to look up.
+            default (_V, optional): The default if key is not found.
+
+        Returns:
+            _V or None: Value if present, else None.
+        """
+        return self._dict.get(key, default)
 
     def __setitem__(self, key: _K, value: _V) -> None:
         """
@@ -76,8 +128,11 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
             key (_K): The key to set.
             value (_V): The new value to store.
         """
-        with self._lock:
-            self._dict[key] = value
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentDict.")
+        else:
+            with self._lock:
+                self._dict[key] = value
 
     def __delitem__(self, key: _K) -> None:
         """
@@ -89,8 +144,11 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Raises:
             KeyError: If the key is not in the dict.
         """
-        with self._lock:
-            del self._dict[key]
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentDict.")
+        else:
+            with self._lock:
+                del self._dict[key]
 
     def __contains__(self, key: object) -> bool:
         """
@@ -102,8 +160,11 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Returns:
             bool: True if key is in the dictionary, False otherwise.
         """
-        with self._lock:
+        if self._freeze:
             return key in self._dict
+        else:
+            with self._lock:
+                return key in self._dict
 
     def __len__(self) -> int:
         """
@@ -112,8 +173,14 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Returns:
             int: The number of key-value pairs in the dict.
         """
-        with self._lock:
+        if self._freeze:
             return len(self._dict)
+        else:
+            with self._lock:
+                # Use the lock to ensure thread safety
+                # This prevents 'dictionary changed size during iteration' errors
+                # when using len() in a multi-threaded context.
+                return len(self._dict)
 
     def __bool__(self) -> bool:
         """
@@ -132,22 +199,31 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Returns:
             Iterator[_K]: An iterator over the keys.
         """
-        with self._lock:
-            return iter(list(self._dict.keys()))
+        if self._freeze:
+            return iter(self._dict.keys())
+        else:
+            with self._lock:
+                return iter(list(self._dict.keys()))
 
     def __repr__(self) -> str:
         """
         Return the official string representation of the ConcurrentDict.
         """
-        with self._lock:
+        if self._freeze:
             return f"{self.__class__.__name__}({self._dict!r})"
+        else:
+            with self._lock:
+                return f"{self.__class__.__name__}({self._dict!r})"
 
     def __str__(self) -> str:
         """
         Return the informal string representation of the ConcurrentDict.
         """
-        with self._lock:
+        if self._freeze:
             return str(self._dict)
+        else:
+            with self._lock:
+                return str(self._dict)
 
     def __eq__(self, other: object) -> bool:
         """
@@ -184,8 +260,11 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         """
         Remove all items from the dict.
         """
-        with self._lock:
-            self._dict.clear()
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentDict.")
+        else:
+            with self._lock:
+                self._dict.clear()
 
     def get(self, key: _K, default: Optional[_V] = None) -> Optional[_V]:
         """
@@ -198,8 +277,12 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Returns:
             _V or None: Value if present, else default.
         """
-        with self._lock:
+        if self._freeze:
             return self._dict.get(key, default)
+        else:
+            # Use the lock to ensure thread safety
+            with self._lock:
+                return self._dict.get(key, default)
 
     def pop(self, key: _K, default: Optional[_V] = None) -> _V:
         """
@@ -216,12 +299,15 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Raises:
             KeyError: If the key is missing and no default was provided.
         """
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentDict.")
         with self._lock:
-            if key in self._dict:
+            try:
                 return self._dict.pop(key)
-            if default is not None:
-                return default
-            raise KeyError(key)
+            except KeyError:
+                if default is not None:
+                    return default
+                raise
 
     def popitem(self) -> Tuple[_K, _V]:
         """
@@ -234,10 +320,14 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Raises:
             KeyError: If the dictionary is empty.
         """
-        with self._lock:
-            if not self._dict:
-                raise KeyError("popitem(): dictionary is empty")
-            return self._dict.popitem()
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentDict.")
+        else:
+            # Use the lock to ensure thread safety
+            with self._lock:
+                if not self._dict:
+                    raise KeyError("popitem(): dictionary is empty")
+                return self._dict.popitem()
 
     def setdefault(self, key: _K, default: Optional[_V] = None) -> Optional[_V]:
         """
@@ -251,8 +341,12 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Returns:
             _V or None: The existing or newly set value.
         """
-        with self._lock:
-            return self._dict.setdefault(key, default)
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentDict.")
+        else:
+            # Use the lock to ensure thread safety
+            with self._lock:
+                return self._dict.setdefault(key, default)
 
     def update(
         self,
@@ -271,22 +365,25 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
                 Another dict or iterable of (key, value) pairs.
             **kwargs: Additional key-value pairs provided as keyword arguments.
         """
-        if other is None:
-            other = {}
-        with self._lock:
-            # Process 'other'
-            if hasattr(other, "keys"):
-                # Mapping-like
-                for k in other.keys():  # type: ignore
-                    self._dict[k] = other[k]  # type: ignore
-            else:
-                # Iterable of (key, value)
-                for k, v in other:  # type: ignore
-                    self._dict[k] = v
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentDict.")
+        else:
+            if other is None:
+                other = {}
+            with self._lock:
+                # Process 'other'
+                if hasattr(other, "keys"):
+                    # Mapping-like
+                    for k in other.keys():  # type: ignore
+                        self._dict[k] = other[k]  # type: ignore
+                else:
+                    # Iterable of (key, value)
+                    for k, v in other:  # type: ignore
+                        self._dict[k] = v
 
-            # Process additional kwargs
-            for k, v in kwargs.items():
-                self._dict[k] = v
+                # Process additional kwargs
+                for k, v in kwargs.items():
+                    self._dict[k] = v
 
     def keys(self) -> List[_K]:
         """
@@ -295,8 +392,12 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Returns:
             List[_K]: A list of the keys.
         """
-        with self._lock:
+        if self._freeze:
             return list(self._dict.keys())
+        else:
+            # Use the lock to ensure thread safety
+            with self._lock:
+                return list(self._dict.keys())
 
     def values(self) -> List[_V]:
         """
@@ -305,8 +406,12 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Returns:
             List[_V]: A list of the values.
         """
-        with self._lock:
+        if self._freeze:
             return list(self._dict.values())
+        else:
+            # Use the lock to ensure thread safety
+            with self._lock:
+                return list(self._dict.values())
 
     def items(self) -> List[Tuple[_K, _V]]:
         """
@@ -315,8 +420,12 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Returns:
             List[Tuple[_K, _V]]: A list of all key-value pairs.
         """
-        with self._lock:
+        if self._freeze:
             return list(self._dict.items())
+        else:
+            # Use the lock to ensure thread safety
+            with self._lock:
+                return list(self._dict.items())
 
     def copy(self) -> "ConcurrentDict[_K, _V]":
         """
@@ -325,8 +434,12 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Returns:
             ConcurrentDict[_K, _V]: A new ConcurrentDict with copied items.
         """
-        with self._lock:
+        if self._freeze:
             return ConcurrentDict(initial=self._dict.copy())
+        else:
+            # Use the lock to ensure thread safety
+            with self._lock:
+                return ConcurrentDict(initial=self._dict.copy())
 
     def __copy__(self) -> "ConcurrentDict[_K, _V]":
         """
@@ -347,8 +460,12 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Returns:
             ConcurrentDict[_K, _V]: A deep copy of this ConcurrentDict.
         """
-        with self._lock:
+        if self._freeze:
             return ConcurrentDict(initial=deepcopy(self._dict, memo))
+        else:
+            # Use the lock to ensure thread safety
+            with self._lock:
+                return ConcurrentDict(initial=deepcopy(self._dict, memo))
 
     def to_dict(self) -> Dict[_K, _V]:
         """
@@ -357,8 +474,12 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Returns:
             Dict[_K, _V]: A standard Python dict with the same keys and values.
         """
-        with self._lock:
+        if self._freeze:
             return dict(self._dict)
+        else:
+            # Use the lock to ensure thread safety
+            with self._lock:
+                return dict(self._dict)
 
     def batch_update(self, func: Callable[[Dict[_K, _V]], None]) -> None:
         """
@@ -370,8 +491,13 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
                 A function that accepts the internal dict as its only argument.
                 The function should perform all necessary mutations.
         """
-        with self._lock:
-            func(self._dict)
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentDict.")
+        else:
+            # Use the lock to ensure thread safety
+            # This allows for batch operations without acquiring the lock multiple times
+            with self._lock:
+                func(self._dict)
 
     def map(self, func: Callable[[_K, _V], Tuple[_K, _V]]) -> "ConcurrentDict[_K, _V]":
         """
@@ -385,10 +511,16 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         Returns:
             ConcurrentDict[_K, _V]: A new dictionary with transformed pairs.
         """
-        with self._lock:
+        if self._freeze:
             new_items: List[Tuple[_K, _V]] = []
             for k, v in self._dict.items():
                 new_items.append(func(k, v))
+        else:
+            # Use the lock to ensure thread safety
+            with self._lock:
+                new_items: List[Tuple[_K, _V]] = []
+                for k, v in self._dict.items():
+                    new_items.append(func(k, v))
         return ConcurrentDict(initial=new_items)
 
     def filter(self, func: Callable[[_K, _V], bool]) -> "ConcurrentDict[_K, _V]":
@@ -404,11 +536,18 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
             ConcurrentDict[_K, _V]:
                 A new dictionary containing only items where func(key, value) is True.
         """
-        with self._lock:
+        if self._freeze:
             new_items: List[Tuple[_K, _V]] = []
             for k, v in self._dict.items():
                 if func(k, v):
                     new_items.append((k, v))
+        else:
+            # Use the lock to ensure thread safety
+            with self._lock:
+                new_items: List[Tuple[_K, _V]] = []
+                for k, v in self._dict.items():
+                    if func(k, v):
+                        new_items.append((k, v))
         return ConcurrentDict(initial=new_items)
 
     def reduce(
@@ -440,8 +579,13 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
 
             total = concurrent_dict.reduce(add_values, 0)
         """
-        with self._lock:
+        items_copy = []
+        if self._freeze:
             items_copy = list(self._dict.items())
+        else:
+            # Use the lock to ensure thread safety
+            with self._lock:
+                items_copy = list(self._dict.items())
 
         if not items_copy and initial is None:
             raise TypeError("reduce() of empty ConcurrentDict with no initial value")
@@ -504,7 +648,7 @@ class ConcurrentDict(Generic[_K, _V], Disposable):
         """
         Dispose (clear) this ConcurrentDict, releasing its contents.
 
-        Once disposed, `_disposed` becomes True and the internal dict is cleared.
+        Once disposed, `disposed` becomes True and the internal dict is cleared.
         No further usage checks are enforced, so the user must avoid calling
         other methods after disposal.
 

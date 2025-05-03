@@ -7,7 +7,32 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`Work`**  
+  A future-compatible, extensible task container designed for expressive async and threaded workloads. Acts as a core unit in the execution system.
 
+- **`AutoResetTimer`**  
+  A utility class that resets automatically after expiration. Ideal for retry loops or lightweight state machines.
+
+- **`Stopwatch`**  
+  A high-resolution timing utility for measuring task durations with minimal overhead.
+
+- **`SmartCondition`**  
+  A thread synchronization primitive similar to `threading.Condition`, but enhanced with *targeted wakeups* via `factory_ids`.  
+  Supports selective `notify`, `notify_all`, and predicate-based `wait_for` with ID filtering.  
+  Built from scratch for full transparency and fine-grained thread control.
+
+- **`SwitchLock`**  
+  A dynamic semaphore built atop `SmartCondition`, enabling runtime-adjustable permits and ID-targeted thread blocking/unblocking.  
+  Serves as the foundation for trap-and-release execution models and room-based thread routing.
+- 
+### Added Features
+- Integrated time-tracking capabilities through `Stopwatch` and `AutoResetTimer` to support precise performance metrics and scheduled operations.
+- Introduced the first version of the `Work` abstraction for structured task submission, response handling, and optional callbacks.
+- Added targeted thread trapping and wakeup mechanisms via `SmartCondition`, allowing threads to wait on logical `factory_ids` and be selectively released based on those IDs.
+- Introduced `SwitchLock` to orchestrate semaphore-like control with dynamic permit scaling and smart ID-based synchronization.  
+  Supports granular release control, timed thread suspension, and future-safe thread disposal coordination.
+- Added batch steal support to `ConcurrentQueue` and `ConcurrentStack`, allowing for efficient bulk operations and improved performance in high-contention scenarios.
+- 
 #### 🧠 Work Object
 - Introduced the `Work` class: a disposable, hook-enabled, metadata-rich extension of `Future`.
 - Features:
@@ -45,6 +70,84 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - `DiagnosticsInterface`: Real-time throughput, queue, and performance tracking.
 - `Orchestrator`: Dynamic coordination of thread lifecycles, workloads, and contention resolution.
 
+
+### Changes
+- `ConcurrentDict` implemented an optimized version of pop.
+
+---
+# Changelog
+
+## [1.2.4] - 2025-05-02
+
+### 🚀 Classes Added
+
+- **`ConcurrentSet`**
+  - A thread-safe set implementation designed for high-read and concurrent modification environments.
+  - Supports standard set operations (`union`, `intersection`, `difference`, `symmetric_difference`) with both standard and in-place variants.
+  - Includes a `freeze()` method that disables mutation and enables lock-free reads for optimal performance under read-heavy workloads.
+  - Fully compatible with context managers and implements `IDispose` for lifecycle control.
+
+### ➕ Features
+
+- **Set Algebra Support**
+  - Operators: `|`, `&`, `-`, `^` and their in-place variants (`|=`, etc.)
+  - Method equivalents: `union()`, `intersection()`, `difference()`, `symmetric_difference()`
+
+- **Functional Utilities**
+  - `map(func)`, `filter(func)`, and `reduce(func)` to enable functional programming patterns with thread-safe access.
+
+- **Lock-Aware Reads**
+  - Automatically determines whether to acquire a lock or operate lock-free depending on freeze status.
+  - `__iter__`, `__len__`, `__contains__`, and copies behave differently in frozen mode for performance.
+
+- **Atomic Batch Operations**
+  - `batch_update(func)` allows users to perform multiple modifications under a single lock.
+
+- **Context Manager Integration**
+  - Using `with ConcurrentSet(...) as s:` provides exclusive access to the underlying set for manual atomic operations.
+
+- **Freeze Mode**
+  - `freeze()` method allows users to lock the `ConcurrentList`, `ConcurrentDict`, or `ConcurrentSet` for read-only access, improving performance in read-heavy scenarios.
+  - Once frozen, the collection cannot be modified until it is unfrozen.
+
+### 🛠 Fixes
+
+- **`ConcurrentQueue` and `ConcurrentStack`**
+  - Updated `peek()` to use `try/finally` to ensure the lock is always released properly, even when exceptions occur.
+
+- **Comment Improvements**
+  - Clarified `concurrent_core` comments explaining the internal lock handling, dispose behavior, and access lifecycle.
+
+### 🔄 Changes
+
+- **License Update**
+  - Switched from **MIT** to **Apache 2.0**
+    - Provides better attribution enforcement and aligns with modern corporate and open-source compliance standards.
+
+- **NOTICE File**
+  - Updated to include formal attribution for all bundled third-party libraries in compliance with Apache 2.0.
+
+- **Standardized Disposal**
+  - Introduced `IDispose` base class.
+  - All classes implementing disposal now include a consistent `disposed` flag and thread-safe `dispose()` method.
+
+### 📌 Notes for Developers
+
+- `ConcurrentSet` requires elements to be **hashable**. Types like `dict`, `list`, and `set` cannot be added directly.
+  - This is a fundamental limitation of Python sets — use `frozenset(dict.items())` if you need to store dict-like data.
+  - For non-hashable types, consider using `ConcurrentList` instead.
+
+- Use `freeze()` when you no longer plan to mutate the set — it allows lock-free reads and improves performance dramatically.
+
+- All new concurrent collections now support `IDispose` and can be used safely with `with` statements or explicit cleanup logic.
+
+
+### ✅ Suggested Actions
+
+- Upgrade to 1.2.1 to take advantage of `ConcurrentSet` and improved lock handling in existing data structures.
+- Review any existing `set` usage in concurrent contexts and replace with `ConcurrentSet` where necessary.
+- Use `freeze()` for cache-like read-heavy workloads.
+- Consider wrapping mutation-heavy operations inside `batch_update()` for better atomicity and throughput.
 
 ---
 

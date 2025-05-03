@@ -9,7 +9,7 @@ class BenchmarkVisualizer:
     """
     A flexible visualizer that can:
       - plot bar charts, line charts, scatter plots
-      - group or filter data
+      - group or filter reporting
       - save results to CSV/JSON
     """
 
