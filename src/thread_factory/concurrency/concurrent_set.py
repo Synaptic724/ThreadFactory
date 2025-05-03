@@ -72,9 +72,7 @@ class ConcurrentSet(Generic[_T], IDisposable):
         # for external operations (mutating methods will raise TypeError), and
         # read operations can skip locking.
         self._freeze: bool = False
-        # Initialize the `disposed` flag required by the IDisposable interface.
-        # This flag indicates whether the set's resources have been cleaned up.
-        self.disposed: bool = False
+
 
     # --------------------------- freeze control -------------------------
     def freeze(self) -> None:

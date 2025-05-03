@@ -9,7 +9,7 @@ from thread_factory.concurrency.concurrent_list import ConcurrentList
 
 
 class TestConcurrentSet(unittest.TestCase):
-    # ────────────────────────────  Basic CRUD  ────────────────────────────
+
     def test_init_and_add(self):
         cset = ConcurrentSet([1, 2, 3])
         self.assertEqual(len(cset), 3)
@@ -31,7 +31,7 @@ class TestConcurrentSet(unittest.TestCase):
         cset.clear()
         self.assertEqual(len(cset), 0)
 
-    # ────────────────────────────  Algebra (new)  ─────────────────────────
+
     def test_union_intersection_difference_symdiff(self):
         a = ConcurrentSet([1, 2, 3])
         b = [3, 4, 5]
@@ -40,7 +40,7 @@ class TestConcurrentSet(unittest.TestCase):
         self.assertEqual(a.difference(b).to_set(), {1, 2})
         self.assertEqual(a.symmetric_difference(b).to_set(), {1, 2, 4, 5})
 
-    # ────────────────────────────  Algebra (in‑place) ─────────────────────
+
     def test_inplace_operators(self):
         cset = ConcurrentSet([1, 2, 3])
         cset |= [3, 4]
@@ -52,7 +52,7 @@ class TestConcurrentSet(unittest.TestCase):
         cset ^= [2, 99]
         self.assertEqual(cset.to_set(), {99})
 
-    # ────────────────────────────  Functional helpers  ────────────────────
+
     def test_map_filter_reduce(self):
         cset = ConcurrentSet(range(1, 5))            # {1,2,3,4}
         self.assertEqual(cset.map(lambda x: x * 10).to_set(), {10, 20, 30, 40})
@@ -60,7 +60,7 @@ class TestConcurrentSet(unittest.TestCase):
         self.assertEqual(cset.reduce(lambda acc, x: acc + x), 10)
         self.assertEqual(cset.reduce(lambda a, x: a + x, 100), 110)
 
-    # ────────────────────────────  Equality semantics  ────────────────────
+
     def test_eq_and_ne(self):
         a = ConcurrentSet([1, 2, 3])
         b = ConcurrentSet([3, 2, 1])
@@ -69,7 +69,7 @@ class TestConcurrentSet(unittest.TestCase):
         self.assertTrue(a == {1, 2, 3})
         self.assertFalse(a == {1, 2})
 
-    # ─────────────────────────────  Freeze logic  ─────────────────────────
+
     def test_freeze_blocks_mutation(self):
         cset = ConcurrentSet([1])
         cset.freeze()
@@ -98,7 +98,7 @@ class TestConcurrentSet(unittest.TestCase):
         cset.add(99)
         self.assertIn(99, cset)
 
-    # ───────────────────────────  Batch Update  ───────────────────────────
+
     def test_batch_update(self):
         cset = ConcurrentSet([1, 2, 3])
         def op(s):
@@ -107,7 +107,7 @@ class TestConcurrentSet(unittest.TestCase):
         cset.batch_update(op)
         self.assertEqual(cset.to_set(), {2, 3, 99, 100})
 
-    # ───────────────────────────  Conversions  ────────────────────────────
+
     def test_to_set_and_to_concurrent_list(self):
         cset = ConcurrentSet({7, 8, 9})
         snapshot = cset.to_set()
@@ -116,7 +116,7 @@ class TestConcurrentSet(unittest.TestCase):
         self.assertIsInstance(clist, ConcurrentList)
         self.assertCountEqual(clist.to_list(), [7, 8, 9])
 
-    # ───────────────────────────  Copy / deepcopy  ────────────────────────
+
     def test_copy_and_deepcopy(self):
         cs = ConcurrentSet([("x", 1), ("y", 2)])  # tuples are hashable
         shallow = copy.copy(cs)
@@ -130,7 +130,7 @@ class TestConcurrentSet(unittest.TestCase):
         self.assertNotEqual(cs.to_set(), deep.to_set())
         self.assertNotEqual(cs.to_set(), shallow.to_set())  # tuple values changed
 
-    # ────────────────────────────  Repr / Bool  ───────────────────────────
+
     def test_repr_and_bool(self):
         cs = ConcurrentSet()
         self.assertFalse(cs)
@@ -138,7 +138,7 @@ class TestConcurrentSet(unittest.TestCase):
         self.assertTrue(cs)
         self.assertIn("ConcurrentSet", repr(cs))
 
-    # ────────────────────────────  Context / Dispose  ─────────────────────
+
     def test_context_manager_and_dispose(self):
         cs = ConcurrentSet([1, 2])
         with self.assertWarns(UserWarning):
@@ -147,7 +147,6 @@ class TestConcurrentSet(unittest.TestCase):
         self.assertTrue(cs.disposed)
         self.assertEqual(len(cs), 0)
 
-    # ───────────────────────────  Concurrency basics  ─────────────────────
     def test_multithreaded_add(self):
         cs = ConcurrentSet()
         threads = [threading.Thread(target=lambda: [cs.add(i) for i in range(1000)])
@@ -157,7 +156,7 @@ class TestConcurrentSet(unittest.TestCase):
         # Each thread added 0..999; final set size ≤ 1000
         self.assertEqual(len(cs), 1000)
 
-    # ───────────────────────────  Concurrency batch  ──────────────────────
+
     def test_multithreaded_batch_update(self):
         cs = ConcurrentSet(range(1000))
         def worker():
@@ -172,7 +171,7 @@ class TestConcurrentSet(unittest.TestCase):
         for t in threads: t.join()
         self.assertGreaterEqual(len(cs), 0)  # Sanity: no crash
 
-    # ────────────────────────────  Performance smoke  ─────────────────────
+
     def test_massive_concurrent_operations(self):
         cs = ConcurrentSet(range(1000))
         ops = 50_000
