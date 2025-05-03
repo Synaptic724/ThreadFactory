@@ -18,7 +18,7 @@ class ConcurrentList(Generic[_T], IDisposable):
     including slicing, in-place operators, and common utility methods.
     It is designed for Python 3.13+ No-GIL environments.
     """
-
+    __slots__ = IDisposable.__slots__ + ["_lock", "_list", "_freeze"]
     def __init__(self, initial: Optional[Iterable[_T]] = None) -> None:
         """
         Initialize the ConcurrentList.

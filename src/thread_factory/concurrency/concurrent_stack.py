@@ -29,7 +29,7 @@ class ConcurrentStack(Generic[_T], IDisposable):
     It is designed for Python 3.13+ No-GIL environments (though it will
     work fine in standard Python as well).
     """
-
+    __slots__ = IDisposable.__slots__ + ["_lock", "_deque"]
     def __init__(
             self,
             initial: Optional[Iterable[_T]] = None

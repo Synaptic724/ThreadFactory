@@ -29,7 +29,7 @@ class ConcurrentBag(Generic[_T], IDisposable):
     is designed for Python 3.13+ No-GIL environments (though it will
     work fine in standard Python as well).
     """
-
+    __slots__ =  IDisposable.__slots__ + ["_bag", "_lock"]
     def __init__(self, initial: Optional[List[_T]] = None) -> None:
         """
         Initialize the ConcurrentBag.

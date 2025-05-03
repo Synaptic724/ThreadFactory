@@ -63,7 +63,7 @@ class Concurrent:
       you are responsible for implementing your own thread-safety mechanisms
       (e.g., locks, thread-local storage, or other synchronization primitives).
     """
-
+    __slots__ = []
     @staticmethod
     def for_loop(
             start: int,

@@ -38,6 +38,7 @@ class _Shard(Generic[_T], IDisposable):
     independently while still providing approximate global FIFO behavior.
     """
 
+    __slots__ =  IDisposable.__slots__ + ["_lock", "_queue", "_length_array", "_time_array", "_index"]
     def __init__(self, len_array: array, time_array: array, index: int) -> None:
         """
         Initialize a new shard.
@@ -212,6 +213,7 @@ class ConcurrentBuffer(Generic[_T], IDisposable):
     This class now implements a Disposable pattern, allowing you to dispose
     of it explicitly or via a `with` statement when it's no longer needed.
     """
+    __slots__ = IDisposable.__slots__ + ["_shards", "_length_array", "_time_array", "_num_shards", "_mid", "_left_range", "_right_range", "_shard_indices"]
 
     def __init__(
         self,

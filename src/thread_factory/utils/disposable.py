@@ -19,6 +19,7 @@ class IDisposable(ABC):
         - Optionally provide a `cleanup()` alias.
         - Handle multiple calls to `dispose()` gracefully.
     """
+    __slots__ = ['_disposed']
     def __init__(self):
         """
         Constructor for IDisposable.

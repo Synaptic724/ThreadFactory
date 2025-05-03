@@ -38,7 +38,7 @@ class ConcurrentDict(Generic[_K, _V], IDisposable):
     The dictionary can be frozen to prevent further modifications unless
     internal contents of dictionary are objects that are mutable.
     """
-
+    __slots__ = IDisposable.__slots__ + ["_dict", "_lock", "_freeze"]
     def __init__(
         self,
         initial: Optional[Union[Mapping[_K, _V], Iterable[Tuple[_K, _V]]]] = None

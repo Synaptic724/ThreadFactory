@@ -43,7 +43,7 @@ class _Shard(Generic[_T], IDisposable):
         in the shared length array. Once disposed, the shard should not be reused.
     """
 
-    __slots__ = ('_disposed', '_lock', '_queue', '_length_array', '_index')
+    __slots__ = IDisposable.__slots__ + ['_lock', '_queue', '_length_array', '_index']
 
     def __init__(self, len_array: array, index: int) -> None:
         """
