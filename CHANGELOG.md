@@ -74,8 +74,25 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ### Changes
 - `ConcurrentDict` implemented an optimized version of pop.
 
+
+
+
 ---
 # Changelog
+## [1.2.5] - 2025-05-03
+
+### 🚀 Classes Added
+
+### ➕ Features
+
+### 🛠 Fixes
+
+### 🔄 Changes
+- **`Slots`**
+    - Added `__slots__` to all concurrency classes to reduce memory overhead and improve performance.
+    - This change is expected to reduce memory usage across all concurrent collections.
+
+---
 
 ## [1.2.4] - 2025-05-02
 
