@@ -25,7 +25,8 @@ Please see the benchmarks at the bottom of this page and if you are interested t
 
 [Repository Benchmarks 🚀](https://github.com/Synaptic724/ThreadFactory/blob/production/benchmarks/benchmark_data/general_benchmarks.md)  
 
-[Jump to Benchmarks Below🔥](#-benchmark-results-10000000-ops--10-producers--10-consumers)  
+[Jump to Benchmarks Below🔥](#-benchmark-results-10000000-ops--10-producers--10-consumers)
+
 ---
 
 ## 🚀 Features
