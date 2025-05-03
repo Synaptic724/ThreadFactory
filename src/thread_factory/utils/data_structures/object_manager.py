@@ -1,5 +1,7 @@
 import uuid
 from typing import Optional, List
+
+from thread_factory.utils import IDisposable
 from thread_factory.utils.data_structures.tree_manager import TreeNode
 from tree_manager import TreeManager, TreeNode
 import threading
@@ -136,13 +138,13 @@ class ObjectManager(TreeManager):
 
 
 
-class TreeManager(Disposable):
+class TreeManager(IDisposable):
     """
     Manages a hierarchy of TreeNode objects (categories and items).
     """
 
     def __init__(self, name: str):
-        self.disposed: bool = False
+        super().__init__()
         self.root: TreeNode = TreeNode(name=name, type="category")
 
     def add_node(self, name: str, type: str, parent_name: str, metadata: Optional[dict] = None) -> None:

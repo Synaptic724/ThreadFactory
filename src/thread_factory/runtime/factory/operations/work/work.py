@@ -2,9 +2,9 @@ import inspect
 import time
 from concurrent.futures import Future
 from typing import Optional, Callable, List, Any
-from thread_factory.utils import Disposable
+from thread_factory.utils import IDisposable
 
-class Work(Future, Disposable):
+class Work(Future, IDisposable):
     """
     Work represents a self-contained unit of execution in the ThreadFactory ecosystem.
 
@@ -32,6 +32,7 @@ class Work(Future, Disposable):
             TypeError: If `fn` is not a callable or is a coroutine function.
         """
         super().__init__()
+        IDisposable.__init__(self)
         if not callable(fn):
             raise TypeError(f"Expected a callable, got type '{type(fn).__name__}' instead.")
         if inspect.iscoroutinefunction(fn):
@@ -41,7 +42,6 @@ class Work(Future, Disposable):
         self.args = args
         self.kwargs = kwargs
         self.priority = priority
-        self.disposed = False
 
         # Internal execution metadata
         self.task_id = id(self)

@@ -15,11 +15,11 @@ from typing import (
 
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.exceptions import Empty
-from thread_factory.utils.disposable import Disposable
+from thread_factory.utils.disposable import IDisposable
 
 _T = TypeVar("_T")
 
-class ConcurrentBag(Generic[_T], Disposable):
+class ConcurrentBag(Generic[_T], IDisposable):
     """
     A thread-safe multiset ("bag") implementation using:
     - a dict from item -> integer count
@@ -39,14 +39,12 @@ class ConcurrentBag(Generic[_T], Disposable):
                 A list (or iterable turned into a list) of initial items
                 to add to the bag.
         """
+        super().__init__()
         if initial is None:
             initial = []
         self._lock = threading.RLock()
         # Dictionary to store item -> count
         self._bag: Dict[_T, int] = {}
-
-        # A flag to ensure we only dispose once (idempotent)
-        self.disposed = False
 
         # Add initial items
         for item in initial:

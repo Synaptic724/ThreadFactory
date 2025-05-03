@@ -1,5 +1,5 @@
 import unittest
-from thread_factory import Work
+from thread_factory.runtime.factory.operations import Work
 import unittest
 import time
 import asyncio
@@ -85,7 +85,7 @@ class TestWork(unittest.TestCase):
         work = Work(cleanup_fn)
         work.run()
         result = work.result()
-        work.cleanup()
+        work.dispose()
 
         self.assertEqual(result, "cleanup")
         self.assertEqual(work.result(), None)

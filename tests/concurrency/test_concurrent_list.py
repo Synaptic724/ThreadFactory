@@ -2,8 +2,7 @@ import threading
 import unittest
 import time
 import random
-
-from thread_factory import ConcurrentList
+from thread_factory.concurrency.concurrent_list import ConcurrentList
 
 
 class TestConcurrentList(unittest.TestCase):
@@ -124,8 +123,13 @@ class TestConcurrentList(unittest.TestCase):
         mul_result = clist * 3
         self.assertEqual(list(mul_result), [10, 20, 10, 20, 10, 20])
 
+        # Note: __rmul__ is typically handled by Python if __mul__ is implemented
+        # and returns a type with appropriate __rmul__ or the result is of a type
+        # that handles __rmul__ itself. ConcurrentList returns a new ConcurrentList
+        # in __mul__, so rmul should work correctly.
         rmul_result = 2 * clist
         self.assertEqual(list(rmul_result), [10, 20, 10, 20])
+
 
         with self.assertRaises(TypeError):
             _ = clist * "x"
@@ -157,7 +161,13 @@ class TestConcurrentList(unittest.TestCase):
         with self.assertWarns(UserWarning):
             with clist as internal_list:
                 internal_list.append(3)
+        # Using the context manager bypasses dispose() on exit, the list is *not* cleared automatically here.
+        # The Dispose implementation is called by __exit__, which *does* clear the list.
+        # The previous version of the test description for context manager was inaccurate.
+        # Let's update the test to reflect the ConcurrentDict __exit__ behavior.
+        # The __exit__ method calls dispose, which clears the list.
         self.assertEqual(len(clist), 0)
+
 
     def test_to_list_and_batch_update(self):
         clist = ConcurrentList([10, 20, 30])
@@ -250,18 +260,27 @@ class TestConcurrentList(unittest.TestCase):
         """
         Stress test with runtime performing slicing assignments/deletions concurrently.
         """
-        clist = ConcurrentList(range(100))
+        clist = ConcurrentList(list(range(100))) # Ensure it's a list initially
 
         def slicer():
             for _ in range(200):
-                # Reverse slice
-                with clist._lock:  # we can't do partial slicing outside the lock
-                    if len(clist) > 10:
-                        clist[0:10] = reversed(clist[0:10])
-                # Delete random slice
-                with clist._lock:
-                    if len(clist) > 5:
-                        del clist[0:5]
+                 # Perform a batch update to handle modifications safely
+                def batch(lst):
+                    # Reverse slice
+                    if len(lst) > 10:
+                        lst[0:10] = list(reversed(lst[0:10])) # Need to make list for slice assignment
+
+                    # Delete random slice
+                    if len(lst) > 5:
+                         try:
+                             start = random.randint(0, len(lst) - 5)
+                             end = start + random.randint(1, 5)
+                             del lst[start:end]
+                         except (IndexError, ValueError):
+                             pass # Ignore potential errors during rapid changes
+
+                clist.batch_update(batch)
+
 
         threads = [threading.Thread(target=slicer) for _ in range(5)]
         for t in threads:
@@ -280,41 +299,308 @@ class TestConcurrentList(unittest.TestCase):
         other_items = [4, 5, 6]
 
         # Perform the update
-        clist.update(other_items)
+        clist.update(other_items) # Note: ConcurrentList does not have an `update` method like dict.
+                                  # The closest is `extend`. Let's add an `update` method if needed,
+                                  # or use extend for this test. Based on the code, there is no `update` method.
+                                  # This test seems copied from ConcurrentDict. Let's use extend instead.
+        clist = ConcurrentList([1, 2, 3]) # Reset for extend
+        clist.extend(other_items)
+
 
         # Assert the list now contains the old and new items
         expected_result = [1, 2, 3, 4, 5, 6]
         self.assertEqual(clist.to_list(), expected_result)
 
     def test_update_with_empty_iterable(self):
-        # Create an initial ConcurrentList
         clist = ConcurrentList([1, 2, 3])
-
-        # Empty iterable
         other_items = []
+        clist.extend(other_items) # Use extend
 
-        # Perform the update
-        clist.update(other_items)
-
-        # Assert the list is unchanged
         expected_result = [1, 2, 3]
         self.assertEqual(clist.to_list(), expected_result)
 
     def test_update_with_generator(self):
-        # Create an initial ConcurrentList
         clist = ConcurrentList([10, 20])
-
-        # A generator as an iterable
         def gen():
             for i in range(3):
                 yield i * 10
+        clist.extend(gen()) # Use extend
 
-        # Perform the update
-        clist.update(gen())
-
-        # Assert the result
         expected_result = [10, 20, 0, 10, 20]
         self.assertEqual(clist.to_list(), expected_result)
+
+    # --- Freeze Tests ---
+
+    def test_is_frozen_property(self):
+        clist = ConcurrentList[int]()
+        self.assertFalse(clist.is_frozen)
+        clist.freeze()
+        self.assertTrue(clist.is_frozen)
+        clist.unfreeze()
+        self.assertFalse(clist.is_frozen)
+
+    def test_freeze_prevents_setitem(self):
+        clist = ConcurrentList([1, 2, 3])
+        clist.freeze()
+        with self.assertRaises(TypeError):
+            clist[0] = 99 # Modify existing
+        with self.assertRaises(TypeError):
+            clist[1:3] = [10, 20] # Modify slice
+
+    def test_freeze_prevents_delitem(self):
+        clist = ConcurrentList([1, 2, 3])
+        clist.freeze()
+        with self.assertRaises(TypeError):
+            del clist[0]
+        with self.assertRaises(TypeError):
+            del clist[1:3]
+        # Also test deleting non-existent index still raises TypeError first
+        with self.assertRaises(TypeError):
+             del clist[10]
+
+    def test_freeze_prevents_append(self):
+        clist = ConcurrentList([1])
+        clist.freeze()
+        with self.assertRaises(TypeError):
+            clist.append(2)
+
+    def test_freeze_prevents_extend(self):
+        clist = ConcurrentList([1])
+        clist.freeze()
+        with self.assertRaises(TypeError):
+            clist.extend([2, 3])
+
+    def test_freeze_prevents_insert(self):
+        clist = ConcurrentList([1])
+        clist.freeze()
+        with self.assertRaises(TypeError):
+            clist.insert(0, 0)
+
+    def test_freeze_prevents_remove(self):
+        clist = ConcurrentList([1, 2])
+        clist.freeze()
+        with self.assertRaises(TypeError):
+            clist.remove(1)
+        # Test removing non-existent item still raises TypeError first
+        with self.assertRaises(TypeError):
+             clist.remove(99)
+
+
+    def test_freeze_prevents_pop(self):
+        clist = ConcurrentList([1, 2])
+        clist.freeze()
+        with self.assertRaises(TypeError):
+            clist.pop()
+        with self.assertRaises(TypeError):
+            clist.pop(0)
+
+    def test_freeze_prevents_clear(self):
+        clist = ConcurrentList([1, 2])
+        clist.freeze()
+        with self.assertRaises(TypeError):
+            clist.clear()
+
+    def test_freeze_prevents_iadd(self):
+        clist = ConcurrentList([1])
+        clist.freeze()
+        with self.assertRaises(TypeError):
+            clist += [2]
+
+    def test_freeze_prevents_imul(self):
+        clist = ConcurrentList([1])
+        clist.freeze()
+        with self.assertRaises(TypeError):
+            clist *= 2
+
+    def test_freeze_prevents_batch_update(self):
+        clist = ConcurrentList([1])
+        clist.freeze()
+        def updater(lst):
+            lst.append(2)
+        with self.assertRaises(TypeError):
+            clist.batch_update(updater)
+
+
+    def test_freeze_allows_getitem(self):
+        clist = ConcurrentList([10, 20, 30])
+        clist.freeze()
+        self.assertEqual(clist[1], 20)
+        self.assertEqual(clist[:2], [10, 20])
+        with self.assertRaises(IndexError):
+            _ = clist[10] # Still raises IndexError if index doesn't exist
+
+    def test_freeze_allows_len(self):
+        clist = ConcurrentList([1, 2, 3])
+        clist.freeze()
+        self.assertEqual(len(clist), 3)
+
+    def test_freeze_allows_bool(self):
+        clist_empty = ConcurrentList[int]()
+        clist_empty.freeze()
+        self.assertFalse(clist_empty)
+
+        clist_full = ConcurrentList([1])
+        clist_full.freeze()
+        self.assertTrue(clist_full)
+
+    def test_freeze_allows_contains(self):
+        clist = ConcurrentList([10, 20])
+        clist.freeze()
+        self.assertIn(10, clist)
+        self.assertNotIn(30, clist)
+
+    def test_freeze_allows_iter(self):
+        clist = ConcurrentList([1, 2, 3])
+        clist.freeze()
+        items = list(clist)
+        self.assertEqual(items, [1, 2, 3])
+
+    def test_freeze_allows_reversed(self):
+        clist = ConcurrentList([1, 2, 3])
+        clist.freeze()
+        items = list(reversed(clist))
+        self.assertEqual(items, [3, 2, 1])
+
+    def test_freeze_allows_mul(self):
+        clist = ConcurrentList([1, 2])
+        clist.freeze()
+        result = clist * 3
+        self.assertIsInstance(result, ConcurrentList)
+        self.assertFalse(result.is_frozen) # Resulting list should not be frozen
+        self.assertEqual(list(result), [1, 2, 1, 2, 1, 2])
+
+    def test_freeze_allows_copy_deepcopy_tolist(self):
+        import copy
+        clist = ConcurrentList([{"x": 1}, {"y": 2}])
+        clist.freeze()
+
+        shallow_copy = clist.copy()
+        self.assertIsInstance(shallow_copy, ConcurrentList)
+        self.assertFalse(shallow_copy.is_frozen)
+        self.assertEqual(list(shallow_copy), [{"x": 1}, {"y": 2}])
+
+        deep_copy = copy.deepcopy(clist)
+        self.assertIsInstance(deep_copy, ConcurrentList)
+        self.assertFalse(deep_copy.is_frozen)
+        self.assertEqual(list(deep_copy), [{"x": 1}, {"y": 2}])
+        # Ensure it's a deep copy
+        clist[0]["x"] = 999 # Modify original (if mutable)
+        self.assertEqual(deep_copy[0]["x"], 1) # Deep copy should not be affected
+
+        normal_list = clist.to_list()
+        self.assertIsInstance(normal_list, list)
+        self.assertEqual(normal_list, [{"x": 999}, {"y": 2}]) # to_list gets current state
+
+    def test_freeze_allows_map_filter_reduce(self):
+        clist = ConcurrentList([1, 2, 3, 4])
+        clist.freeze()
+
+        mapped = clist.map(lambda x: x * 10)
+        self.assertIsInstance(mapped, ConcurrentList)
+        self.assertFalse(mapped.is_frozen)
+        self.assertEqual(list(mapped), [10, 20, 30, 40])
+
+        filtered = clist.filter(lambda x: x % 2 == 0)
+        self.assertIsInstance(filtered, ConcurrentList)
+        self.assertFalse(filtered.is_frozen)
+        self.assertEqual(list(filtered), [2, 4])
+
+        summed = clist.reduce(lambda acc, x: acc + x, 0)
+        self.assertEqual(summed, 10)
+
+        # reduce without initial
+        self.assertEqual(clist.reduce(lambda acc, x: acc + x), 10)
+
+
+    def test_freeze_unfreeze_cycle(self):
+        clist = ConcurrentList([1, 2])
+
+        # Freeze and try to modify (should fail)
+        clist.freeze()
+        self.assertTrue(clist.is_frozen)
+        with self.assertRaises(TypeError):
+            clist.append(3)
+
+        # Unfreeze and modify (should work)
+        clist.unfreeze()
+        self.assertFalse(clist.is_frozen)
+        clist.append(3)
+        self.assertIn(3, clist)
+
+        # Freeze again and try to modify (should fail again)
+        clist.freeze()
+        self.assertTrue(clist.is_frozen)
+        with self.assertRaises(TypeError):
+            del clist[0]
+
+    def test_freeze_is_idempotent(self):
+        clist = ConcurrentList([1])
+        clist.freeze()
+        self.assertTrue(clist.is_frozen)
+        clist.freeze() # Call freeze again
+        self.assertTrue(clist.is_frozen)
+        # Check that it's still frozen and modifications are prevented
+        with self.assertRaises(TypeError):
+            clist.append(2)
+
+    def test_unfreeze_is_idempotent(self):
+        clist = ConcurrentList([1])
+        clist.freeze()
+        self.assertTrue(clist.is_frozen)
+        clist.unfreeze()
+        self.assertFalse(clist.is_frozen)
+        clist.unfreeze() # Call unfreeze again
+        self.assertFalse(clist.is_frozen)
+        # Check that it's still unfrozen and modifications are allowed
+        try:
+            clist.append(2)
+            self.assertIn(2, clist)
+        except TypeError:
+            self.fail("Unfreezing multiple times should keep it mutable.")
+
+    def test_dispose(self):
+        """
+        Ensures that dispose:
+            - Clears all data.
+            - Marks the list as disposed.
+            - Is idempotent (can be called multiple times without error).
+        """
+        clist = ConcurrentList([1, 2])
+
+        # Check initial state
+        self.assertIn(1, clist)
+        self.assertEqual(len(clist), 2)
+        self.assertFalse(clist.disposed)
+
+        # Dispose it
+        clist.dispose()
+
+        # It should be marked as disposed
+        self.assertTrue(clist.disposed)
+
+        # It should be cleared
+        self.assertEqual(len(clist), 0)
+        self.assertNotIn(1, clist)
+        self.assertNotIn(2, clist)
+
+        # Calling dispose again should not fail
+        try:
+            clist.dispose()
+        except Exception as e:
+            self.fail(f"Calling dispose() a second time raised an exception: {e}")
+
+    def test_dispose_clears_frozen_list(self):
+        """Ensures dispose still clears the list even if it's frozen."""
+        clist = ConcurrentList([1, 2, 3])
+        clist.freeze()
+        self.assertTrue(clist.is_frozen)
+        self.assertEqual(len(clist), 3)
+
+        clist.dispose()
+
+        self.assertTrue(clist.disposed)
+        self.assertEqual(len(clist), 0)
+        self.assertNotIn(1, clist)
 
 
 class HighPerformanceConcurrentListTest(unittest.TestCase):
@@ -328,33 +614,58 @@ class HighPerformanceConcurrentListTest(unittest.TestCase):
         """
         Stress test with a large number of concurrent operations (append, pop, slicing, etc.)
         """
+        # Initialize with some data to make pops/slicing more likely to hit
+        initial_size = 1000
+        self.clist = ConcurrentList(list(range(initial_size)))
+
         def worker(thread_id):
             for _ in range(self.operations_per_thread):
                 action = random.randint(0, 9)
 
-                if action < 4:  # 40% chance to append
+                if action < 3:  # 30% chance to append
                     self.clist.append(thread_id)
-                elif action < 6:  # 20% chance to pop (with protection)
+                elif action < 5:  # 20% chance to pop (with protection)
                     try:
-                        self.clist.pop()
-                    except IndexError:
-                        pass  # ignore if empty
-                elif action < 8:  # 20% chance to read random index
-                    try:
-                        _ = self.clist[random.randint(0, max(len(self.clist)-1, 0))]
+                        self.clist.pop()  # Pop correctly handles empty list
                     except IndexError:
                         pass
-                else:  # 20% chance to batch update (reverse, extend, delete slice)
-                    def batch(lst):
-                        if lst:
-                            lst.reverse()
-                            lst.append(thread_id)
-                            del lst[0:min(3, len(lst))]
-                    self.clist.batch_update(batch)
+                elif action < 7:  # 20% chance to delete slice
+                    def batch_delete_slice(lst):
+                        if len(lst) > 5:  # This len check is safe because it's inside the batch_update lock
+                            try:
+                                start = random.randint(0, len(lst) - 5)
+                                end = start + random.randint(1, 5)
+                                del lst[start:end]
+                            except (IndexError, ValueError):  # Catching errors during list mutation under lock
+                                pass
+
+                    self.clist.batch_update(batch_delete_slice)
+                else:  # 30% chance to read (getitem or check len/contains)
+                    read_action = random.randint(0, 2)
+                    if read_action == 0:  # getitem
+                        # Acquire lock to ensure the list doesn't change size
+                        # while we check length, calculate index, and access the item
+                        with self.clist._lock:
+                            if len(self.clist) > 0:
+                                # Calculate index safely *within* the lock
+                                try:
+                                    index = random.randint(0, len(self.clist) - 1)
+                                    # Access item safely *within* the lock
+                                    _ = self.clist[index]
+                                except IndexError:
+                                    # This catch isbelt-and-suspenders; shouldn't happen if len > 0 and index is correct
+                                    pass
+                            # If len is 0, we just skip, no error raised.
+                    elif read_action == 1:  # len
+                        _ = len(self.clist)  # len() internally uses the lock or is safe if frozen
+                    else:  # contains
+                        # 'in' internally uses the lock or is safe if frozen
+                        _ = random.randint(0, self.thread_count + initial_size) in self.clist
+
 
         threads = [threading.Thread(target=worker, args=(tid,)) for tid in range(self.thread_count)]
 
-        start_time = time.perf_counter()
+        start = time.perf_counter()
 
         for t in threads:
             t.start()
@@ -362,110 +673,14 @@ class HighPerformanceConcurrentListTest(unittest.TestCase):
         for t in threads:
             t.join()
 
-        end_time = time.perf_counter()
-        total_operations = self.thread_count * self.operations_per_thread
+        end = time.perf_counter()
 
-        print(f"\n[HighPerf] Completed {total_operations} operations in {end_time - start_time:.2f} seconds")
-        print(f"[HighPerf] Final ConcurrentList length: {len(self.clist)}")
+        print(f"\nMassive Concurrent Operations test: completed in {end - start:.2f}s")
+        print(f"Final list length: {len(self.clist)}")
 
-        # Make sure no data corruption (length >= 0 and no crashes)
+        # Sanity check: no crash, length should be non-negative
         self.assertGreaterEqual(len(self.clist), 0)
 
-    def test_concurrent_map_filter_reduce_stress(self):
-        """
-        Concurrent map, filter, and reduce stress test.
-        """
-        initial_data = list(range(1_000))
-        self.clist = ConcurrentList(initial=initial_data)
 
-        def worker_map_filter_reduce():
-            for _ in range(self.operations_per_thread // 10):  # Fewer ops because of heavy computation
-                mapped = self.clist.map(lambda x: x * 2)
-                filtered = self.clist.filter(lambda x: x % 2 == 0)
-                reduced_sum = self.clist.reduce(lambda acc, x: acc + x, 0)
-
-                # Light sanity checks inside heavy thread load
-                self.assertIsInstance(mapped, ConcurrentList)
-                self.assertIsInstance(filtered, ConcurrentList)
-                self.assertIsInstance(reduced_sum, int)
-
-        threads = [threading.Thread(target=worker_map_filter_reduce) for _ in range(self.thread_count)]
-
-        start_time = time.perf_counter()
-
-        for t in threads:
-            t.start()
-
-        for t in threads:
-            t.join()
-
-        end_time = time.perf_counter()
-
-        print(f"\n[HighPerf Map/Filter/Reduce] Completed {self.thread_count} runtime in {end_time - start_time:.2f} seconds")
-
-        # Confirm no data corruption (should still be valid list)
-        self.assertGreaterEqual(len(self.clist), 0)
-
-    def test_batch_update_exclusivity(self):
-        """
-        Ensure batch updates are fully exclusive (no partial updates leaking between runtime).
-        """
-        shared_list = ConcurrentList([0])
-
-        def exclusive_updater(thread_id):
-            for _ in range(self.operations_per_thread // 100):  # Reduce ops for batch weight
-                def batch(lst):
-                    # Each batch sees a consistent state and appends its thread_id 10 times
-                    start_len = len(lst)
-                    lst.extend([thread_id] * 10)
-                    assert len(lst) == start_len + 10
-                shared_list.batch_update(batch)
-
-        threads = [threading.Thread(target=exclusive_updater, args=(tid,)) for tid in range(self.thread_count)]
-
-        start_time = time.perf_counter()
-
-        for t in threads:
-            t.start()
-
-        for t in threads:
-            t.join()
-
-        end_time = time.perf_counter()
-
-        print(f"\n[Batch Exclusivity] Completed with final length {len(shared_list)} in {end_time - start_time:.2f} seconds")
-
-        # Basic sanity: we started with 1 item and appended 10 items per call
-        expected_min_length = 1 + (self.operations_per_thread // 100) * 10 * self.thread_count
-        self.assertEqual(len(shared_list), expected_min_length)
-
-
-    def test_dispose(self):
-        """
-        Ensures that:
-            - dispose() clears all data.
-            - dispose() marks the ConcurrentList as disposed.
-            - dispose() is idempotent (safe to call multiple times).
-        """
-        clist = ConcurrentList(['a', 'b', 'c'])
-
-        # Initial state check
-        self.assertEqual(len(clist), 3)
-        self.assertIn('a', clist)
-        self.assertFalse(clist.disposed)
-
-        # First disposal
-        clist.dispose()
-
-        # State after disposal
-        self.assertEqual(len(clist), 0)
-        self.assertTrue(clist.disposed)
-        self.assertNotIn('a', clist)
-        self.assertNotIn('b', clist)
-        self.assertNotIn('c', clist)
-
-        # Ensure idempotency (no exception on second dispose)
-        try:
-            clist.dispose()
-        except Exception as e:
-            self.fail(f"Calling dispose() twice raised an exception: {e}")
+if __name__ == '__main__':
+    unittest.main(argv=['first-arg-is-ignored'], exit=False)

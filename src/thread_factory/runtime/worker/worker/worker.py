@@ -5,7 +5,7 @@ import ulid
 import ctypes
 from typing import Callable, Any, Union
 from thread_factory.runtime.orchestrator.monitoring.records.records import Records, Record
-from thread_factory.utils import Disposable
+from thread_factory.utils import IDisposable
 from enum import Enum, auto
 
 
@@ -26,7 +26,7 @@ class WorkerState(Enum):
     DEAD = auto()  # Fully stopped, no longer participating
     DISPOSED = auto()  # Disposed, no longer usable
 
-class Worker(threading.Thread, Disposable):
+class Worker(threading.Thread, IDisposable):
     """
     Worker Thread
     -------------
@@ -59,7 +59,6 @@ class Worker(threading.Thread, Disposable):
         self.shutdown_flag = threading.Event()
         self.completed_work = 0
         self.death_event = threading.Event()
-        self.disposed = False
 
     def run(self):
         """Main worker loop: pulls from queue and executes work."""

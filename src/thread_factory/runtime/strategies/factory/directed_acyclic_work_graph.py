@@ -1,11 +1,11 @@
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from thread_factory.utils.disposable import Disposable
+from thread_factory.utils.disposable import IDisposable
 
 # TODO: Remember that this DAG system is not adapted for parallelization. It sequentially executes work.
 
 
-class StateObject(Disposable):
+class StateObject(IDisposable):
     """
     Thread-safe state object that references a Directed Acyclic Graph (DAG)
     for dynamic modifications during execution.
@@ -27,7 +27,6 @@ class StateObject(Disposable):
         self._dag = dag  # Store a reference to the DAG
         self._execution_data = {}  # Dictionary to store the execution status of each node (node_id: status)
         self._state_lock = threading.RLock()  # Reentrant lock for thread-safe access to the state
-        self.disposed = False  # Flag indicating if the object has been disposed
 
     def register_node_result(self, node_id, success=True):
         """
@@ -120,7 +119,7 @@ class StateObject(Disposable):
 
 
 
-class ExecutionContext(Disposable):
+class ExecutionContext(IDisposable):
     """
     Abstract base class for defining the 'work to be done' within a Node.
 
@@ -140,8 +139,8 @@ class ExecutionContext(Disposable):
         Args:
             state: The shared StateObject instance.
         """
+        super().__init__()  # Initialize the Disposable base class
         self.state = state  # Store a reference to the shared state object
-        self.disposed = False  # Flag indicating if the object has been disposed
         self._dispose_lock = threading.RLock()  # Lock for thread-safe disposal
 
     def execute(self):
@@ -188,7 +187,7 @@ class ExecutionContext(Disposable):
         self.dispose()
 
 
-class Node(Disposable):
+class Node(IDisposable):
     """
     Represents a node in the Directed Acyclic Graph (DAG).
 
@@ -208,7 +207,6 @@ class Node(Disposable):
         """
         super().__init__()  # Initialize the Disposable base class
         self.id = node_id  # Unique identifier of the node
-        self.disposed = False  # Flag indicating if the node has been disposed
         self._lock = threading.RLock()  # Reentrant lock for thread-safe access to node data
 
         # Data structures to manage connections and tasks
@@ -395,7 +393,7 @@ class Node(Disposable):
             self.disposed = True  # Mark the node as disposed
 
 
-class Edge(Disposable):
+class Edge(IDisposable):
     """
     Represents a directed edge in the DAG, connecting two nodes.
 
@@ -411,7 +409,6 @@ class Edge(Disposable):
             to_node: The Node object where the edge points to.
         """
         super().__init__()  # Initialize the Disposable base class
-        self.disposed = False  # Flag indicating if the edge has been disposed
         self.from_node = from_node  # The source node of the edge
         self.to_node = to_node  # The destination node of the edge
         self._edge_lock = threading.RLock()  # Lock for thread-safe disposal
@@ -427,7 +424,7 @@ class Edge(Disposable):
             self.from_node = None  # Remove the reference to the source node
             self.to_node = None  # Remove the reference to the destination node
 
-class DirectedAcyclicWorkGraph(Disposable):
+class DirectedAcyclicWorkGraph(IDisposable):
     """
     Represents a Directed Acyclic Graph (DAG) composed of nodes and edges.
 
@@ -446,7 +443,6 @@ class DirectedAcyclicWorkGraph(Disposable):
         self._nodes = {}  # Dictionary to store nodes (node_id: Node object)
         self._edges = []  # List to store Edge objects
         self._lock = threading.RLock()  # Reentrant lock for thread-safe access to the DAG's data structures
-        self.disposed = False  # Flag indicating if the DAG has been disposed
 
     def add_node(self, node):
         """

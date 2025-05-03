@@ -1,8 +1,8 @@
 import threading
 import traceback
-from thread_factory.utils import Disposable
+from thread_factory.utils import IDisposable
 
-class AutoResetTimer(Disposable):
+class AutoResetTimer(IDisposable):
     """
     AutoResetTimer
     --------------
@@ -23,6 +23,7 @@ class AutoResetTimer(Disposable):
             callback (Callable): The function to call on each interval.
             daemon (bool): Whether the internal timer thread should run as a daemon. Default is True.
         """
+        super().__init__()
         self.interval = interval_sec
         self.callback = callback
         self.daemon = daemon
@@ -95,5 +96,9 @@ class AutoResetTimer(Disposable):
         Dispose of the timer and stop any scheduled execution.
         This should be called to clean up the timer when no longer needed.
         """
-        self.stop()
-        self._timer = None
+        if self.disposed:
+            return
+        with self._lock:
+            self.disposed = True
+            self.stop()
+            self._timer = None

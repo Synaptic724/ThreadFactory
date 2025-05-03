@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-class Disposable(ABC):
+class IDisposable(ABC):
     """
     Abstract base class for all disposable objects in the system.
 
@@ -19,12 +19,12 @@ class Disposable(ABC):
         - Optionally provide a `cleanup()` alias.
         - Handle multiple calls to `dispose()` gracefully.
     """
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.dispose()
+    def __init__(self):
+        """
+        Constructor for IDisposable.
+        This is a no-op, but can be overridden by subclasses if needed.
+        """
+        self.disposed = False
 
     @abstractmethod
     def dispose(self):
@@ -38,10 +38,3 @@ class Disposable(ABC):
             - Be idempotent (safe to call multiple times).
         """
         raise NotImplementedError
-
-    def cleanup(self):
-        """
-        Optional alias to dispose() to allow compatibility with systems
-        or developers expecting cleanup() as the entrypoint.
-        """
-        self.dispose()

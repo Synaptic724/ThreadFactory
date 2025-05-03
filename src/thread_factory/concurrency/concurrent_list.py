@@ -4,11 +4,11 @@ import warnings
 from copy import deepcopy
 from typing import Any, Callable, Optional, List, TypeVar, Generic
 from collections.abc import Iterable, Iterator
-from thread_factory.utils import Disposable
+from thread_factory.utils import IDisposable
 
 _T = TypeVar('_T')
 
-class ConcurrentList(Generic[_T], Disposable):
+class ConcurrentList(Generic[_T], IDisposable):
     """
     A thread-safe list implementation using an underlying Python list,
     a reentrant lock for synchronization, and an atomic counter for fast,
@@ -26,9 +26,36 @@ class ConcurrentList(Generic[_T], Disposable):
         Args:
             initial (Iterable[_T], optional): An iterable to initialize the list.
         """
+        super().__init__()
         self._lock = threading.RLock()
         self._list: List[_T] = list(initial) if initial else []
-        self.disposed = False
+        self._freeze = False
+
+    def freeze(self) -> None:
+        """
+        Freeze the dictionary to prevent further modifications.
+        This is useful for making the dictionary immutable after initialization.
+        """
+        with self._lock:
+            self._freeze = True
+
+    @property
+    def is_frozen(self) -> bool:
+        """
+        Check if the dictionary is frozen.
+
+        Returns:
+            bool: True if the dictionary is frozen, False otherwise.
+        """
+        return self._freeze
+
+    def unfreeze(self) -> None:
+        """
+        Unfreeze the dictionary to allow modifications.
+        This is useful for making the dictionary mutable again after being frozen.
+        """
+        with self._lock:
+            self._freeze = False
 
     def __getitem__(self, index: int | slice) -> _T | List[_T]:
         """
@@ -48,7 +75,7 @@ class ConcurrentList(Generic[_T], Disposable):
         Raises:
             IndexError: If the index is out of range.
         """
-        with self._lock:
+        if self._freeze:
             if isinstance(index, int):
                 try:
                     return self._list[index]
@@ -57,6 +84,16 @@ class ConcurrentList(Generic[_T], Disposable):
             else:  # slice
                 # Return a shallow copy of the slice
                 return self._list[index].copy()
+        else:
+            with self._lock:
+                if isinstance(index, int):
+                    try:
+                        return self._list[index]
+                    except IndexError:
+                        raise IndexError("ConcurrentList index out of range")
+                else:  # slice
+                    # Return a shallow copy of the slice
+                    return self._list[index].copy()
 
     def __setitem__(self, index: int | slice, value: _T | Iterable[_T]) -> None:
         """
@@ -74,23 +111,26 @@ class ConcurrentList(Generic[_T], Disposable):
         Raises:
             IndexError: If the index is out of range.
         """
-        with self._lock:
-            if isinstance(index, int):
-                try:
-                    # If value is an iterable, type checkers might complain, so ignore for brevity
-                    self._list[index] = value  # type: ignore
-                except IndexError:
-                    raise IndexError("ConcurrentList index out of range")
-            else:
-                old_slice = self._list[index]
-                # Ensure we're assigning a list if it's an iterable, or treat as single item
-                if isinstance(value, Iterable) and not isinstance(value, str):
-                    value_list = list(value)
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            with self._lock:
+                if isinstance(index, int):
+                    try:
+                        # If value is an iterable, type checkers might complain, so ignore for brevity
+                        self._list[index] = value  # type: ignore
+                    except IndexError:
+                        raise IndexError("ConcurrentList index out of range")
                 else:
-                    # Fallback if someone calls slice assignment with a single non-iterable
-                    # You could also just raise TypeError here if you prefer stricter behavior
-                    value_list = [value]  # type: ignore
-                self._list[index] = value_list
+                    old_slice = self._list[index]
+                    # Ensure we're assigning a list if it's an iterable, or treat as single item
+                    if isinstance(value, Iterable) and not isinstance(value, str):
+                        value_list = list(value)
+                    else:
+                        # Fallback if someone calls slice assignment with a single non-iterable
+                        # You could also just raise TypeError here if you prefer stricter behavior
+                        value_list = [value]  # type: ignore
+                    self._list[index] = value_list
 
     def __delitem__(self, index: int | slice) -> None:
         """
@@ -105,16 +145,19 @@ class ConcurrentList(Generic[_T], Disposable):
         Raises:
             IndexError: If the index is out of range (for int index).
         """
-        with self._lock:
-            try:
-                del self._list[index]
-            except IndexError:
-                # Only raise a custom message for int index, slices behave differently
-                if isinstance(index, int):
-                    raise IndexError("ConcurrentList index out of range")
-                else:
-                    # Re-raise slice-related errors (could be ValueError or IndexError)
-                    raise
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            with self._lock:
+                try:
+                    del self._list[index]
+                except IndexError:
+                    # Only raise a custom message for int index, slices behave differently
+                    if isinstance(index, int):
+                        raise IndexError("ConcurrentList index out of range")
+                    else:
+                        # Re-raise slice-related errors (could be ValueError or IndexError)
+                        raise
 
     def append(self, item: _T) -> None:
         """
@@ -123,8 +166,11 @@ class ConcurrentList(Generic[_T], Disposable):
         Args:
             item (_T): The item to append.
         """
-        with self._lock:
-            self._list.append(item)
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            with self._lock:
+                self._list.append(item)
 
     def extend(self, items: Iterable[_T]) -> None:
         """
@@ -136,9 +182,12 @@ class ConcurrentList(Generic[_T], Disposable):
         Raises:
             TypeError: If items is not iterable (e.g., if it's None).
         """
-        with self._lock:
-            for x in items:
-                self._list.append(x)
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            with self._lock:
+                for x in items:
+                    self._list.append(x)
 
     def insert(self, index: int, item: _T) -> None:
         """
@@ -151,9 +200,12 @@ class ConcurrentList(Generic[_T], Disposable):
         Raises:
             IndexError: If the index is out of range (depending on desired behavior).
         """
-        with self._lock:
-            # Python's list.insert clamps the index if out of range, but you can raise if you prefer
-            self._list.insert(index, item)
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            with self._lock:
+                # Python's list.insert clamps the index if out of range, but you can raise if you prefer
+                self._list.insert(index, item)
 
     def remove(self, item: _T) -> None:
         """
@@ -165,11 +217,14 @@ class ConcurrentList(Generic[_T], Disposable):
         Raises:
             ValueError: If the item is not found.
         """
-        with self._lock:
-            try:
-                self._list.remove(item)
-            except ValueError:
-                raise ValueError(f"'{item}' not in ConcurrentList")
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            with self._lock:
+                try:
+                    self._list.remove(item)
+                except ValueError:
+                    raise ValueError(f"'{item}' not in ConcurrentList")
 
     def pop(self, index: int = -1) -> _T:
         """
@@ -184,20 +239,26 @@ class ConcurrentList(Generic[_T], Disposable):
         Raises:
             IndexError: If the list is empty or index is out of range.
         """
-        with self._lock:
-            if not self._list:
-                raise IndexError("pop from empty ConcurrentList")
-            try:
-                return self._list.pop(index)
-            except IndexError:
-                raise IndexError("ConcurrentList index out of range for pop")
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            with self._lock:
+                if not self._list:
+                    raise IndexError("pop from empty ConcurrentList")
+                try:
+                    return self._list.pop(index)
+                except IndexError:
+                    raise IndexError("ConcurrentList index out of range for pop")
 
     def clear(self) -> None:
         """
         Remove all items from the list.
         """
-        with self._lock:
-            self._list.clear()
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            with self._lock:
+                self._list.clear()
 
     def __len__(self) -> int:
         """
@@ -206,14 +267,21 @@ class ConcurrentList(Generic[_T], Disposable):
         Returns:
             int: The current size of the list.
         """
-        return len(self._list)
+        if self._freeze:
+            return len(self._list)
+        else:
+            with self._lock:
+                return len(self._list)
 
     def __iter__(self) -> Iterator[_T]:
         """
         Return an iterator over a shallow copy of the list.
         """
-        with self._lock:
-            return iter(self._list.copy())
+        if self._freeze:
+            return iter(self._list)
+        else:
+            with self._lock:
+                return iter(self._list.copy())
 
     def __contains__(self, item: Any) -> bool:
         """
@@ -225,22 +293,31 @@ class ConcurrentList(Generic[_T], Disposable):
         Returns:
             bool: True if the item is present, False otherwise.
         """
-        with self._lock:
+        if self._freeze:
             return item in self._list
+        else:
+            with self._lock:
+                return item in self._list
 
     def __repr__(self) -> str:
         """
         Return the official string representation of the ConcurrentList.
         """
-        with self._lock:
+        if self._freeze:
             return f"{self.__class__.__name__}({self._list!r})"
+        else:
+            with self._lock:
+                return f"{self.__class__.__name__}({self._list!r})"
 
     def __str__(self) -> str:
         """
         Return the informal string representation of the ConcurrentList.
         """
-        with self._lock:
+        if self._freeze:
             return str(self._list)
+        else:
+            with self._lock:
+                return str(self._list)
 
     def __eq__(self, other: Any) -> bool:
         """
@@ -281,8 +358,11 @@ class ConcurrentList(Generic[_T], Disposable):
         """
         Return a reverse iterator over a copy of the list.
         """
-        with self._lock:
-            return reversed(self._list.copy())
+        if self._freeze:
+            return reversed(self._list)
+        else:
+            with self._lock:
+                return reversed(self._list.copy())
 
     def __iadd__(self, other: Iterable[_T]) -> 'ConcurrentList[_T]':
         """
@@ -294,8 +374,11 @@ class ConcurrentList(Generic[_T], Disposable):
         Returns:
             ConcurrentList[_T]: self
         """
-        self.extend(other)
-        return self
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            self.extend(other)
+            return self
 
     def __imul__(self, n: int) -> 'ConcurrentList[_T]':
         """
@@ -310,11 +393,14 @@ class ConcurrentList(Generic[_T], Disposable):
         Raises:
             TypeError: If n is not an integer.
         """
-        if not isinstance(n, int):
-            raise TypeError("can't multiply sequence by non-int of type '{}'".format(type(n).__name__))
-        with self._lock:
-            self._list *= n
-        return self
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            if not isinstance(n, int):
+                raise TypeError("can't multiply sequence by non-int of type '{}'".format(type(n).__name__))
+            with self._lock:
+                self._list *= n
+            return self
 
     def __mul__(self, n: int) -> 'ConcurrentList[_T]':
         """
@@ -331,8 +417,12 @@ class ConcurrentList(Generic[_T], Disposable):
         """
         if not isinstance(n, int):
             raise TypeError("can't multiply sequence by non-int of type '{}'".format(type(n).__name__))
-        with self._lock:
+
+        if self._freeze:
             return ConcurrentList(initial=self._list * n)
+        else:
+            with self._lock:
+                return ConcurrentList(initial=self._list * n)
 
     def __rmul__(self, n: int) -> 'ConcurrentList[_T]':
         """
@@ -355,8 +445,11 @@ class ConcurrentList(Generic[_T], Disposable):
         Raises:
             ValueError: If the item is not present.
         """
-        with self._lock:
+        if self._freeze:
             return self._list.index(item, start, end if end is not None else len(self._list))
+        else:
+            with self._lock:
+                return self._list.index(item, start, end if end is not None else len(self._list))
 
     def count(self, item: Any) -> int:
         """
@@ -368,15 +461,32 @@ class ConcurrentList(Generic[_T], Disposable):
         Returns:
             int: The number of occurrences.
         """
-        with self._lock:
+        if self._freeze:
             return self._list.count(item)
+        else:
+            with self._lock:
+                return self._list.count(item)
 
     def __copy__(self) -> 'ConcurrentList[_T]':
         """
         Return a shallow copy of the ConcurrentList.
+        This method is called by copy.copy().
         """
-        with self._lock:
+        if self._freeze:
             return ConcurrentList(initial=self._list.copy())
+        else:
+            with self._lock:
+                return ConcurrentList(initial=self._list.copy())
+
+    def copy(self) -> "ConcurrentList[_T]":
+        """
+        Return a shallow copy of the ConcurrentList.
+
+        Returns:
+            ConcurrentList[_T]: A new ConcurrentList with copied items.
+        """
+        # Reusing the logic already present in __copy__
+        return self.__copy__()
 
     def __deepcopy__(self, memo: dict) -> 'ConcurrentList[_T]':
         """
@@ -388,8 +498,12 @@ class ConcurrentList(Generic[_T], Disposable):
         Returns:
             ConcurrentList[_T]: A deep copy of this ConcurrentList.
         """
-        with self._lock:
+        if self._freeze:
+            # If the list is frozen, we can safely deepcopy it
             return ConcurrentList(initial=deepcopy(self._list, memo))
+        else:
+            with self._lock:
+                return ConcurrentList(initial=deepcopy(self._list, memo))
 
 
     def to_list(self) -> List[_T]:
@@ -399,8 +513,12 @@ class ConcurrentList(Generic[_T], Disposable):
         Returns:
             List[_T]: A copy of the list.
         """
-        with self._lock:
+        if self._freeze:
+            # If the list is frozen, we can safely return a copy
             return list(self._list)
+        else:
+            with self._lock:
+                return list(self._list)
 
     def batch_update(self, func: Callable[[List[_T]], None]) -> None:
         """
@@ -411,8 +529,11 @@ class ConcurrentList(Generic[_T], Disposable):
             func (Callable[[List[_T]], None]): A function that accepts the internal list as its only argument.
                                                The function should perform all necessary mutations.
         """
-        with self._lock:
-            func(self._list)
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            with self._lock:
+                func(self._list)
 
     def sort(self, key: Optional[Callable[[_T], Any]] = None, reverse: bool = False) -> None:
         """
@@ -422,15 +543,21 @@ class ConcurrentList(Generic[_T], Disposable):
             key (Callable[[_T], Any], optional): A function used to extract a comparison key.
             reverse (bool, optional): If True, the list elements are sorted as if each comparison were reversed.
         """
-        with self._lock:
-            self._list.sort(key=key, reverse=reverse)
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            with self._lock:
+                self._list.sort(key=key, reverse=reverse)
 
     def reverse(self) -> None:
         """
         Reverse the elements of the list in-place.
         """
-        with self._lock:
-            self._list.reverse()
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            with self._lock:
+                self._list.reverse()
 
     def map(self, func: Callable[[_T], Any]) -> 'ConcurrentList[Any]':
         """
@@ -442,8 +569,11 @@ class ConcurrentList(Generic[_T], Disposable):
         Returns:
             ConcurrentList[Any]: A new ConcurrentList with the function applied to each element.
         """
-        with self._lock:
+        if self._freeze:
             return ConcurrentList(initial=list(map(func, self._list.copy())))
+        else:
+            with self._lock:
+                return ConcurrentList(initial=list(map(func, self._list.copy())))
 
     def filter(self, func: Callable[[_T], bool]) -> 'ConcurrentList[_T]':
         """
@@ -455,8 +585,11 @@ class ConcurrentList(Generic[_T], Disposable):
         Returns:
             ConcurrentList[_T]: A new ConcurrentList containing only elements where func(element) is True.
         """
-        with self._lock:
+        if self._freeze:
             return ConcurrentList(initial=list(filter(func, self._list.copy())))
+        else:
+            with self._lock:
+                return ConcurrentList(initial=list(filter(func, self._list.copy())))
 
     def reduce(self, func: Callable[[Any, _T], Any], initial: Optional[Any] = None) -> Any:
         """
@@ -472,9 +605,19 @@ class ConcurrentList(Generic[_T], Disposable):
         Raises:
             TypeError: If the list is empty and no initial value is provided.
         """
-        with self._lock:
-            snapshot = self._list.copy()
+        # Acquire lock only if not frozen
+        snapshot = []
+        if self._freeze:
+            # When frozen, we can access _list directly without the lock
+            snapshot = list(self._list)
+        else:
+            with self._lock:
+                snapshot = list(self._list)
+
         # Once copied, we can reduce outside the lock
+        if not snapshot and initial is None:
+            raise TypeError("reduce() of empty ConcurrentList with no initial value")
+
         if initial is None:
             return functools.reduce(func, snapshot)
         else:
@@ -488,8 +631,11 @@ class ConcurrentList(Generic[_T], Disposable):
         Args:
             other (Iterable[_T]): The iterable to update from.
         """
-        with self._lock:
-            self._list.extend(other)
+        if self._freeze:
+            raise TypeError("Cannot modify a frozen ConcurrentList")
+        else:
+            with self._lock:
+                self._list.extend(other)
 
     # -----------------------------------------------------------------------------------
     # Disposable Implementation

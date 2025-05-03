@@ -15,11 +15,11 @@ from typing import (
 )
 
 from thread_factory.concurrency import ConcurrentList
-from thread_factory.utils import Empty, Disposable
+from thread_factory.utils import Empty, IDisposable
 
 _T = TypeVar("_T")
 
-class ConcurrentStack(Generic[_T], Disposable):
+class ConcurrentStack(Generic[_T], IDisposable):
     """
     A thread-safe LIFO stack implementation using an underlying deque,
     a reentrant lock for synchronization, and an atomic counter for fast
@@ -34,6 +34,7 @@ class ConcurrentStack(Generic[_T], Disposable):
             self,
             initial: Optional[Iterable[_T]] = None
     ) -> None:
+        super().__init__()
         """
         Initialize the ConcurrentStack.
 
@@ -45,7 +46,6 @@ class ConcurrentStack(Generic[_T], Disposable):
             initial = []
         self._lock: threading.RLock = threading.RLock()
         self._deque: Deque[_T] = deque(initial)
-        self.disposed = False
 
     def push(self, item: _T) -> None:
         """

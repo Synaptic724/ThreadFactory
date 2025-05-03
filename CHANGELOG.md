@@ -45,6 +45,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - `DiagnosticsInterface`: Real-time throughput, queue, and performance tracking.
 - `Orchestrator`: Dynamic coordination of thread lifecycles, workloads, and contention resolution.
 
+
+### Changes
+- `ConcurrentDict` implemented an optimized version of pop.
+
 ---
 
 ## [1.2.1] - 2025-04-08

@@ -1,7 +1,7 @@
 import threading
-from thread_factory.utils import Disposable
+from thread_factory.utils import IDisposable
 
-class Dynaphore(threading.Semaphore, Disposable):
+class Dynaphore(threading.Semaphore, IDisposable):
     """
     A dynamic semaphore that can increase or decrease the number of permits at runtime.
     Exposes the internal Condition for wait/notify and provides dynamic scaling.
@@ -13,8 +13,6 @@ class Dynaphore(threading.Semaphore, Disposable):
             self._cond = threading.Condition() #This defaults to RLock instead of Lock
         else:
             self._cond = threading.Condition(threading.Lock())
-
-        self.disposed = False
 
     @property
     def condition(self) -> threading.Condition:

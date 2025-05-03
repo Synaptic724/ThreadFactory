@@ -1,10 +1,10 @@
 import threading
 import time
 from typing import Optional, Union, Iterable
-from thread_factory.utils import Disposable
+from thread_factory.utils import IDisposable
 from thread_factory.primatives.smart_condition import SmartCondition
 
-class SwitchLock(Disposable):
+class SwitchLock(IDisposable):
     """
     A dynamic, 'smart' semaphore that can:
       - Increase or decrease permits at runtime.
@@ -19,6 +19,7 @@ class SwitchLock(Disposable):
 
         :param value: The initial number of available permits (>= 0).
         """
+        super().__init__()
         # Validation: the initial number of permits cannot be negative.
         if value < 0:
             raise ValueError("SwitchLock initial value must be >= 0")
@@ -29,11 +30,6 @@ class SwitchLock(Disposable):
 
         # The current permit count (like a normal semaphore).
         self._value = value
-
-        # Flag to indicate that this lock has been "disposed",
-        # meaning no further usage is valid, and all waiting threads
-        # should be unblocked and return False from acquire().
-        self._disposed = False
 
     @property
     def condition(self) -> SmartCondition:
@@ -68,7 +64,7 @@ class SwitchLock(Disposable):
         # Use the condition as a context manager => automatically acquire/release its lock.
         with self._cond:
             # If the lock is disposed before we even start, we fail fast.
-            if self._disposed:
+            if self.disposed:
                 return False
 
             # -----------------------------
@@ -101,7 +97,7 @@ class SwitchLock(Disposable):
             # We loop until a permit is available OR we time out OR we get disposed.
             while self._value == 0:
                 # If disposed in the meantime, fail.
-                if self._disposed:
+                if self.disposed:
                     return False
 
                 # If a timeout is set, check how much time remains.
@@ -117,7 +113,7 @@ class SwitchLock(Disposable):
                     got_it = self._cond.wait()
 
                 # We woke up from waiting. Could be due to a notify, spurious wake, or disposal.
-                if self._disposed:
+                if self.disposed:
                     # If disposed, fail with False.
                     return False
                 if not got_it:
@@ -228,20 +224,20 @@ class SwitchLock(Disposable):
         :return: List of .factory_id from all waiting threads.
                  If disposed or _cond is None, return an empty list.
         """
-        if self._disposed or self._cond is None:
+        if self.disposed or self._cond is None:
             return []
         return self._cond.get_all_waiting_factory_ids()
 
     def dispose(self):
         """
         Dispose of the SwitchLock, waking any waiters so they can exit gracefully.
-        Any thread currently in acquire() will see self._disposed=True and return False.
+        Any thread currently in acquire() will see self.disposed=True and return False.
 
         After dispose(), the lock is no longer valid for normal usage.
         """
-        if self._disposed:
+        if self.disposed:
             return
-        self._disposed = True
+        self.disposed = True
         # Wake up everyone so they can see that we've been disposed
         with self._cond:
             self._cond.notify_all()

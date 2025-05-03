@@ -2,7 +2,7 @@ import threading
 import unittest
 import random
 import time
-from thread_factory import ConcurrentDict
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 
 
 class TestConcurrentDict(unittest.TestCase):
@@ -495,3 +495,202 @@ class HighPerformanceConcurrentDictTest(unittest.TestCase):
             d.dispose()
         except Exception as e:
             self.fail(f"Calling dispose() a second time raised an exception: {e}")
+
+    def test_is_frozen_property(self):
+        d = ConcurrentDict[str, int]()
+        self.assertFalse(d.is_frozen)
+        d.freeze()
+        self.assertTrue(d.is_frozen)
+        d.unfreeze()
+        self.assertFalse(d.is_frozen)
+
+    def test_freeze_prevents_setitem(self):
+        d = ConcurrentDict[str, int]({"a": 1})
+        d.freeze()
+        with self.assertRaises(TypeError):
+            d["b"] = 2 # Add new key
+        with self.assertRaises(TypeError):
+            d["a"] = 10 # Modify existing key
+
+    def test_freeze_prevents_delitem(self):
+        d = ConcurrentDict[str, int]({"a": 1})
+        d.freeze()
+        with self.assertRaises(TypeError):
+            del d["a"]
+        # Also test deleting non-existent key still raises TypeError first
+        with self.assertRaises(TypeError):
+             del d["b"]
+
+    def test_freeze_prevents_clear(self):
+        d = ConcurrentDict[str, int]({"a": 1})
+        d.freeze()
+        with self.assertRaises(TypeError):
+            d.clear()
+
+    def test_freeze_prevents_pop(self):
+        d = ConcurrentDict[str, int]({"a": 1, "b": 2})
+        d.freeze()
+        with self.assertRaises(TypeError):
+            d.pop("a")
+        # Test popping non-existent key with default
+        with self.assertRaises(TypeError):
+             d.pop("c", 99)
+        # Test popping non-existent key without default
+        with self.assertRaises(TypeError):
+             d.pop("c")
+
+
+    def test_freeze_prevents_popitem(self):
+        d = ConcurrentDict[str, int]({"a": 1})
+        d.freeze()
+        with self.assertRaises(TypeError):
+            d.popitem()
+
+    def test_freeze_prevents_setdefault(self):
+        d = ConcurrentDict[str, int]({"a": 1})
+        d.freeze()
+        with self.assertRaises(TypeError):
+             d.setdefault("b", 42)
+
+
+    def test_freeze_prevents_update(self):
+        d = ConcurrentDict[str, int]({"a": 1})
+        d.freeze()
+        with self.assertRaises(TypeError):
+            d.update({"b": 2})
+        with self.assertRaises(TypeError):
+            d.update([("c", 3)])
+        with self.assertRaises(TypeError):
+            d.update(d=4)
+
+    def test_freeze_prevents_batch_update(self):
+        d = ConcurrentDict[str, int]({"a": 1})
+        d.freeze()
+        def updater(dct):
+            dct["b"] = 10
+        with self.assertRaises(TypeError):
+            d.batch_update(updater)
+
+
+    def test_freeze_allows_getitem(self):
+        d = ConcurrentDict[str, int]({"a": 1})
+        d.freeze()
+        self.assertEqual(d["a"], 1)
+        with self.assertRaises(KeyError):
+            _ = d["b"] # Still raises KeyError if key doesn't exist
+
+    def test_freeze_allows_contains(self):
+        d = ConcurrentDict[str, int]({"a": 1})
+        d.freeze()
+        self.assertIn("a", d)
+        self.assertNotIn("b", d)
+
+    def test_freeze_allows_len(self):
+        d = ConcurrentDict[str, int]({"a": 1, "b": 2})
+        d.freeze()
+        self.assertEqual(len(d), 2)
+
+    def test_freeze_allows_bool(self):
+        d_empty = ConcurrentDict[str, int]()
+        d_empty.freeze()
+        self.assertFalse(d_empty)
+
+        d_full = ConcurrentDict[str, int]({"a": 1})
+        d_full.freeze()
+        self.assertTrue(d_full)
+
+
+    def test_freeze_allows_iter(self):
+        d = ConcurrentDict[str, int]({"a": 1, "b": 2})
+        d.freeze()
+        keys = list(d)
+        self.assertCountEqual(keys, ["a", "b"]) # Iteration works
+
+    def test_freeze_allows_get(self):
+        d = ConcurrentDict[str, int]({"a": 1})
+        d.freeze()
+        self.assertEqual(d.get("a"), 1)
+        self.assertIsNone(d.get("b"))
+        self.assertEqual(d.get("b", 99), 99)
+
+
+    def test_freeze_allows_views_copies(self):
+        d = ConcurrentDict[str, int]({"a": 1, "b": 2})
+        d.freeze()
+
+        self.assertCountEqual(d.keys(), ["a", "b"])
+        self.assertCountEqual(d.values(), [1, 2])
+        self.assertCountEqual(d.items(), [("a", 1), ("b", 2)])
+
+        # Check copies
+        shallow_copy = d.copy()
+        self.assertIsInstance(shallow_copy, ConcurrentDict)
+        self.assertFalse(shallow_copy.is_frozen) # Copies should not inherit frozen state
+        self.assertEqual(shallow_copy["a"], 1)
+
+        normal_dict_copy = d.to_dict()
+        self.assertIsInstance(normal_dict_copy, dict)
+        self.assertEqual(normal_dict_copy["a"], 1)
+
+        # Check map, filter, reduce produce new dicts/values
+        mapped = d.map(lambda k, v: (k + "!", v + 1))
+        self.assertIsInstance(mapped, ConcurrentDict)
+        self.assertFalse(mapped.is_frozen)
+        self.assertIn("a!", mapped)
+        self.assertEqual(mapped["a!"], 2)
+
+        filtered = d.filter(lambda k, v: v > 1)
+        self.assertIsInstance(filtered, ConcurrentDict)
+        self.assertFalse(filtered.is_frozen)
+        self.assertNotIn("a", filtered)
+        self.assertIn("b", filtered)
+
+        total = d.reduce(lambda acc, kv: acc + kv[1], 0)
+        self.assertEqual(total, 3)
+
+
+    def test_freeze_unfreeze_cycle(self):
+        d = ConcurrentDict[str, int]({"a": 1})
+
+        # Freeze and try to modify (should fail)
+        d.freeze()
+        self.assertTrue(d.is_frozen)
+        with self.assertRaises(TypeError):
+            d["b"] = 2
+
+        # Unfreeze and modify (should work)
+        d.unfreeze()
+        self.assertFalse(d.is_frozen)
+        d["b"] = 2
+        self.assertIn("b", d)
+
+        # Freeze again and try to modify (should fail again)
+        d.freeze()
+        self.assertTrue(d.is_frozen)
+        with self.assertRaises(TypeError):
+            del d["a"]
+
+    def test_freeze_is_idempotent(self):
+        d = ConcurrentDict[str, int]({"a": 1})
+        d.freeze()
+        self.assertTrue(d.is_frozen)
+        d.freeze() # Call freeze again
+        self.assertTrue(d.is_frozen)
+        # Check that it's still frozen and modifications are prevented
+        with self.assertRaises(TypeError):
+            d["b"] = 2
+
+    def test_unfreeze_is_idempotent(self):
+        d = ConcurrentDict[str, int]({"a": 1})
+        d.freeze()
+        self.assertTrue(d.is_frozen)
+        d.unfreeze()
+        self.assertFalse(d.is_frozen)
+        d.unfreeze() # Call unfreeze again
+        self.assertFalse(d.is_frozen)
+        # Check that it's still unfrozen and modifications are allowed
+        try:
+            d["b"] = 2
+            self.assertIn("b", d)
+        except TypeError:
+            self.fail("Unfreezing multiple times should keep it mutable.")

@@ -1,9 +1,9 @@
 import threading
 import time
-from thread_factory.utils import Disposable
+from thread_factory.utils import IDisposable
 
 
-class Stopwatch(Disposable):
+class Stopwatch(IDisposable):
     """
     Stopwatch
     ---------
@@ -18,6 +18,7 @@ class Stopwatch(Disposable):
         """
         Initializes the stopwatch using a monotonic high-resolution clock.
         """
+        super().__init__()
         self._clock = time.perf_counter
         self.start_time = None
         self.elapsed_time = 0.0
@@ -80,6 +81,7 @@ class Stopwatch(Disposable):
             self.start_time = None
             self.elapsed_time = 0.0
             self._clock = None
+            self.disposed = True
 
     def __repr__(self):
         """

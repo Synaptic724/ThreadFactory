@@ -1,7 +1,7 @@
 import concurrent.futures
 import os
 import threading
-from thread_factory.utils import Disposable
+from thread_factory.utils import IDisposable
 
 class ThreadFactory:
     _shared_pool = None

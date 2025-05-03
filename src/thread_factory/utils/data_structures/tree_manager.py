@@ -1,11 +1,11 @@
 from typing import List, Optional
 import uuid
-from thread_factory.utils.disposable import Disposable
+from thread_factory.utils.disposable import IDisposable
 
 
 # TODO 1: Rename "Tree" to "Synaptic" or "Pulse Storage" later.
 
-class TreeNode(Disposable):
+class TreeNode(IDisposable):
     """
     Represents a node in a hierarchy (with categories and items).
     Categories group items and other categories. Items hold actual content.
@@ -16,6 +16,7 @@ class TreeNode(Disposable):
                  type: str,
                  metadata: Optional[dict] = None,
                  unique_id: Optional[str] = None):
+        super().__init__()
         if type not in {"category", "item"}:
             raise ValueError("Type must be 'category' or 'item'.")
 
@@ -24,7 +25,6 @@ class TreeNode(Disposable):
         self.metadata: dict = metadata or {}
         self.children: List["TreeNode"] = []
         self.unique_id: str = unique_id or str(uuid.uuid4())
-        self.disposed: bool = False
 
     def add_child(self, child: "TreeNode") -> None:
         if self.type != "category":
@@ -73,13 +73,13 @@ class TreeNode(Disposable):
 
 
 
-class TreeManager(Disposable):
+class TreeManager(IDisposable):
     """
     Manages a hierarchy of TreeNode objects (categories and items).
     """
 
     def __init__(self, name: str):
-        self.disposed: bool = False
+        super().__init__()
         self.root: TreeNode = TreeNode(name=name, type="category")
 
     def add_node(self, name: str, type: str, parent_name: str, metadata: Optional[dict] = None) -> None:

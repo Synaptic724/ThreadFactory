@@ -15,11 +15,11 @@ from typing import (
 )
 
 from thread_factory.concurrency import ConcurrentList
-from thread_factory.utils import Empty, Disposable
+from thread_factory.utils import Empty, IDisposable
 
 _T = TypeVar("_T")
 
-class ConcurrentQueue(Generic[_T], Disposable):
+class ConcurrentQueue(Generic[_T], IDisposable):
     """
     A thread-safe FIFO queue implementation using an underlying deque,
     a reentrant lock for synchronization, and an atomic counter for fast
@@ -41,6 +41,7 @@ class ConcurrentQueue(Generic[_T], Disposable):
             initial (Iterable[_T], optional):
                 An iterable of initial items. Defaults to an empty list if None is given.
         """
+        super().__init__()
         if initial is None:
             initial = []
         self._lock: threading.RLock = threading.RLock()
