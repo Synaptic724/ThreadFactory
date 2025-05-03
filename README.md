@@ -23,7 +23,7 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 
 Please see the benchmarks at the bottom of this page and if you are interested there are more in the repository.  
 
-[Repository Benchmarks 🚀](https://github.com/Synaptic724/ThreadFactory/blob/production/benchmarks/benchmark_data/general_benchmarks.md)
+[Repository Benchmarks 🚀](https://github.com/Synaptic724/ThreadFactory/blob/production/benchmarks/benchmark_data/general_benchmarks.md)  
 [Jump to Benchmarks Below🔥](#-benchmark-results-10000000-ops--10-producers--10-consumers)
 
 ---
