@@ -29,6 +29,7 @@ Please see the benchmarks at the bottom of this page if interested there are mor
 ## 🚀 Features
 
 ## Concurrent Data Structures
+
 ### `ConcurrentBag`  
 - A thread-safe “multiset” collection that allows duplicates.  
 - Methods like `add`, `remove`, `discard`, etc.  
@@ -37,25 +38,27 @@ Please see the benchmarks at the bottom of this page if interested there are mor
 ### `ConcurrentDict`  
 - A thread-safe dictionary.  
 - Supports typical dict operations (`update`, `popitem`, etc.).  
-- Provides `map`, `filter`, and `reduce` for safe, bulk operations.
+- Provides `map`, `filter`, and `reduce` for safe, bulk operations.  
+- **Freeze support**: When frozen, the dictionary becomes read-only. Lock acquisition is skipped during reads, dramatically improving performance in high-read workloads.
 
 ### `ConcurrentList`  
 - A thread-safe list supporting concurrent access and modification.  
-- Slice assignment, in-place operators (`+=`, `*=`), and advanced operations (`map`, `filter`, `reduce`).
+- Slice assignment, in-place operators (`+=`, `*=`), and advanced operations (`map`, `filter`, `reduce`).  
+- **Freeze support**: Prevents structural modifications while enabling safe, lock-free reads (e.g., `__getitem__`, iteration, and slicing). Ideal for caching and broadcast scenarios.
 
 ### `ConcurrentQueue`  
 - A thread-safe FIFO queue built atop `collections.deque`.  
 - Tested and outperforms deque alone by up to 64% in our benchmark.
 - Supports `enqueue`, `dequeue`, `peek`, `map`, `filter`, and `reduce`.  
 - Raises `Empty` when `dequeue` or `peek` is called on an empty queue.
-- Outperforms multiprocessing queues by over 400% in some cases clone and run unit tests to see.
+- Outperforms multiprocessing queues by over 400% in some cases — clone and run unit tests to see.
 
 ### `ConcurrentStack`  
 - A thread-safe LIFO stack.  
 - Supports `push`, `pop`, `peek` operations.  
 - Ideal for last-in, first-out (LIFO) workloads.  
 - Built on `deque` for fast appends and pops.
-- Similar performance to ConcurrentQueue
+- Similar performance to ConcurrentQueue.
 
 ### `ConcurrentBuffer`  
 - A **high-performance**, thread-safe buffer using **sharded deques** for low-contention access.  
@@ -74,7 +77,16 @@ Please see the benchmarks at the bottom of this page if interested there are mor
     - **ConcurrentCollection**: 108,235 ops/sec
     - **ConcurrentBuffer**: 102,494 ops/sec
     - Better scaling under thread contention.
+
+### `ConcurrentSet`
+- A thread-safe set implementation supporting all standard set algebra operations.
+- Supports `add`, `discard`, `remove`, and all bitwise set operations (`|`, `&`, `^`, `-`) along with their in-place forms.
+- Provides `map`, `filter`, `reduce`, and `batch_update` to safely perform bulk transformations.
+- **Freeze support**: Once frozen, the set cannot be modified — but read operations become lock-free and extremely efficient.
+- Ideal for workloads where the set is mutated during setup but then used repeatedly in a read-only context (e.g., filters, routing tables, permissions).
+
 ---
+
 
 ## Parallel Utilities
 
