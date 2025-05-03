@@ -2,7 +2,7 @@
 factory
 High-performance concurrency collections and parallel operations for Python 3.13+.
 """
-DEBUG_MODE = True
+DEBUG_MODE = False
 import sys
 import warnings
 from thread_factory.__version__ import __version__ as version
@@ -27,7 +27,8 @@ __version__ = version
 from thread_factory.concurrency import (
     ConcurrentBag, ConcurrentDict, ConcurrentList,
     ConcurrentQueue, ConcurrentStack, Concurrent,
-    ConcurrentBuffer, ConcurrentCollection
+    ConcurrentBuffer, ConcurrentCollection,
+    ConcurrentSet
 )
 # ---- Utilities ----
 from thread_factory.utils import Empty, Stopwatch, AutoResetTimer
@@ -49,6 +50,7 @@ __all__ = [
     "ConcurrentStack",
     "ConcurrentBuffer",
     "ConcurrentCollection",
+    "ConcurrentSet",
     "Empty",
     "Dynaphore",
     "Stopwatch",
