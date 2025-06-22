@@ -1,7 +1,6 @@
 import threading
 from enum import Enum, auto
 
-
 class TaskState(Enum):
     """
     Enum representing the states of a task during its lifecycle.
