@@ -159,10 +159,12 @@ class Work(Future, IDisposable):
                 return "cancelled"
             elif self._state == "FINISHED":
                 return "completed"
-            elif self._state == "RUNNING":
+            elif self._state == "IN_PROGRESS":
                 return "running"
             elif self._state == "PENDING":
                 return "pending"
+            elif self._state == "FAILED":
+                return "failed"
             else:
                 return f"unknown({self._state})"
 

@@ -3,8 +3,10 @@ import time
 from queue import Queue
 from typing import Callable, Optional, List
 from src.thread_factory.executors.worker.dynamic_worker import DynamicWorker
-from src.thread_factory.primatives import switchlock, smart_condition
+from thread_factory.primatives import switchlock, smart_condition
 from src.thread_factory.executors.work.work_state import WorkState
+from thread_factory.runtime.worker.worker.worker import WorkerState
+from thread_factory.concurrency import ConcurrentList, ConcurrentQueue, ConcurrentDict
 
 
 # Dynapool class to manage the pool of workers and tasks
@@ -12,7 +14,7 @@ class Dynapool:
     def __init__(self, max_workers: int, min_workers: int = 1):
         self.max_workers = max_workers
         self.min_workers = min_workers
-        self.worker_pool: List[Worker] = []
+        self.worker_pool: ConcurrentList[DynamicWorker] = []
         self.task_queue = Queue()
         self.lock = threading.Lock()
 

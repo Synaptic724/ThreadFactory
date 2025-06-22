@@ -1,6 +1,8 @@
 import datetime
+from dataclasses import dataclass
 from enum import auto, Enum
 import ulid
+from thread_factory.concurrency import ConcurrentList
 
 
 class WorkStatus(Enum):
@@ -12,26 +14,24 @@ class WorkStatus(Enum):
     """
     # Lifecycle states (for execution tracking)
     PENDING = auto()
-    RUNNING = auto()
+    IN_PROGRESS = auto()
     COMPLETED = auto()
     CANCELLED = auto()
     FAILED = auto()
 
 
+@dataclass
 class Record:
     """
     Represents a single ULID record of completed work.
 
     This object is intended to store history of executed tasks for audit/logging.
     """
-    def __init__(self, task_id: ulid.ULID, work_status: WorkStatus, creation_time: datetime.datetime,
-                 execution_time: datetime.datetime, completion_time: datetime.datetime):
-
-        self.task_id = task_id
-        self.timestamp_creation_time =  creation_time
-        self.timestamp_execution_time =  execution_time
-        self.timestamp_completion_time =  completion_time
-        self.status = work_status
+    task_id: ulid.ULID
+    status: WorkStatus
+    timestamp_creation_time: datetime.datetime
+    timestamp_execution_time: datetime.datetime = None
+    timestamp_completion_time: datetime.datetime = None
 
     def __repr__(self):
         return f"<Record task_id={self.task_id} timestamp={self.timestamp_completion_time}>"
@@ -45,7 +45,7 @@ class Records:
     """
 
     def __init__(self):
-        self.records: list[Record] = []
+        self.records: ConcurrentList[Record] = ConcurrentList()
 
     def add(self, record: Record):
         """Appends a ULID for a completed task."""
