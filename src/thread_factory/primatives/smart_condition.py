@@ -385,57 +385,39 @@ class SmartCondition:
                    awaited_caller: bool = False) -> None:
         """
         Wakes up all threads currently waiting on the SmartCondition.
-        Optionally, only threads whose `factory_id` matches one of the specified IDs will be woken.
 
-        If `awaited_caller` is True, and a default or bound callback exists, it will be
-        passed to the awaited thread to execute. Otherwise, no callbacks are executed.
-
-        The calling thread must hold the `SmartCondition`'s internal lock (`self._lock`).
-
-        Args:
-            factory_ids (Union[str, Iterable[str]], optional): A single `factory_id` string
-                                                               or an iterable of `factory_id` strings.
-                                                               Only threads with matching IDs will be woken.
-                                                               If `None`, all waiting threads are notified.
-            awaited_caller (bool): If True, and if a default or bound callback exists, it will be
-                                   stored in the Waiter object for the awaited thread to execute.
-                                   If False (default), no callback is executed or passed.
-
-        Raises:
-            RuntimeError: If the internal lock is not held by the calling thread.
+        If `awaited_caller=True`, the thread that was waiting will execute its callback.
+        If `awaited_caller=False`, the notifying thread will execute the callback.
         """
         if not self._is_owned():
-            raise RuntimeError("cannot notify_all on un-acquired lock")
+            raise RuntimeError("Cannot notify_all on un-acquired lock")
 
         to_notify = []  # List to store Waiter objects that will be selected for notification.
-        # Convert single string factory_id to a set for efficient lookup, or keep as None.
         target_ids = {factory_ids} if isinstance(factory_ids, str) else set(factory_ids) if factory_ids else None
 
-        # Iterate over a copy of the `_waiters` queue to allow safe removal during iteration.
         for w in list(self._waiters):
-            # Check if the current waiter matches the target IDs (if any are specified).
             if target_ids is None or w.factory_id in target_ids:
-                # Attempt to remove the waiter from the queue. If successful (meaning it was still waiting),
-                # add it to the list for notification.
                 if self._waiters.remove_item(w):
                     to_notify.append(w)
 
-        # Release the private lock of each selected waiter, which unblocks them.
         for w in to_notify:
             if awaited_caller:
-                # If awaited_caller is True, and there's a bound or default callback,
-                # store it in the Waiter object for the awaited thread to execute.
+                # If awaited_caller is True, store the callback in the Waiter object
+                # for the awaited thread to execute.
                 cb_to_pass = self._callback_registry.get(w.factory_id) or self._default_callback
                 if cb_to_pass:
                     w.callback = cb_to_pass
-            # In 'notify_all', if awaited_caller is False, no callback is executed here.
+            else:
+                # If awaited_caller is False, call the callback directly from the notifying thread
+                cb_to_pass = self._callback_registry.get(w.factory_id) or self._default_callback
+                if cb_to_pass:
+                    # **Execute the callback directly here in the notifying thread**
+                    cb_to_pass()  # This will execute the callback in the notifying thread
 
             try:
                 w.lock.release()  # This unblocks the `waiter_lock.acquire()` call in `wait()`.
             except RuntimeError:
-                # This exception can occur if the `waiter_lock` was already released,
-                # e.g., if the waiting thread timed out or was notified by another source
-                # just before this call and removed itself from the queue.
+                # This exception can occur if the `waiter_lock` was already released.
                 pass
 
 

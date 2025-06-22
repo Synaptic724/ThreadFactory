@@ -1,5 +1,5 @@
 import time
-from typing import Optional, Union, Iterable, Any
+from typing import Optional, Union, Iterable, Any, Callable
 from thread_factory.utils import IDisposable
 from thread_factory.primatives.smart_condition import SmartCondition
 
@@ -50,6 +50,27 @@ class SwitchLock(IDisposable):
             SmartCondition: The internal SmartCondition instance.
         """
         return self._cond
+
+
+    def set_callback(self, factory_id: str, callback: Callable[[], None]) -> None:
+        """
+        Registers a specific callback for a particular factory_id.
+
+        Args:
+            factory_id (str): The unique identifier of the waiting thread.
+            callback (Callable[[], None]): The callback to be executed when this thread is notified.
+        """
+        self._cond.bind_callback(factory_id, callback)
+
+    def set_default_callback(self, callback: Callable[[], None]) -> None:
+        """
+        Registers a default callback to be executed if no specific callback
+        is bound to a waiting thread.
+
+        Args:
+            callback (Callable[[], None]): The callback to be executed for any notified thread without a specific callback.
+        """
+        self._cond.set_default_callback(callback)
 
     def acquire(self, blocking: bool = True, timeout: Optional[float] = None) -> bool:
         """
@@ -150,6 +171,76 @@ class SwitchLock(IDisposable):
             self._value += n  # Increase the count of available permits
             # Notify waiting threads. SmartCondition handles the actual awakening logic.
             self._cond.notify(n=n, factory_ids=factory_ids)
+
+    # In SwitchLock class
+    def notify(self, n: int = 1, factory_ids: Optional[Union[str, Iterable[str]]] = None,
+               awaited_caller: bool = False) -> None:
+        """
+        Notifies `n` waiting threads, increments permits by `n`, and executes their callbacks.
+        This method combines permit release with flexible notification and callback execution.
+
+        Args:
+            n (int): The number of permits to increment and threads to notify. Must be 1 or greater.
+            factory_ids (Union[str, Iterable[str]], optional): A specific factory ID or a set of IDs to notify.
+            awaited_caller (bool): If True, the waking thread will execute the callback; otherwise, the notifying thread will.
+        """
+        if n < 1:
+            raise ValueError("Number of permits/notifications (n) must be >= 1.")
+        if self._disposed:
+            return
+
+        with self._cond:  # Acquire the internal condition's lock for synchronized state modification
+            self._value += n  # Increment the permit count FIRST
+            print(
+                f"[SwitchLock.notify] Permits increased by {n}, current value: {self._value}. Notifying...")  # Debug print
+
+            # Delegate to SmartCondition.notify_and_call for actual notification and callback handling.
+            # Pass None for the explicit 'callback' argument, so it uses the bound/default registry.
+            self._cond.notify_and_call(n=n, factory_ids=factory_ids, callback=None, awaited_caller=awaited_caller)
+
+    def notify_all(self, factory_ids: Optional[Union[str, Iterable[str]]] = None,
+                   awaited_caller: bool = False) -> None:
+        """
+        Notifies all waiting threads, potentially increments permits, and executes their callbacks.
+        This method combines permit release with flexible notification and callback execution.
+
+        Args:
+            factory_ids (Union[str, Iterable[str]], optional): A factory ID or a set of IDs to notify.
+                                                                If None, all waiting threads are considered.
+            awaited_caller (bool): If True, the waking thread will execute the callback; otherwise, the notifying thread will.
+        """
+        if self._disposed:
+            return
+
+        with self._cond:  # Acquire the internal condition's lock for synchronized state modification
+            # Get a snapshot of currently waiting threads within the lock to ensure consistency
+            waiting_threads_snapshot = self._cond.get_all_waiters()
+
+            # Filter by factory_ids if specified
+            if factory_ids:
+                if isinstance(factory_ids, str):
+                    target_ids = {factory_ids}
+                else:
+                    target_ids = set(factory_ids)
+                threads_to_notify = [w for w in waiting_threads_snapshot if w.factory_id in target_ids]
+            else:
+                threads_to_notify = waiting_threads_snapshot
+
+            n_to_increment = len(threads_to_notify)
+
+            if n_to_increment == 0:
+                print(f"[SwitchLock.notify_all] No {'' if factory_ids else 'eligible '}waiters found to notify.")
+                return
+
+            self._value += n_to_increment  # Increment permit count by the number of threads we're about to notify
+
+            print(
+                f"[SwitchLock.notify_all] Permits increased by {n_to_increment}, current value: {self._value}. Notifying all eligible...")
+
+            # Delegate to SmartCondition.notify_all for actual notification and callback handling.
+            # SmartCondition.notify_all handles selecting based on factory_ids and awakening.
+            self._cond.notify_all(factory_ids=factory_ids, awaited_caller=awaited_caller)
+
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):
         """

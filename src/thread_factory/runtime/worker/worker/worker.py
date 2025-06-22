@@ -382,6 +382,8 @@ class DynamicWorker(Worker):
         self.save_points.clear()
         self.locations.clear()
         self.home = None
+        if self._wake_event:
+            self._wake_event.set()
         self._wake_event = None
         super().dispose()
 #endregion Disposal Logic
