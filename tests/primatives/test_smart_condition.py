@@ -2,31 +2,41 @@ import unittest
 import time
 import random
 import threading
-import ulid  # Assuming ulid is available and imported correctly in your project
-import queue  # For result_queue in test_ensure_factory_id_on_generic_thread_without_id_problematic
+import ulid
+import queue
 
-# --- IMPORT YOUR ACTUAL CLASSES ---
-# Ensure these imports correctly point to your SmartCondition and Worker implementations.
+# Assuming ConcurrentQueue is correctly imported from your project's modules
+# from thread_factory.concurrency.concurrent_queue import ConcurrentQueue # This is not directly used in the tests, but if SmartCondition uses it internally, it's fine.
 from thread_factory.primatives.smart_condition import SmartCondition
 from thread_factory.runtime.worker.worker import Worker
 
 
-# A simple thread class that does *not* pre-set factory_id,
-# to simulate the problematic scenario for testing _ensure_factory_id.
-# This class is for testing SmartCondition's _ensure_factory_id robustness.
+# --- MODIFICATION START ---
+# Apply this change to your actual SmartCondition.py file
+# in the notify_and_call method
+"""
+    def notify_and_call(self, n: int = 1, factory_ids: Optional[Union[str, Iterable[str]]] = None,
+                        callback: Optional[Callable[[], None]] = None) -> None:
+        # ... (rest of the method) ...
+        # Corrected callback priority: inline callback (if provided) > specific bound callback > default callback
+        cb = callback or self._callback_registry.get(w.factory_id) or self._default_callback
+        if cb:
+            try:
+                cb()
+            except Exception as e:
+                print(f"[SmartCondition] Error in callback for {w.factory_id}: {e}")
+"""
+# --- MODIFICATION END ---
+
+
 class GenericTestThread(threading.Thread):
     def __init__(self, target=None, args=(), kwargs=None):
         super().__init__(target=target, args=args, kwargs=kwargs)
-        # Ensure it does NOT have factory_id set initially for the purpose of this test.
         if hasattr(self, 'factory_id'):
             del self.factory_id
 
 
 class TestSmartCondition(unittest.TestCase):
-    # --- Helper for factory_id setup in test MyWorker classes ---
-    # This helper function is specifically for MyWorker.run() methods
-    # that override Worker.run() and don't call super().run().
-    # It ensures threading.current_thread().factory_id is set for SmartCondition.
     def _set_thread_factory_id(self, fid: str):
         threading.current_thread().factory_id = fid
 
@@ -40,11 +50,9 @@ class TestSmartCondition(unittest.TestCase):
             def __init__(self, name, fid):
                 super().__init__()
                 self.name = name
-                self.factory_id = str(fid)  # This sets self.factory_id on the instance
+                self.factory_id = str(fid)
 
             def run(self):
-                # Ensure the current thread object's factory_id is set
-                # as the base Worker.run() (which does _bind_factory_id) is not called.
                 TestSmartCondition._set_thread_factory_id(self, self.factory_id)
                 with cond:
                     cond.wait()
@@ -107,7 +115,7 @@ class TestSmartCondition(unittest.TestCase):
     def test_notify_specific_order(self):
         cond = SmartCondition()
         results = []
-        order = []  # Not strictly used for assertion, but good for understanding flow
+        order = []
 
         class MyWorker(Worker):
             def __init__(self, fid):
@@ -128,16 +136,15 @@ class TestSmartCondition(unittest.TestCase):
 
         for fid in [1, 2, 3]:
             with cond:
-                cond.notify_all(factory_ids=str(fid))  # notify_all wakes all with matching FID
+                cond.notify_all(factory_ids=str(fid))
             time.sleep(0.05)
             order.append(fid)
 
         for t in threads:
             t.join()
 
-        # Should be [1, 1, 2, 2, 3, 3] as two workers for each FID are woken
         self.assertEqual(sorted(results), [1, 1, 2, 2, 3, 3])
-        self.assertTrue(all(fid in results for fid in order))  # Check if all targeted FIDs appear in results
+        self.assertTrue(all(fid in results for fid in order))
 
     def test_nested_notify_depth_proof(self):
         cond = SmartCondition()
@@ -163,7 +170,7 @@ class TestSmartCondition(unittest.TestCase):
                 with cond:
                     cond.notify(factory_ids="test-nested")
             else:
-                with cond:  # Each recursive call also acquires the condition's lock
+                with cond:
                     recursive_notify(n - 1)
 
         recursive_notify(10)
@@ -187,18 +194,17 @@ class TestSmartCondition(unittest.TestCase):
                 with lock:
                     results.append(int(self.factory_id))
 
-        factory_ids = [random.choice(range(10)) for _ in range(100)]  # 100 workers, 10 possible IDs
+        factory_ids = [random.choice(range(10)) for _ in range(100)]
         threads = [MyWorker(fid) for fid in factory_ids]
         for t in threads:
             t.start()
 
-        time.sleep(0.2)  # Allow workers to enter wait state
+        time.sleep(0.2)
 
-        # Notify each group of FIDs
-        for fid_to_notify in set(factory_ids):  # Iterate over unique IDs to notify each group
+        for fid_to_notify in set(factory_ids):
             with cond:
                 cond.notify_all(factory_ids=str(fid_to_notify))
-            time.sleep(0.01)  # Short pause between group notifications
+            time.sleep(0.01)
 
         for t in threads:
             t.join()
@@ -212,9 +218,6 @@ class TestSmartCondition(unittest.TestCase):
 
         class TimeoutWorker(Worker):
             def run(self):
-                # For this test, SmartCondition assigns a default ULID via _ensure_factory_id
-                # as we don't explicitly set threading.current_thread().factory_id here.
-                # However, it's good practice for any worker to ensure its ID is set.
                 TestSmartCondition._set_thread_factory_id(self, str(ulid.ULID()))
                 with cond:
                     result = cond.wait(timeout=0.2)
@@ -251,12 +254,12 @@ class TestSmartCondition(unittest.TestCase):
 
         time.sleep(0.2)
         with cond:
-            cond.notify(n=2)  # Wake 2 arbitrary threads
+            cond.notify(n=2)
 
-        time.sleep(0.2)  # Give woken threads time to run
+        time.sleep(0.2)
 
         with cond:
-            cond.notify_all()  # Wake any remaining threads
+            cond.notify_all()
 
         for t in threads:
             t.join()
@@ -288,10 +291,9 @@ class TestSmartCondition(unittest.TestCase):
         time.sleep(0.2)
 
         with cond:
-            # Only notify workers with factory_id "1" or "3"
             cond.notify(n=2, factory_ids=["1", "3"])
 
-        time.sleep(0.2)  # Give targeted threads time to run
+        time.sleep(0.2)
 
         num_woken_initially = len(results)
         initial_woken_ids = list(results)
@@ -302,7 +304,7 @@ class TestSmartCondition(unittest.TestCase):
                 self.assertIn(str(woken_fid), ["1", "3"], "Woke a thread not in target group")
 
         with cond:
-            cond.notify_all()  # Wake any remaining
+            cond.notify_all()
 
         for t in threads:
             t.join()
@@ -325,12 +327,11 @@ class TestSmartCondition(unittest.TestCase):
                 with cond:
                     cond.wait()
 
-        # Start 3 workers who will all block on SmartCondition
         threads = [MyWorker(f"test_id_{i}") for i in range(3)]
         for t in threads:
             t.start()
 
-        time.sleep(0.2)  # Allow them to enter the wait state
+        time.sleep(0.2)
 
         with cond:
             captured_ids = cond.get_all_waiting_factory_ids()
@@ -345,23 +346,20 @@ class TestSmartCondition(unittest.TestCase):
         for fid in captured_ids:
             self.assertIsInstance(fid, str)
             self.assertTrue(fid.startswith("test_id_"), f"ID '{fid}' does not start with 'test_id_' prefix.")
-            # This is the line that was problematic. It is now removed.
             self.assertIn(fid, [f"test_id_{i}" for i in range(3)], f"Unexpected ID captured: {fid}")
 
     # --- New High-Performance Tests for SmartCondition ---
 
     def test_performance_high_contention_notify_all(self):
-        # Scenario: Many threads wait, single source notifies all.
-        # Measures efficiency of SmartCondition.wait() and SmartCondition.notify_all()
         num_workers = 100
-        operations_per_worker = 100  # Each worker waits/wakes 100 times
+        operations_per_worker = 100
         total_operations = num_workers * operations_per_worker
 
         cond = SmartCondition()
         successful_wakes = 0
-        wakes_lock = threading.Lock()  # Protect shared counter
+        wakes_lock = threading.Lock()
 
-        events = [threading.Event() for _ in range(num_workers)]  # Signal worker completion
+        events = [threading.Event() for _ in range(num_workers)]
 
         class ContentionWorker(Worker):
             def __init__(self, worker_id, event_to_set):
@@ -371,20 +369,15 @@ class TestSmartCondition(unittest.TestCase):
 
             def run(self):
                 TestSmartCondition._set_thread_factory_id(self, self.factory_id)
-                nonlocal successful_wakes  # Access outer scope counter
+                nonlocal successful_wakes
                 for _ in range(operations_per_worker):
                     with cond:
-                        # Wait for the condition to be met (i.e., notified)
-                        # We don't have an explicit predicate here, just waiting for a signal.
-                        # `cond.wait()` will return True if notified.
-                        if cond.wait(timeout=0.5):  # Short timeout per wait cycle
+                        if cond.wait(timeout=0.5):
                             with wakes_lock:
                                 successful_wakes += 1
                         else:
-                            # If timeout, means condition wasn't met in time.
-                            # Re-enter loop to potentially wait again.
                             pass
-                self.event_to_set.set()  # Signal completion
+                self.event_to_set.set()
 
         workers = []
         for i in range(num_workers):
@@ -395,21 +388,16 @@ class TestSmartCondition(unittest.TestCase):
         for w in workers:
             w.start()
 
-        # The main thread will continuously notify all workers
-        # to simulate high wake-up frequency.
         notifies_sent = 0
-        while successful_wakes < total_operations and (time.perf_counter() - start_time < 10):  # Limit total runtime
+        while successful_wakes < total_operations and (time.perf_counter() - start_time < 10):
             with cond:
-                # Notify some workers. Since we have many workers and few notifies,
-                # this simulates contention for wake-ups.
-                cond.notify(n=num_workers // 5)  # Wake a fifth of workers at a time
+                cond.notify(n=num_workers // 5)
                 notifies_sent += (num_workers // 5)
-            time.sleep(0.001)  # Small pause to allow workers to re-acquire lock and wait
+            time.sleep(0.001)
 
-        # After initial burst, ensure all workers eventually finish
         if successful_wakes < total_operations:
             with cond:
-                cond.notify_all()  # Final sweep to wake everyone up
+                cond.notify_all()
 
         all_finished = all(e.wait(timeout=5) for e in events)
         end_time = time.perf_counter()
@@ -436,10 +424,8 @@ class TestSmartCondition(unittest.TestCase):
                                 "Expected most operations to succeed, allowing for some timeouts")
 
     def test_performance_targeted_notification_stress(self):
-        # Scenario: Many threads wait, notifications are precisely targeted.
-        # Measures efficiency of SmartCondition.notify(factory_ids=...)
         num_workers = 50
-        num_unique_ids = 10  # Workers will share these IDs
+        num_unique_ids = 10
         operations_per_worker = 200
         total_operations = num_workers * operations_per_worker
 
@@ -449,13 +435,12 @@ class TestSmartCondition(unittest.TestCase):
 
         events = [threading.Event() for _ in range(num_workers)]
 
-        # Keep track of worker FIDs for targeted notifications
         worker_fids = [f"group-{i % num_unique_ids}" for i in range(num_workers)]
 
         class TargetedWorker(Worker):
             def __init__(self, worker_id, event_to_set):
                 super().__init__()
-                self.factory_id = worker_fids[worker_id]  # Assign group ID
+                self.factory_id = worker_fids[worker_id]
                 self.event_to_set = event_to_set
 
             def run(self):
@@ -477,22 +462,20 @@ class TestSmartCondition(unittest.TestCase):
         for w in workers:
             w.start()
 
-        # Continuously send targeted notifications
         notifies_sent = 0
-        unique_ids = list(set(worker_fids))  # Get the unique IDs to cycle through
+        unique_ids = list(set(worker_fids))
         id_idx = 0
         while successful_wakes < total_operations and (time.perf_counter() - start_time < 15):
             target_fid = unique_ids[id_idx % num_unique_ids]
             with cond:
-                # Notify one specific worker (or group) at a time
                 cond.notify(n=1, factory_ids=target_fid)
                 notifies_sent += 1
             id_idx += 1
-            time.sleep(0.0005)  # Small pause
+            time.sleep(0.0005)
 
         if successful_wakes < total_operations:
             with cond:
-                cond.notify_all()  # Final sweep
+                cond.notify_all()
 
         all_finished = all(e.wait(timeout=5) for e in events)
         end_time = time.perf_counter()
@@ -519,16 +502,13 @@ class TestSmartCondition(unittest.TestCase):
                                 "Expected most operations to succeed, allowing for some timeouts")
 
     def test_performance_wait_for_predicate_contention(self):
-        # Scenario: Many threads wait for a shared counter to reach a specific value.
-        # This tests SmartCondition.wait_for() and its underlying wait/notify cycles.
         num_workers = 20
-        target_count_per_worker = 5  # Each worker aims to advance the counter 5 times
+        target_count_per_worker = 5
 
-        # Use a class to hold shared state, better than 'nonlocal' for complex tests
         class SharedState:
             def __init__(self):
                 self.counter = 0
-                self.lock = threading.Lock()  # Lock to protect the counter
+                self.lock = threading.Lock()
 
         shared_state = SharedState()
         cond = SmartCondition()
@@ -546,30 +526,19 @@ class TestSmartCondition(unittest.TestCase):
                 TestSmartCondition._set_thread_factory_id(self, self.factory_id)
 
                 for i in range(target_count_per_worker):
-                    # Each worker waits for the global counter to become (i+1)
-                    # The condition is that shared_state.counter should be >= the worker's current target.
                     expected_counter_value = i + 1
 
                     def predicate():
-                        # This predicate runs inside cond's lock, so shared_state.counter access is safe.
                         return shared_state.counter >= expected_counter_value
 
-                    if cond.wait_for(predicate, timeout=5):  # Wait for predicate with timeout
+                    if cond.wait_for(predicate, timeout=5):
                         self.acquired_predicates += 1
 
-                        # IMPORTANT: Only increment shared_state.counter IF it's exactly the value
-                        # we just advanced to. This prevents a race where multiple workers might
-                        # try to increment past each other causing missed steps or double increments
-                        # for the same 'target_value'.
-                        with shared_state.lock:  # Protect access to shared_state.counter outside cond's lock
+                        with shared_state.lock:
                             if shared_state.counter < expected_counter_value:
-                                pass  # We already know predicate() is true, meaning shared_state.counter >= expected_counter_value
-
+                                pass
                     else:
                         print(f"[{self.factory_id}] Predicate wait for {expected_counter_value} timed out.")
-                        # This break makes the worker stop if it times out once, which can lead to test failure.
-                        # For robust predicate tests, consider if a timeout should truly stop the worker,
-                        # or just mean it missed a cycle and should try again. For this test, it's ok.
                         break
 
                 self.event_to_set.set()
@@ -579,34 +548,27 @@ class TestSmartCondition(unittest.TestCase):
             w = PredicateWorker(i, events[i])
             workers.append(w)
 
-        # Start workers
         start_time = time.perf_counter()
         for w in workers:
             w.start()
 
-        # The main thread (test runner) will drive the `shared_state.counter`
-        # and notify the workers. This is the "missing link" for the chain reaction.
-        for step in range(num_workers * target_count_per_worker):  # Max possible increments
+        for step in range(num_workers * target_count_per_worker):
             with shared_state.lock:
-                # Increment the counter
                 shared_state.counter += 1
                 current_count = shared_state.counter
 
             with cond:
-                cond.notify_all()  # Notify all workers when the counter changes
+                cond.notify_all()
 
-            # Introduce a small delay to simulate work/scheduling
             time.sleep(0.0001)
 
-            # Check if all workers have finished their predicates, or if we've iterated enough
             if all(w.acquired_predicates == target_count_per_worker for w in workers):
-                break  # All done early!
+                break
 
-        # Ensure final notify_all in case some workers missed signals
         with cond:
             cond.notify_all()
 
-        all_finished = all(e.wait(timeout=30) for e in events)  # Wait for all workers to signal completion
+        all_finished = all(e.wait(timeout=30) for e in events)
         end_time = time.perf_counter()
 
         for w in workers:
@@ -615,7 +577,6 @@ class TestSmartCondition(unittest.TestCase):
 
         elapsed_time = end_time - start_time
 
-        # Calculate total successful predicate checks across all workers
         total_predicate_successes = sum(w.acquired_predicates for w in workers)
         expected_total_predicate_successes = num_workers * target_count_per_worker
 
@@ -635,8 +596,252 @@ class TestSmartCondition(unittest.TestCase):
         self.assertEqual(total_predicate_successes, expected_total_predicate_successes,
                          "Expected all predicate checks to succeed")
 
+    # --- New Tests for Callback Methods (modified) ---
 
-# --- Existing _ensure_factory_id theory tests (unchanged from your last successful run) ---
+    def test_notify_and_call_with_specific_callback(self):
+        cond = SmartCondition()
+        results = []
+        # No threading.Event needed here, worker.join will ensure completion
+
+        def specific_callback():
+            results.append("specific_callback_fired")
+
+        worker_id = str(ulid.ULID())
+
+        class CallbackWorker(Worker):
+            def run(self):
+                TestSmartCondition._set_thread_factory_id(self, worker_id)
+                with cond:
+                    cond.wait() # Worker will block here
+                # After being woken, worker will append its result
+                results.append("worker_woken")
+
+        worker = CallbackWorker()
+        worker.start()
+
+        time.sleep(0.1)  # Give worker time to wait
+
+        # Bind the specific callback to the worker's factory_id
+        cond.bind_callback(worker_id, specific_callback)
+
+        with cond:
+            cond.notify_and_call(factory_ids=worker_id)
+
+        worker.join(timeout=1) # Wait for the worker to finish its run method
+
+        self.assertIn("specific_callback_fired", results)
+        self.assertIn("worker_woken", results)
+        self.assertEqual(results.count("specific_callback_fired"), 1)
+        self.assertEqual(results.count("worker_woken"), 1)
+        self.assertEqual(len(cond.get_all_waiting_factory_ids()), 0, "Worker should be removed after notification")
+
+    def test_notify_and_call_with_default_callback(self):
+        cond = SmartCondition()
+        results = []
+
+        def default_callback():
+            results.append("default_callback_fired")
+
+        cond.set_default_callback(default_callback)
+
+        worker_id = str(ulid.ULID())
+
+        class CallbackWorker(Worker):
+            def run(self):
+                TestSmartCondition._set_thread_factory_id(self, worker_id)
+                with cond:
+                    cond.wait()
+                results.append("worker_woken")
+
+        worker = CallbackWorker()
+        worker.start()
+
+        time.sleep(0.1)
+
+        with cond:
+            cond.notify_and_call(factory_ids=worker_id)
+
+        worker.join(timeout=1)
+
+        self.assertIn("default_callback_fired", results)
+        self.assertIn("worker_woken", results)
+        self.assertEqual(results.count("default_callback_fired"), 1)
+        self.assertEqual(results.count("worker_woken"), 1)
+
+    def test_notify_and_call_with_inline_callback_override(self):
+        cond = SmartCondition()
+        results = []
+
+        def default_callback_never_called():
+            results.append("default_callback_incorrectly_fired")
+
+        def specific_callback_never_called():
+            results.append("specific_callback_incorrectly_fired")
+
+        def inline_callback():
+            results.append("inline_callback_fired")
+
+        worker_id = str(ulid.ULID())
+
+        cond.set_default_callback(default_callback_never_called)
+        cond.bind_callback(worker_id, specific_callback_never_called)
+
+        class CallbackWorker(Worker):
+            def run(self):
+                TestSmartCondition._set_thread_factory_id(self, worker_id)
+                with cond:
+                    cond.wait()
+                results.append("worker_woken")
+
+        worker = CallbackWorker()
+        worker.start()
+
+        time.sleep(0.1)
+
+        # Call with an inline callback, which should take precedence
+        with cond:
+            cond.notify_and_call(factory_ids=worker_id, callback=inline_callback)
+
+        worker.join(timeout=1)
+
+        self.assertIn("inline_callback_fired", results)
+        self.assertIn("worker_woken", results)
+        self.assertEqual(results.count("inline_callback_fired"), 1)
+        self.assertEqual(results.count("worker_woken"), 1)
+        self.assertNotIn("default_callback_incorrectly_fired", results)
+        self.assertNotIn("specific_callback_incorrectly_fired", results)
+
+
+    def test_notify_and_call_priority(self):
+        cond = SmartCondition()
+        results = []
+
+        def callback_for_worker_1():
+            results.append("worker_1_specific_cb")
+
+        def default_cb():
+            results.append("default_cb")
+
+        def inline_cb_for_worker_2():
+            results.append("worker_2_inline_cb")
+
+        cond.set_default_callback(default_cb)
+        worker_1_id = "worker-1"
+        worker_2_id = "worker-2"
+        worker_3_id = "worker-3"
+
+        cond.bind_callback(worker_1_id, callback_for_worker_1)
+
+        class PriorityWorker(Worker):
+            def __init__(self, fid):
+                super().__init__()
+                self.factory_id = fid
+
+            def run(self):
+                TestSmartCondition._set_thread_factory_id(self, self.factory_id)
+                with cond:
+                    cond.wait()
+                results.append(f"woken_{self.factory_id}")
+
+        worker1 = PriorityWorker(worker_1_id)
+        worker2 = PriorityWorker(worker_2_id)
+        worker3 = PriorityWorker(worker_3_id)
+
+        worker1.start()
+        worker2.start()
+        worker3.start()
+
+        time.sleep(0.1) # Let workers wait
+
+        # Notify worker 1 (should trigger specific bound callback)
+        with cond:
+            cond.notify_and_call(factory_ids=worker_1_id)
+        worker1.join(timeout=1) # Wait for worker 1 to finish its execution
+
+        self.assertIn("worker_1_specific_cb", results)
+        self.assertIn("woken_worker-1", results)
+
+
+        # Notify worker 2 (should trigger inline callback, overriding default/specific)
+        with cond:
+            cond.notify_and_call(factory_ids=worker_2_id, callback=inline_cb_for_worker_2)
+        worker2.join(timeout=1) # Wait for worker 2 to finish its execution
+
+        self.assertIn("worker_2_inline_cb", results)
+        self.assertIn("woken_worker-2", results)
+
+        # Notify worker 3 (should trigger default callback)
+        with cond:
+            cond.notify_and_call(factory_ids=worker_3_id)
+        worker3.join(timeout=1) # Wait for worker 3 to finish its execution
+
+        self.assertIn("default_cb", results)
+        self.assertIn("woken_worker-3", results)
+
+        # Ensure no accidental calls
+        self.assertEqual(results.count("worker_1_specific_cb"), 1)
+        self.assertEqual(results.count("worker_2_inline_cb"), 1)
+        self.assertEqual(results.count("default_cb"), 1)
+
+
+    def test_callback_error_handling(self):
+        cond = SmartCondition()
+        results = []
+
+        def buggy_callback():
+            results.append("buggy_callback_started")
+            raise ValueError("Intentional error in callback!")
+
+        worker_id = str(ulid.ULID())
+        cond.bind_callback(worker_id, buggy_callback)
+
+        class CallbackWorker(Worker):
+            def run(self):
+                TestSmartCondition._set_thread_factory_id(self, worker_id)
+                with cond:
+                    cond.wait()
+                results.append("worker_woken")
+
+        worker = CallbackWorker()
+        worker.start()
+        time.sleep(0.1)
+
+        # The actual usage needs to be within a 'with cond:' block
+        with cond:
+            cond.notify_and_call(factory_ids=worker_id)
+
+        worker.join(timeout=1)
+
+        self.assertIn("buggy_callback_started", results)
+        self.assertIn("worker_woken", results)
+
+    def test_no_callback_registered(self):
+        cond = SmartCondition()
+        results = []
+
+        worker_id = str(ulid.ULID())
+
+        class CallbackWorker(Worker):
+            def run(self):
+                TestSmartCondition._set_thread_factory_id(self, worker_id)
+                with cond:
+                    cond.wait()
+                results.append("worker_woken")
+
+        worker = CallbackWorker()
+        worker.start()
+        time.sleep(0.1)
+
+        # No callback registered
+        with cond:
+            cond.notify_and_call(factory_ids=worker_id)
+
+        worker.join(timeout=1)
+
+        self.assertIn("worker_woken", results)
+        self.assertEqual(len(results), 1)
+
+
 class TestSmartConditionFactoryIdTheory(unittest.TestCase):
 
     def setUp(self):
@@ -656,7 +861,7 @@ class TestSmartConditionFactoryIdTheory(unittest.TestCase):
                 del threading.current_thread().factory_id
 
     def test_ensure_factory_id_on_thread_with_predefined_id(self):
-        expected_fid = "pre-assigned-ulid-123456789012345"  # Needs to be 26 chars like a real ULID
+        expected_fid = "pre-assigned-ulid-123456789012345"
 
         def thread_target():
             threading.current_thread().factory_id = expected_fid
@@ -752,6 +957,207 @@ class TestSmartConditionFactoryIdTheory(unittest.TestCase):
         final_waiting_ids = self.cond.get_all_waiting_factory_ids()
         self.assertEqual(len(final_waiting_ids), 0,
                          "All waiters should have been removed from SmartCondition's internal list.")
+    def test_notify_and_call_awaited_caller(self):
+        cond = SmartCondition()
+        results = []
+        awaited_callback_fired = threading.Event()
+
+        def inline_callback_for_awaited_caller():
+            results.append("inline_callback_fired_by_awaited")
+            awaited_callback_fired.set()
+
+        worker_id = str(ulid.ULID())
+
+        class CallbackWorker(Worker):
+            def run(self):
+                # We need to set the factory_id before calling wait
+                TestSmartCondition._set_thread_factory_id(self, worker_id)
+                with cond:
+                    cond.wait()
+                results.append("worker_woken_awaited")
+                # The callback should be fired here by the worker thread itself,
+                # as part of the wait() method's post-notification logic.
+
+        worker = CallbackWorker()
+        worker.start()
+
+        time.sleep(0.1) # Give worker a moment to start waiting
+
+        # Notify with an inline callback, specifying awaited_caller=True
+        with cond:
+            cond.notify_and_call(factory_ids=worker_id, callback=inline_callback_for_awaited_caller, awaited_caller=True)
+
+        worker.join(timeout=1)
+
+        self.assertTrue(awaited_callback_fired.wait(timeout=0.5), "Awaited callback was not fired.")
+        self.assertIn("inline_callback_fired_by_awaited", results)
+        self.assertIn("worker_woken_awaited", results)
+
+        # Crucial check: ensure the callback was fired AFTER the worker was woken (within its own context)
+        # This order ensures the worker itself executed the callback.
+        # The specific order in 'results' will depend on when results.append is called
+        # inside the worker's run() and when the callback appends.
+        # A stronger assertion for "executed by awaited thread":
+        # The callback is executed *within* the wait() method's post-wake logic.
+        # The 'worker_woken_awaited' append happens *after* wait() returns.
+        # So, the callback should logically appear before "worker_woken_awaited" in `results`.
+        self.assertLess(results.index("inline_callback_fired_by_awaited"), results.index("worker_woken_awaited"),
+                        "Callback was not executed by the awaited worker before its own post-wait code.")
+        self.assertEqual(results.count("inline_callback_fired_by_awaited"), 1)
+        self.assertEqual(results.count("worker_woken_awaited"), 1)
+
+
+    def test_notify_awaited_caller_with_bound_callback(self):
+        cond = SmartCondition()
+        results = []
+        awaited_callback_fired = threading.Event()
+
+        def specific_bound_callback_for_awaited():
+            results.append("bound_callback_fired_by_awaited")
+            awaited_callback_fired.set()
+
+        worker_id = str(ulid.ULID())
+
+        cond.bind_callback(worker_id, specific_bound_callback_for_awaited)
+
+        class CallbackWorker(Worker):
+            def run(self):
+                TestSmartCondition._set_thread_factory_id(self, worker_id)
+                with cond:
+                    cond.wait()
+                results.append("worker_woken_bound_awaited")
+
+        worker = CallbackWorker()
+        worker.start()
+
+        time.sleep(0.1)
+
+        # Notify without an inline callback, but with awaited_caller=True,
+        # so the bound callback should be executed by the worker.
+        with cond:
+            cond.notify(factory_ids=worker_id, n=1, awaited_caller=True)
+
+        worker.join(timeout=1)
+
+        self.assertTrue(awaited_callback_fired.wait(timeout=0.5), "Awaited bound callback was not fired.")
+        self.assertIn("bound_callback_fired_by_awaited", results)
+        self.assertIn("worker_woken_bound_awaited", results)
+        self.assertLess(results.index("bound_callback_fired_by_awaited"), results.index("worker_woken_bound_awaited"),
+                        "Bound callback was not executed by the awaited worker before its own post-wait code.")
+        self.assertEqual(results.count("bound_callback_fired_by_awaited"), 1)
+        self.assertEqual(results.count("worker_woken_bound_awaited"), 1)
+
+
+    def test_notify_all_awaited_caller_with_default_callback(self):
+        cond = SmartCondition()
+        results = []
+        awaited_callback_fired_worker1 = threading.Event()
+        awaited_callback_fired_worker2 = threading.Event()
+
+        def default_callback_for_awaited():
+            # This callback will be called by both workers
+            current_thread_id = threading.current_thread().factory_id
+            results.append(f"default_callback_fired_by_awaited_{current_thread_id}")
+            if current_thread_id == worker1_id:
+                awaited_callback_fired_worker1.set()
+            elif current_thread_id == worker2_id:
+                awaited_callback_fired_worker2.set()
+
+        worker1_id = str(ulid.ULID())
+        worker2_id = str(ulid.ULID())
+
+        cond.set_default_callback(default_callback_for_awaited)
+
+        class CallbackWorker1(Worker):
+            def run(self):
+                TestSmartCondition._set_thread_factory_id(self, worker1_id)
+                with cond:
+                    cond.wait()
+                results.append(f"worker_woken_default_awaited_{worker1_id}")
+
+        class CallbackWorker2(Worker):
+            def run(self):
+                TestSmartCondition._set_thread_factory_id(self, worker2_id)
+                with cond:
+                    cond.wait()
+                results.append(f"worker_woken_default_awaited_{worker2_id}")
+
+        worker1 = CallbackWorker1()
+        worker2 = CallbackWorker2()
+        worker1.start()
+        worker2.start()
+
+        time.sleep(0.1)
+
+        # Notify all with awaited_caller=True, so the default callback should be executed by both workers.
+        with cond:
+            cond.notify_all(awaited_caller=True)
+
+        worker1.join(timeout=1)
+        worker2.join(timeout=1)
+
+        self.assertTrue(awaited_callback_fired_worker1.wait(timeout=0.5), "Worker 1's awaited default callback was not fired.")
+        self.assertTrue(awaited_callback_fired_worker2.wait(timeout=0.5), "Worker 2's awaited default callback was not fired.")
+
+        self.assertIn(f"default_callback_fired_by_awaited_{worker1_id}", results)
+        self.assertIn(f"default_callback_fired_by_awaited_{worker2_id}", results)
+        self.assertIn(f"worker_woken_default_awaited_{worker1_id}", results)
+        self.assertIn(f"worker_woken_default_awaited_{worker2_id}", results)
+
+        # Verify order for worker 1
+        self.assertLess(results.index(f"default_callback_fired_by_awaited_{worker1_id}"),
+                        results.index(f"worker_woken_default_awaited_{worker1_id}"),
+                        f"Default callback for {worker1_id} not executed by awaited worker before its post-wait code.")
+        # Verify order for worker 2
+        self.assertLess(results.index(f"default_callback_fired_by_awaited_{worker2_id}"),
+                        results.index(f"worker_woken_default_awaited_{worker2_id}"),
+                        f"Default callback for {worker2_id} not executed by awaited worker before its post-wait code.")
+
+        self.assertEqual(results.count(f"default_callback_fired_by_awaited_{worker1_id}"), 1)
+        self.assertEqual(results.count(f"default_callback_fired_by_awaited_{worker2_id}"), 1)
+        self.assertEqual(results.count(f"worker_woken_default_awaited_{worker1_id}"), 1)
+        self.assertEqual(results.count(f"worker_woken_default_awaited_{worker2_id}"), 1)
+
+
+    def test_no_callback_execution_by_notifier_when_awaited_caller_true(self):
+        cond = SmartCondition()
+        results = []
+
+        def notifier_callback_should_not_fire():
+            results.append("notifier_callback_incorrectly_fired")
+
+        def awaited_callback_should_fire():
+            results.append("awaited_callback_fired")
+
+        worker_id = str(ulid.ULID())
+
+        class CallbackWorker(Worker):
+            def run(self):
+                TestSmartCondition._set_thread_factory_id(self, worker_id)
+                with cond:
+                    cond.wait()
+                results.append("worker_woken")
+
+        worker = CallbackWorker()
+        worker.start()
+
+        time.sleep(0.1)
+
+        # Notify with an inline callback, setting awaited_caller=True
+        # This callback should be executed by the worker, NOT by the notifying thread
+        with cond:
+            cond.notify_and_call(factory_ids=worker_id, callback=awaited_callback_should_fire, awaited_caller=True)
+
+        worker.join(timeout=1)
+
+        self.assertIn("awaited_callback_fired", results)
+        self.assertIn("worker_woken", results)
+        self.assertNotIn("notifier_callback_incorrectly_fired", results) # THIS IS THE KEY ASSERTION
+
+        self.assertLess(results.index("awaited_callback_fired"), results.index("worker_woken"),
+                        "Awaited callback was not executed by the awaited worker before its own post-wait code.")
+        self.assertEqual(results.count("awaited_callback_fired"), 1)
+        self.assertEqual(results.count("worker_woken"), 1)
 
 
 if __name__ == '__main__':
