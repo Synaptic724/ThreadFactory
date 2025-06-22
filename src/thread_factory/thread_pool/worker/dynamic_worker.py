@@ -1,8 +1,6 @@
 import threading
 from typing import Callable, Any, Union, Optional
-from ulid import ULID
-from thread_factory.runtime import Worker, WorkerState, Records
-
+from thread_factory.runtime import Worker, WorkerState
 
 class DynamicWorker(Worker):
     """
@@ -39,7 +37,6 @@ class DynamicWorker(Worker):
         """
         self.home = fn
 
-
     def run(self):
         """
         Main worker execution loop.
@@ -48,7 +45,6 @@ class DynamicWorker(Worker):
         `locations` and `save_points` when directed.
         """
         self._bind_factory_id()  # Ensures the factory_id is set for the worker's thread context.
-        print(f"[DynamicWorker {self.factory_id}] Starting dynamic loop.")
         self.state = WorkerState.STARTING
 
         if self.home is None:
@@ -59,7 +55,6 @@ class DynamicWorker(Worker):
             self.state = WorkerState.IDLE
             self.home()  # The worker will always call the home method
 
-        print(f"[DynamicWorker {self.factory_id}] Exiting dynamic loop.")
         self.death_event.set()  # Notify that the thread has completed
 
     def stop(self):
@@ -69,28 +64,18 @@ class DynamicWorker(Worker):
         self.shutdown_flag.set()
         self._wake_event.set()
 
-    def _execute_task(self, task: Union[Callable, 'Work']):
-        """
-        Executes a unit of work, while also managing dynamic states.
-        """
-        try:
-            super()._execute_task(task)  # Leverage the parent class's execution logic
-            self._count_work()  # Increment the task completion counter
-        except Exception as e:
-            print(f"[DynamicWorker {self.factory_id}] Error in executing task: {e}")
-            self.state = WorkerState.FAILED  # Update the state to FAILED
-
     def dispose(self):
         """
         Ensure proper disposal of dynamic worker resources.
         """
         if self.disposed:
             return
-        super().dispose()  # Call parent class disposal
         self.save_points.clear()  # Clear all dynamic behaviors and save points
+        self.save_points = None
         self.locations.clear()  # Clear all dynamic locations
+        self.locations = None
         self.home = None  # Clear the home function reference
-        print(f"[DynamicWorker {self.factory_id}] Disposed of dynamic resources.")
+        super().dispose()  # Call parent class disposal
 
     def __repr__(self):
         """

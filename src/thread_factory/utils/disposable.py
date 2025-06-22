@@ -36,6 +36,11 @@ class IDisposable(ABC):
         """
         return self._disposed
 
+    @property
+    def is_disposed(self) -> bool:
+        """Indicates whether the object has been disposed."""
+        return self._disposed
+
     @abstractmethod
     def dispose(self):
         """
