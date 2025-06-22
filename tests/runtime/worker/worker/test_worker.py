@@ -2,11 +2,10 @@ import datetime
 import unittest
 import threading
 import time
+from enum import Enum, auto
 import ulid
 from collections import deque
-
-from thread_factory.runtime import Records, Worker  # Change to match your actual module
-
+from thread_factory.runtime import Records, Worker, WorkerState
 
 class DummyQueue:
     """Simple queue to test Worker"""
@@ -54,9 +53,9 @@ class TestWorker(unittest.TestCase):
             self.worker.join(timeout=2)
 
     def test_worker_initial_state(self):
-        self.assertEqual(self.worker.state, "IDLE")
+        self.assertEqual(self.worker.state, WorkerState.CREATED)
         self.assertEqual(self.worker.completed_work, 0)
-        self.assertIsInstance(self.worker.unique, str)
+        self.assertIsInstance(self.worker.factory_id, str)
         self.assertIsInstance(self.worker.records, Records)
 
     def test_worker_hard_kill(self):
@@ -85,6 +84,83 @@ class TestWorker(unittest.TestCase):
         self.worker.dispose()
         self.assertTrue(self.worker.disposed)
         self.assertFalse(self.worker.is_alive())
+
+    def test_worker_executes_callable(self):
+        flag = threading.Event()
+
+        def task():
+            flag.set()
+
+        self.worker.work_queue = self.queue
+        self.queue.enqueue(task)
+        self.worker.start()
+        flag.wait(timeout=2)
+        self.worker.stop()
+        self.worker.join()
+
+        self.assertTrue(flag.is_set())
+        self.assertEqual(self.worker.completed_work, 1)
+
+    def test_worker_executes_run_method(self):
+        class MyTask:
+            def __init__(self):
+                self.ran = False
+
+            def run(self):
+                self.ran = True
+
+        obj = MyTask()
+        self.worker.work_queue = self.queue
+        self.queue.enqueue(obj)
+        self.worker.start()
+        time.sleep(0.05)
+        self.worker.stop()
+        self.worker.join()
+
+        self.assertTrue(obj.ran)
+        self.assertEqual(self.worker.completed_work, 1)
+
+    def test_invalid_task_type(self):
+        self.worker.work_queue = self.queue
+        self.queue.enqueue(123)  # Not callable or runnable
+
+        self.worker.start()
+        time.sleep(0.05)
+        self.worker.stop()
+        self.worker.join()
+
+        self.assertEqual(self.worker.completed_work, 0)
+
+    def test_thread_switch_behavior(self):
+        new_queue = DummyQueue()
+        self.worker.thread_switch(new_queue)
+        self.assertIs(self.worker.work_queue, new_queue)
+        self.assertEqual(self.worker.state, WorkerState.SWITCHED)
+
+    def test_get_creation_properties(self):
+        ts = self.worker.get_creation_timestamp()
+        dt = self.worker.get_creation_datetime()
+        self.assertIsInstance(ts, float)
+        self.assertIsInstance(dt, datetime.datetime)
+
+    def test_stop_flag_sets(self):
+        self.assertFalse(self.worker.shutdown_flag.is_set())
+        self.worker.stop()
+        self.assertTrue(self.worker.shutdown_flag.is_set())
+
+    def test_dispose_twice_safe(self):
+        self.worker.dispose()
+        self.assertTrue(self.worker.disposed)
+        try:
+            self.worker.dispose()  # Should not raise
+        except Exception as e:
+            self.fail(f"Calling dispose twice raised an exception: {e}")
+
+    def test_repr_contains_state_and_id(self):
+        rep = repr(self.worker)
+        self.assertIn("Worker", rep)
+        self.assertIn("state=", rep)
+        self.assertIn("completed=", rep)
 
 
 if __name__ == "__main__":

@@ -1,228 +1,276 @@
-import threading
 import time
-from typing import Optional, Union, Iterable
+from typing import Optional, Union, Iterable, Any
 from thread_factory.utils import IDisposable
 from thread_factory.primatives.smart_condition import SmartCondition
 
+
 class SwitchLock(IDisposable):
     """
-    A dynamic, 'smart' semaphore that can:
-      - Increase or decrease permits at runtime.
-      - Acquire/release permits in a semaphore-like fashion.
-      - Optionally do targeted factory_ids for wakeups (via SmartCondition).
-      - If disposed, all waiting threads are unblocked and acquire() returns False.
+    SwitchLock
+    ----------
+    A dynamic, "smart" semaphore implementation that provides granular control
+    over permits and thread notifications. It extends standard semaphore
+    functionality by allowing runtime adjustment of available permits,
+    targeted thread awakening using unique identifiers (ULIDs), and
+    robust disposal mechanisms.
+
+    This lock is designed for scenarios requiring flexible synchronization,
+    such as managing access to limited resources where the resource count
+    can change, or coordinating groups of threads with specific needs.
+
+    It leverages a `SmartCondition` internally for advanced thread signaling.
     """
 
     def __init__(self, value: int = 1):
         """
-        Initialize the SwitchLock with a starting number of 'permits'.
+        Initializes a new SwitchLock instance.
 
-        :param value: The initial number of available permits (>= 0).
+        Args:
+            value (int): The initial number of available permits. Must be a non-negative integer.
+
+        Raises:
+            ValueError: If the initial `value` is less than 0.
         """
-        super().__init__()
-        # Validation: the initial number of permits cannot be negative.
+        super().__init__()  # Initialize the IDisposable base class
         if value < 0:
             raise ValueError("SwitchLock initial value must be >= 0")
 
-        # SmartCondition is a specialized condition that uses .factory_id from threads
-        # and supports targeted wake-ups. We use this for all blocking/waiting logic.
-        self._cond = SmartCondition()
-
-        # The current permit count (like a normal semaphore).
-        self._value = value
+        self._cond: SmartCondition = SmartCondition()
+        self._value: int = value  # Current count of available permits
+        self._log_ids: list[str] = []  # Stores unique identifiers of threads that attempted to acquire the lock
 
     @property
     def condition(self) -> SmartCondition:
         """
-        Provide access to the underlying SmartCondition if external code
-        needs to do custom wait/notify beyond the standard acquire/release usage.
+        Provides direct access to the internal SmartCondition object.
+        This property is primarily for advanced use cases or introspection,
+        allowing direct interaction with the underlying condition variable.
+
+        Returns:
+            SmartCondition: The internal SmartCondition instance.
         """
         return self._cond
 
-    def acquire(self,
-                blocking: bool = True,
-                timeout: Optional[float] = None
-    ) -> bool:
+    def acquire(self, blocking: bool = True, timeout: Optional[float] = None) -> bool:
         """
-        Acquire a permit:
-          - If self._value > 0, consume one and return True immediately.
-          - Otherwise, block (or wait up to 'timeout' seconds) unless disposed.
-          - If disposed while waiting, return False immediately.
+        Attempts to acquire a permit from the SwitchLock.
 
-        :param blocking: If False, don't block; immediately return True if a permit
-                         is available, or False otherwise.
-        :param timeout:  How many seconds to wait for a permit if blocking=True.
-                         If None, wait indefinitely (unless disposed).
-        :return: True if we successfully acquired a permit;
-                 False if we timed out, were disposed, or no permit was found.
+        If `blocking` is True, the calling thread will wait until a permit
+        becomes available or the `timeout` expires. If `blocking` is False,
+        the method returns immediately.
+
+        Args:
+            blocking (bool): If True, block until a permit is acquired or timeout.
+                             If False, return immediately. Defaults to True.
+            timeout (Optional[float]): The maximum time (in seconds) to wait if `blocking` is True.
+                                       If None, wait indefinitely. This parameter cannot be used
+                                       when `blocking` is False.
+
+        Returns:
+            bool: True if a permit was successfully acquired, False otherwise (e.g., timed out,
+                  `blocking=False` and no permit available, or lock was disposed).
+
+        Raises:
+            ValueError: If `timeout` is specified when `blocking` is False.
         """
-        # If the user sets blocking=False but also provides a timeout, that is contradictory.
-        # We cannot do a timed wait in non-blocking mode, so we raise an error.
         if not blocking and timeout is not None:
-            raise ValueError("Can't specify timeout if 'blocking=False'")
+            raise ValueError("Cannot specify 'timeout' when 'blocking' is False.")
 
-        # Use the condition as a context manager => automatically acquire/release its lock.
-        with self._cond:
-            # If the lock is disposed before we even start, we fail fast.
+        # Ensure the current thread has a factory_id, assigning one if missing.
+        # This ID is used for targeted notifications and logging.
+        thread_factory_id = self._cond._ensure_factory_id()
+
+        # Log the factory ID of the thread attempting to acquire the lock
+        if thread_factory_id not in self._log_ids:
+            self._log_ids.append(thread_factory_id)
+
+        with self._cond:  # Acquire the internal condition's lock for synchronized access
             if self._disposed:
-                return False
+                return False  # Cannot acquire if the lock has been disposed
 
-            # -----------------------------
-            # Non-blocking case:
-            # -----------------------------
             if not blocking:
-                # If there's a permit available now, consume it and return True.
+                # Non-blocking attempt: check if a permit is immediately available
                 if self._value > 0:
                     self._value -= 1
                     return True
-                # Otherwise, immediately fail with False.
-                return False
+                return False  # No permit available
 
-            # -----------------------------
-            # Blocking case:
-            # -----------------------------
-            # We'll compute an endtime if a timeout was specified.
-            endtime = None
-            if timeout is not None:
-                # If the user gave a non-positive timeout (e.g. 0 or negative),
-                # then we effectively do an immediate check:
-                if timeout <= 0:
-                    if self._value > 0:
-                        self._value -= 1
-                        return True
-                    return False
-                # Otherwise, we calculate the future point in time we'll stop waiting.
-                endtime = time.time() + timeout
+            # Blocking attempt:
+            endtime = time.time() + timeout if timeout is not None else None
 
-            # We loop until a permit is available OR we time out OR we get disposed.
-            while self._value == 0:
-                # If disposed in the meantime, fail.
+            while True:
                 if self._disposed:
-                    return False
+                    return False  # Exit if disposed while waiting
 
-                # If a timeout is set, check how much time remains.
-                if endtime is not None:
-                    remaining = endtime - time.time()
-                    # If we've run out of time, return False immediately.
-                    if remaining <= 0:
-                        return False
-                    # Otherwise, wait with a specific timeout.
-                    got_it = self._cond.wait(timeout=remaining)
-                else:
-                    # If no timeout, wait indefinitely.
-                    got_it = self._cond.wait()
+                if self._value > 0:
+                    self._value -= 1
+                    return True  # Permit acquired
 
-                # We woke up from waiting. Could be due to a notify, spurious wake, or disposal.
-                if self._disposed:
-                    # If disposed, fail with False.
-                    return False
+                # Calculate remaining time for timeout, if applicable
+                remaining = endtime - time.time() if endtime else None
+                if remaining is not None and remaining <= 0:
+                    return False  # Timeout has expired
+
+                # Wait on the internal SmartCondition. This releases the internal lock,
+                # then re-acquires it upon waking or timeout.
+                got_it = self._cond.wait(timeout=remaining)
                 if not got_it:
-                    # not got_it => we timed out or got a spurious wake.
-                    # If there's still no permit after re-check, return False.
-                    if self._value == 0:
-                        return False
+                    # If wait() returned False, it implies a timeout on the condition itself.
+                    # The loop will re-check the overall `remaining` time and `_value`.
+                    return False # Permit was not acquired within the specified duration
 
-            # If we exit the loop, there's a permit available => decrement the count and succeed.
-            self._value -= 1
-            return True
-
-    # So we can use the lock in a `with SwitchLock():` block, which calls acquire() on entry.
-    __enter__ = acquire
+    __enter__ = acquire  # Allows using the SwitchLock as a context manager (e.g., `with lock:`)
 
     def release(self,
                 n: int = 1,
-                factory_ids: Optional[Union[int, Iterable[int]]] = None
+                factory_ids: Optional[Union[str, Iterable[str]]] = None
     ) -> None:
         """
-        Release 'n' permits. If threads are waiting:
-         - If factory_ids is None, do a normal FIFO notify for up to n threads.
-         - If factory_ids is an int or iterable, only wake matching threads (targeted).
+        Releases `n` permits, making them available for other threads to acquire.
+        Optionally, specific waiting threads can be targeted by their `factory_id`s
+        to be woken up.
 
-        :param n: How many permits to release at once. Must be >= 1.
-        :param factory_ids: If specified, only wake threads with matching .factory_id sets.
-                            If None, a normal FIFO wake of up to n waiters.
+        Args:
+            n (int): The number of permits to release. Must be 1 or greater.
+            factory_ids (Union[str, Iterable[str]], optional): A single factory ID (string)
+                                                               or an iterable of factory IDs
+                                                               to specifically notify. If None,
+                                                               the `SmartCondition` will notify
+                                                               general waiting threads (FIFO).
+
+        Raises:
+            ValueError: If `n` is less than 1.
+            RuntimeError: If called when the internal condition's lock is not acquired (should not happen
+                          if used correctly with `with self._cond:` context or within `acquire`).
         """
         if n < 1:
-            raise ValueError("n must be >= 1")
+            raise ValueError("Number of permits to release (n) must be >= 1.")
 
-        with self._cond:
-            # Add 'n' to our permit count
-            self._value += n
-            # Notify up to n waiters, possibly filtered by factory_ids
+        with self._cond:  # Acquire the internal condition's lock for synchronized state modification
+            self._value += n  # Increase the count of available permits
+            # Notify waiting threads. SmartCondition handles the actual awakening logic.
             self._cond.notify(n=n, factory_ids=factory_ids)
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):
         """
-        If used in a `with SwitchLock():` block, automatically release one permit upon exit.
+        Context manager exit method. Automatically releases one permit upon exiting
+        the `with` block, regardless of whether an exception occurred.
+
+        Args:
+            exc_type (Any): The exception type (if an exception was raised in the `with` block).
+            exc_val (Any): The exception value.
+            exc_tb (Any): The exception traceback.
         """
         self.release()
 
+    def get_all_waiters(self) -> list[Any]:
+        """
+        Returns a snapshot of all `Waiter` objects currently blocking on this lock's
+        internal `SmartCondition`. Each `Waiter` object contains details about
+        the waiting thread, including its `factory_id`.
+
+        Returns:
+            list[Any]: A list of `Waiter` objects. Returns an empty list if the
+                       lock is disposed or no threads are waiting.
+        """
+        if self._disposed or self._cond is None:
+            return []
+        return self._cond.get_all_waiters()
+
+    def get_all_logged_factory_ids(self) -> list[str]:
+        """
+        Returns a copy of all unique `factory_id`s that have attempted to acquire
+        this lock since its initialization. This log can be useful for debugging
+        or monitoring thread participation.
+
+        Returns:
+            list[str]: A list of unique string IDs.
+        """
+        return list(self._log_ids)  # Return a copy to prevent external modification
+
     def increase_permits(self, n: int = 1) -> None:
         """
-        Increase the number of available permits by n (same as calling release(n) with no targeting).
+        Increases the number of available permits by `n` and notifies any
+        waiting threads. This effectively adds more capacity to the semaphore.
 
-        :param n: How many additional permits to add.
+        Args:
+            n (int): The number of permits to add. Must be non-negative.
+
+        Raises:
+            ValueError: If `n` is a negative value.
         """
         if n < 0:
-            raise ValueError("Cannot increase permits by a negative value")
+            raise ValueError("Cannot increase permits by a negative value.")
 
         with self._cond:
             self._value += n
             print(f"[SwitchLock] Increased permits by {n}, total={self._value}")
-            # Wake up to n waiting threads in FIFO order
-            self._cond.notify(n=n)
+            self._cond.notify(n=n)  # Notify potential waiters that permits are now available
 
     def decrease_permits(self, n: int = 1) -> None:
         """
-        Decrease the number of available permits by n, must not go below zero.
+        Decreases the number of available permits by `n`. This operation
+        can reduce the capacity of the semaphore. It will raise a `ValueError`
+        if attempting to decrease more permits than are currently available.
 
-        :param n: How many permits to remove.
-        :raises ValueError: If we attempt to remove more permits than currently available.
+        Args:
+            n (int): The number of permits to remove. Must be non-negative.
+
+        Raises:
+            ValueError: If `n` is a negative value, or if `n` is greater than
+                        the current number of available permits.
         """
         if n < 0:
-            raise ValueError("Cannot decrease permits by a negative value")
+            raise ValueError("Cannot decrease permits by a negative value.")
 
         with self._cond:
             if n > self._value:
-                raise ValueError("Cannot decrease more permits than available")
+                raise ValueError(f"Cannot decrease {n} permits; only {self._value} available.")
             self._value -= n
             print(f"[SwitchLock] Decreased permits by {n}, total={self._value}")
 
     def wait_for_permit(self, timeout: Optional[float] = None) -> bool:
         """
-        A convenience method that calls acquire(blocking=True, timeout=...),
-        then logs success/failure to the console.
+        A convenience method to acquire a permit, specifically for blocking waits,
+        and provides logging of the outcome. This is a wrapper around `acquire(blocking=True)`.
 
-        :param timeout: How many seconds to wait for a permit. If None, wait indefinitely.
-        :return: True if we acquired a permit, False if timed out or the lock was disposed.
+        Args:
+            timeout (Optional[float]): The maximum time (in seconds) to wait.
+                                       If None, wait indefinitely.
+
+        Returns:
+            bool: True if a permit was successfully acquired, False if the timeout expired.
         """
         success = self.acquire(blocking=True, timeout=timeout)
-        if success:
-            print(f"[SwitchLock] Permit acquired! Remaining: {self._value}")
-        else:
-            print(f"[SwitchLock] Timed out or disposed while waiting for permit.")
+        print(f"[SwitchLock] {'Acquired' if success else 'Timed out'} permit. Remaining: {self._value}")
         return success
 
     def release_permit(self,
                        n: int = 1,
-                       factory_ids: Optional[Union[int, Iterable[int]]] = None
+                       factory_ids: Optional[Union[str, Iterable[str]]] = None
     ) -> None:
         """
-        A convenience method equivalent to calling release(n, factory_ids=...),
-        plus logs the event.
+        A convenience method to release permits, providing logging of the action.
+        This is a wrapper around the `release()` method.
 
-        :param n: Number of permits to release.
-        :param factory_ids: If specified, only threads with matching .factory_id are awoken.
+        Args:
+            n (int): The number of permits to release.
+            factory_ids (Union[str, Iterable[str]], optional): A single factory ID (string)
+                                                               or an iterable of factory IDs
+                                                               to specifically notify.
         """
         self.release(n=n, factory_ids=factory_ids)
-        print(f"[SwitchLock] Permit released! Total: {self._value}")
+        print(f"[SwitchLock] Released permit(s). Total: {self._value}")
 
-    def get_all_waiting_factory_ids(self) -> list[int]:
+    def get_all_waiting_factory_ids(self) -> list[str]:
         """
-        Returns a flat list of factory IDs from threads currently blocked in acquire().
+        Retrieves a list of `factory_id` strings for all threads that are
+        currently blocked and waiting to acquire a permit from this lock.
 
-        :return: List of .factory_id from all waiting threads.
-                 If disposed or _cond is None, return an empty list.
+        Returns:
+            list[str]: A list of string ULIDs (or "MainThread") representing
+                       the waiting threads. Returns an empty list if the lock
+                       is disposed or no threads are waiting.
         """
         if self._disposed or self._cond is None:
             return []
@@ -230,15 +278,15 @@ class SwitchLock(IDisposable):
 
     def dispose(self):
         """
-        Dispose of the SwitchLock, waking any waiters so they can exit gracefully.
-        Any thread currently in acquire() will see self.disposed=True and return False.
-
-        After dispose(), the lock is no longer valid for normal usage.
+        Disposes of the SwitchLock, releasing all its resources and
+        waking up any threads currently waiting to acquire a permit.
+        After disposal, the lock should no longer be used. This method is idempotent.
         """
-        if self._disposed:
+        if self.disposed:  # Check if the lock has already been disposed
             return
-        self._disposed = True
-        # Wake up everyone so they can see that we've been disposed
+        self._disposed = True  # Mark the lock as disposed
         with self._cond:
+            # Notify all waiting threads so they can wake up and check the `_disposed` flag
             self._cond.notify_all()
         print("[SwitchLock] Disposed.")
+
