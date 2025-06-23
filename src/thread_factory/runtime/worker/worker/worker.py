@@ -150,10 +150,6 @@ class Worker(threading.Thread, IDisposable):
                     self.last_completed_work = task_record_reference
 
             self.update_metrics()
-            # Explicitly dispose of the Work object now that its record has been collected.
-            if not task.is_disposed: # Check if it's already disposed by some other means (e.g. context manager)
-                task.dispose()
-
 
     def stop(self):
         """Gracefully stop the worker by setting the shutdown flag."""
@@ -211,6 +207,8 @@ class Worker(threading.Thread, IDisposable):
         # Calculate how many hours have passed since the last reset
         hours_elapsed = (current_time - self._last_hourly_reset).total_seconds() / 3600.0
 
+        self._send_records_to_factory()
+
         # Clean up records older than 1 hour from self.records.records
         self.records.records = ConcurrentList([record for record in self.records.records if
                                                (current_time - record.timestamp_creation_time).total_seconds() < 3600])
@@ -227,6 +225,15 @@ class Worker(threading.Thread, IDisposable):
 
             # Recalculate the hours elapsed to account for the new reset
             hours_elapsed -= 1.0
+
+
+    def _send_records_to_factory(self):
+        """
+        Sends the worker's records to the factory for aggregation or storage.
+        This method is a placeholder and should be implemented in subclasses or by the factory.
+        """
+        if self.factory and hasattr(self.factory, 'receive_worker_records'):
+            self.factory.receive_worker_records(self.records)
 
     def __repr__(self):
         """Human-readable representation for debugging/logging."""

@@ -92,7 +92,6 @@ class TestWorker(unittest.TestCase):
         self.assertEqual(self.worker.units_per_minute, 1)
         self.assertEqual(self.worker.work_unit_counter, 1)
         self.assertGreater(self.worker.availability, 0)
-        self.assertTrue(work_instance.is_disposed)  # Assert Work object is disposed by Worker
         self.assertEqual(self.worker.state, WorkerState.BLOCKED)
 
     def test_worker_handles_task_failure(self):
@@ -110,7 +109,6 @@ class TestWorker(unittest.TestCase):
         self.assertEqual(self.worker.records.records[0].status, WorkStatus.FAILED)
         self.assertEqual(self.worker.units_per_minute, 1)
         self.assertEqual(self.worker.work_unit_counter, 1)
-        self.assertTrue(work_instance.is_disposed)  # Assert Work object is disposed by Worker
         self.assertEqual(self.worker.state, WorkerState.BLOCKED)
 
     def test_worker_graceful_shutdown(self):

@@ -4,7 +4,6 @@ from typing import Callable, Optional
 from thread_factory.concurrency import ConcurrentList
 from thread_factory.thread_pool import DynamicWorker
 
-
 # Dynapool class to manage the pool of workers and tasks
 class Dynapool:
     def __init__(self, max_workers: int, min_workers: int = 1):
