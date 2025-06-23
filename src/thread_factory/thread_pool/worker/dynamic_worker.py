@@ -18,6 +18,7 @@ class DynamicWorker(Worker):
         self.save_points: dict[str, Callable[[], None]] = {}
         self.locations: dict[str, Callable[[], None]] = {}
         self.home: Optional[Callable[[], None]] = None
+        self._value_work = None  # Work Associated with this worker
 
     def register_save_point(self, name: str, fn: Callable[[], None]) -> None:
         """
