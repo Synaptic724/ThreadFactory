@@ -19,6 +19,7 @@ class DynamicWorker(Worker):
         self.locations: dict[str, Callable[[], None]] = {}
         self.home: Optional[Callable[[], None]] = None
         self._value_work = None  # Work Associated with this worker
+        self._worker_type = "dynamic"  # Type of worker, can be used for identification
 
     def register_save_point(self, name: str, fn: Callable[[], None]) -> None:
         """
@@ -37,6 +38,15 @@ class DynamicWorker(Worker):
         Set the home function (main loop or resting state) for the worker.
         """
         self.home = fn
+
+    def return_home(self):
+        """
+        Return to the home function, which is the main loop or resting state of the worker.
+        """
+        if self.home is not None:
+            self.home()
+        else:
+            raise RuntimeError(f"[Worker {self.factory_id}] No home() set to return to.")
 
     def run(self):
         """

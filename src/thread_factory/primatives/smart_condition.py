@@ -94,6 +94,14 @@ class SmartCondition:
         """
         return self._lock.__exit__(exc_type, exc_val, exc_tb)
 
+
+    def register_this_thread(self, factory_id: Optional[str] = None):
+        """
+        Registers the current thread with a unique `factory_id` for tracking.
+        """
+        thread = threading.current_thread()
+        thread.factory_id = factory_id or str(ulid.ULID())
+
     def _ensure_factory_id(self) -> str:
         """
         Ensures that the current `threading.Thread` object has a `factory_id` attribute.

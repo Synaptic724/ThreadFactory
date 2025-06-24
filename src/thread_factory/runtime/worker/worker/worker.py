@@ -41,7 +41,7 @@ class Worker(threading.Thread, IDisposable):
         Initializes a Worker thread with tracking capabilities for work performance metrics.
         """
         super().__init__(group, target, name, args, kwargs, daemon=True)
-        # IDisposable.__init__(self) # No need to call if IDisposable is just an interface
+        IDisposable.__init__(self) # No need to call if IDisposable is just an interface
 
         self.factory = factory
         self.factory_id = factory_id if factory_id else str(ulid.ULID())
@@ -50,7 +50,7 @@ class Worker(threading.Thread, IDisposable):
         self.state = WorkerState.CREATED
         self.shutdown_flag = threading.Event()
         self.death_event = threading.Event()
-        self._disposed: bool = False # Manually managed disposed flag for this class
+        self.worker_type = "dynamic"
 
         # Metrics tracking
         self.records = Records()
