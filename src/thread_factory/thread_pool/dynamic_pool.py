@@ -5,7 +5,7 @@ from thread_factory.concurrency import ConcurrentList
 from thread_factory.thread_pool import DynamicWorker
 
 # Dynapool class to manage the pool of workers and tasks
-class Dynapool:
+class DynamicPool:
     def __init__(self, max_workers: int, min_workers: int = 1):
         self.max_workers = max_workers
         self.min_workers = min_workers

@@ -20,7 +20,6 @@ class DynamicWorker(Worker):
         self._event_loop: Optional[Callable[[], None]] = None
         self._value_work = None  # Work Associated with this worker
         self._worker_type = "dynamic"  # Type of worker, can be used for identification
-        self._home_pool_id = None # Home pool for the worker, if applicable
 
     def register_save_point(self, name: str, fn: Callable[[], None]) -> None:
         """
