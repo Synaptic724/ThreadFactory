@@ -22,7 +22,7 @@ class SwitchLock(IDisposable):
     It leverages a `SmartCondition` internally for advanced thread signaling.
     """
 
-    def __init__(self, value: int = 1, return_home_on_block: bool = False, worker_type: str = "dynamic", bias_threshold: Optional[int] = None):
+    def __init__(self, value: int = 1, worker_type: str = "dynamic", bias_threshold: Optional[int] = None):
         """
         Initializes a new SwitchLock instance.
 
@@ -39,24 +39,9 @@ class SwitchLock(IDisposable):
         self._cond: SmartCondition = SmartCondition()
         self._value: int = value  # Current count of available permits
         self._log_ids: list[str] = []  # Stores unique identifiers of threads that attempted to acquire the lock
-        self._return_home_on_block: bool = return_home_on_block  # Flag to control behavior when a thread blocks on the lock
         self._worker_type: str = worker_type  # Type of worker, can be used for identification
         self._bias_threshold: Optional[int] = bias_threshold
         self._pending_permits: int = 0  # buffered until bias flush
-
-    @property
-    def return_home_on_block(self) -> bool:
-        """
-        Indicates whether the worker should return to its home state when it blocks on this lock.
-        """
-        return self._return_home_on_block
-
-    @return_home_on_block.setter
-    def return_home_on_block(self, value: bool) -> None:
-        """
-        Sets whether the worker should return to its home state when it blocks on this lock.
-        """
-        self._return_home_on_block = value
 
     @property
     def condition(self) -> SmartCondition:
@@ -170,24 +155,6 @@ class SwitchLock(IDisposable):
         """
         self._cond.set_default_callback(callback)
 
-    def _return_home(self) -> None:
-        """
-        Called when a thread blocks on this lock and
-        `return_home_on_block` is True.  If the current
-        thread exposes a callable `return_home()` method,
-        invoke it.
-        """
-        current = threading.current_thread()
-
-        # Only fire if the attribute exists *and* is callable.
-        return_home_fn = getattr(current, "return_home", None)
-        if callable(return_home_fn):
-            return_home_fn()
-        else:
-            raise RuntimeError(
-                f"[SwitchLock] Current thread does not have a callable 'return_home' method."
-            )
-
     def bypass_bias(self) -> None:
         """
         Force-flush any buffered permits and wake everyone.
@@ -242,11 +209,7 @@ class SwitchLock(IDisposable):
                 if endtime is not None and time.time() >= endtime:
                     return False
 
-                ### 4 — optional “return home” callback
-                if self._return_home_on_block:
-                    self._return_home()
-
-                ### 5 — bias flush check
+                ### 4 — bias flush check
                 if (
                         self._bias_threshold is not None
                         and self._pending_permits
@@ -258,7 +221,7 @@ class SwitchLock(IDisposable):
                     self._cond.notify(n=self._value)
                     continue  # loop back and try to grab one immediately
 
-                ### 6 — really wait
+                ### 5 — really wait
                 remaining = None if endtime is None else max(0, endtime - time.time())
                 if not self._cond.wait(timeout=remaining):
                     return False  # woke by timeout, not by notify
@@ -295,9 +258,8 @@ class SwitchLock(IDisposable):
             if self._bias_threshold is None:
                 self._cond.notify(n=n, factory_ids=factory_ids)
 
-    # In SwitchLock class
     def notify(self, n: int = 1, factory_ids: Optional[Union[str, Iterable[str]]] = None,
-               awaited_caller: bool = False) -> None:
+               awaited_caller: bool = False, callback: Optional[Callable[[], None]] = None) -> None:
         """
         Notifies `n` waiting threads, increments permits by `n`, and executes their callbacks.
         This method combines permit release with flexible notification and callback execution.
@@ -306,6 +268,7 @@ class SwitchLock(IDisposable):
             n (int): The number of permits to increment and threads to notify. Must be 1 or greater.
             factory_ids (Union[str, Iterable[str]], optional): A specific factory ID or a set of IDs to notify.
             awaited_caller (bool): If True, the waking thread will execute the callback; otherwise, the notifying thread will.
+            callback (Optional[Callable[[], None]]): A callback function to be executed by the waking thread.
         """
         if n < 1:
             raise ValueError("Number of permits/notifications (n) must be >= 1.")
@@ -318,12 +281,13 @@ class SwitchLock(IDisposable):
                 self._cond.notify_and_call(
                     n=n,
                     factory_ids=factory_ids,
-                    callback=None,
+                    callback=callback,
                     awaited_caller=awaited_caller
                 )
 
+
     def notify_all(self, factory_ids: Optional[Union[str, Iterable[str]]] = None,
-                   awaited_caller: bool = False) -> None:
+                   awaited_caller: bool = False, callback: Optional[Callable[[], None]] = None) -> None:
         """
         Notifies all waiting threads, potentially increments permits, and executes their callbacks.
         This method combines permit release with flexible notification and callback execution.
@@ -357,10 +321,12 @@ class SwitchLock(IDisposable):
 
             self._buffer_or_grant(n_to_increment)
             if self._bias_threshold is None:
-                self._cond.notify_all(
+                self._cond.notify_all_and_call(
                     factory_ids=factory_ids,
-                    awaited_caller=awaited_caller
+                    awaited_caller=awaited_caller,
+                    callback=callback,
                 )
+
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):
         """

@@ -17,9 +17,10 @@ class DynamicWorker(Worker):
         self._wake_event = threading.Event()
         self.save_points: dict[str, Callable[[], None]] = {}
         self.locations: dict[str, Callable[[], None]] = {}
-        self.home: Optional[Callable[[], None]] = None
+        self._event_loop: Optional[Callable[[], None]] = None
         self._value_work = None  # Work Associated with this worker
         self._worker_type = "dynamic"  # Type of worker, can be used for identification
+        self._home_pool_id = None # Home pool for the worker, if applicable
 
     def register_save_point(self, name: str, fn: Callable[[], None]) -> None:
         """
@@ -37,16 +38,7 @@ class DynamicWorker(Worker):
         """
         Set the home function (main loop or resting state) for the worker.
         """
-        self.home = fn
-
-    def return_home(self):
-        """
-        Return to the home function, which is the main loop or resting state of the worker.
-        """
-        if self.home is not None:
-            self.home()
-        else:
-            raise RuntimeError(f"[Worker {self.factory_id}] No home() set to return to.")
+        self._event_loop = fn
 
     def run(self):
         """
@@ -57,15 +49,9 @@ class DynamicWorker(Worker):
         """
         self._bind_factory_id()  # Ensures the factory_id is set for the worker's thread context.
         self.state = WorkerState.STARTING
-
-        if self.home is None:
+        if self._event_loop is None:
             raise RuntimeError(f"[Worker {self.factory_id}] No home() set before thread start.")
-
-        # Execute the home loop, making sure it's externally controllable and dynamic
-        while not self.shutdown_flag.is_set():
-            self.state = WorkerState.IDLE
-            self.home()  # The worker will always call the home method
-
+        self._event_loop()  # The worker will always call the home method
         self.death_event.set()  # Notify that the thread has completed
 
     def stop(self):

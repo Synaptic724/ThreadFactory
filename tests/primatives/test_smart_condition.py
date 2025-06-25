@@ -231,6 +231,206 @@ class TestSmartCondition(unittest.TestCase):
         self.assertEqual(len(cond.get_all_waiting_factory_ids()), 0,
                          "Timed-out waiter should be removed from waiter list")
 
+
+    # ------------------------------------------------------------------
+    # NEW TESTS -- notify_all_and_call variants (fixed closure capture)
+    # ------------------------------------------------------------------
+
+    def test_notify_all_and_call_specific_callback(self):
+        """
+        All waiters wake; a *one-off* inline callback must run once
+        for every waiter.
+        """
+        cond = SmartCondition()
+        results, lock = [], threading.Lock()
+
+        def inline_cb():
+            with lock:
+                results.append("inline_cb")
+
+        workers = []
+        for i in range(3):
+            this_fid = f"fid-{i}"
+
+            class W(Worker):
+                def __init__(self, fid):
+                    super().__init__()
+                    self.factory_id = fid
+
+                def run(self_inner):  # noqa: N802
+                    TestSmartCondition._set_thread_factory_id(self_inner,
+                                                              self_inner.factory_id)
+                    with cond:
+                        cond.wait()
+                    with lock:
+                        results.append(f"woken_{self_inner.factory_id}")
+
+            w = W(this_fid)
+            workers.append(w)
+            w.start()
+
+        time.sleep(0.1)
+
+        with cond:
+            cond.notify_all_and_call(callback=inline_cb)
+
+        for w in workers:
+            w.join()
+
+        # 3 inline-callback executions + one woken entry per thread
+        self.assertEqual(results.count("inline_cb"), 3)
+        self.assertCountEqual(
+            [r for r in results if r.startswith("woken_")],
+            [f"woken_fid-{i}" for i in range(3)],
+        )
+
+    def test_notify_all_and_call_bound_vs_default(self):
+        """
+        Bound callback beats default when no inline callback supplied.
+        """
+        cond = SmartCondition()
+        results, lock = [], threading.Lock()
+
+        def default_cb():
+            with lock:
+                results.append("default_cb")
+
+        cond.set_default_callback(default_cb)
+
+        fid_specific = "fid-specific"
+
+        def bound_cb():
+            with lock:
+                results.append("bound_cb")
+
+        cond.bind_callback(fid_specific, bound_cb)
+
+        fids = [fid_specific, "fid-other"]
+        workers = []
+
+        for fid in fids:
+            class W(Worker):
+                def __init__(self, fid_):
+                    super().__init__()
+                    self.factory_id = fid_
+
+                def run(self_inner):  # noqa: N802
+                    TestSmartCondition._set_thread_factory_id(self_inner,
+                                                              self_inner.factory_id)
+                    with cond:
+                        cond.wait()
+                    with lock:
+                        results.append(f"woken_{self_inner.factory_id}")
+
+            w = W(fid)
+            workers.append(w)
+            w.start()
+
+        time.sleep(0.1)
+
+        with cond:
+            cond.notify_all_and_call()          # no inline callback
+
+        for w in workers:
+            w.join()
+
+        # ‘fid-specific’ should use its bound callback, the other the default
+        self.assertIn("bound_cb", results)
+        self.assertIn("default_cb", results)
+        self.assertEqual(results.count("bound_cb"), 1)
+        self.assertEqual(results.count("default_cb"), 1)
+        self.assertCountEqual(
+            [r for r in results if r.startswith("woken_")],
+            [f"woken_{fid}" for fid in fids],
+        )
+
+
+    def test_notify_all_and_call_inline_overrides_others(self):
+        """Inline callback overrides bound + default for every waiter."""
+        cond = SmartCondition()
+        results, lock = [], threading.Lock()
+
+        # set bound & default that should be ignored
+        cond.set_default_callback(lambda: results.append("default_cb_bad"))
+        cond.bind_callback("fid-0", lambda: results.append("bound_cb_bad"))
+
+        def inline_cb():
+            with lock:
+                results.append("inline_cb")
+
+        # two waiters
+        for i in range(2):
+            fid = f"fid-{i}"
+            class W(Worker):
+                def run(self_inner):          # noqa: N801
+                    TestSmartCondition._set_thread_factory_id(self_inner, fid)
+                    with cond:
+                        cond.wait()
+            W().start()
+
+        time.sleep(0.1)
+        with cond:
+            cond.notify_all_and_call(callback=inline_cb)
+
+        # give them time to finish
+        time.sleep(0.1)
+        self.assertEqual(results.count("inline_cb"), 2)
+        self.assertNotIn("default_cb_bad", results)
+        self.assertNotIn("bound_cb_bad", results)
+
+    def test_notify_all_and_call_awaited_caller(self):
+        """
+        Each waiter should execute the callback itself when awaited_caller=True.
+        Order: callback runs **before** worker's post-wait code.
+        """
+        cond = SmartCondition()
+        results = []
+
+        fids = [f"fid-{i}" for i in range(2)]
+        fired_events = {fid: threading.Event() for fid in fids}
+
+        def mk_cb(fid):
+            def _cb():
+                results.append(f"cb_by_{fid}")
+                fired_events[fid].set()
+            return _cb
+
+        # bind specific callbacks
+        for fid in fids:
+            cond.bind_callback(fid, mk_cb(fid))
+
+        class W(Worker):
+            def __init__(self, fid):
+                super().__init__()
+                self.factory_id = fid
+            def run(self):                    # noqa: N801
+                TestSmartCondition._set_thread_factory_id(self, self.factory_id)
+                with cond:
+                    cond.wait()
+                results.append(f"woken_{self.factory_id}")
+
+        workers = [W(fid) for fid in fids]
+        for w in workers:
+            w.start()
+
+        time.sleep(0.1)
+
+        with cond:
+            cond.notify_all_and_call(awaited_caller=True)
+
+        for w in workers:
+            w.join()
+
+        # verify callback fired inside each worker
+        for fid in fids:
+            self.assertTrue(fired_events[fid].is_set())
+            self.assertLess(
+                results.index(f"cb_by_{fid}"),
+                results.index(f"woken_{fid}"),
+                f"Callback for {fid} did not execute inside awaited thread before its post-wait logic",
+            )
+        self.assertEqual(len([r for r in results if r.startswith("cb_by_")]), 2)
+
     def test_notify_limited_count(self):
         cond = SmartCondition()
         results = []

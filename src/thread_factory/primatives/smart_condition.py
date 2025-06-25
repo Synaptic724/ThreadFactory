@@ -429,6 +429,83 @@ class SmartCondition:
                 pass
 
 
+    def notify_all_and_call(
+        self,
+        factory_ids: Optional[Union[str, Iterable[str]]] = None,
+        awaited_caller: bool = False,
+        callback: Optional[Callable[[], None]] = None,
+    ) -> None:
+        """
+        Wake *every* eligible waiter and optionally run a callback.
+
+        Callback-selection precedence for each waiter is identical to
+        `notify_and_call`:
+
+            1. `callback` given to this method
+            2. per-waiter bound callback        (bind_callback)
+            3. default callback                 (set_default_callback)
+
+        Args
+        ----
+        factory_ids : str | Iterable[str] | None
+            • None   → notify everyone.
+            • str    → notify only that id.
+            • Iterable → notify each id in the set.
+        awaited_caller : bool
+            • False (default) → *this thread* runs the chosen callback(s).
+            • True            → awakened thread runs its callback.
+        callback : Callable | None
+            One-off function that overrides all other callbacks.
+        """
+        if not self._is_owned():
+            raise RuntimeError("cannot notify_all_and_call on un-acquired lock")
+
+        # Normalise target-id filter
+        target_ids = (
+            {factory_ids}
+            if isinstance(factory_ids, str)
+            else set(factory_ids)
+            if factory_ids is not None
+            else None
+        )
+
+        to_notify: list[Waiter] = []
+
+        # Work on a *copy* to avoid mutating during iteration
+        for w in list(self._waiters):
+            if target_ids is None or w.factory_id in target_ids:
+                if self._waiters.remove_item(w):
+                    to_notify.append(w)
+
+        if not to_notify:                     # nothing to do
+            return
+
+        for w in to_notify:
+            chosen_cb = (
+                callback
+                or self._callback_registry.get(w.factory_id)
+                or self._default_callback
+            )
+
+            if awaited_caller:
+                if chosen_cb:
+                    w.callback = chosen_cb      # executed by waiter after wake
+            else:
+                if chosen_cb:
+                    try:
+                        chosen_cb()             # executed right here
+                    except Exception as exc:
+                        print(
+                            f"[SmartCondition] Error in callback for {w.factory_id}: {exc}"
+                        )
+
+            try:
+                w.lock.release()                # finally, wake the waiter
+            except RuntimeError:
+                # If it already timed-out / was woken elsewhere, ignore
+                pass
+
+
     def wait_for(self, predicate: Callable[[], bool], timeout: Optional[float] = None) -> bool:
         """
         Waits until a given `predicate` function evaluates to `True`, or until an

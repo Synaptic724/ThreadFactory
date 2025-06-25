@@ -277,30 +277,6 @@ class TestSwitchLock(unittest.TestCase):
         t.join(timeout=1)
         self.assertFalse(t.is_alive())
 
-    def test_return_home_not_called_if_permit_immediately_available(self):
-        lock = SwitchLock(value=1, return_home_on_block=True)
-        flag = threading.Event()
-
-        class SneakyWorker(DynamicWorker):
-            def __init__(self):
-                super().__init__(name="Sneaky")
-                self.set_home(self._work)
-
-            def return_home(self):
-                flag.set()
-
-            def _work(self):
-                # Permit is available, should not block, so return_home should not fire
-                if lock.acquire(timeout=1):
-                    time.sleep(0.1)
-                    lock.release()
-                    self.stop()
-
-        w = SneakyWorker()
-        w.start()
-        w.join(timeout=1)
-        self.assertFalse(flag.is_set(), "return_home should NOT have been triggered.")
-
     def test_permit_exhaustion_recovery(self):
         lock = SwitchLock(value=1)
         count = 0
@@ -450,66 +426,6 @@ class TestSwitchLock(unittest.TestCase):
 
         self.assertEqual(counter, total_ops)
 
-# --------------------------------------------------------------------------- #
-#  Test-suite                                                                 #
-# --------------------------------------------------------------------------- #
-class TestSwitchLock2(unittest.TestCase):
-
-    #  … ALL THE PREVIOUS TESTS ARE UNCHANGED …
-    #  (omitted here for brevity – keep the ones you already have!)
-    #  ------------------------------------------------------------------- #
-
-    # ===================================================================== #
-    #  NEW   –  return_home behaviour                                       #
-    # ===================================================================== #
-    def test_return_home_called_for_dynamic_worker(self):
-        """
-        When return_home_on_block=True and a DynamicWorker blocks on acquire,
-        its custom `return_home` method must be invoked.
-        """
-        lock   = SwitchLock(value=0, return_home_on_block=True)
-        fired  = threading.Event()
-
-        class HomeyWorker(DynamicWorker):
-            def __init__(self):
-                super().__init__(name="Homey")
-                self.set_home(self._home)
-
-            # called from SwitchLock when blocked
-            def return_home(self):
-                fired.set()
-                # (optional) you could do more “go-home” logic here
-
-            def _home(self):
-                # will block for a bit, then caller (test) will release
-                lock.acquire()
-                lock.release()
-                self.stop()
-
-        w = HomeyWorker()
-        w.start()
-
-        # make sure the worker reaches the wait state and return_home fires
-        wait_for_waiters(lock, 1)
-        self.assertTrue(fired.wait(timeout=0.5),
-                        "return_home was not executed by DynamicWorker")
-
-        # clean up
-        lock.release()         # let the worker finish
-        w.join(timeout=1)
-        self.assertFalse(w.is_alive())
-
-    def test_return_home_missing_raises_runtime_error(self):
-        """
-        A normal thread that lacks `return_home` should trigger a RuntimeError
-        when return_home_on_block=True (exactly as SwitchLock._return_home
-        specifies).
-        """
-        lock = SwitchLock(value=0, return_home_on_block=True)
-
-        # call acquire in *this* thread – main thread has no return_home
-        with self.assertRaises(RuntimeError):
-            lock.acquire(timeout=0.2)      # will try to block → raise
 
 # --------------------------------------------------------------------------- #
 #  Bias-threshold behaviour                                                   #
@@ -602,6 +518,113 @@ class TestSwitchLockBias(unittest.TestCase):
         self.assertFalse(t.is_alive())
         self.assertEqual(lock._value, 0)
 
+    # ------------------------------------------------------------------- #
+    #  Callback-aware notify / notify_all                                 #
+    # ------------------------------------------------------------------- #
+    def test_notify_inline_callback_notifier_thread(self):
+        """
+        lock.notify(..., awaited_caller=False, callback=cb)
+        → cb must run in the notifying thread *before* the waiter resumes.
+        """
+        lock = SwitchLock(value=0)
+        events = []
+        trail = []  # execution log (order matters)
+        tlock = threading.Lock()
+
+        def inline_cb():
+            with tlock:
+                trail.append(("cb", threading.current_thread().name))
+
+        def waiter(ev: threading.Event):
+            lock.acquire()
+            with tlock:
+                trail.append(("woken", threading.current_thread().name))
+            ev.set()
+            lock.release()
+
+        w = Worker(target=waiter, args=(threading.Event(),), name="InlineNotifyWorker")
+        events.append(w._args[0])
+        w.start()
+
+        wait_for_waiters(lock, 1)
+        with tlock:
+            trail.append(("before_notify", threading.current_thread().name))
+        lock.notify(n=1, callback=inline_cb, awaited_caller=False)
+        events[0].wait(timeout=1)
+        w.join(timeout=1)
+
+        # Assertions ------------------------------------------------------
+        cb_entry = next(e for e in trail if e[0] == "cb")
+        woken_entry = next(e for e in trail if e[0] == "woken")
+        self.assertEqual(cb_entry[1], threading.current_thread().name,
+                         "Callback should run in notifying thread")
+        self.assertLess(trail.index(cb_entry), trail.index(woken_entry),
+                        "Callback must execute before waiter resumes")
+
+    def test_notify_inline_callback_awaited_worker(self):
+        """
+        lock.notify(..., awaited_caller=True, callback=cb)
+        → cb must run inside the awakened worker thread.
+        """
+        lock = SwitchLock(value=0)
+        owner = []
+
+        def inline_cb():
+            owner.append(threading.current_thread().name)
+
+        def waiter():
+            lock.acquire()
+            lock.release()
+
+        w = Worker(target=waiter, name="AwaitedWorker")
+        w.start()
+        wait_for_waiters(lock, 1)
+
+        lock.notify(n=1, callback=inline_cb, awaited_caller=True)
+        w.join(timeout=1)
+
+        self.assertIn("AwaitedWorker", owner,
+                      "Callback should be executed by the awaited worker thread")
+
+    def test_notify_all_default_callback_awaited_workers(self):
+        """
+        lock.notify_all(..., awaited_caller=True) with a default callback.
+        Every woken worker must execute the callback exactly once.
+        """
+        lock = SwitchLock(value=0)
+        num_w = 3
+        fired_by = []
+        fire_lock = threading.Lock()
+        evs = [threading.Event() for _ in range(num_w)]
+
+        def default_cb():
+            with fire_lock:
+                fired_by.append(threading.current_thread().factory_id)
+
+        lock.set_default_callback(default_cb)
+
+        def waiter(idx, ev: threading.Event):
+            lock.acquire()
+            ev.set()
+            lock.release()
+
+        workers = [Worker(target=waiter,
+                          args=(i, evs[i]),
+                          name=f"Worker-{i}") for i in range(num_w)]
+        for w in workers:
+            w.start()
+
+        wait_for_waiters(lock, num_w)
+        lock.notify_all(awaited_caller=True)
+
+        self.assertTrue(all(ev.wait(timeout=1) for ev in evs),
+                        "All workers should have been woken")
+        for w in workers:
+            w.join(timeout=1)
+
+        self.assertCountEqual(fired_by,
+                              [w.factory_id for w in workers],
+                              "Default callback should fire once per worker")
 
 
 # --------------------------------------------------------------------------- #

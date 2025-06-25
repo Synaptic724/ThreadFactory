@@ -40,14 +40,6 @@ class TestDynamicWorker(unittest.TestCase):
         self.worker.locations[location_name]()
         location_func.assert_called_once()
 
-    def test_set_home(self):
-        """Test setting the home function for the worker."""
-        home_func = Mock()
-        self.worker.set_home(home_func)
-
-        # Ensure home function is set correctly
-        self.assertEqual(self.worker.home, home_func)
-
     def test_run_with_home_set(self):
         """Test running the worker when home function is set."""
         home_func = Mock()
