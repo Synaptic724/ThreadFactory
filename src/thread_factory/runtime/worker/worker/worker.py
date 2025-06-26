@@ -50,7 +50,7 @@ class Worker(threading.Thread, IDisposable):
         self.state = WorkerState.CREATED
         self.shutdown_flag = threading.Event()
         self.death_event = threading.Event()
-        self.worker_type = "dynamic"
+        self.worker_type = "mainpool"
 
         # Metrics tracking
         self.records = Records()
