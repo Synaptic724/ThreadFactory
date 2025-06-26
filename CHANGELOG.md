@@ -8,7 +8,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.2.9] - 2025-05-03
+## [1.2.9] - 2025-06-26
 
 ### 🚀 Classes Added
 
