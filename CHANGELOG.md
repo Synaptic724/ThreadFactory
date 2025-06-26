@@ -16,6 +16,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   A structured, thread-safe, and `inverted-Future`-like unit of work supporting full lifecycle tracking, cancellation, and hooks.  
   Ideal for orchestrated background task systems and integrates deeply with the `DynamicWorker`.
 
+- **`Dynaphore`**  
+    A dynamic semaphore that allows runtime adjustment of permit limits, enabling flexible concurrency control.  
+    It allows for scaling up or down based on system load, making it suitable for adaptive threading scenarios.
+
 - **`SmartCondition`**  
   A custom synchronization primitive extending `threading.Condition` with *targeted wakeups* via factory IDs (`ULID` or `"MainThread"`).  
   Supports selective `notify`, `notify_all`, and `wait_for()` by ID — enabling *fine-grained thread routing*.  

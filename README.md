@@ -136,6 +136,83 @@ ThreadFactory provides a collection of parallel programming utilities inspired b
 
 ---
 
+## 🔧 Primitives & Utilities
+
+ThreadFactory isn’t just about queues — it includes finely engineered synchronization primitives and timers for orchestration, diagnostics, and thread-safe control.
+
+### 🔑 `SmartCondition`
+- A next-generation `Condition` replacement with **targeted wakeups**.
+- Threads can wait using a `factory_id`, enabling selective `notify(factory_id=...)` or full `notify_all()`.
+- Supports:
+  - `wait()`, `wait_for(predicate)`
+  - ID-targeted `notify()` and `notify_all()`
+  - Waiter inspection via `find_waiter_count()`, `has_waiters()`, etc.
+- ✅ Powers `SwitchLock`, `DynamicWorker`, and advanced coordination routines.
+- Designed for systems requiring precise, minimal, and observable thread signaling.
+
+### ⚖️ `SwitchLock`
+- A **dynamic, ID-aware semaphore** built atop `SmartCondition`.
+- Features:
+  - **Runtime tuning**: Increase or decrease permits dynamically.
+  - **Thread routing**: Use factory IDs to trap or release specific threads.
+  - **Fairness model**: Permit distribution maintains predictable access and wake order.
+- Core mechanism behind agentic thread workflows and distributed locking schemes.
+
+> ⚙️ `SmartCondition` and `SwitchLock` are tightly coupled with `DynamicWorker`. These primitives enable targeted pause/resume flows, conditional routing, and room-based permit logic in execution agents.
+
+### 🧮 `Dynaphore`
+- A **dynamic semaphore** for thread coordination.
+- Unlike `SwitchLock`, `Dynaphore` is designed for **numeric weight-based access**, not ID routing.
+- Features:
+  - Scales up/down the number of available permits at runtime.
+  - Blocks threads when permits are exhausted.
+  - Wakes them as permits become available.
+- Ideal for resource pools, task throttling, or thread admission control.
+- Lighter than `SwitchLock` when ID targeting isn’t required.
+
+### 🧵 `SignalCondition`
+- A **minimalist condition primitive** for classic wait/notify behavior.
+- Designed for speed, simplicity, and self-managed wait logic.
+- Unlike `SmartCondition`, callbacks run **in the waiting thread**, making it ideal for simple producer/consumer pipelines.
+- Use in event loops, polling mechanics, or timeouts where lock contention is minimal.
+
+#### ⏱ `AutoResetTimer`
+- A self-resetting timer that automatically expires and restarts.
+- Ideal for:
+  - Retry loops
+  - Cooldown mechanisms
+  - Debounce filters
+  - State polling under time constraints
+
+#### ⌛ `Stopwatch`
+- A high-resolution, nanosecond-accurate stopwatch.
+- Built with `time.perf_counter_ns()` for ultra-low overhead.
+- API:
+  - `start()`, `stop()`, `reset()`, `elapsed()`
+- Use to measure:
+  - Critical path latency
+  - Thread execution time
+  - Performance bottlenecks
+
+---
+
+### ⚡ Performance Note
+
+| Primitive                | Time (µs)    |
+|--------------------------|--------------|
+| `threading.Lock`         | ~0.07        |
+| `SwitchLock`             | ~4.40        |
+| Thread Spawn (bare)      | ~195.8       |
+| `RLock.acquire/release`  | ~1.96        |
+| `SignalCondition`        | ~12.56       |
+
+- `SignalCondition` is ~6.4× slower than a raw `RLock`, but offers structured wait/notify with internal callback support.
+- `SwitchLock` is an ideal middle-ground for dynamic permits and targeted thread gating.
+- `Dynaphore` sits between a classic semaphore and `SwitchLock` — faster and simpler when IDs aren’t needed.
+
+---
+
+
 ## 📖 Documentation
 
 Full API reference and usage examples are available at:
@@ -229,3 +306,24 @@ Threadfactory is coming soon...
 - For **~40 threads**, `ConcurrentBuffer` shows ~**25% drop** when doubling the number of shards due to increased dequeue complexity.
 - All queues emptied correctly (`final length = 0`).
 
+
+
+---
+
+## 🧪 Coming Soon: ThreadFactory Evolves
+
+ThreadFactory isn't stopping at collections and locks — we're building the **foundation of a full concurrency ecosystem**.
+
+### 🔮 On the Roadmap:
+- **Dynamic Executors**: Adaptive thread pools with per-worker routing, priorities, and work stealing.
+- **Event Semaphores**: Async-aware signaling for mixed coroutine + thread pipelines.
+- **Factory-Orchestrated Graph-based Execution**: Push-based directed graphs or generic graphs of work that dynamically scale.
+- **Thread-Aware Async Hooks**: Bridging `asyncio` and raw threads using hybrid schedulers.
+- **Task Affinity Routing**: Route work based on thread-local cache or historical execution profile.
+- **Metrics and Diagnostics API**: Inspect thread throughput, wait time, and contention hotspots live.
+
+> ThreadFactory isn't just a library.  
+> It's becoming a platform.
+
+Stay tuned.  
+You haven't seen anything yet.
