@@ -55,6 +55,21 @@ class ValueWork(IDisposable):
 
         self._check_work()
 
+    def dispose(self):
+        """
+        Disposes of the ValueWork object, clearing references to the task record and other resources.
+
+        This method is intended to be used in memory-sensitive environments to free up resources
+        once the task has been completed, cancelled, or failed.
+        """
+        with self._lock:
+            if self._disposed:
+                return
+            self.record = None
+            self._work_state = None
+            self._work_callable = None
+            self._disposed = True
+
     def _update_record(self):
         """
         Internal method to update the task's record with the latest state and timestamp information.
@@ -98,6 +113,8 @@ class ValueWork(IDisposable):
         Args:
             new_state (WorkStatus): The new state to transition to.
         """
+        if new_state == self._work_state:
+            return
         with self._lock:
             self._work_state = new_state
             self._update_record()  # Update the internal record with the new state
@@ -201,23 +218,6 @@ class ValueWork(IDisposable):
         if self._disposed:
             raise RuntimeError(f"[ValueWork] {self.task_id} has been disposed and cannot return a record.")
         return self.record
-
-    def dispose(self):
-        """
-        Disposes of the ValueWork object, clearing references to the task record and other resources.
-
-        This method is intended to be used in memory-sensitive environments to free up resources
-        once the task has been completed, cancelled, or failed.
-        """
-        with self._lock:
-            if self._disposed:
-                return
-            self.record = None
-            self._work_state = None
-            self._work_callable = None
-            self._disposed = True
-
-            print(f"[ValueWork] {self.task_id} disposed of.")
 
     def acquire_work(self):
         """

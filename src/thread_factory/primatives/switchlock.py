@@ -55,6 +55,16 @@ class SwitchLock(IDisposable):
         """
         return self._cond
 
+    def get_waiter_count(self):
+        """
+        Returns the number of threads currently waiting on this lock.
+        This is useful for monitoring and debugging purposes.
+
+        Returns:
+            int: The count of waiting threads.
+        """
+        return self._cond.find_waiter_count()
+
     def _try_bias_flush(self) -> None:
         if self._bias_threshold is None:
             return
@@ -154,6 +164,79 @@ class SwitchLock(IDisposable):
             callback (Callable[[], None]): The callback to be executed for any notified thread without a specific callback.
         """
         self._cond.set_default_callback(callback)
+
+    def _attempt_bias_flush(self, n: int, factory_ids: Optional[Union[str, Iterable[str]]] = None, callback: Optional[Callable[[], None]] = None,
+                               awaited_caller: bool = False):
+        """
+        Flush buffered permits and wake *at most* `max_to_wake` threads
+        without violating the bias reserve.
+        Called from release/notify/increase_permits when bias is active.
+        """
+        if self._bias_threshold is None or self._pending_permits == 0:
+            return  # classic mode / nothing buffered
+
+        waiters = len(self._cond.get_all_waiters())
+        excess = max(0, waiters - self._bias_threshold)  # threads allowed to wake
+        to_flush = min(self._pending_permits, n, excess)
+
+        if to_flush:
+            self._value += to_flush
+            self._pending_permits -= to_flush
+            self._cond.notify_and_call(n=to_flush, factory_ids=factory_ids, callback=callback, awaited_caller=awaited_caller)
+
+    def _attempt_bias_flush_all(self, factory_ids: Optional[Union[str, Iterable[str]]] = None,
+                   awaited_caller: bool = False, callback: Optional[Callable[[], None]] = None):
+        """
+        Flush buffered permits and wake *at most* `max_to_wake` threads
+        without violating the bias reserve.
+        Called from release/notify/increase_permits when bias is active.
+        """
+        if self._bias_threshold is None or self._pending_permits == 0:
+            return  # classic mode / nothing buffered
+
+        waiters = len(self._cond.get_all_waiters())
+        excess = max(0, waiters - self._bias_threshold)  # threads allowed to wake
+        to_flush = min(self._pending_permits, self.get_waiter_count(), excess)
+
+        if to_flush:
+            self._value += to_flush
+            self._pending_permits -= to_flush
+            self._cond.notify_and_call(n=to_flush, factory_ids=factory_ids, callback=callback, awaited_caller=awaited_caller)
+
+    def bypass_bias_and_notify(self, n: int, factory_ids: Optional[Union[str, Iterable[str]]] = None, callback: Optional[Callable[[], None]] = None,
+                               awaited_caller: bool = False) -> None:
+        """
+        Bypass the bias and notify up to `n` threads.
+
+        - Flushes up to `n` buffered permits into the value pool.
+        - Notifies up to `n` threads, either in FIFO order or targeted by factory_id.
+        - Completely ignores bias threshold.
+
+        Args:
+            n (int): Number of permits to flush and threads to notify.
+            factory_ids (Optional[str or Iterable[str]]): Specific threads to notify, or None for FIFO.
+        """
+        if n < 1:
+            raise ValueError("n must be >= 1")
+        if self._disposed:
+            return
+
+        with self._cond:
+            to_flush = min(self._pending_permits, n)
+            if to_flush <= 0:
+                return  # Nothing to do
+
+            self._value += to_flush
+            self._pending_permits -= to_flush
+
+            self._cond.notify_and_call(
+                n=n,
+                factory_ids=factory_ids,
+                callback=callback,
+                awaited_caller=awaited_caller
+            )
+
+
 
     def bypass_bias(self) -> None:
         """
@@ -255,8 +338,10 @@ class SwitchLock(IDisposable):
 
         with self._cond:  # Acquire the internal condition's lock for synchronized state modification
             self._buffer_or_grant(n)
-            if self._bias_threshold is None:
+            if self._bias_threshold is None:  # bias OFF
                 self._cond.notify(n=n, factory_ids=factory_ids)
+            else:  # bias ON
+                self._attempt_bias_flush(n, factory_ids)
 
     def notify(self, n: int = 1, factory_ids: Optional[Union[str, Iterable[str]]] = None,
                awaited_caller: bool = False, callback: Optional[Callable[[], None]] = None) -> None:
@@ -284,6 +369,8 @@ class SwitchLock(IDisposable):
                     callback=callback,
                     awaited_caller=awaited_caller
                 )
+            else:  # bias ON
+                self._attempt_bias_flush(n, factory_ids)
 
 
     def notify_all(self, factory_ids: Optional[Union[str, Iterable[str]]] = None,
@@ -326,6 +413,8 @@ class SwitchLock(IDisposable):
                     awaited_caller=awaited_caller,
                     callback=callback,
                 )
+            else:
+                self._attempt_bias_flush_all(factory_ids, awaited_caller, callback)  # <── added
 
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):
@@ -383,6 +472,8 @@ class SwitchLock(IDisposable):
             self._buffer_or_grant(n)
             if self._bias_threshold is None:
                 self._cond.notify(n=n)
+            else:  # bias ON
+                self._attempt_bias_flush(n)
 
     def decrease_permits(self, n: int = 1) -> None:
         """

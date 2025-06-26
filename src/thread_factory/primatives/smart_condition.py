@@ -94,6 +94,16 @@ class SmartCondition:
         """
         return self._lock.__exit__(exc_type, exc_val, exc_tb)
 
+    def find_waiter_count(self):
+        """
+        Returns the number of threads currently waiting on this SmartCondition.
+        This is equivalent to the length of the `_waiters` queue.
+
+        Returns:
+            int: The number of threads currently waiting.
+        """
+        return len(self._waiters)
+
 
     def register_this_thread(self, factory_id: Optional[str] = None):
         """
