@@ -7,8 +7,6 @@ from thread_factory.primatives.smart_condition import SmartCondition
 
 class SwitchLock(IDisposable):
     """
-    SwitchLock
-    ----------
     A dynamic, "smart" semaphore implementation that provides granular control
     over permits and thread notifications. It extends standard semaphore
     functionality by allowing runtime adjustment of available permits,
@@ -19,9 +17,44 @@ class SwitchLock(IDisposable):
     such as managing access to limited resources where the resource count
     can change, or coordinating groups of threads with specific needs.
 
-    It leverages a `SmartCondition` internally for advanced thread signaling.
-    """
+    It leverages a `SmartCondition` internally for advanced thread signaling,
+    enabling targeted wakeups and dynamic permit biasing.
 
+    Thread Requirements
+    -------------------
+    Threads interacting with `SwitchLock` must expose a `factory_id` attribute
+    for targeted coordination. It is also **strongly recommended** they define
+    a `worker_type` attribute for compatibility with advanced routing logic.
+
+    You can use the built-in `GeneralWorker` class or subclass your own threads:
+
+        thread.factory_id = "your_id"
+        thread.worker_type = "your_type"
+
+    Or inherit from:
+
+        from thread_factory.runtime import GeneralWorker
+
+    Performance Benchmark (Single Permit Acquisition)
+    --------------------------------------------------
+    These results reflect average time per operation (in microseconds) based on
+    real-world testing across 1000 iterations:
+
+
+        threading.Lock        │ 0.07
+        SwitchLock (this)     │ 4.40
+        Thread Spawn (bare)   │ 195.8
+
+    ⚠️ Note:
+        `SwitchLock` is ~63× slower than a raw lock, but offers intelligent coordination
+        features, including burst control, bias reserve enforcement, and cross-thread signaling.
+
+    Ideal for:
+    ----------
+    - Adaptive thread pools
+    - Burstable queues and thread leasing model
+    - Work stealing and fine-grained wake control
+    """
     def __init__(self, value: int = 1, worker_type: str = "dynamic", bias_threshold: Optional[int] = None):
         """
         Initializes a new SwitchLock instance.
