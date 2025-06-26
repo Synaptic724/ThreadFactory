@@ -291,13 +291,14 @@ class ValueWork(IDisposable):
         Returns:
             Callable[['ValueWork'], None]: A wrapped version of the original callable that manages lifecycle state.
         """
-        if self._work_state == WorkStatus.CANCELLED or self._work_state == WorkStatus.COMPLETED:
+        if self._work_state == WorkStatus.COMPLETED or self._work_state == WorkStatus.CANCELLED or self._disposed or self._work_state == WorkStatus.FAILED:
             return
         thread = threading.current_thread()
         if not hasattr(thread, '_worker_type'):
             raise RuntimeError("Thread does not have a factory_id set. Ensure the thread is properly initialized.")
         if thread._worker_type == "dynamic":
             thread._value_work = self  # Set the ValueWork instance on the thread for dynamic workers
-        self._work_callable()
-
-
+            try:
+                self._work_callable()
+            except Exception as e:
+                self.mark_failed()
