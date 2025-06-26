@@ -4,7 +4,7 @@ import random
 import threading
 import ulid
 import queue
-from thread_factory.primatives.smart_condition import SmartCondition
+from thread_factory.primatives.smart_condition import SmartCondition, Waiter
 from thread_factory.runtime.worker.worker import Worker
 
 class GenericTestThread(threading.Thread):
@@ -490,6 +490,31 @@ class TestSmartCondition(unittest.TestCase):
         self.assertEqual(len(results), 4, "All threads should have eventually completed")
         self.assertTrue(1 in results and 3 in results, "Targeted threads should have woken up")
         self.assertTrue(2 in results and 4 in results, "Other threads should have woken up eventually")
+
+    def test_dispose_clears_waiters_and_callbacks(self):
+        cond = SmartCondition()
+
+        # Setup: register some fake waiters and callbacks
+        fake_fids = [f"fid-{i}" for i in range(3)]
+        for fid in fake_fids:
+            cond.bind_callback(fid, lambda: None)
+
+        cond.set_default_callback(lambda: None)
+
+        # Simulate waiters by manually injecting (to avoid threading complexity)
+        for fid in fake_fids:
+            w = Waiter(factory_id=fid, lock=threading.Lock(), thread=threading.current_thread())
+            cond._waiters.enqueue(w)
+
+        self.assertGreater(len(cond.get_all_waiters()), 0, "Waiters should be registered before dispose")
+        self.assertGreater(len(cond._callback_registry), 0, "Callbacks should be registered before dispose")
+        self.assertIsNotNone(cond._default_callback, "Default callback should be set before dispose")
+
+        cond.dispose()
+
+        self.assertTrue(cond._disposed, "SmartCondition should be marked as disposed")
+        self.assertIsNone(cond._default_callback, "Default callback should be cleared after dispose")
+
 
     def test_get_all_waiters_returns_correct_ids(self):
         cond = SmartCondition()

@@ -159,6 +159,17 @@ class ConcurrentStack(Generic[_T], IDisposable):
         """
         return self.copy()
 
+
+    def is_empty(self) -> bool:
+        """
+        Check if the stack is empty.
+
+        Returns:
+            bool: True if the stack is empty, False otherwise.
+        """
+        with self._lock:
+            return len(self._deque) == 0
+
     def __deepcopy__(self, memo: dict) -> "ConcurrentStack[_T]":
         """
         Return a deep copy of the ConcurrentStack.

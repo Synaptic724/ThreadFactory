@@ -70,6 +70,35 @@ class TestSignalConditionBasic(unittest.TestCase):
         self.assertEqual(results.count("inline_cb"), 3)
         self.assertEqual(sum(r.startswith("woken_") for r in results), 3)
 
+    def test_dispose_clears_waiters_and_disallows_future_use(self):
+        cond = SignalCondition()
+        results = []
+
+        class W(threading.Thread):
+            def run(self):
+                try:
+                    with cond:
+                        cond.wait()
+                    results.append("woken")
+                except RuntimeError as e:
+                    results.append(str(e))
+
+        t = W()
+        t.start()
+        time.sleep(0.05)
+
+        cond.dispose()
+        t.join(timeout=1)
+
+        # ✅ The thread is allowed to wake up cleanly from dispose
+        self.assertIn("woken", results, "Thread should wake and proceed after dispose")
+        self.assertEqual(cond.find_waiter_count(), 0)
+
+        # 🧨 But new waiters are not allowed
+        with self.assertRaises(RuntimeError):
+            with cond:
+                cond.wait()
+
     def test_default_callback(self):
         cond, results = SignalCondition(), []
         cond.set_default_callback(CallbackRecorder(results, "default_cb"))

@@ -6,91 +6,114 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
-- **`Work`**  
-  A future-compatible, extensible task container designed for expressive async and threaded workloads. Acts as a core unit in the execution system.
-
-- **`AutoResetTimer`**  
-  A utility class that resets automatically after expiration. Ideal for retry loops or lightweight state machines.
-
-- **`Stopwatch`**  
-  A high-resolution timing utility for measuring task durations with minimal overhead.
-
-- **`SmartCondition`**  
-  A thread synchronization primitive similar to `threading.Condition`, but enhanced with *targeted wakeups* via `factory_ids`.  
-  Supports selective `notify`, `notify_all`, and predicate-based `wait_for` with ID filtering.  
-  Built from scratch for full transparency and fine-grained thread control.
-
-- **`SwitchLock`**  
-  A dynamic semaphore built atop `SmartCondition`, enabling runtime-adjustable permits and ID-targeted thread blocking/unblocking.  
-  Serves as the foundation for trap-and-release execution models and room-based thread routing.
-- 
-### Added Features
-- Integrated time-tracking capabilities through `Stopwatch` and `AutoResetTimer` to support precise performance metrics and scheduled operations.
-- Introduced the first version of the `Work` abstraction for structured task submission, response handling, and optional callbacks.
-- Added targeted thread trapping and wakeup mechanisms via `SmartCondition`, allowing threads to wait on logical `factory_ids` and be selectively released based on those IDs.
-- Introduced `SwitchLock` to orchestrate semaphore-like control with dynamic permit scaling and smart ID-based synchronization.  
-  Supports granular release control, timed thread suspension, and future-safe thread disposal coordination.
-- Added batch steal support to `ConcurrentQueue` and `ConcurrentStack`, allowing for efficient bulk operations and improved performance in high-contention scenarios.
-- 
-#### 🧠 Work Object
-- Introduced the `Work` class: a disposable, hook-enabled, metadata-rich extension of `Future`.
-- Features:
-  - Native `await` support through `__await__` for seamless asyncio compatibility.
-  - `auto_dispose` flag to enable automatic cleanup after result or exception retrieval.
-  - Lifecycle hook system (`before`, `after`) for execution tracing and side-effect orchestration.
-  - Full metadata tracking (task ID, timing metrics, worker/queue binding, retry count).
-  - Graceful cancellation with `CancelledError` injection.
-  - Thread-safe via internal `_condition` object override.
-
-#### 🧵 Worker Prototype
-- Introduced a minimal `Worker` class for executing `Work` instances on background threads.
-- Provides early structure for future task orchestration under `ThreadFactory`.
-
-#### 🏗️ ThreadFactory Framework (WIP)
-- Scaffolded architecture for the `ThreadFactory` execution system.
-- Early goals include:
-  - Modular producer-consumer management.
-  - Queue-to-worker routing logic.
-  - Support for scaling policies and diagnostics interfaces.
-- Will form the backbone of both sync and async thread execution systems.
-
-#### 🎫 QueueAllocator
-- Added `QueueAllocator`: a ticket-based ID allocator using `ConcurrentQueue`.
-- Designed for managing worker/task/thread IDs in a pool-based system.
-- Features:
-  - Fast, thread-safe ticket acquisition and release.
-  - Validates returned IDs for correctness and range.
-  - Integrates `Disposable` lifecycle management.
-  - Full context manager support with `with` blocks.
-  - Enforces internal reuse of ticket IDs for efficient resource control.
-
-### Planned
-- `AsyncThreadFactory`: Fully `asyncio`-integrated version of `ThreadFactory`.
-- `DiagnosticsInterface`: Real-time throughput, queue, and performance tracking.
-- `Orchestrator`: Dynamic coordination of thread lifecycles, workloads, and contention resolution.
-
-
-### Changes
-- `ConcurrentDict` implemented an optimized version of pop.
-
-
-
-
 ---
-# Changelog
-## [1.2.5] - 2025-05-03
+
+## [1.2.9] - 2025-05-03
 
 ### 🚀 Classes Added
 
-### ➕ Features
+- **`ValueWork`**  
+  A structured, thread-safe, and `inverted-Future`-like unit of work supporting full lifecycle tracking, cancellation, and hooks.  
+  Ideal for orchestrated background task systems and integrates deeply with the `DynamicWorker`.
 
-### 🛠 Fixes
+- **`SmartCondition`**  
+  A custom synchronization primitive extending `threading.Condition` with *targeted wakeups* via factory IDs (`ULID` or `"MainThread"`).  
+  Supports selective `notify`, `notify_all`, and `wait_for()` by ID — enabling *fine-grained thread routing*.  
+  ✔️ Tightly integrated with `SwitchLock` and `DynamicWorker`.
 
-### 🔄 Changes
-- **`Slots`**
-    - Added `__slots__` to all concurrency classes to reduce memory overhead and improve performance.
-    - This change is expected to reduce memory usage across all concurrent collections.
+- **`SwitchLock`**  
+  A dynamic semaphore built atop `SmartCondition`, offering runtime-adjustable permit scaling and ID-targeted wakeups.  
+  Serves as the orchestration core for trap-and-release systems and room-based thread routing.  
+  ✔️ Acts as a direct control layer for `DynamicWorker` coordination and queue contention management.
+
+- **`SignalCondition`**  
+  A minimal `Condition`-like primitive optimized for simplicity and clarity.  
+  - No targeting, no IDs  
+  - Always executes callbacks in the *awaited thread*  
+  - Designed for producer-consumer signaling and lightweight embedded wake logic
+
+- **`AutoResetTimer`**  
+  A compact timer that automatically resets after expiration.  
+  Useful for retry loops, timed backoffs, polling gates, or simple coordination between workers.
+
+- **`Stopwatch`**  
+  High-resolution timing utility for *nanosecond-level precision*.  
+  Used throughout the framework to record task durations, queue latency, and worker throughput.
+
+---
+
+### 🧠 Work Abstraction
+
+- Introduced the **`ValueWork`** class:
+  - Auto-dispose behavior for cleanup after result collection
+  - Lifecycle hook system (`before`, `after`) for side-effect orchestration
+  - Metadata: timestamps, task ID
+  - Cancellation via `CancelledError`
+---
+
+### 🧵 Dynamic Execution Engine
+
+- Added **`DynamicWorker`** prototype:
+  - Executes `ValueWork` with lifecycle awareness
+  - Waits using `SwitchLock` with ID-based control
+  - Supports checkpointing and behavior swapping via named callables
+  - Controlled wake/sleep logic via `SmartCondition`
+
+---
+
+### 🎛️ Queue + Locking Enhancements
+
+- **`ConcurrentQueue`** and **`ConcurrentStack`**
+  - Added `is_empty()` for zero-contention guard checks
+  - Batch-steal support for improved throughput under high load
+---
+
+### 🧪 Performance Notes
+
+#### ⏱ Lock Timing Comparisons
+- threading.Lock │ 0.07 µs
+- SwitchLock (this) │ 4.40 µs
+- Thread Spawn (bare) │ 195.8 µs
+
+#### 🧠 SmartCondition vs. RLock
+- Raw RLock.acquire()/release(): ~0.00196s
+- SignalCondition wait()/notify(): ~0.01256s
+- SignalCondition is ~6.4× slower in low contention.
+
+
+### ⚙️ Tight Coupling & System Design
+
+- **SmartCondition**, **SwitchLock**, and **DynamicWorker** form the core *orchestration axis* of ThreadFactory.
+  - `DynamicWorker` suspends on `SwitchLock`, which routes permit release through `SmartCondition`.
+  - This trio enables precise worker control, contention resolution, and targeted awakenings.
+
+---
+
+### 🏗️ ThreadFactory (Scaffolded)
+
+- Introduced initial structure for the `ThreadFactory` execution framework:
+  - Modular producer-consumer threading
+  - Queue-to-worker routing logic
+  - Plans for scaling policies, diagnostics, and `multithreaded-asyncio` integration
+
+---
+
+### ✅ Improvements & Fixes
+
+- Added `__slots__` to all concurrency classes:
+  - Reduced memory overhead
+  - Improved attribute access speed
+  - Lowered GC churn under heavy threading loads
+
+---
+
+### 📌 Notes for Developers
+
+- Migrate worker coordination logic to `SmartCondition` and `SwitchLock`
+- Use `ValueWork` as the core unit of execution across sync and async flows
+- Adopt `Stopwatch` and `AutoResetTimer` for all time-based tasks and metrics
+- Use `SignalCondition` for basic waits, `SmartCondition` for ID-based signaling
+- Leverage `ConcurrentQueue.is_empty()` for graceful shutdown and polling guards
 
 ---
 
