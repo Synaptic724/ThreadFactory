@@ -21,7 +21,7 @@ class ValueWork(IDisposable):
     - Graceful disposal to free up resources.
     """
 
-    def __init__(self, task_id: str, work_callable: Callable[['ValueWork'], None]):
+    def __init__(self, task_id: str, work_callable: Callable):
         """
         Initialize a new ValueWork instance with a unique task ID and a callable to execute the work.
 
@@ -52,6 +52,8 @@ class ValueWork(IDisposable):
 
         # Store the callable to be executed (the actual work function)
         self._work_callable = work_callable
+
+        self._check_work()
 
     def _update_record(self):
         """
@@ -126,6 +128,8 @@ class ValueWork(IDisposable):
 
         This method transitions the task from `PENDING` to `IN_PROGRESS` and updates the record.
         """
+        if WorkStatus.IN_PROGRESS == self._work_state:
+            return
         self.set_state(WorkStatus.IN_PROGRESS)
 
     def mark_completed(self):
@@ -135,11 +139,9 @@ class ValueWork(IDisposable):
         This method ensures the task state transitions to `COMPLETED` and reflects the completion timestamp
         in the record.
         """
+        if self._work_state == WorkStatus.CANCELLED:
+            return
         with self._lock:
-            if self._work_state == WorkStatus.CANCELLED:
-                print(f"[ValueWork] {self.task_id} is cancelled, cannot complete.")
-                return  # Exit without making changes if cancelled
-
             self.set_state(WorkStatus.COMPLETED)  # Update the task state to COMPLETED
             self._update_record()  # Update the record with completion time
 
@@ -149,6 +151,8 @@ class ValueWork(IDisposable):
 
         This method transitions the task to the `FAILED` state and updates the record with the failure timestamp.
         """
+        if self._work_state == WorkStatus.FAILED:
+            return
         self.set_state(WorkStatus.FAILED)
 
     def mark_cancelled(self):
@@ -157,15 +161,11 @@ class ValueWork(IDisposable):
 
         This method transitions the task to the `CANCELLED` state, but only if the task has not already been completed.
         """
+        if self._work_state == WorkStatus.CANCELLED or self._work_state == WorkStatus.COMPLETED:
+            return
         with self._lock:
-            if self._work_state == WorkStatus.COMPLETED:
-                # If the task is already completed, you cannot cancel it
-                print(f"[ValueWork] {self.task_id} is already completed, cannot cancel.")
-                return
-
             self.set_state(WorkStatus.CANCELLED)  # Mark the task as cancelled
             self._update_record()  # Update the record to reflect cancellation
-            print(f"[ValueWork] {self.task_id} has been cancelled locally.")
 
     def reset(self):
         """
@@ -173,6 +173,8 @@ class ValueWork(IDisposable):
 
         This method transitions the task back to the `PENDING` state, allowing it to be retried or re-executed.
         """
+        if self._work_state == WorkStatus.PENDING:
+            return
         with self._lock:
             self.set_state(WorkStatus.PENDING)  # Reset state to PENDING
 
@@ -196,6 +198,8 @@ class ValueWork(IDisposable):
         Returns:
             Record: The current record associated with the task.
         """
+        if self._disposed:
+            raise RuntimeError(f"[ValueWork] {self.task_id} has been disposed and cannot return a record.")
         return self.record
 
     def dispose(self):
@@ -241,7 +245,6 @@ class ValueWork(IDisposable):
             # Lock again to mark failure
             with self._lock:
                 self.mark_failed()
-            print(f"[ValueWork] Error executing task {self.task_id}: {e}")
 
     def cancel_job(self):
         """
@@ -249,17 +252,30 @@ class ValueWork(IDisposable):
 
         If the task is already completed, cancellation will not proceed.
         """
+        if self._work_state == WorkStatus.CANCELLED:
+            return
         with self._lock:
             if self._disposed:
                 raise ValueError(f"[ValueWork] {self.task_id} has been disposed.")
 
             # Prevent cancellation if the task is already completed
             if self._work_state == WorkStatus.COMPLETED:
-                print(f"[ValueWork] {self.task_id} is already completed, cannot cancel.")
                 return  # Exit early, do not change the state to CANCELLED
 
             self.set_state(WorkStatus.CANCELLED)
             self._update_record()
+
+    def _check_work(self):
+        """
+        Internal method to check if the work callable is valid.
+
+        This method ensures that the work callable is callable and sets the thread's `_value_work`
+        attribute if the thread is a dynamic worker. It raises an error if the thread does not have
+        a factory ID set.
+        """
+        if self._work_callable is None or not callable(self._work_callable):
+            raise RuntimeError(f"[ValueWork] {self.task_id} has not been disposed.")
+
 
     def bind_value_work(self) -> None:
         """
@@ -275,6 +291,8 @@ class ValueWork(IDisposable):
         Returns:
             Callable[['ValueWork'], None]: A wrapped version of the original callable that manages lifecycle state.
         """
+        if self._work_state == WorkStatus.CANCELLED or self._work_state == WorkStatus.COMPLETED:
+            return
         thread = threading.current_thread()
         if not hasattr(thread, '_worker_type'):
             raise RuntimeError("Thread does not have a factory_id set. Ensure the thread is properly initialized.")
