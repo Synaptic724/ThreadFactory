@@ -1,6 +1,8 @@
 import threading
 import time
 from typing import Optional, Union, Iterable, Any, Callable
+
+from thread_factory import ConcurrentList
 from thread_factory.utils import IDisposable
 from thread_factory.primatives.smart_condition import SmartCondition
 
@@ -71,7 +73,7 @@ class SwitchLock(IDisposable):
 
         self._cond: SmartCondition = SmartCondition()
         self._value: int = value  # Current count of available permits
-        self._log_ids: list[str] = []  # Stores unique identifiers of threads that attempted to acquire the lock
+        self._log_ids: ConcurrentList[str] = ConcurrentList() # Stores unique identifiers of threads that attempted to acquire the lock
         self._worker_type: str = worker_type  # Type of worker, can be used for identification
         self._bias_threshold: Optional[int] = bias_threshold
         self._pending_permits: int = 0  # buffered until bias flush
@@ -293,6 +295,9 @@ class SwitchLock(IDisposable):
 
         The call honours return_home_on_block and per-thread worker-type checks.
         """
+        if self._disposed:
+            raise RuntimeError("SwitchLock has been disposed and cannot be acquired.")
+
         if not blocking and timeout is not None:
             raise ValueError("Cannot give a timeout with blocking=False")
 
@@ -582,7 +587,8 @@ class SwitchLock(IDisposable):
         if self.disposed:  # Check if the lock has already been disposed
             return
         self._disposed = True  # Mark the lock as disposed
-        with self._cond:
-            # Notify all waiting threads so they can wake up and check the `_disposed` flag
-            self._cond.notify_all()
-
+        self._cond.dispose()
+        self._cond = None
+        self._log_ids.clear()
+        self._log_ids.dispose()
+        self._log_ids = None

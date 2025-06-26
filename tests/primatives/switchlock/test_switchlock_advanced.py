@@ -16,7 +16,7 @@ import unittest
 from contextlib import ExitStack
 
 from thread_factory.primatives import SwitchLock
-from thread_factory.thread_pool.worker.dynamic_worker import DynamicWorker
+from thread_factory.thread_pool.dynamic_worker.dynamic_worker import DynamicWorker
 
 
 # --------------------------------------------------------------------------- #

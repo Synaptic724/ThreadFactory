@@ -15,7 +15,7 @@ from typing import (
 
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.exceptions import Empty
-from thread_factory.utils.disposable import IDisposable
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 _T = TypeVar("_T")
 

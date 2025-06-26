@@ -4,7 +4,7 @@ import warnings
 from copy import deepcopy
 from typing import Any, Callable, Generic, Iterable, Iterator, Optional, Set, TypeVar
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.utils.disposable import IDisposable
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 # Type variable _T is used for generic type hinting. This allows the ConcurrentSet
 # to hold elements of any single type, maintaining type safety.

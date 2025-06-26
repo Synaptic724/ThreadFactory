@@ -173,6 +173,16 @@ class ConcurrentQueue(Generic[_T], IDisposable):
                 initial=deepcopy(list(self._deque), memo)
             )
 
+    def is_empty(self) -> bool:
+        """
+        Return True if the queue has no items.
+
+        Returns:
+            bool: True if the queue is empty, False otherwise.
+        """
+        with self._lock:
+            return len(self._deque) == 0
+
     def steal_batch(self, max_items: int = 4) -> ConcurrentList[_T]:
         """
         Atomically steal up to `max_items` from the tail of the queue.

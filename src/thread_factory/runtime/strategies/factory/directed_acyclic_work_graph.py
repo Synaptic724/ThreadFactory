@@ -1,6 +1,6 @@
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from thread_factory.utils.disposable import IDisposable
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 # TODO: Remember that this DAG system is not adapted for parallelization. It sequentially executes work.
 

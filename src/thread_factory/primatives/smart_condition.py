@@ -4,7 +4,8 @@ import ulid
 from typing import Optional, Union, Iterable, Any, Callable
 from dataclasses import dataclass
 # Assuming ConcurrentQueue is correctly imported from your project's modules
-from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
+from thread_factory.concurrency import ConcurrentQueue, ConcurrentDict
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 
 @dataclass
@@ -32,7 +33,7 @@ class Waiter:
     callback: Optional[Callable[[], None]] = None
 
 
-class SmartCondition:
+class SmartCondition(IDisposable):
     """
     SmartCondition
     ---------------
@@ -68,6 +69,7 @@ class SmartCondition:
                                              and `notify_and_call()` methods require this lock
                                              to be acquired by the calling thread.
         """
+        super().__init__()
         self._lock: threading.RLock = lock or threading.RLock()
         self.acquire: Callable = self._lock.acquire  # Expose acquire method of the internal lock
         self.release: Callable = self._lock.release  # Expose release method of the internal lock
@@ -75,7 +77,7 @@ class SmartCondition:
             Waiter]()  # A thread-safe queue of `Waiter` objects, representing all blocked threads.
 
         # Registry for callbacks specific to a factory_id, executed upon notification.
-        self._callback_registry: dict[str, Callable[[], None]] = {}
+        self._callback_registry: ConcurrentDict[str, Callable[[], None]] = ConcurrentDict()
         # A default callback to be executed if no specific callback is bound for a notified thread.
         self._default_callback: Optional[Callable[[], None]] = None
 
@@ -276,6 +278,8 @@ class SmartCondition:
             RuntimeError: If the internal lock (`self._lock`) is not held by the
                           calling thread when `wait()` is invoked.
         """
+        if self._disposed:
+            raise RuntimeError("SmartCondition has been disposed and cannot be used")
         # Ensure the current thread has a factory_id for tracking and potential targeted notifications.
         factory_id = self._ensure_factory_id()
 
@@ -654,3 +658,36 @@ class SmartCondition:
             self._lock.release()  # Release it immediately as we just acquired it.
             return False
         return True  # If non-blocking acquire failed, it means this thread already held the lock.
+
+    def dispose(self) -> None:
+        """
+        Disposes the SmartCondition, releasing all waiters and clearing internal registries.
+
+        This method:
+        - Marks the condition as disposed.
+        - Wakes all waiting threads without executing callbacks.
+        - Clears the waiters queue.
+        - Clears callback registries.
+        - Releases the internal lock (if possible).
+
+        This is safe to call multiple times.
+        """
+        if self._disposed:
+            return
+        self._disposed = True
+
+        # Clear all waiters
+        while not self._waiters.is_empty():
+            waiter = self._waiters.dequeue()
+            try:
+                waiter.lock.release()
+            except RuntimeError:
+                pass
+
+        # Clear all registries
+        self._waiters.dispose()
+        self._waiters = None
+        self._callback_registry.clear()
+        self._callback_registry.dispose()
+        self._callback_registry = None
+        self._default_callback = None

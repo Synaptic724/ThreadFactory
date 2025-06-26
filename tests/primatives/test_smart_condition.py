@@ -4,30 +4,8 @@ import random
 import threading
 import ulid
 import queue
-
-# Assuming ConcurrentQueue is correctly imported from your project's modules
-# from thread_factory.concurrency.concurrent_queue import ConcurrentQueue # This is not directly used in the tests, but if SmartCondition uses it internally, it's fine.
 from thread_factory.primatives.smart_condition import SmartCondition
 from thread_factory.runtime.worker.worker import Worker
-
-
-# --- MODIFICATION START ---
-# Apply this change to your actual SmartCondition.py file
-# in the notify_and_call method
-"""
-    def notify_and_call(self, n: int = 1, factory_ids: Optional[Union[str, Iterable[str]]] = None,
-                        callback: Optional[Callable[[], None]] = None) -> None:
-        # ... (rest of the method) ...
-        # Corrected callback priority: inline callback (if provided) > specific bound callback > default callback
-        cb = callback or self._callback_registry.get(w.factory_id) or self._default_callback
-        if cb:
-            try:
-                cb()
-            except Exception as e:
-                print(f"[SmartCondition] Error in callback for {w.factory_id}: {e}")
-"""
-# --- MODIFICATION END ---
-
 
 class GenericTestThread(threading.Thread):
     def __init__(self, target=None, args=(), kwargs=None):
