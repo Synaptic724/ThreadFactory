@@ -1,10 +1,12 @@
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 import threading
 from datetime import datetime
 from thread_factory.runtime import WorkerState
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus
 from thread_factory.thread_pool.worker.dynamic_worker import DynamicWorker
+from thread_factory.thread_pool.value_work.value_work import ValueWork
+from ulid import ULID
 
 
 class TestDynamicWorker(unittest.TestCase):
@@ -13,6 +15,14 @@ class TestDynamicWorker(unittest.TestCase):
         """Set up before each test."""
         # Initialize DynamicWorker with the factory_id explicitly defined
         self.worker = DynamicWorker(factory_id="worker1", factory=None)
+        self.mock_value_work = Mock(spec=ValueWork)
+
+        # Mock the record attribute and its getter method to return it
+        self.mock_value_work.record = Mock()
+        self.mock_value_work.get_record.return_value = self.mock_value_work.record  # <-- This line is crucial
+
+        # Set the return value for get_state
+        self.mock_value_work.get_state.return_value = WorkStatus.PENDING
 
     def test_register_save_point(self):
         """Test registering a save point and its functionality."""
@@ -75,7 +85,7 @@ class TestDynamicWorker(unittest.TestCase):
         self.assertTrue(self.worker._disposed)
         self.assertIsNone(self.worker.save_points)
         self.assertIsNone(self.worker.locations)
-        self.assertIsNone(self.worker.home)
+        self.assertIsNone(self.worker._event_loop)
 
     def test_dynamic_worker_repr(self):
         """Test the string representation of the worker."""
@@ -102,8 +112,117 @@ class TestDynamicWorker(unittest.TestCase):
 
         # Now, dispose of the worker and check for proper cleanup
         self.worker.dispose()
-        self.assertTrue(self.worker._disposed)
+        self.assertTrue(self.worker.disposed)
         self.assertEqual(self.worker.state, WorkerState.DISPOSED)
+
+    # --- New tests for ValueWork integration ---
+
+    def test_bind_value_work(self):
+        """Test binding a ValueWork instance to the worker."""
+        # Directly set the _value_work attribute since there's no public method to bind it
+        # This is a bit of a workaround, but it's how the DynamicWorker is designed to work
+        self.worker._value_work = self.mock_value_work
+        self.assertIs(self.worker._value_work, self.mock_value_work)
+
+    def test_set_work_state(self):
+        """Test setting the state of the bound ValueWork."""
+        self.worker._value_work = self.mock_value_work
+        self.worker.set_work_state(WorkStatus.IN_PROGRESS)
+        self.mock_value_work.set_state.assert_called_once_with(WorkStatus.IN_PROGRESS)
+
+    def test_get_work_state(self):
+        """Test getting the state of the bound ValueWork."""
+        self.worker._value_work = self.mock_value_work
+        state = self.worker.get_work_state()
+        self.assertEqual(state, WorkStatus.PENDING)
+        self.mock_value_work.get_state.assert_called_once()
+
+    def test_mark_work_in_progress(self):
+        """Test marking the bound ValueWork as 'in progress'."""
+        self.worker._value_work = self.mock_value_work
+        self.worker.mark_work_in_progress()
+        self.mock_value_work.mark_in_progress.assert_called_once()
+
+    def test_mark_work_completed(self):
+        """Test marking the bound ValueWork as 'completed'."""
+        self.worker._value_work = self.mock_value_work
+        self.worker.mark_work_completed()
+        self.mock_value_work.mark_completed.assert_called_once()
+
+    def test_mark_work_failed(self):
+        """Test marking the bound ValueWork as 'failed'."""
+        self.worker._value_work = self.mock_value_work
+        self.worker.mark_work_failed()
+        self.mock_value_work.mark_failed.assert_called_once()
+
+    def test_mark_work_cancelled(self):
+        """Test marking the bound ValueWork as 'cancelled'."""
+        self.worker._value_work = self.mock_value_work
+        self.worker.mark_work_cancelled()
+        self.mock_value_work.mark_cancelled.assert_called_once()
+
+    def test_reset_work(self):
+        """Test resetting the bound ValueWork."""
+        self.worker._value_work = self.mock_value_work
+        self.worker.reset_work()
+        self.mock_value_work.reset.assert_called_once()
+
+    def test_get_work_record(self):
+        """Test getting the record from the bound ValueWork."""
+        self.worker._value_work = self.mock_value_work
+        record = self.worker.get_work_record()
+        self.assertIs(record, self.mock_value_work.record)
+        self.mock_value_work.get_record.assert_called_once()
+
+    def test_acquire_and_run_work(self):
+        """Test acquiring and running the bound ValueWork."""
+        self.worker._value_work = self.mock_value_work
+        self.worker.acquire_and_run_work()
+        self.mock_value_work.acquire_work.assert_called_once()
+
+    def test_cancel_bound_job(self):
+        """Test canceling the bound ValueWork job."""
+        self.worker._value_work = self.mock_value_work
+        self.worker.cancel_bound_job()
+        self.mock_value_work.cancel_job.assert_called_once()
+
+    def test_dispose_work(self):
+        """Test disposing of the bound ValueWork."""
+        self.worker._value_work = self.mock_value_work
+        self.worker.dispose_work()
+        self.mock_value_work.dispose.assert_called_once()
+        self.assertIsNone(self.worker._value_work)
+
+    def test_multiple_thread_disposal(self):
+        """Test that multiple worker threads can be started and disposed of."""
+        workers = []
+        threads = []
+        num_workers = 5
+
+        # Create and start multiple workers in threads
+        for i in range(num_workers):
+            worker = DynamicWorker(factory_id=f"worker_{i}", factory=None)
+            worker.set_home(Mock())
+            thread = threading.Thread(target=worker.run)
+            thread.start()
+            workers.append(worker)
+            threads.append(thread)
+
+        # Allow some time for threads to start
+        threading.Event().wait(0.2)
+
+        # Stop all workers and join their threads
+        for worker in workers:
+            worker.stop()
+        for thread in threads:
+            thread.join()
+            self.assertFalse(thread.is_alive())  # Ensure thread is no longer alive
+
+        # Dispose of all workers and check their state
+        for worker in workers:
+            worker.dispose()
+            self.assertTrue(worker.disposed)
+            self.assertEqual(worker.state, WorkerState.DISPOSED)
 
 
 if __name__ == "__main__":

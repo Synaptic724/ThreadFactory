@@ -52,7 +52,6 @@ class ValueWork(IDisposable):
 
         # Store the callable to be executed (the actual work function)
         self._work_callable = work_callable
-        self._disposed = False  # Initial disposed flag
 
     def _update_record(self):
         """
@@ -262,7 +261,7 @@ class ValueWork(IDisposable):
             self.set_state(WorkStatus.CANCELLED)
             self._update_record()
 
-    def wrap_callable(self, original_callable: Callable[['ValueWork'], None]) -> Callable[['ValueWork'], None]:
+    def bind_value_work(self) -> None:
         """
         Wraps a user-provided callable for task execution.
 
@@ -276,10 +275,11 @@ class ValueWork(IDisposable):
         Returns:
             Callable[['ValueWork'], None]: A wrapped version of the original callable that manages lifecycle state.
         """
+        thread = threading.current_thread()
+        if not hasattr(thread, '_worker_type'):
+            raise RuntimeError("Thread does not have a factory_id set. Ensure the thread is properly initialized.")
+        if thread._worker_type == "dynamic":
+            thread._value_work = self  # Set the ValueWork instance on the thread for dynamic workers
+        self._work_callable()
 
-        def wrapped_callable(value_work_instance: 'ValueWork'):
-            # This wrapper simply executes the original callable, passing the ValueWork instance.
-            # Lifecycle state changes (in_progress, completed, etc.) are handled by acquire_work().
-            original_callable(value_work_instance)
 
-        return wrapped_callable

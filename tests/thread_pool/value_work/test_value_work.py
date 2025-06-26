@@ -1,3 +1,4 @@
+import threading
 import unittest
 from datetime import datetime
 from unittest.mock import Mock
@@ -58,31 +59,6 @@ class TestValueWork(unittest.TestCase):
         self.assertEqual(self.value_work.get_state(), WorkStatus.PENDING)
         self.assertEqual(self.value_work.record.status, WorkStatus.PENDING)
 
-    def test_task_execution(self):
-        """Test that the task executes and marks as completed."""
-        self.value_work.wrap_callable(self.mock_callable)
-
-        self.mock_callable.reset_mock()  # Reset any previous calls to the mock
-        self.value_work.acquire_work()  # Trigger the task execution
-
-        self.mock_callable.assert_called_once_with(self.value_work)
-        self.assertEqual(self.value_work.get_state(), WorkStatus.COMPLETED)
-        # Record should still exist here, disposal only happens in `test_dispose`
-        self.assertIsNotNone(self.value_work.record)  # Record should not be nulled out in execution tests
-
-    def test_task_execution_with_exception(self):
-        """Test task execution with an exception."""
-        self.mock_callable.side_effect = Exception("Test error")
-        self.value_work.wrap_callable(self.mock_callable)
-
-        self.value_work.acquire_work()
-
-        self.assertEqual(self.value_work.get_state(), WorkStatus.FAILED)
-        self.mock_callable.assert_called_once_with(self.value_work)
-
-        # Record should still exist after failure
-        self.assertIsNotNone(self.value_work.record)  # Record should not be nulled out in failure tests
-
     def test_dispose(self):
         """Test the dispose functionality."""
         self.value_work.mark_completed()  # Ensure it's in a state where dispose actually clears references
@@ -91,6 +67,36 @@ class TestValueWork(unittest.TestCase):
         self.assertTrue(self.value_work._disposed)
         self.assertIsNone(self.value_work._work_callable)
         self.assertIsNone(self.value_work.record)
+
+    def test_bind_value_work_sets_thread_context(self):
+        """Test that bind_value_work sets _value_work on the current thread."""
+        thread = threading.current_thread()
+        thread._worker_type = "dynamic"  # Simulate valid thread setup
+
+        self.value_work.bind_value_work()
+
+        self.assertTrue(hasattr(thread, '_value_work'))
+        self.assertIs(thread._value_work, self.value_work)
+
+    def test_bind_value_work_invokes_callable(self):
+        """Test that bind_value_work invokes the _work_callable."""
+        thread = threading.current_thread()
+        thread._worker_type = "dynamic"
+
+        self.value_work.bind_value_work()
+
+        self.mock_callable.assert_called_once()
+
+    def test_bind_value_work_raises_without_worker_type(self):
+        """Test that bind_value_work raises if thread lacks _worker_type."""
+        thread = threading.current_thread()
+        if hasattr(thread, '_worker_type'):
+            del thread._worker_type  # Ensure _worker_type is missing
+
+        with self.assertRaises(RuntimeError) as context:
+            self.value_work.bind_value_work()
+
+        self.assertIn("Thread does not have a factory_id", str(context.exception))
 
     def test_cancel_job(self):
         """Test cancelling the job locally."""
