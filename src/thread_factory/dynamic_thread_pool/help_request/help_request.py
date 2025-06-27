@@ -98,7 +98,7 @@ class HelpRequest(IDisposable):
 
         # Store the callable to be executed (the actual work function)
         self._work_callable = work_callable
-
+        self._return_to_pool = False
         self._check_work()
 
     def dispose(self):
@@ -114,6 +114,7 @@ class HelpRequest(IDisposable):
             self.record = None
             self._work_state = None
             self._work_callable = None
+            self._return_to_pool = True
             self._disposed = True
 
     def _update_record(self):
@@ -139,14 +140,17 @@ class HelpRequest(IDisposable):
                     self.record.timestamp_execution_time = datetime.now()
 
             elif self._work_state == WorkStatus.COMPLETED:
+                self._return_to_pool = True
                 if self.record.timestamp_completion_time is None:
                     self.record.timestamp_completion_time = datetime.now()
 
             elif self._work_state == WorkStatus.CANCELLED:
+                self._return_to_pool = True
                 if self.record.timestamp_completion_time is None:  # Cancelling without completion timestamp
                     self.record.timestamp_completion_time = datetime.now()
 
             elif self._work_state == WorkStatus.FAILED:
+                self._return_to_pool = True
                 if self.record.timestamp_completion_time is None:  # Failed task won't complete
                     self.record.timestamp_completion_time = datetime.now()
 
@@ -229,6 +233,40 @@ class HelpRequest(IDisposable):
         with self._lock:
             self.set_state(WorkStatus.CANCELLED)  # Mark the task as cancelled
             self._update_record()  # Update the record to reflect cancellation
+
+    def set_return_to_pool(self, should_return: bool = True):
+        """
+        Signals that the current worker intends to return to the pool after task execution.
+
+        This method can be called from within the task's callable to indicate that the thread
+        has completed its duty and does not require further chaining, context retention, or
+        special cleanup logic.
+
+        Args:
+            should_return (bool): Whether to mark this task for return to pool. Defaults to True.
+        """
+        with self._lock:
+            self._return_to_pool = should_return
+
+
+    def check_return_to_pool(self) -> bool:
+        """
+        Checks if the task should return to the pool after execution.
+
+        This method is used to determine if the worker thread should be returned to the pool
+        after completing the task. It is typically called at the end of the task's execution.
+
+        Returns:
+            bool: True if the task should return to the pool, False otherwise.
+
+        This is useful for managing thread lifecycle and resource allocation in the dynamic pool.
+
+        Example:
+            if help_request.check_return_to_pool():
+            # Logic to return the worker thread to the pool
+                return
+        """
+        return self._return_to_pool
 
     def reset(self):
         """
@@ -337,7 +375,7 @@ class HelpRequest(IDisposable):
         Returns:
             Callable[['HelpRequest'], None]: A wrapped version of the original callable that manages lifecycle state.
         """
-        if self._work_state == WorkStatus.COMPLETED or self._work_state == WorkStatus.CANCELLED or self._disposed or self._work_state == WorkStatus.FAILED:
+        if self._work_state in [WorkStatus.COMPLETED, WorkStatus.CANCELLED, WorkStatus.FAILED] or self._disposed or self._return_to_pool == True:
             return
         thread = threading.current_thread()
         if not hasattr(thread, '_worker_type'):
