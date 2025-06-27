@@ -158,8 +158,6 @@ ThreadFactory isn’t just about queues — it includes finely engineered synchr
   - **Fairness model**: Permit distribution maintains predictable access and wake order.
 - Core mechanism behind agentic thread workflows and distributed locking schemes.
 
-> ⚙️ `SmartCondition` and `SwitchLock` are tightly coupled with `DynamicWorker`. These primitives enable targeted pause/resume flows, conditional routing, and room-based permit logic in execution agents.
-
 ### 🧮 `Dynaphore`
 - A **dynamic semaphore** for thread coordination.
 - Unlike `SwitchLock`, `Dynaphore` is designed for **numeric weight-based access**, not ID routing.

@@ -1,14 +1,15 @@
 import threading
 import time
 from typing import Optional, Union, Iterable, Any, Callable
-
-from thread_factory import ConcurrentList
+from thread_factory.concurrency import ConcurrentList
 from thread_factory.utils import IDisposable
 from thread_factory.primatives.smart_condition import SmartCondition
 
 
 class SwitchLock(IDisposable):
     """
+    SwitchLock
+    ----------
     A dynamic, "smart" semaphore implementation that provides granular control
     over permits and thread notifications. It extends standard semaphore
     functionality by allowing runtime adjustment of available permits,
@@ -20,44 +21,42 @@ class SwitchLock(IDisposable):
     can change, or coordinating groups of threads with specific needs.
 
     It leverages a `SmartCondition` internally for advanced thread signaling,
-    enabling targeted wakeups and dynamic permit biasing.
+    enabling targeted wakeups, dynamic bias buffering, and event-driven callbacks.
 
-    Thread Requirements
-    -------------------
-    Threads interacting with `SwitchLock` must expose a `factory_id` attribute
-    for targeted coordination. It is also **strongly recommended** they define
-    a `worker_type` attribute for compatibility with advanced routing logic.
+    Thread Behavior
+    ---------------
+    Threads do **not** need to declare themselves explicitly to use SwitchLock.
 
-    You can use the built-in `GeneralWorker` class or subclass your own threads:
+    • All threads are automatically assigned a `factory_id` (ULID) by the internal SmartCondition.
+    • This allows for targeted notifications, callback binding, and fine-grained control.
+    • Compatible with raw `threading.Thread`, `DynamicWorker`, `GeneralWorker`, or any subclass.
 
-        thread.factory_id = "your_id"
-        thread.worker_type = "your_type"
+    If a thread manually sets `thread.factory_id`, that ID will be respected.
+    Otherwise, the ID is auto-generated the first time it interacts with the lock.
 
-    Or inherit from:
+    Use Cases
+    ---------
+    - Adaptive thread pools with dynamic worker management.
+    - Burstable queues with gated concurrency.
+    - Work stealing patterns with targeted wakeups.
+    - Systems requiring dynamic throttling or bias control.
 
-        from thread_factory.runtime import GeneralWorker
+    Performance Benchmark (μs per operation)
+    ----------------------------------------
+    Based on 1000 iterations of `acquire()` with one permit available:
 
-    Performance Benchmark (Single Permit Acquisition)
-    --------------------------------------------------
-    These results reflect average time per operation (in microseconds) based on
-    real-world testing across 1000 iterations:
+        threading.Lock        │  0.07 μs
+        SwitchLock (this)     │  4.40 μs
+        Thread Spawn (bare)   │ 195.8 μs
 
+    ⚠ Note:
+        While ~63× slower than a raw lock, `SwitchLock` provides intelligent
+        scheduling, permit biasing, and cross-thread callback coordination—
+        ideal for controlled concurrency and thread orchestration.
 
-        threading.Lock        │ 0.07
-        SwitchLock (this)     │ 4.40
-        Thread Spawn (bare)   │ 195.8
-
-    ⚠Note:
-        `SwitchLock` is ~63× slower than a raw lock, but offers intelligent coordination
-        features, including burst control, bias reserve enforcement, and cross-thread signaling.
-
-    Ideal for:
-    ----------
-    - Adaptive thread pools
-    - Burstable queues and thread leasing model
-    - Work stealing and fine-grained wake control
     """
-    def __init__(self, value: int = 1, worker_type: str = "dynamic", bias_threshold: Optional[int] = None):
+
+    def __init__(self, value: int = 1, bias_threshold: Optional[int] = None):
         """
         Initializes a new SwitchLock instance.
 
@@ -74,7 +73,6 @@ class SwitchLock(IDisposable):
         self._cond: SmartCondition = SmartCondition()
         self._value: int = value  # Current count of available permits
         self._log_ids: ConcurrentList[str] = ConcurrentList() # Stores unique identifiers of threads that attempted to acquire the lock
-        self._worker_type: str = worker_type  # Type of worker, can be used for identification
         self._bias_threshold: Optional[int] = bias_threshold
         self._pending_permits: int = 0  # buffered until bias flush
 
@@ -133,18 +131,6 @@ class SwitchLock(IDisposable):
         # bias ON  → just buffer, don’t flush yet
         self._pending_permits += n
         #  ⬅ NO call to _try_bias_flush() here
-
-    def _check_if_worker_type(self) -> bool:
-        """
-        Internal method to check if the current thread is a DynamicWorker.
-        """
-        # Check for valid factory thread if ignoring non-factory threads
-        current = threading.current_thread()
-        # Only fire if the attribute exists *and* is callable.
-        if hasattr(current, "_worker_type"):
-            if current._worker_type == self._worker_type:
-                return True
-        return False
 
     def _flush_pending_permits(self, wake_all: bool = False, wake_n: int | None = None) -> None:
         """
@@ -315,11 +301,6 @@ class SwitchLock(IDisposable):
 
         if not blocking and timeout is not None:
             raise ValueError("Cannot give a timeout with blocking=False")
-
-        if not self._check_if_worker_type():
-            raise RuntimeError(
-                f"Cannot acquire switchlock outside of {self._worker_type} worker context."
-            )
 
         this_id = self._cond._ensure_factory_id()
         if this_id not in self._log_ids:

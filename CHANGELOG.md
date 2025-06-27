@@ -10,39 +10,107 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [1.2.9] - 2025-06-26
 
-### 🚀 Classes Added
+# 🚀 ThreadFactory Changelog – Massive Concurrency Upgrade
 
-- **`ValueWork`**  
-  A structured, thread-safe, and `inverted-Future`-like unit of work supporting full lifecycle tracking, cancellation, and hooks.  
-  Ideal for orchestrated background task systems and integrates deeply with the `DynamicWorker`.
+## 🧠 New Primitives – Welcome to the Age of Agentic Threads
 
-- **`Dynaphore`**  
-    A dynamic semaphore that allows runtime adjustment of permit limits, enabling flexible concurrency control.  
-    It allows for scaling up or down based on system load, making it suitable for adaptive threading scenarios.
+---
 
-- **`SmartCondition`**  
-  A custom synchronization primitive extending `threading.Condition` with *targeted wakeups* via factory IDs (`ULID` or `"MainThread"`).  
-  Supports selective `notify`, `notify_all`, and `wait_for()` by ID — enabling *fine-grained thread routing*.  
-  ✔️ Tightly integrated with `SwitchLock` and `DynamicWorker`.
+### 🧱 `ValueWork` — *The Inverted Future*
 
-- **`SwitchLock`**  
-  A dynamic semaphore built atop `SmartCondition`, offering runtime-adjustable permit scaling and ID-targeted wakeups.  
-  Serves as the orchestration core for trap-and-release systems and room-based thread routing.  
-  ✔️ Acts as a direct control layer for `DynamicWorker` coordination and queue contention management.
+A structured, thread-safe **unit of work** designed for **thread-controlled execution**.  
+Tracks full lifecycle transitions:  
+`pending → running → completed | cancelled | failed`
 
-- **`SignalCondition`**  
-  A minimal `Condition`-like primitive optimized for simplicity and clarity.  
-  - No targeting, no IDs  
-  - Always executes callbacks in the *awaited thread*  
-  - Designed for producer-consumer signaling and lightweight embedded wake logic
+Includes:
+- Lifecycle timestamps
+- Status tracking (`WorkStatus`)
+- Cancelation support
+- Hooks for post-run logic
 
-- **`AutoResetTimer`**  
-  A compact timer that automatically resets after expiration.  
-  Useful for retry loops, timed backoffs, polling gates, or simple coordination between workers.
+🔗 Perfect for use with `DynamicWorker`, where threads control their own futures.
 
-- **`Stopwatch`**  
-  High-resolution timing utility for *nanosecond-level precision*.  
-  Used throughout the framework to record task durations, queue latency, and worker throughput.
+---
+
+### 🎛 `Dynaphore` — *Elastic Semaphore Control*
+
+A dynamically resizable **permit gate** for concurrency.  
+Ideal for:
+- Adaptive thread pools
+- Runtime-scalable queues
+- Systems where load fluctuates and **concurrency must flex**
+
+🧠 Just change the number of active permits — **no restart required**.
+
+---
+
+### 🧠 `SmartCondition` — *Identity-Aware Synchronization*
+
+A next-gen condition variable with:
+- 🔁 `notify(factory_ids=...)` for **targeted wakeups**
+- 🧬 ULID-based identity assignment (`factory_id`)
+- ✅ Callback routing
+- 🧭 Full waiter inspection & tracking
+
+🔧 Supports intelligent signaling **without subclassing threads** — drop-in compatible with `threading.Thread`.
+
+---
+
+### 🌀 `SwitchLock` — *Call-Driven Agentic Thread Orchestration*
+
+Forget semaphores. This is **not** a lock — it’s a **programmable execution gate**.
+
+Key powers:
+- 🔁 **Permit buffering with bias thresholding** — control bursts, prevent starvation
+- 🎯 **Targeted wakeups** — notify exact threads via `factory_id`
+- 📞 **Callback routing** — run logic in the thread that *wakes up*
+- 💬 `awaited_caller=True` — let the *woken* thread execute the callback (like an agent returning to the field)
+- 🚪 Works with **vanilla threads** — threads get a `factory_id` automatically
+- 🔍 Logs all attempting threads for postmortem analysis
+
+Use it for:
+- Work stealing
+- Adaptive queues
+- Room-based thread signaling
+- Agent awakening systems
+- ⚡️ Cooperative multitasking — not just raw contention
+
+💡 This isn't a lock. It's a **router for attention**.
+
+---
+
+### 🔔 `SignalCondition` — *Minimalist Thread Sync*
+
+Lightweight condition primitive with:
+- No identity targeting
+- Always executes callbacks in the **awaiting thread**
+- 🚦 Best for:
+  - Producer-consumer queues
+  - One-shot wakeups
+  - Embedded coordination where `SmartCondition` would be overkill
+
+---
+
+### ⏲️ `AutoResetTimer` — *Heartbeat for Workers*
+
+A compact backoff timer that **resets automatically** after expiration.  
+✅ Ideal for:
+- Retry logic
+- Gate polling
+- Periodic wakeups in agents and consumers
+
+---
+
+### ⏱️ `Stopwatch` — *True Nanosecond Profiling*
+
+Fast and dead-simple:
+- `start()`, `stop()`, `elapsed_ns()`
+- Fine-grained profiling for:
+  - Task durations
+  - Waiter latency
+  - Queue throughput
+
+📊 Precision timing made practical for every worker.
 
 ---
 
@@ -83,13 +151,6 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Raw RLock.acquire()/release(): ~0.00196s
 - SignalCondition wait()/notify(): ~0.01256s
 - SignalCondition is ~6.4× slower in low contention.
-
-
-### ⚙️ Tight Coupling & System Design
-
-- **SmartCondition**, **SwitchLock**, and **DynamicWorker** form the core *orchestration axis* of ThreadFactory.
-  - `DynamicWorker` suspends on `SwitchLock`, which routes permit release through `SmartCondition`.
-  - This trio enables precise worker control, contention resolution, and targeted awakenings.
 
 ---
 

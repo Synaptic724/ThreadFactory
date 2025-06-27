@@ -54,16 +54,6 @@ class SmartCondition(IDisposable):
     - **Snapshot inspection**: Runtime visibility into which threads are waiting, including
       full `Waiter` object snapshots and their `factory_id`s.
 
-    Usage Context
-    ----------------
-    This class is a critical synchronization primitive used by:
-
-    - `DynamicWorker`: Each worker can wait on a `SmartCondition` and be targeted by name (`factory_id`)
-      for explicit wakeups and behavior changes.
-
-    - `DynamicPool`: The pool uses SmartCondition to coordinate multiple `DynamicWorker`s, allowing it to
-      resume or repurpose workers based on load, location, or routing rules.
-
     These systems require **precise control** over which threads are signaled, especially in environments
     with hundreds of long-lived workers behaving like agents. `SmartCondition` makes that possible
     with minimal overhead and clean callback integration.
