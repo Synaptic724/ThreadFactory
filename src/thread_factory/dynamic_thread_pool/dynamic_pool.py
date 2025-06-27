@@ -17,8 +17,6 @@ class _DynamicPoolContainer(IDisposable):
         self._unregister_thread_check = False
         self._unregister_lock = threading.RLock()
 
-
-
     def _container(self):
         """
         A container for managing dynamic threads.
