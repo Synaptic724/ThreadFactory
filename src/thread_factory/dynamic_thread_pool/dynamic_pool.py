@@ -5,9 +5,11 @@ from ulid import ULID
 from thread_factory.concurrency import ConcurrentList
 from thread_factory.dynamic_thread_pool import DynamicWorker
 from thread_factory.primatives.switchlock import SwitchLock
+from thread_factory.utils.interfaces.disposable import IDisposable
 
-class DynamicPoolContainer:
+class _DynamicPoolContainer(IDisposable):
     def __init__(self):
+        super().__init__()
         self._switch_lock = SwitchLock(0)
         self._active = False
         self._registered_threads = ConcurrentList[ULID]()
@@ -15,7 +17,9 @@ class DynamicPoolContainer:
         self._unregister_thread_check = False
         self._unregister_lock = threading.RLock()
 
-    def container(self):
+
+
+    def _container(self):
         """
         A container for managing dynamic threads.
         """
@@ -76,8 +80,9 @@ class DynamicPoolContainer:
                 self._active = False
 
 # Dynapool class to manage the pool of workers and tasks
-class DynamicPool:
+class DynamicPool(IDisposable):
     def __init__(self, max_workers: int, min_workers: int = 1):
+        super().__init__()
         self.max_workers = max_workers
         self.min_workers = min_workers
         self.worker_pool: ConcurrentList['DynamicWorker'] = ConcurrentList()
@@ -129,21 +134,3 @@ class DynamicPool:
             for worker in self.worker_pool:
                 worker.shutdown()
 
-
-# Example Task for the workers to run
-def example_task():
-    print(f"Task is being executed by {threading.current_thread().name}")
-    time.sleep(1)
-    print(f"Task completed by {threading.current_thread().name}")
-
-# Example usage
-if __name__ == "__main__":
-    dynapool = Dynapool(max_workers=5, min_workers=2)
-
-    # Submit tasks
-    for _ in range(20):
-        dynapool.submit_task(example_task)
-
-    # Wait for some tasks to finish before shutting down
-    time.sleep(5)
-    dynapool.shutdown()

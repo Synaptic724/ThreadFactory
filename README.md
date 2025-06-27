@@ -28,6 +28,22 @@ Please see the benchmarks at the bottom of this page and if you are interested t
 
 ---
 
+## 🌟 Support the Project
+
+If you find **ThreadFactory** useful, **please consider [starring the repository](https://github.com/Synaptic724/ThreadFactory/)** and **watching it for updates** 🔔!
+
+Your support helps:
+- Grow awareness 🧠  
+- Justify deeper development 💻  
+- Keep high-performance Python in the spotlight ⚡
+
+Every ⭐ star shows there's a need for **GIL-free, scalable concurrency** in Python.  
+Thank you for helping make that vision real ❤️
+
+> You can also [open an issue](https://github.com/Synaptic724/ThreadFactory/issues) or [start a discussion](https://github.com/Synaptic724/ThreadFactory/discussions) — I’d love to hear how you're using ThreadFactory or what you'd like to see next!
+
+---
+
 ## 🚀 Features
 
 ## Concurrent Data Structures
