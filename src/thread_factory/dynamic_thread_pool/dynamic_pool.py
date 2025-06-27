@@ -3,7 +3,7 @@ from queue import Queue
 from typing import Callable, Optional
 from ulid import ULID
 from thread_factory.concurrency import ConcurrentList
-from thread_factory.thread_pool import DynamicWorker
+from thread_factory.dynamic_thread_pool import DynamicWorker
 from thread_factory.primatives.switchlock import SwitchLock
 
 class DynamicPoolContainer:

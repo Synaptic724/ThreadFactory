@@ -1,7 +1,7 @@
 import threading
 from typing import Callable, Any, Union, Optional
 from thread_factory.runtime import Worker, WorkerState
-from thread_factory.thread_pool.value_work.value_work import ValueWork
+from thread_factory.dynamic_thread_pool.value_work.value_work import ValueWork
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 
 

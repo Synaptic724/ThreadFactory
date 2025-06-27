@@ -1,7 +1,7 @@
 import unittest
 import threading
 import time
-from thread_factory.thread_pool.general_worker.general_worker import GeneralWorker
+from thread_factory.dynamic_thread_pool.general_worker.general_worker import GeneralWorker
 
 class TestGeneralWorker(unittest.TestCase):
 
