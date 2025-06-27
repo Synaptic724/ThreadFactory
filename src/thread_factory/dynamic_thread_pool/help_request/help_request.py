@@ -6,29 +6,74 @@ from typing import Callable
 from thread_factory.utils import IDisposable
 
 
-class ValueWork(IDisposable):
+class HelpRequest(IDisposable):
     """
-    A lightweight, thread-safe task tracking object that can be dynamically executed
-    by workers. This class is designed to track the lifecycle of a task, including its state transitions
-    (e.g., from pending to in progress, completed, cancelled, or failed). The task's lifecycle can be managed
-    through the `mark_*` methods and provides hooks for execution, cancellation, and completion.
+    HelpRequest
+    -----------
+    A thread-safe, agentic task signal designed to coordinate thread behavior through explicit lifecycle control.
 
-    Key Features:
-    - Thread-safe state management.
-    - Task lifecycle tracking.
-    - Callable support for task execution.
-    - Automatic record management during execution.
-    - Graceful disposal to free up resources.
+    This object represents a directed help-call — a request for thread assistance at a specific callable site.
+    It is purpose-built for systems using agentic threading, where threads operate with autonomy and intention,
+    often coordinated by a scheduler or dispatcher that routes these HelpRequests to appropriate workers.
+
+    Conceptual Role:
+    ----------------
+    Think of HelpRequest as a dynamic thread contract — a beacon raised by a task site requesting help.
+    When issued, it contains everything a thread needs to arrive, perform the task, and update the system
+    about what happened. This design is ideal for distributed, autonomous thread orchestration where
+    threads operate in multiple locations and are activated by incoming requests, not passive queues.
+
+    Agentic Threading Design:
+    -------------------------
+    • Threads are active agents, not passive workers.
+    • Threads receive a HelpRequest and decide how to engage with the callable.
+    • Execution must be explicitly triggered via `acquire_work()`.
+    • Lifecycle state (e.g. `IN_PROGRESS`, `COMPLETED`, `FAILED`, `CANCELLED`) must be correctly maintained
+      by the user or the thread executing the task.
+    • State transitions are thread-safe and backed by an internal `Record` object with timestamps.
+
+    Responsibilities:
+    -----------------
+    - The **caller** is responsible for issuing the HelpRequest and defining the callable.
+    - The **worker thread** is responsible for executing the callable, and must call `mark_completed()`,
+      `mark_failed()`, or `mark_cancelled()` if the task ends early or is aborted.
+    - If the task is no longer needed, the dispatcher or thread must call `cancel_job()`.
+    - If a thread attempts to execute an already completed task, it may introduce logical errors or
+      side effects; such scenarios should be avoided by proper state inspection before thread dispatch.
+
+    Design Philosophy:
+    ------------------
+    HelpRequest is part of a broader agentic execution model where control and responsibility
+    are shared between the system and the worker threads. It avoids the passive, opaque
+    behavior of standard Future/Promise abstractions in favor of visibility, control, and contract-driven
+    delegation.
+
+    Error Handling:
+    ---------------
+    - Exceptions raised during execution do not need to be propagated — threads should handle
+      failures by calling `mark_failed()` or `cancel_job()` as appropriate.
+    - This decouples execution from exception propagation and allows external systems to inspect
+      task outcomes purely through lifecycle state.
+
+    Disposal:
+    ---------
+    Call `dispose()` when the HelpRequest is no longer needed. This clears internal references
+    and indicates that the contract has been resolved or abandoned.
+
+    Summary:
+    --------
+    HelpRequest is a precise, agent-ready task signal for thread orchestration systems.
+    It allows tasks to be dynamically issued, cleanly tracked, and cooperatively completed by threads
+    operating across distinct execution contexts.
     """
-
     def __init__(self, task_id: str, work_callable: Callable):
         """
-        Initialize a new ValueWork instance with a unique task ID and a callable to execute the work.
+        Initialize a new HelpRequest instance with a unique task ID and a callable to execute the work.
 
         Args:
             task_id (str): Unique identifier for the task.
-            work_callable (Callable[['ValueWork'], None]): A callable function to execute the task.
-                The callable will receive the ValueWork instance itself as an argument.
+            work_callable (Callable[['HelpRequest'], None]): A callable function to execute the task.
+                The callable will receive the HelpRequest instance itself as an argument.
 
         Initializes:
             - `task_id`: Stores the task's unique identifier.
@@ -57,7 +102,7 @@ class ValueWork(IDisposable):
 
     def dispose(self):
         """
-        Disposes of the ValueWork object, clearing references to the task record and other resources.
+        Disposes of the HelpRequest object, clearing references to the task record and other resources.
 
         This method is intended to be used in memory-sensitive environments to free up resources
         once the task has been completed, cancelled, or failed.
@@ -134,9 +179,9 @@ class ValueWork(IDisposable):
         """
         with self._lock:
             if self._disposed:
-                raise RuntimeError("ValueWork object is disposed")
+                raise RuntimeError("HelpRequest object is disposed")
             if self.record is None:
-                raise ValueError(f"[ValueWork] {self.task_id} has no record.")
+                raise ValueError(f"[HelpRequest] {self.task_id} has no record.")
             return self.record.status  # Return the state of the record
 
     def mark_in_progress(self):
@@ -202,9 +247,9 @@ class ValueWork(IDisposable):
         This includes the task ID, current state, and a reference to the task's record.
 
         Returns:
-            str: A string representation of the ValueWork instance.
+            str: A string representation of the HelpRequest instance.
         """
-        return f"<ValueWork task_id={self.task_id}, state={self.get_state().name}, record={self.record}>"
+        return f"<HelpRequest task_id={self.task_id}, state={self.get_state().name}, record={self.record}>"
 
     def get_record(self) -> Record:
         """
@@ -216,7 +261,7 @@ class ValueWork(IDisposable):
             Record: The current record associated with the task.
         """
         if self._disposed:
-            raise RuntimeError(f"[ValueWork] {self.task_id} has been disposed and cannot return a record.")
+            raise RuntimeError(f"[HelpRequest] {self.task_id} has been disposed and cannot return a record.")
         return self.record
 
     def acquire_work(self):
@@ -227,7 +272,7 @@ class ValueWork(IDisposable):
         work callable. If the work is completed or fails, the task is marked accordingly.
         """
         if self._disposed:
-            raise ValueError(f"[ValueWork] {self.task_id} has already been disposed.")
+            raise ValueError(f"[HelpRequest] {self.task_id} has already been disposed.")
 
         # Acquire lock for state-changing operations only (marking in progress, completion, failure)
         with self._lock:
@@ -256,7 +301,7 @@ class ValueWork(IDisposable):
             return
         with self._lock:
             if self._disposed:
-                raise ValueError(f"[ValueWork] {self.task_id} has been disposed.")
+                raise ValueError(f"[HelpRequest] {self.task_id} has been disposed.")
 
             # Prevent cancellation if the task is already completed
             if self._work_state == WorkStatus.COMPLETED:
@@ -274,22 +319,22 @@ class ValueWork(IDisposable):
         a factory ID set.
         """
         if self._work_callable is None or not callable(self._work_callable):
-            raise RuntimeError(f"[ValueWork] {self.task_id} has not been disposed.")
+            raise RuntimeError(f"[HelpRequest] {self.task_id} has not been disposed.")
 
 
     def bind_value_work(self) -> None:
         """
         Wraps a user-provided callable for task execution.
 
-        This method allows a callable to be wrapped so that when it's executed, it receives the `ValueWork`
+        This method allows a callable to be wrapped so that when it's executed, it receives the `HelpRequest`
         instance as an argument. This ensures that the lifecycle management (e.g., in-progress, completed)
         is properly handled through the `acquire_work()` method.
 
         Args:
-            original_callable (Callable[['ValueWork'], None]): The callable that will perform the task.
+            original_callable (Callable[['HelpRequest'], None]): The callable that will perform the task.
 
         Returns:
-            Callable[['ValueWork'], None]: A wrapped version of the original callable that manages lifecycle state.
+            Callable[['HelpRequest'], None]: A wrapped version of the original callable that manages lifecycle state.
         """
         if self._work_state == WorkStatus.COMPLETED or self._work_state == WorkStatus.CANCELLED or self._disposed or self._work_state == WorkStatus.FAILED:
             return
@@ -297,7 +342,7 @@ class ValueWork(IDisposable):
         if not hasattr(thread, '_worker_type'):
             raise RuntimeError("Thread does not have a factory_id set. Ensure the thread is properly initialized.")
         if thread._worker_type == "dynamic":
-            thread._value_work = self  # Set the ValueWork instance on the thread for dynamic workers
+            thread._value_work = self  # Set the HelpRequest instance on the thread for dynamic workers
             try:
                 self._work_callable()
             except Exception as e:

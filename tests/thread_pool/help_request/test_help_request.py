@@ -4,7 +4,7 @@ from datetime import datetime
 from unittest.mock import Mock
 from ulid import ULID
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
-from thread_factory.dynamic_thread_pool.value_work.value_work import ValueWork
+from thread_factory.dynamic_thread_pool.help_request.help_request import HelpRequest
 
 class TestValueWork(unittest.TestCase):
 
@@ -12,7 +12,7 @@ class TestValueWork(unittest.TestCase):
         """Set up before each test."""
         self.task_id = str(ULID())
         self.mock_callable = Mock()  # Mock work callable
-        self.value_work = ValueWork(task_id=self.task_id, work_callable=self.mock_callable)
+        self.value_work = HelpRequest(task_id=self.task_id, work_callable=self.mock_callable)
 
     def test_initialization(self):
         """Test initialization of ValueWork."""

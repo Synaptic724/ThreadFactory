@@ -5,7 +5,7 @@ from datetime import datetime
 from thread_factory.runtime import WorkerState
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus
 from thread_factory.dynamic_thread_pool.worker.dynamic_worker import DynamicWorker
-from thread_factory.dynamic_thread_pool.value_work.value_work import ValueWork
+from thread_factory.dynamic_thread_pool.help_request.help_request import ValueWork
 from ulid import ULID
 
 
