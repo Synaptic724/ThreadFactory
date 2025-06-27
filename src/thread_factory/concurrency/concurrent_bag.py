@@ -50,6 +50,40 @@ class ConcurrentBag(Generic[_T], IDisposable):
         for item in initial:
             self._bag[item] = self._bag.get(item, 0) + 1
 
+    def dispose(self) -> None:
+        """
+        Disposes of this ConcurrentBag, releasing all internal resources.
+
+        Responsibilities:
+          - Clears the internal bag, removing all items.
+          - Sets the `disposed` flag to True, marking this object as no longer valid.
+          - Emits a warning to notify that the object has been disposed.
+
+        Behavior:
+          - This method is idempotent: subsequent calls have no effect after the first.
+          - No automatic usage checks are enforced after disposal; it is the user's responsibility
+            to avoid further operations.
+
+        Notes:
+          - Designed for consistency with deterministic resource management patterns
+            seen in systems programming (e.g., RAII, IDisposable).
+          - Disposal does NOT release the lock itself since locks are acquired per operation.
+
+        Example:
+            with ConcurrentBag(...) as bag:
+                bag.add(42)
+            # bag is now automatically disposed and cleared
+        """
+        with self._lock:
+            if not self._disposed:
+                self._bag.clear()
+                self._disposed = True
+
+        warnings.warn(
+            "ConcurrentBag has been disposed and should not be used further.",
+            UserWarning
+        )
+
     def add(self, item: _T) -> None:
         """
         Add one occurrence of `item` to the bag.
@@ -339,44 +373,6 @@ class ConcurrentBag(Generic[_T], IDisposable):
         with self._lock:
             for item, count in other._bag.items():
                 self._bag[item] = self._bag.get(item, 0) + count
-
-    # -------------------------------------------------
-    # Disposable implementation
-    # -------------------------------------------------
-
-    def dispose(self) -> None:
-        """
-        Disposes of this ConcurrentBag, releasing all internal resources.
-
-        Responsibilities:
-          - Clears the internal bag, removing all items.
-          - Sets the `disposed` flag to True, marking this object as no longer valid.
-          - Emits a warning to notify that the object has been disposed.
-
-        Behavior:
-          - This method is idempotent: subsequent calls have no effect after the first.
-          - No automatic usage checks are enforced after disposal; it is the user's responsibility
-            to avoid further operations.
-
-        Notes:
-          - Designed for consistency with deterministic resource management patterns
-            seen in systems programming (e.g., RAII, IDisposable).
-          - Disposal does NOT release the lock itself since locks are acquired per operation.
-
-        Example:
-            with ConcurrentBag(...) as bag:
-                bag.add(42)
-            # bag is now automatically disposed and cleared
-        """
-        with self._lock:
-            if not self._disposed:
-                self._bag.clear()
-                self._disposed = True
-
-        warnings.warn(
-            "ConcurrentBag has been disposed and should not be used further.",
-            UserWarning
-        )
 
     def __enter__(self):
         """

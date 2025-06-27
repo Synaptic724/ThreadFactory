@@ -72,7 +72,30 @@ class ConcurrentSet(Generic[_T], IDisposable):
         # read operations can skip locking.
         self._freeze: bool = False
 
+    def dispose(self) -> None:
+        """Clear internal data and mark the ConcurrentSet as disposed.
 
+        This method releases the resources held by the set, primarily by clearing
+        the underlying built-in set. Once disposed, the set should not be used
+        further.
+
+        This method is idempotent; calling it multiple times has no additional effect
+        after the first call. It is also thread-safe, using the internal lock
+        to protect the clearing operation and the `disposed` flag update.
+        """
+        # Check if the set has already been disposed. The `getattr` with a default
+        # handles the case where the `disposed` attribute might not exist yet
+        # during initialization or in error scenarios, although it's set in __init__.
+        if not getattr(self, "_disposed", False):
+            # Acquire the lock before clearing the internal set and updating the flag.
+            with self._lock:
+                # Clear the underlying built-in set, releasing references to its elements.
+                self._set.clear()
+                # Mark the set as disposed. This flag is checked in the outer `if`.
+                self._disposed = True
+            # Issue a warning to inform the user that the set has been disposed.
+            # This is a helpful indicator if the set is accidentally used after disposal.
+            warnings.warn("Your ConcurrentSet has been disposed and should not be used further.", UserWarning)
 # endregion
 # region Freeze control
     def freeze(self) -> None:
@@ -895,33 +918,5 @@ class ConcurrentSet(Generic[_T], IDisposable):
         # Note that dispose() itself is idempotent and thread-safe.
         self.dispose()
 
-# endregion
-#region Disposable
-
-    def dispose(self) -> None:
-        """Clear internal data and mark the ConcurrentSet as disposed.
-
-        This method releases the resources held by the set, primarily by clearing
-        the underlying built-in set. Once disposed, the set should not be used
-        further.
-
-        This method is idempotent; calling it multiple times has no additional effect
-        after the first call. It is also thread-safe, using the internal lock
-        to protect the clearing operation and the `disposed` flag update.
-        """
-        # Check if the set has already been disposed. The `getattr` with a default
-        # handles the case where the `disposed` attribute might not exist yet
-        # during initialization or in error scenarios, although it's set in __init__.
-        if not getattr(self, "_disposed", False):
-            # Acquire the lock before clearing the internal set and updating the flag.
-            with self._lock:
-                # Clear the underlying built-in set, releasing references to its elements.
-                self._set.clear()
-                # Mark the set as disposed. This flag is checked in the outer `if`.
-                self._disposed = True
-            # Issue a warning to inform the user that the set has been disposed.
-            # This is a helpful indicator if the set is accidentally used after disposal.
-            warnings.warn("Your ConcurrentSet has been disposed and should not be used further.", UserWarning)
-    #endregion
-
+#endregion
 #endregion

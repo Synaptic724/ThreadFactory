@@ -58,6 +58,21 @@ class _Shard(Generic[_T], IDisposable):
         self._time_array = time_array
         self._index = index
 
+    def dispose(self) -> None:
+        """
+        Dispose of this shard by clearing all items and marking it as unusable.
+
+        Notes:
+            - Safe to call multiple times (idempotent).
+            - Required to release resources when integrated with a Disposable system.
+        """
+        with self._lock:
+            if not self._disposed:
+                self._queue.clear()
+                self._length_array[self._index] = 0
+                self._set_time_value(0)
+                self._disposed = True
+
     def _increase_length_value(self) -> None:
         """
         Increments this shard's length counter in the shared length array.
@@ -161,21 +176,6 @@ class _Shard(Generic[_T], IDisposable):
             self._length_array[self._index] = 0
             self._set_time_value(0)
 
-    def dispose(self) -> None:
-        """
-        Dispose of this shard by clearing all items and marking it as unusable.
-
-        Notes:
-            - Safe to call multiple times (idempotent).
-            - Required to release resources when integrated with a Disposable system.
-        """
-        with self._lock:
-            if not self._disposed:
-                self._queue.clear()
-                self._length_array[self._index] = 0
-                self._set_time_value(0)
-                self._disposed = True
-
     def __enter__(self):
         """
         Enter the runtime context related to this object.
@@ -264,6 +264,43 @@ class ConcurrentBuffer(Generic[_T], IDisposable):
         # Initialize with any provided items
         for item in initial:
             self.enqueue(item)
+
+    def dispose(self) -> None:
+        """
+        Disposes of this ConcurrentBuffer, releasing all internal resources.
+
+        Responsibilities:
+          - Disposes each internal shard by clearing their queues and resetting their counters.
+          - Resets the shared `_length_array` and `_time_array` used for shard coordination.
+          - Marks this object as disposed (`self.disposed = True`).
+
+        Behavior:
+          - This method is idempotent: multiple calls will have no adverse effects after the first.
+          - Once disposed, the buffer should be considered permanently invalid.
+          - No post-disposal protection is enforced — correct usage is left to the caller's responsibility.
+
+        Notes:
+          - A warning is emitted when disposal occurs to signal that the buffer has been destroyed.
+          - This follows the explicit resource control philosophy common in high-performance and systems programming.
+
+        Example:
+            with ConcurrentBuffer(...) as buf:
+                ...
+            # buffer is automatically disposed here
+        """
+        if not self._disposed:
+            # Dispose all shards and reset internal arrays
+            for shard in self._shards:
+                shard.dispose()
+            self._length_array = array("Q", [0] * self._num_shards)
+            self._time_array = array("Q", [0] * self._num_shards)
+            self._disposed = True
+
+            # Notify user that buffer is no longer valid
+            warnings.warn(
+                "ConcurrentBuffer has been disposed and should not be used further.",
+                UserWarning
+            )
 
     def enqueue(self, item: _T) -> None:
         """
@@ -577,47 +614,6 @@ class ConcurrentBuffer(Generic[_T], IDisposable):
             return functools.reduce(func, items_copy)
         else:
             return functools.reduce(func, items_copy, initial)
-
-    # -----------------------------------------------------------------------------------
-    # Disposable Implementation
-    # -----------------------------------------------------------------------------------
-
-    def dispose(self) -> None:
-        """
-        Disposes of this ConcurrentBuffer, releasing all internal resources.
-
-        Responsibilities:
-          - Disposes each internal shard by clearing their queues and resetting their counters.
-          - Resets the shared `_length_array` and `_time_array` used for shard coordination.
-          - Marks this object as disposed (`self.disposed = True`).
-
-        Behavior:
-          - This method is idempotent: multiple calls will have no adverse effects after the first.
-          - Once disposed, the buffer should be considered permanently invalid.
-          - No post-disposal protection is enforced — correct usage is left to the caller's responsibility.
-
-        Notes:
-          - A warning is emitted when disposal occurs to signal that the buffer has been destroyed.
-          - This follows the explicit resource control philosophy common in high-performance and systems programming.
-
-        Example:
-            with ConcurrentBuffer(...) as buf:
-                ...
-            # buffer is automatically disposed here
-        """
-        if not self._disposed:
-            # Dispose all shards and reset internal arrays
-            for shard in self._shards:
-                shard.dispose()
-            self._length_array = array("Q", [0] * self._num_shards)
-            self._time_array = array("Q", [0] * self._num_shards)
-            self._disposed = True
-
-            # Notify user that buffer is no longer valid
-            warnings.warn(
-                "ConcurrentBuffer has been disposed and should not be used further.",
-                UserWarning
-            )
 
     def __enter__(self):
         """

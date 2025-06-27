@@ -22,39 +22,27 @@ class Waiter:
 
 class SignalCondition(IDisposable):
     """
-    A *minimal* Condition-flavoured primitive with **embedded callbacks**.
+    SignalCondition
+    ----------------
+    A lightweight, simplified condition-like primitive designed for event-based synchronization
+    and minimal contention environments.
 
-    Differences to :class:`threading.Condition`:
-    ------------------------------------------------
-    1. **Always awaited-caller execution** – Any callback set via
-       :py:meth:`notify` / :py:meth:`notify_all` (or the optional *default*)
-       is executed *inside the woken thread* **after** it re-acquires the
-       internal lock.  The notifying thread *never* runs user code.
+    Unlike `threading.Condition`, this primitive offers:
+      1. **Callback Execution Inside the Woken Thread** – ensures the notifier never runs arbitrary code.
+      2. **No ID-based Targeting** – maintains strict FIFO fairness.
+      3. **Predictable Lifecycle** – integrates callback logic into the `wait()` lifecycle cleanly.
 
-    2. **No targeting / no IDs** – Every waiter is treated equally.  First
-       come, first served.
+    Use this when you need a **declarative thread wakeup pattern**, where the signaler declares the
+    logic and the waiting thread executes it — cleanly and safely.
 
-    3. **No advanced semantics** – No bias, worker-type checks, or
-       per-thread registries.  The goal is surfacing a single, declarative
-       pattern:
+    Suitable for:
+    - Embedding post-wakeup behavior inside producers/consumers.
+    - Controlled signal-response loops.
+    - Minimalist pipeline signaling.
+    - Self-healing wait patterns (using callbacks to re-queue or finalize state).
 
-            • Thread blocks via ``wait()``
-            • Notifier wakes it and optionally attaches a callable
-            • Waiter runs the callable → continues
-
-    Typical use-cases:
-    ------------------
-    • Embedding *post-wake initialization* in a producer/consumer queue.
-    • Barrier coordination where each participant performs a local
-      side-effect on release.
-    • Replacing scattered ``wait()/notify()`` pairs with a *single* call that
-      declares *both* the wake and the follow-up action.
-
-    Performance note:
-    -----------------
-    • Raw `RLock.acquire()/release()` took ~0.00196s
-    • `SignalCondition.wait()/notify()` took ~0.01256s
-    → SignalCondition is ~6.4× slower in minimal contention scenarios.
+    Performance Tradeoff:
+    - Approximately 6.4x slower than bare `RLock` due to user logic hooks, but massively safer and clearer.
     """
 
     def __init__(self, lock: Optional[threading.Lock] = None):
@@ -63,7 +51,7 @@ class SignalCondition(IDisposable):
 
         Args:
             lock (Optional[threading.Lock]): Custom lock object to use (must be RLock-compatible).
-                                              If None, a new RLock is created.
+                                             If None, a new RLock is created internally.
         """
         super().__init__()
         self._lock: threading.RLock = lock or threading.RLock()
@@ -71,6 +59,32 @@ class SignalCondition(IDisposable):
         self.release: Callable = self._lock.release
         self._waiters: ConcurrentQueue[Waiter] = ConcurrentQueue()
         self._default_callback: Optional[Callable[[], None]] = None
+
+    def dispose(self) -> None:
+        """
+        Dispose of this SignalCondition safely.
+
+        This method will:
+          - Mark the instance as disposed.
+          - Wake all remaining waiters to prevent deadlocks.
+          - Clear internal references to allow GC.
+        """
+        if self._disposed:
+            return
+        self._disposed = True
+
+        while not self._waiters.is_empty():
+            waiter = self._waiters.dequeue()
+            try:
+                waiter.lock.release()
+            except RuntimeError:
+                pass  # Already released or timed out
+
+        self.acquire = None
+        self.release = None
+        self._waiters.dispose()
+        self._default_callback = None
+
 
     def __enter__(self):
         """Enter the context manager and acquire the lock."""
@@ -83,54 +97,57 @@ class SignalCondition(IDisposable):
 
     def set_default_callback(self, fn: Callable[[], None]) -> None:
         """
-        Set a fallback callback that is executed by any woken thread
-        which did not receive an explicit callback.
+        Sets a fallback callback to be run by any woken thread that
+        does not receive a specific callback via `notify()` or `notify_all()`.
 
         Args:
-            fn (Callable[[], None]): The default callable. Set to None to clear it.
+            fn (Callable[[], None]): The default callable to attach to future wake-ups.
         """
         self._default_callback = fn
 
     def find_waiter_count(self) -> int:
         """
         Returns:
-            int: The number of threads currently blocked.
+            int: Number of threads currently blocked and waiting for notification.
         """
         return len(self._waiters)
 
     def get_all_waiters(self) -> List[Waiter]:
         """
-        Snapshot of all waiters currently waiting.
+        Returns a snapshot of all waiters currently waiting.
 
         Returns:
-            List[Waiter]: A shallow copy of all current waiters.
+            List[Waiter]: A shallow list copy of all current waiters for diagnostics.
         """
         return list(self._waiters)
 
     def wait(self, timeout: Optional[float] = None) -> bool:
         """
-        Block the calling thread until notified or timeout occurs.
+        Blocks the calling thread until it is notified, then executes
+        an attached callback (if any), and resumes.
 
         Args:
-            timeout (Optional[float]): Maximum time to wait in seconds.
+            timeout (Optional[float]): Maximum time to wait (in seconds). `None` = wait forever.
 
         Returns:
-            bool: True if woken by notifier, False if timed out.
+            bool: True if woken by a notifier. False if timed out.
 
         Raises:
-            RuntimeError: If the internal lock is not acquired.
+            RuntimeError: If the internal lock is not acquired prior to calling.
         """
         if self._disposed:
             raise RuntimeError("SignalCondition has been disposed")
         if not self._is_owned():
             raise RuntimeError("cannot wait on un-acquired lock")
 
+        # Prepare the local lock the thread will block on.
         waiter_lock = threading.Lock()
         waiter_lock.acquire()
 
         waiter = Waiter(lock=waiter_lock, thread=threading.current_thread())
         self._waiters.enqueue(waiter)
 
+        # Release main lock temporarily while waiting.
         saved_state = self._release_save()
         woke_normally = False
         try:
@@ -150,18 +167,19 @@ class SignalCondition(IDisposable):
                     except Exception as exc:
                         print(f"[SignalCondition] Callback error: {exc}")
             else:
+                # If the wait timed out, clean up the queue entry.
                 self._waiters.remove_item(waiter)
 
     def notify(self, n: int = 1, callback: Optional[Callable[[], None]] = None) -> None:
         """
-        Wake up to `n` waiters, optionally attaching a callback to each.
+        Wake up to `n` waiters, optionally assigning a callback to each.
 
         Args:
-            n (int): Number of waiters to wake.
-            callback (Optional[Callable[[], None]]): Optional function passed to each waiter.
+            n (int): Maximum number of threads to notify.
+            callback (Optional[Callable[[], None]]): Callable to assign to each woken waiter.
 
         Raises:
-            RuntimeError: If the lock is not acquired.
+            RuntimeError: If the calling thread doesn't hold the internal lock.
         """
         if n <= 0:
             return
@@ -181,17 +199,17 @@ class SignalCondition(IDisposable):
             try:
                 w.lock.release()
             except RuntimeError:
-                pass  # Likely timed out
+                pass  # Thread likely timed out and already moved on.
 
     def notify_all(self, callback: Optional[Callable[[], None]] = None) -> None:
         """
-        Wake all current waiters, optionally attaching a callback to each.
+        Wake all current waiters and optionally assign a callback to each.
 
         Args:
-            callback (Optional[Callable[[], None]]): Optional function passed to all waiters.
+            callback (Optional[Callable[[], None]]): Callable to assign to each woken waiter.
 
         Raises:
-            RuntimeError: If the lock is not acquired.
+            RuntimeError: If the internal lock is not held.
         """
         if not self._is_owned():
             raise RuntimeError("cannot notify_all on un-acquired lock")
@@ -206,10 +224,12 @@ class SignalCondition(IDisposable):
 
     def _release_save(self) -> Any:
         """
-        Internal: Fully releases the internal RLock and returns a restore token.
+        Internal: Releases the current lock completely and returns a restore token.
+
+        This ensures compatibility with both CPython and subclassed locks.
 
         Returns:
-            Any: Token used for restoring the original lock state.
+            Any: A token (either int or None) used to later restore the lock state.
         """
         if hasattr(self._lock, "_release_save"):
             return self._lock._release_save()
@@ -224,10 +244,10 @@ class SignalCondition(IDisposable):
 
     def _acquire_restore(self, saved_state: Any) -> None:
         """
-        Internal: Re-acquires the internal RLock based on the saved token.
+        Internal: Restores the lock state using a token from `_release_save()`.
 
         Args:
-            saved_state (Any): Token returned by _release_save().
+            saved_state (Any): The token returned during lock release.
         """
         if hasattr(self._lock, "_acquire_restore"):
             self._lock._acquire_restore(saved_state)
@@ -240,36 +260,15 @@ class SignalCondition(IDisposable):
 
     def _is_owned(self) -> bool:
         """
-        Internal: Checks if the current thread holds the internal lock.
+        Internal: Determines if the current thread owns the lock.
 
         Returns:
-            bool: True if the lock is held by this thread.
+            bool: True if the thread holds the lock.
         """
         if hasattr(self._lock, "_is_owned"):
             return self._lock._is_owned()
+        # Manual fallback: Try to acquire. If successful, we didn’t own it.
         if self._lock.acquire(blocking=False):
             self._lock.release()
             return False
         return True
-
-    def dispose(self) -> None:
-        """
-        Dispose of the SignalCondition, releasing all resources and clearing waiters.
-
-        This method is idempotent and can be called multiple times without side effects.
-        """
-        if self._disposed:
-            return
-        self._disposed = True
-        # Clear all waiters
-        while not self._waiters.is_empty():
-            waiter = self._waiters.dequeue()
-            try:
-                waiter.lock.release()
-            except RuntimeError:
-                pass
-        self.acquire = None
-        self.release = None
-        self._waiters.dispose()
-        self._default_callback = None
-

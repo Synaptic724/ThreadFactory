@@ -47,7 +47,7 @@ class SwitchLock(IDisposable):
         SwitchLock (this)     │ 4.40
         Thread Spawn (bare)   │ 195.8
 
-    ⚠️ Note:
+    ⚠Note:
         `SwitchLock` is ~63× slower than a raw lock, but offers intelligent coordination
         features, including burst control, bias reserve enforcement, and cross-thread signaling.
 
@@ -77,6 +77,21 @@ class SwitchLock(IDisposable):
         self._worker_type: str = worker_type  # Type of worker, can be used for identification
         self._bias_threshold: Optional[int] = bias_threshold
         self._pending_permits: int = 0  # buffered until bias flush
+
+    def dispose(self):
+        """
+        Disposes of the SwitchLock, releasing all its resources and
+        waking up any threads currently waiting to acquire a permit.
+        After disposal, the lock should no longer be used. This method is idempotent.
+        """
+        if self.disposed:  # Check if the lock has already been disposed
+            return
+        self._disposed = True  # Mark the lock as disposed
+        self._cond.dispose()
+        self._cond = None
+        self._log_ids.clear()
+        self._log_ids.dispose()
+        self._log_ids = None
 
     @property
     def condition(self) -> SmartCondition:
@@ -578,17 +593,3 @@ class SwitchLock(IDisposable):
             return []
         return self._cond.get_all_waiting_factory_ids()
 
-    def dispose(self):
-        """
-        Disposes of the SwitchLock, releasing all its resources and
-        waking up any threads currently waiting to acquire a permit.
-        After disposal, the lock should no longer be used. This method is idempotent.
-        """
-        if self.disposed:  # Check if the lock has already been disposed
-            return
-        self._disposed = True  # Mark the lock as disposed
-        self._cond.dispose()
-        self._cond = None
-        self._log_ids.clear()
-        self._log_ids.dispose()
-        self._log_ids = None

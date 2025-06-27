@@ -61,6 +61,26 @@ class ConcurrentDict(Generic[_K, _V], IDisposable):
         self._lock: threading.RLock = threading.RLock()
         self._freeze = False
 
+    def dispose(self) -> None:
+        """
+        Dispose (clear) this ConcurrentDict, releasing its contents.
+
+        Once disposed, `disposed` becomes True and the internal dict is cleared.
+        No further usage checks are enforced, so the user must avoid calling
+        other methods after disposal.
+
+        This method is idempotent — multiple calls won't cause errors.
+        """
+        if not self._disposed:
+            with self._lock:
+                self._dict.clear()
+            self._disposed = True
+        warnings.warn(
+            "Your ConcurrentDictionary has been disposed and should not be used further. ",
+            UserWarning
+        )
+
+
     def freeze(self) -> None:
         """
         Freeze the dictionary to prevent further modifications.
@@ -643,23 +663,3 @@ class ConcurrentDict(Generic[_K, _V], IDisposable):
         """
         self._lock.release()
         self.dispose()
-
-    def dispose(self) -> None:
-        """
-        Dispose (clear) this ConcurrentDict, releasing its contents.
-
-        Once disposed, `disposed` becomes True and the internal dict is cleared.
-        No further usage checks are enforced, so the user must avoid calling
-        other methods after disposal.
-
-        This method is idempotent — multiple calls won't cause errors.
-        """
-        if not self._disposed:
-            with self._lock:
-                self._dict.clear()
-            self._disposed = True
-        warnings.warn(
-            "Your ConcurrentDictionary has been disposed and should not be used further. ",
-            UserWarning
-        )
-

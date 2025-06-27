@@ -47,6 +47,26 @@ class ConcurrentStack(Generic[_T], IDisposable):
         self._lock: threading.RLock = threading.RLock()
         self._deque: Deque[_T] = deque(initial)
 
+    def dispose(self) -> None:
+        """
+        Dispose (clear) this ConcurrentStack, releasing its contents.
+
+        Once disposed, `_disposed` becomes True and the internal dict is cleared.
+        No further usage checks are enforced, so the user must avoid calling
+        other methods after disposal.
+
+        This method is idempotent — multiple calls won't cause errors.
+        """
+        if not self._disposed:
+            with self._lock:
+                self._deque.clear()
+            self._disposed = True
+        warnings.warn(
+            "Your ConcurrentStack has been disposed and should not be used further. ",
+            UserWarning
+        )
+
+
     def push(self, item: _T) -> None:
         """
         Push an item onto the top of the stack (LIFO).
@@ -350,23 +370,3 @@ class ConcurrentStack(Generic[_T], IDisposable):
         """
         self._lock.release()
         self.dispose()
-
-    def dispose(self) -> None:
-        """
-        Dispose (clear) this ConcurrentStack, releasing its contents.
-
-        Once disposed, `_disposed` becomes True and the internal dict is cleared.
-        No further usage checks are enforced, so the user must avoid calling
-        other methods after disposal.
-
-        This method is idempotent — multiple calls won't cause errors.
-        """
-        if not self._disposed:
-            with self._lock:
-                self._deque.clear()
-            self._disposed = True
-        warnings.warn(
-            "Your ConcurrentStack has been disposed and should not be used further. ",
-            UserWarning
-        )
-

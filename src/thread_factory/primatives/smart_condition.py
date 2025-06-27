@@ -37,22 +37,36 @@ class SmartCondition(IDisposable):
     """
     SmartCondition
     ---------------
-    A custom, thread-aware condition variable that extends the capabilities
-    of `threading.Condition`. It provides:
-    - **Thread-aware semantics**: Each waiting thread is identified by a unique
-      `factory_id` (typically a ULID), enabling more granular control.
-    - **Targeted notifications**: The ability to wake specific threads or groups
-      of threads based on their `factory_id`s, rather than just arbitrary ones.
-    - **Snapshot access**: Provides methods to get lists of all currently waiting
-      threads and their identifiers.
-    - **Callback execution on notification**: Supports binding specific callbacks
-      to `factory_id`s or a default callback, which are executed when a thread is notified
-      via `notify_and_call`.
+    A custom, thread-aware condition variable designed specifically for use in high-performance
+    concurrent systems like `DynamicWorker` and `DynamicPool` within ThreadFactory.
 
-    This class is particularly useful in complex concurrent systems, such as
-    thread pools, dynamic semaphores, or orchestrators, where more granular
-    control over thread signaling and coordination is required than offered
-    by standard condition variables.
+    Unlike standard `threading.Condition`, this implementation supports:
+
+    - **Thread-aware semantics**: Each thread is tracked using a unique `factory_id` (usually a ULID),
+      enabling granular coordination of threads in distributed or agentic thread systems.
+
+    - **Targeted notifications**: Allows precise wake-up calls to specific threads, critical for
+      orchestrating behavior across many worker threads in a pool.
+
+    - **Awaited callback delivery**: Callbacks can be passed into the waiter thread to be executed
+      once it wakes up, enabling thread-local response behavior (a key feature for DynamicWorker checkpoints).
+
+    - **Snapshot inspection**: Runtime visibility into which threads are waiting, including
+      full `Waiter` object snapshots and their `factory_id`s.
+
+    Usage Context
+    ----------------
+    This class is a critical synchronization primitive used by:
+
+    - `DynamicWorker`: Each worker can wait on a `SmartCondition` and be targeted by name (`factory_id`)
+      for explicit wakeups and behavior changes.
+
+    - `DynamicPool`: The pool uses SmartCondition to coordinate multiple `DynamicWorker`s, allowing it to
+      resume or repurpose workers based on load, location, or routing rules.
+
+    These systems require **precise control** over which threads are signaled, especially in environments
+    with hundreds of long-lived workers behaving like agents. `SmartCondition` makes that possible
+    with minimal overhead and clean callback integration.
     """
 
     def __init__(self, lock: Optional[threading.Lock] = None):
@@ -80,6 +94,39 @@ class SmartCondition(IDisposable):
         self._callback_registry: ConcurrentDict[str, Callable[[], None]] = ConcurrentDict()
         # A default callback to be executed if no specific callback is bound for a notified thread.
         self._default_callback: Optional[Callable[[], None]] = None
+
+    def dispose(self) -> None:
+        """
+        Disposes the SmartCondition, releasing all waiters and clearing internal registries.
+
+        This method:
+        - Marks the condition as disposed.
+        - Wakes all waiting threads without executing callbacks.
+        - Clears the waiters queue.
+        - Clears callback registries.
+        - Releases the internal lock (if possible).
+
+        This is safe to call multiple times.
+        """
+        if self._disposed:
+            return
+        self._disposed = True
+
+        # Clear all waiters
+        while not self._waiters.is_empty():
+            waiter = self._waiters.dequeue()
+            try:
+                waiter.lock.release()
+            except RuntimeError:
+                pass
+
+        # Clear all registries
+        self._waiters.dispose()
+        self._waiters = None
+        self._callback_registry.clear()
+        self._callback_registry.dispose()
+        self._callback_registry = None
+        self._default_callback = None
 
     def __enter__(self):
         """
@@ -658,36 +705,3 @@ class SmartCondition(IDisposable):
             self._lock.release()  # Release it immediately as we just acquired it.
             return False
         return True  # If non-blocking acquire failed, it means this thread already held the lock.
-
-    def dispose(self) -> None:
-        """
-        Disposes the SmartCondition, releasing all waiters and clearing internal registries.
-
-        This method:
-        - Marks the condition as disposed.
-        - Wakes all waiting threads without executing callbacks.
-        - Clears the waiters queue.
-        - Clears callback registries.
-        - Releases the internal lock (if possible).
-
-        This is safe to call multiple times.
-        """
-        if self._disposed:
-            return
-        self._disposed = True
-
-        # Clear all waiters
-        while not self._waiters.is_empty():
-            waiter = self._waiters.dequeue()
-            try:
-                waiter.lock.release()
-            except RuntimeError:
-                pass
-
-        # Clear all registries
-        self._waiters.dispose()
-        self._waiters = None
-        self._callback_registry.clear()
-        self._callback_registry.dispose()
-        self._callback_registry = None
-        self._default_callback = None

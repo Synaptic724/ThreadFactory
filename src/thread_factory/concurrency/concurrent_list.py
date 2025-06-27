@@ -31,6 +31,26 @@ class ConcurrentList(Generic[_T], IDisposable):
         self._list: List[_T] = list(initial) if initial else []
         self._freeze = False
 
+    def dispose(self) -> None:
+        """
+        Dispose (clear) this ConcurrentList, releasing its contents.
+
+        Once disposed, `_disposed` becomes True and the internal dict is cleared.
+        No further usage checks are enforced, so the user must avoid calling
+        other methods after disposal.
+
+        This method is idempotent — multiple calls won't cause errors.
+        """
+        if not self._disposed:
+            with self._lock:
+                self._list.clear()
+            self._disposed = True
+        warnings.warn(
+            "Your ConcurrentList has been disposed and should not be used further. ",
+            UserWarning
+        )
+
+
     def freeze(self) -> None:
         """
         Freeze the dictionary to prevent further modifications.
@@ -681,23 +701,3 @@ class ConcurrentList(Generic[_T], IDisposable):
         """
         self._lock.release()
         self.dispose()
-
-    def dispose(self) -> None:
-        """
-        Dispose (clear) this ConcurrentList, releasing its contents.
-
-        Once disposed, `_disposed` becomes True and the internal dict is cleared.
-        No further usage checks are enforced, so the user must avoid calling
-        other methods after disposal.
-
-        This method is idempotent — multiple calls won't cause errors.
-        """
-        if not self._disposed:
-            with self._lock:
-                self._list.clear()
-            self._disposed = True
-        warnings.warn(
-            "Your ConcurrentList has been disposed and should not be used further. ",
-            UserWarning
-        )
-

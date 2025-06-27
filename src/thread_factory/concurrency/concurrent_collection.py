@@ -68,6 +68,18 @@ class _Shard(Generic[_T], IDisposable):
         # Index in the shared length array for this particular shard.
         self._index = index
 
+    def dispose(self) -> None:
+        """
+        Clears the shard's data and marks it as disposed.
+
+        This method is idempotent; multiple calls have no further effect.
+        """
+        with self._lock:
+            if not self._disposed:
+                self._queue.clear()
+                self._length_array[self._index] = 0
+                self._disposed = True
+
     def _increase_length_value(self) -> None:
         """
         Increments the length counter for this shard in the shared length array.
@@ -148,18 +160,6 @@ class _Shard(Generic[_T], IDisposable):
         with self._lock:
             self._queue.clear()
             self._length_array[self._index] = 0
-
-    def dispose(self) -> None:
-        """
-        Clears the shard's data and marks it as disposed.
-
-        This method is idempotent; multiple calls have no further effect.
-        """
-        with self._lock:
-            if not self._disposed:
-                self._queue.clear()
-                self._length_array[self._index] = 0
-                self._disposed = True
 
     def __enter__(self):
         """
