@@ -117,6 +117,13 @@ class HelpRequest(IDisposable):
             self._return_to_pool = True
             self._disposed = True
 
+    @property
+    def should_return(self) -> bool:
+        """
+        Alias for check_return_to_pool(), for expressive read-style use.
+        """
+        return self._return_to_pool
+
     def _update_record(self):
         """
         Internal method to update the task's record with the latest state and timestamp information.
@@ -251,20 +258,24 @@ class HelpRequest(IDisposable):
 
     def check_return_to_pool(self) -> bool:
         """
-        Checks if the task should return to the pool after execution.
+        Signals whether the worker should return to the pool after responding to this HelpRequest.
 
-        This method is used to determine if the worker thread should be returned to the pool
-        after completing the task. It is typically called at the end of the task's execution.
+        This flag is set by either the HelpRequest itself (e.g., after `mark_completed()`),
+        or by the user thread explicitly using `set_return_to_pool(True)` or `return_home()`.
+
+        Philosophical Model:
+        --------------------
+        Agentic threads do not assume ownership blindly — they verify whether help is still needed.
+        If this method returns True, it indicates the thread should gracefully release itself
+        from this contract and return to the pool.
+
+        This mechanism supports cooperative execution:
+        - Threads act only when help is truly needed.
+        - User threads retain final ownership of task state.
+        - Threads honor intent, not just availability.
 
         Returns:
-            bool: True if the task should return to the pool, False otherwise.
-
-        This is useful for managing thread lifecycle and resource allocation in the dynamic pool.
-
-        Example:
-            if help_request.check_return_to_pool():
-            # Logic to return the worker thread to the pool
-                return
+            bool: True if this thread should return to the pool and not continue execution.
         """
         return self._return_to_pool
 

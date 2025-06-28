@@ -13,7 +13,7 @@ class _AgenticPoolContainer(IDisposable):
         self._switch_lock = SwitchLock(0)
         self._active = False
         self._registered_threads = ConcurrentList[ULID]()
-        self._unregistered_threads = ConcurrentList[ULID]() # We need to incorporate unregistered threads into the system.
+        self._unregistered_threads = ConcurrentList[ULID]() # We need to incorporate unregistered threads into the system. #TODO: Implement unregistered threads handling
         self._unregister_thread_check = False
         self._unregister_lock = threading.RLock()
 
@@ -77,43 +77,53 @@ class _AgenticPoolContainer(IDisposable):
             if len(self._registered_threads) == 0:
                 self._active = False
 
-# Dynapool class to manage the pool of workers and tasks
 class AgenticPool(IDisposable):
     """
     AgenticPool
     -----------
-    A cooperative thread assistance system built on agentic execution principles.
+    A cooperative thread assistance system based on agentic execution principles.
 
-    This pool enables threads to *request* help via `HelpRequest` objects instead of offloading
-    tasks blindly. The calling thread remains the owner of the task and is responsible for managing
-    its lifecycle, regardless of whether agentic threads respond.
+    Unlike traditional thread pools that offload tasks into queues, AgenticPool enables
+    the calling thread to immediately begin executing work while optionally requesting
+    help from agentic workers via `HelpRequest` contracts.
 
-    Philosophy:
-    -----------
-    • Threads do not delegate work — they summon assistance.
-    • Agents (DynamicWorkers) respond voluntarily to `HelpRequest` contracts.
-    • Help may arrive now, later, or not at all — the system supports all outcomes.
+    ⚙️ Core Idea:
+    -------------
+    • The caller does not delegate — it initiates the work.
+    • Agentic workers may choose to assist — or not.
+    • If help never arrives, the caller is still responsible.
+    • The workload is shared, not offloaded.
 
-    Features:
-    ---------
-    • Backpressure-aware: Threads can block, proceed solo, or monitor for later execution.
-    • Lifecycle-transparent: Every request has a complete record of its journey.
-    • Agentic coordination: Workers act independently, honoring contract states and returning to the pool.
+    🎯 Features:
+    ------------
+    • **Backpressure-aware** — Help is only requested if workers are available.
+    • **Mutual-completion** — Either the caller or a worker may finalize the work.
+    • **Lifecycle-transparent** — Each `HelpRequest` tracks its execution journey.
+    • **Autonomous coordination** — Workers act voluntarily and return home when done.
 
-    Use Cases:
-    ----------
-    - Distributed execution with fallback to local thread completion.
-    - Agent-style threading where cooperation replaces strict task scheduling.
-    - Adaptive concurrency models that favor intent over delegation.
+    🧠 Use Cases:
+    -------------
+    - High-throughput cooperative systems (e.g., shared queues, concurrent stacks).
+    - Situations where every available thread, including the caller, should contribute.
+    - Agent-like thread orchestration where execution follows intention, not enforcement.
+    - Systems requiring dynamic, graceful thread participation under pressure.
+    - Existing thread pools that need extra throughput for dealing with spikes in demand.
 
-    This system is ideal for intelligent runtime environments where threads behave as first-class citizens,
-    capable of negotiating workload distribution rather than merely pushing tasks into queues.
+    🧵 Philosophy:
+    --------------
+    Threads are not subordinates—they are peers in a dynamic execution model.
+    AgenticPool empowers them to negotiate, respond, and collaborate under load.
+
+    🧩 Integration Note:
+    --------------------
+    AgenticPool is a foundational component of the larger `MainPool` architecture,
+    but it can also be used independently for standalone agentic threading needs.
     """
     def __init__(self, max_workers: int, min_workers: int = 1):
         super().__init__()
         self.max_workers = max_workers
         self.min_workers = min_workers
-        self.worker_pool: ConcurrentList['DynamicWorker'] = ConcurrentList()
+        self.worker_pool: ConcurrentList['AgenticWorker'] = ConcurrentList()
         self.task_queue = Queue()
         self.lock = threading.Lock()
 
@@ -125,7 +135,7 @@ class AgenticPool(IDisposable):
         Creates workers and starts them.
         """
         for worker_id in range(len(self.worker_pool), len(self.worker_pool) + num_workers):
-            worker = DynamicWorker()
+            worker = AgenticWorker()
             self.worker_pool.append(worker)
             worker.start()
 
