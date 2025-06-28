@@ -1,10 +1,9 @@
 import threading
 import time
 from typing import Optional, Union, Iterable, Any, Callable
-from thread_factory.concurrency import ConcurrentList
+from thread_factory import ConcurrentSet
 from thread_factory.utils import IDisposable
-from thread_factory.primitives.smart_condition import SmartCondition
-
+from thread_factory.primitives import SmartCondition
 
 class SwitchLock(IDisposable):
     """
@@ -72,7 +71,7 @@ class SwitchLock(IDisposable):
 
         self._cond: SmartCondition = SmartCondition()
         self._value: int = value  # Current count of available permits
-        self._log_ids: ConcurrentList[str] = ConcurrentList() # Stores unique identifiers of threads that attempted to acquire the lock
+        self._log_ids: ConcurrentSet[str] = ConcurrentSet() # Stores unique identifiers of threads that attempted to acquire the lock
         self._bias_threshold: Optional[int] = bias_threshold
         self._pending_permits: int = 0  # buffered until bias flush
 
@@ -272,8 +271,6 @@ class SwitchLock(IDisposable):
                 awaited_caller=awaited_caller
             )
 
-
-
     def bypass_bias(self) -> None:
         """
         Force-flush any buffered permits and wake everyone.
@@ -304,7 +301,7 @@ class SwitchLock(IDisposable):
 
         this_id = self._cond._ensure_factory_id()
         if this_id not in self._log_ids:
-            self._log_ids.append(this_id)
+            self._log_ids.add(this_id)
 
         endtime = None if timeout is None else time.time() + timeout
 
@@ -406,7 +403,6 @@ class SwitchLock(IDisposable):
             else:  # bias ON
                 self._attempt_bias_flush(n, factory_ids)
 
-
     def notify_all(self, factory_ids: Optional[Union[str, Iterable[str]]] = None,
                    awaited_caller: bool = False, callback: Optional[Callable[[], None]] = None) -> None:
         """
@@ -449,7 +445,6 @@ class SwitchLock(IDisposable):
                 )
             else:
                 self._attempt_bias_flush_all(factory_ids, awaited_caller, callback)  # <── added
-
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):
         """
@@ -573,4 +568,3 @@ class SwitchLock(IDisposable):
         if self._disposed or self._cond is None:
             return []
         return self._cond.get_all_waiting_factory_ids()
-
