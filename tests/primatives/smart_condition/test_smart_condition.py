@@ -1051,17 +1051,14 @@ class TestSmartConditionFactoryIdTheory(unittest.TestCase):
         self.cond = SmartCondition()
 
     def test_ensure_factory_id_on_main_thread(self):
-        initial_main_factory_id = getattr(threading.current_thread(), 'factory_id', None)
-        try:
-            fid = self.cond._ensure_factory_id()
-            self.assertEqual(fid, "MainThread", "MainThread factory_id should be 'MainThread'")
-            self.assertEqual(threading.current_thread().factory_id, "MainThread",
-                             "MainThread's thread object should have 'MainThread' factory_id")
-        finally:
-            if initial_main_factory_id is not None:
-                threading.current_thread().factory_id = initial_main_factory_id
-            elif hasattr(threading.current_thread(), 'factory_id'):
-                del threading.current_thread().factory_id
+        current = threading.current_thread()
+        if hasattr(current, "factory_id"):
+            del current.factory_id  # 🚨 Clear it so _ensure_factory_id can do its job
+
+        fid = self.cond._ensure_factory_id()
+        self.assertEqual(fid, "MainThread", "MainThread factory_id should be 'MainThread'")
+        self.assertEqual(current.factory_id, "MainThread",
+                         "MainThread's thread object should have 'MainThread' factory_id")
 
     def test_ensure_factory_id_on_thread_with_predefined_id(self):
         expected_fid = "pre-assigned-ulid-123456789012345"

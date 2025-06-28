@@ -6,6 +6,7 @@ DEBUG_MODE = True
 import sys
 import warnings
 from thread_factory.__version__ import __version__ as version
+from thread_factory.__author__ import __author__ as author
 
 # 🚫 Exit if Python version is less than 3.13
 if sys.version_info < (3, 13):
@@ -57,7 +58,8 @@ __all__ = primatives_all + concurrency_all + [
     "Empty",
     "Stopwatch",
     "AutoResetTimer",
-    "__version__"
+    "__version__",
+    "__author__",
 ]
 
 def _detect_nogil_mode() -> None:

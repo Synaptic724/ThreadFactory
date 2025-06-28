@@ -2,54 +2,71 @@ from abc import ABC, abstractmethod
 
 class IDisposable(ABC):
     """
+    IDisposable
+    -----------
     Abstract base class for all disposable objects in the system.
 
-    Usage:
-        Any object that holds runtime, memory, open resources, or registration
-        within ThreadFactory must implement this.
+    Objects that manage runtime, memory, open resources, or registration
+    within ThreadFactory must implement this interface.
 
-        Automatically supports context-manager usage:
-            with MyObject(...) as obj:
-                ...
-            # dispose() is called automatically on exit.
+    Supports context-manager usage:
+        with MyObject(...) as obj:
+            ...
+        # dispose() is called automatically on exit.
 
-    Implementations MUST:
-        - Provide a `dispose()` method.
-        - Register all their cleanups inside `dispose()`.
-        - Optionally provide a `cleanup()` alias.
-        - Handle multiple calls to `dispose()` gracefully.
+    Contract:
+    ---------
+    - `dispose()` must be safe to call multiple times.
+    - `cleanup()` is a semantic alias (not required but encouraged).
+    - All disposables must set `_disposed = True` when disposal completes.
     """
-    __slots__ = ['_disposed']
+
+    __slots__ = ['_disposed',]
+
     def __init__(self):
-        """
-        Constructor for IDisposable.
-        This is a no-op, but can be overridden by subclasses if needed.
-        """
         self._disposed = False
 
     @property
-    def disposed(self):
-        """
-        Check if the object has been disposed.
-        Returns:
-            bool: True if disposed, False otherwise.
-        """
+    def disposed(self) -> bool:
+        """Returns True if the object has already been disposed."""
         return self._disposed
 
     @property
     def is_disposed(self) -> bool:
-        """Indicates whether the object has been disposed."""
+        """Alias for `disposed`."""
         return self._disposed
+
+    def __enter__(self):
+        """Enable usage with `with` statements."""
+        if self._disposed:
+            raise RuntimeError(f"{self.__class__.__name__} has already been disposed.")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Ensure disposal on context exit."""
+        self.dispose()
+
+    def __del__(self):
+        """Best-effort safety: try to dispose on garbage collection."""
+        try:
+            self.dispose()
+        except Exception:
+            # Never throw in __del__
+            pass
 
     @abstractmethod
     def dispose(self):
         """
         Dispose must be implemented by subclasses.
-        It MUST:
-            - Release all allocated resources.
-            - Kill or join all running runtime.
-            - Deregister itself from any supervisors or orchestrators.
-            - Clear any persistent state to avoid memory leakage.
-            - Be idempotent (safe to call multiple times).
+
+        Must:
+        -----
+        - Release all resources.
+        - Deregister or finalize any allocations.
+        - Be idempotent (safe to call multiple times).
         """
-        raise NotImplementedError
+        raise NotImplementedError("Subclasses must implement dispose().")
+
+    def cleanup(self):
+        """Optional semantic alias for `dispose()`."""
+        self.dispose()

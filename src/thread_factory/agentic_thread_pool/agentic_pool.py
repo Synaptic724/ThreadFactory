@@ -1,26 +1,49 @@
-import threading
-from queue import Queue
 from typing import Callable, Optional
+import threading
 from ulid import ULID
-from thread_factory.concurrency import ConcurrentList
+from thread_factory.concurrency import ConcurrentSet, ConcurrentQueue, ConcurrentList
 from thread_factory.agentic_thread_pool import AgenticWorker
 from thread_factory.primitives.switchlock import SwitchLock
 from thread_factory.utils.interfaces.disposable import IDisposable
 
+
 class _AgenticPoolContainer(IDisposable):
     def __init__(self):
         super().__init__()
+        self._lock = threading.RLock()
         self._switch_lock = SwitchLock(0)
         self._active = False
-        self._registered_threads = ConcurrentList[ULID]()
-        self._unregistered_threads = ConcurrentList[ULID]() # We need to incorporate unregistered threads into the system. #TODO: Implement unregistered threads handling
+
+        self._registered_threads = ConcurrentSet[ULID]()      # Threads currently looping
+        self._unregistered_threads = ConcurrentSet[ULID]()    # Threads marked for shutdown externally
         self._unregister_thread_check = False
-        self._unregister_lock = threading.RLock()
+
+    def dispose(self):
+        """
+        Cleans up the container by unregistering all threads.
+        """
+        if self._disposed:
+            return
+        with self._lock:
+            if self._disposed:
+                return
+            self._disposed = True
+            self._unregistered_threads = self._registered_threads
+            self._unregister_thread_check = True
+            self._switch_lock.notify_all()
+            self._switch_lock.dispose()
+            self._active = False
+            self._registered_threads.dispose()
+            self._unregistered_threads.dispose()
+            self._unregister_thread_check = False
 
     def _container(self):
         """
-        A container for managing dynamic threads.
+        Thread participation container for managing agentic threads.
+        Handles registration, lifecycle tracking, and graceful unregistration.
         """
+        if self._disposed:
+            raise RuntimeError("Container has been disposed and cannot be used.")
         self._check_thread()
         self._register_thread()
 
@@ -28,54 +51,63 @@ class _AgenticPoolContainer(IDisposable):
             with self._switch_lock:
                 pass
 
+            # Check if the current thread is marked for unregistration
             if self._unregister_thread_check:
-                if self._return_if_unregistered:
+                if self._should_exit():
+                    self._finalize_unregistration()
                     return
 
     def _check_thread(self) -> None:
         """
-        Checks if a thread is registered in the container.
+        Validates that the current thread is an AgenticWorker.
         """
         current_thread = threading.current_thread()
         if not isinstance(current_thread, AgenticWorker):
-            raise TypeError("Current thread must be an instance of DynamicWorker")
+            raise TypeError("Current thread must be an instance of AgenticWorker")
 
     def _register_thread(self):
         """
-        Adds a thread to the container and increments the thread count.
+        Adds current thread to the registered thread set.
         """
-        with self._switch_lock:
+        thread_id = self._get_thread_id()
+        with self._lock:
             if not self._active:
                 self._active = True
-            id = threading.current_thread().factory_id
-            # Check if the thread is already registered
-            if id in self._registered_threads:
+            if thread_id in self._registered_threads:
                 return
-            self._registered_threads.append(id)
+            self._registered_threads.add(thread_id)
 
-    def _return_if_unregistered(self):
+    def _get_thread_id(self) -> ULID:
+        """Returns the current thread's factory ID."""
+        return threading.current_thread().factory_id
+
+    def _should_exit(self) -> bool:
         """
-        Checks if the current thread is unregistered and sets the flag to unregister.
+        Returns True if current thread is in the externally marked unregistration set.
         """
-        with self._unregister_lock:
-            if threading.current_thread().factory_id not in self._registered_threads:
-                self._unregister_thread_check = True
-                return True
-        return False
+        thread_id = self._get_thread_id()
+        return thread_id in self._unregistered_threads
+
+    def _finalize_unregistration(self):
+        """
+        Cleanly unregisters the current thread.
+        """
+        thread_id = self._get_thread_id()
+        self._registered_threads.discard(thread_id)
+
+        if len(self._registered_threads) == 0:
+            self._active = False
+        if len(self._unregistered_threads) == 0:
+            self._unregister_thread_check = False
 
     def _unregister_thread(self, thread_id: ULID):
         """
-        Removes a thread from the container and decrements the thread count.
+        Flags a thread to exit its container loop on next SwitchLock cycle.
         """
-        with self._switch_lock:
-            if not self._active:
-                return
-            # Check if the thread is registered
-            if thread_id not in self._registered_threads:
-                return
-            self._registered_threads.remove(thread_id)
-            if len(self._registered_threads) == 0:
-                self._active = False
+        self._unregistered_threads.add(thread_id)
+
+        with self._lock:
+            self._unregister_thread_check = True
 
 class AgenticPool(IDisposable):
     """
@@ -124,7 +156,7 @@ class AgenticPool(IDisposable):
         self.max_workers = max_workers
         self.min_workers = min_workers
         self.worker_pool: ConcurrentList['AgenticWorker'] = ConcurrentList()
-        self.task_queue = Queue()
+        self.task_queue = ConcurrentQueue()
         self.lock = threading.Lock()
 
         # Initially create workers up to min_workers

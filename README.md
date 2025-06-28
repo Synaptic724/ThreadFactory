@@ -41,7 +41,7 @@ Every ⭐ star shows there's a need for **GIL-free, scalable concurrency** in Py
 Thank you for helping make that vision real ❤️
 
 > You can also [open an issue](https://github.com/Synaptic724/ThreadFactory/issues) or [start a discussion](https://github.com/Synaptic724/ThreadFactory/discussions) — I’d love to hear how you're using ThreadFactory or what you'd like to see next!
-
+> If you really love my work please connect with me on [LinkedIn](https://www.linkedin.com/in/mark-geleta/) and feel free to chat with me there. (p.s I'm super busy coding so I may not respond right away, but I will try to get back to you as soon as I can!)
 ---
 
 ## 🚀 Features

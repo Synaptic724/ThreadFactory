@@ -4,7 +4,7 @@ import threading
 from datetime import datetime
 from thread_factory.runtime import WorkerState
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus
-from thread_factory.agentic_thread_pool.dynamic_worker.agentic_worker import AgenticWorker
+from thread_factory.agentic_thread_pool.agentic_worker.agentic_worker import AgenticWorker
 from thread_factory.agentic_thread_pool.help_request.help_request import HelpRequest
 from ulid import ULID
 
@@ -91,7 +91,7 @@ class TestDynamicWorker(unittest.TestCase):
         """Test the string representation of the worker."""
         self.worker.state = WorkerState.STARTING
         repr_str = repr(self.worker)
-        self.assertIn("DynamicWorker", repr_str)
+        self.assertIn("AgenticWorker", repr_str)
         self.assertIn("worker1", repr_str)
         self.assertIn("STARTING", repr_str)
 
