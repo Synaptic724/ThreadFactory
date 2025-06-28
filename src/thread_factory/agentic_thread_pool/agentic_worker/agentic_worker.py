@@ -17,10 +17,9 @@ class AgenticWorker(Worker):
         super().__init__(*args, **kwargs)
 
         # Initialize the dynamic worker specific attributes
-        self._wake_event = threading.Event()
         self.save_points: dict[str, Callable[[], None]] = {}
         self.locations: dict[str, Callable[[], None]] = {}
-        self._event_loop: Optional[Callable[[], None]] = None
+        self._event_loop: Optional[Callable[[], None]] = None # Usually the pool location
         self._value_work: HelpRequest | None = None  # Work Associated with this worker
         self._worker_type = "agentic"  # Type of worker, can be used for identification
 
@@ -135,13 +134,6 @@ class AgenticWorker(Worker):
             raise RuntimeError(f"[Worker {self.factory_id}] No home() set before thread start.")
         self._event_loop()  # The worker will always call the home method
         self.death_event.set()  # Notify that the thread has completed
-
-    def stop(self):
-        """
-        Gracefully stop the worker.
-        """
-        self.shutdown_flag.set()
-        self._wake_event.set()
 
     def dispose(self):
         """

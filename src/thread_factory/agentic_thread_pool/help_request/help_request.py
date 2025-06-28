@@ -67,7 +67,7 @@ class HelpRequest(IDisposable):
     threads operate as autonomous responders to distributed work requests.
     """
 
-    def __init__(self, task_id: str, work_callable: Callable):
+    def __init__(self, work_callable: Callable):
         """
         Initialize a new HelpRequest instance with a unique task ID and a callable to execute the work.
 
@@ -85,7 +85,6 @@ class HelpRequest(IDisposable):
             - `_disposed`: Flag to indicate whether the object has been disposed of to prevent further interaction.
         """
         super().__init__()
-        self.task_id = task_id
         self._work_state = WorkStatus.PENDING  # Initial state is pending
         self._lock = threading.RLock()  # Thread-safe locking for state changes
 
@@ -332,7 +331,7 @@ class HelpRequest(IDisposable):
 
         # Execute the provided callable (do the work) without the lock so it can be done concurrently
         try:
-            self._work_callable(self)  # Perform the work
+            self._work_callable()  # Perform the work
             # Lock again to mark completion
             with self._lock:
                 self.mark_completed()
@@ -369,31 +368,31 @@ class HelpRequest(IDisposable):
         a factory ID set.
         """
         if self._work_callable is None or not callable(self._work_callable):
-            raise RuntimeError(f"[HelpRequest] {self.task_id} has not been disposed.")
-
+            raise RuntimeError(f"[HelpRequest] {self.task_id} does not have a valid callable.")
 
     def bind_value_work(self) -> None:
         """
-        Wraps a user-provided callable for task execution.
+        Executes the bound work callable for dynamic threads.
 
-        This method allows a callable to be wrapped so that when it's executed, it receives the `HelpRequest`
-        instance as an argument. This ensures that the lifecycle management (e.g., in-progress, completed)
-        is properly handled through the `acquire_work()` method.
-
-        Args:
-            original_callable (Callable[['HelpRequest'], None]): The callable that will perform the task.
-
-        Returns:
-            Callable[['HelpRequest'], None]: A wrapped version of the original callable that manages lifecycle state.
+        Binds this HelpRequest instance to the current dynamic thread and executes the
+        associated callable, tracking factory ID and ensuring failure reporting.
         """
-        if self._work_state in [WorkStatus.COMPLETED, WorkStatus.CANCELLED, WorkStatus.FAILED] or self._disposed or self._return_to_pool == True:
+        if self._work_state in (WorkStatus.COMPLETED, WorkStatus.CANCELLED, WorkStatus.FAILED):
+            return
+        if self._disposed or self._return_to_pool:
             return
         thread = threading.current_thread()
         if not hasattr(thread, '_worker_type'):
-            raise RuntimeError("Thread does not have a factory_id set. Ensure the thread is properly initialized.")
-        if thread._worker_type == "dynamic":
-            thread._value_work = self  # Set the HelpRequest instance on the thread for dynamic workers
-            try:
-                self._work_callable()
-            except Exception as e:
-                self.mark_failed()
+            raise RuntimeError("Thread is not properly initialized as an AgenticWorker.")
+        if thread._worker_type != "agentic":
+            return  # This is only for dynamic threads
+        thread._value_work = self
+        if not callable(self._work_callable):
+            raise RuntimeError("No callable has been assigned to this HelpRequest.")
+        try:
+            self.record.add_factory_id(thread._factory_id)
+            self._work_callable()
+        except Exception as e:
+            self.mark_failed()
+            # Optionally: print or log for debug mode
+            # print(f"[HelpRequest] Task {self.task_id} failed with: {e}")

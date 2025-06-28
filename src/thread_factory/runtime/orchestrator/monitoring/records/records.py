@@ -1,8 +1,12 @@
 import datetime
+import threading
 from dataclasses import dataclass
 from enum import auto, Enum
 import ulid
+
+from thread_factory import ConcurrentDict
 from thread_factory.concurrency import ConcurrentList
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 
 class WorkStatus(Enum):
@@ -19,7 +23,6 @@ class WorkStatus(Enum):
     CANCELLED = auto()
     FAILED = auto()
 
-
 @dataclass
 class Record:
     """
@@ -30,14 +33,39 @@ class Record:
     task_id: ulid.ULID
     status: WorkStatus
     timestamp_creation_time: datetime.datetime
+    factory_id: ConcurrentList[ulid.ULID] | ulid.ULID = None
     timestamp_execution_time: datetime.datetime = None
     timestamp_completion_time: datetime.datetime = None
 
     def __repr__(self):
         return f"<Record task_id={self.task_id} timestamp={self.timestamp_completion_time}>"
 
+    def add_factory_id(self, factory_id: ulid.ULID):
+        """
+        Registers the factory ID of a thread that worked on this task.
+        Promotes the field to a ConcurrentList if needed.
+        """
+        if factory_id is None:
+            raise ValueError("factory_id must not be None")
 
-class Records:
+        if self.factory_id is None:
+            self.factory_id = factory_id
+            return
+
+        if isinstance(self.factory_id, ConcurrentList):
+            if factory_id in self.factory_id:
+                raise ValueError("factory_id already exists in the ConcurrentList")
+            self.factory_id.append(factory_id)
+
+        elif isinstance(self.factory_id, ulid.ULID):
+            if factory_id != self.factory_id:
+                self.factory_id = ConcurrentList([self.factory_id, factory_id])
+
+        else:
+            raise TypeError("factory_id must be a ULID or a ConcurrentList of ULIDs")
+
+
+class Records(IDisposable):
     """
     Tracks ULID records of completed work.
 
@@ -45,11 +73,24 @@ class Records:
     """
 
     def __init__(self):
-        self.records: ConcurrentList[Record] = ConcurrentList()
+        super().__init__()
+        self._lock = threading.RLock()
+        self.records: ConcurrentDict[ulid.ULID, Record] = ConcurrentDict()
+
+    def dispose(self):
+        """Cleans up the records."""
+        if self._disposed:
+            return
+        with self._lock:
+            if self._disposed:
+                return
+            self._disposed = True
+            self.records.dispose()
+            self.records = None
 
     def add(self, record: Record):
         """Appends a ULID for a completed task."""
-        self.records.append(record)
+        self.records[record.task_id] = record
 
     def __repr__(self):
         return f"<Records count={len(self.records)}>"

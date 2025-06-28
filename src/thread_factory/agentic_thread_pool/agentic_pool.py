@@ -1,26 +1,62 @@
 from typing import Callable, Optional
 import threading
 from ulid import ULID
-from thread_factory.concurrency import ConcurrentSet, ConcurrentQueue, ConcurrentList
+from thread_factory.concurrency import ConcurrentSet, ConcurrentQueue, ConcurrentList, ConcurrentDict
 from thread_factory.agentic_thread_pool import AgenticWorker
 from thread_factory.primitives.switchlock import SwitchLock
 from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.runtime.orchestrator.monitoring.records.records import Record, WorkStatus, Records
 
 
 class _AgenticPoolContainer(IDisposable):
-    def __init__(self):
-        super().__init__()
-        self._lock = threading.RLock()
-        self._switch_lock = SwitchLock(0)
-        self._active = False
+    """
+    _AgenticPoolContainer
+    ---------------------
+    Internal coordination structure for managing a set of AgenticWorker threads.
 
-        self._registered_threads = ConcurrentSet[ULID]()      # Threads currently looping
-        self._unregistered_threads = ConcurrentSet[ULID]()    # Threads marked for shutdown externally
-        self._unregister_thread_check = False
+    It ensures:
+    - Thread registration (with optional record tracking)
+    - Thread unregistration upon disposal
+    - Smart signaling and wake-up via SwitchLock
+    - Optional callback-based notifications
+    - Controlled shutdown with unregister state cleanup
+
+    This pool is intended for internal orchestration of dynamic, agentic threads
+    that behave like living actors in a system.
+    """
+
+    def __init__(self, ignore_tracking: bool = False):
+        """
+        Initializes the container.
+
+        Args:
+            ignore_tracking (bool): If True, no Records will be tracked per-thread.
+                                    Instead, threads are tracked using only a ULID set.
+        """
+        super().__init__()
+        self._lock = threading.RLock()  # Internal lock for safe concurrent modifications
+        self._switch_lock = SwitchLock(0)  # Smart semaphore-like switch used for synchronization
+        self._active = False  # Flag to indicate whether the container is active
+        self._ignore_tracking = ignore_tracking  # Whether to store tracking Records or not
+
+        # Track threads either as a simple set (if no tracking) or as a dict mapping to Records
+        if ignore_tracking:
+            self._registered_threads: ConcurrentSet[ULID] | ConcurrentDict[ULID, Records] = ConcurrentSet[ULID]()
+        else:
+            self._registered_threads: ConcurrentSet[ULID] | ConcurrentDict[ULID, Records] = ConcurrentDict[
+                ULID, Records]()
+
+        self._unregistered_threads = ConcurrentSet[ULID]()  # Tracks which threads have been requested to unregister
+        self._unregister_thread_check = False  # Flag to indicate if any threads should unregister
 
     def dispose(self):
         """
-        Cleans up the container by unregistering all threads.
+        Disposes of the container and signals all waiting threads to exit.
+
+        This will:
+        - Transfer all current thread IDs to the unregister list
+        - Notify all waiting threads to allow them to exit
+        - Dispose of all internal state and clear tracking registries
         """
         if self._disposed:
             return
@@ -28,38 +64,69 @@ class _AgenticPoolContainer(IDisposable):
             if self._disposed:
                 return
             self._disposed = True
-            self._unregistered_threads = self._registered_threads
+
+            # Prepare unregistration set based on tracking strategy
+            if self._ignore_tracking:
+                self._unregistered_threads = self._registered_threads
+            else:
+                self._unregistered_threads = ConcurrentSet(self._registered_threads.keys())
+
             self._unregister_thread_check = True
-            self._switch_lock.notify_all()
-            self._switch_lock.dispose()
-            self._active = False
-            self._registered_threads.dispose()
-            self._unregistered_threads.dispose()
+            self._switch_lock.notify_all()  # Wake all threads
+            self._switch_lock.dispose()  # Dispose of the switch lock
+            self._active = False  # Mark container inactive
+            self._registered_threads.dispose()  # Dispose of registry
+            self._unregistered_threads.dispose()  # Dispose of unregistration list
             self._unregister_thread_check = False
 
     def _container(self):
         """
-        Thread participation container for managing agentic threads.
-        Handles registration, lifecycle tracking, and graceful unregistration.
+        Main entrypoint for worker participation in this pool.
+
+        Threads calling this will:
+        - Register themselves
+        - Wait until a notify is received
+        - Exit gracefully if they're marked for unregistration
         """
         if self._disposed:
             raise RuntimeError("Container has been disposed and cannot be used.")
-        self._check_thread()
-        self._register_thread()
+        self._check_thread()  # Validate the thread is an AgenticWorker
+        self._register_thread()  # Add thread to the pool registry
 
         while self._active:
             with self._switch_lock:
-                pass
+                pass  # Thread will block here until notified
 
-            # Check if the current thread is marked for unregistration
-            if self._unregister_thread_check:
-                if self._should_exit():
-                    self._finalize_unregistration()
-                    return
+            if not self._ignore_tracking:
+                self.attach_record()
+
+            if self._unregister_thread_check and self._should_exit():
+                self._finalize_unregistration()
+                return
+
+    def attach_record(self) -> None:
+        """
+        Attaches the current thread's `ValueWork` (if present) to its associated `Records` entry
+        in the agentic pool, assuming tracking is enabled.
+
+        Raises:
+            RuntimeError: If the current thread is not registered in the container.
+        """
+        thread_id = self._get_thread_id()  # Get the unique thread identifier
+
+        # Try to fetch the current ValueWork task from the thread
+        if value_work := getattr(threading.current_thread(), "_value_work", None):
+            # Ensure this thread is registered before assigning work
+            if thread_id not in self._registered_threads:
+                raise RuntimeError("Thread is not registered in the AgenticPoolContainer.")
+
+            # Attach the task into the record structure
+            records = self._registered_threads.get(thread_id)
+            records[value_work.task_id] = value_work
 
     def _check_thread(self) -> None:
         """
-        Validates that the current thread is an AgenticWorker.
+        Ensures the calling thread is a valid AgenticWorker.
         """
         current_thread = threading.current_thread()
         if not isinstance(current_thread, AgenticWorker):
@@ -67,47 +134,107 @@ class _AgenticPoolContainer(IDisposable):
 
     def _register_thread(self):
         """
-        Adds current thread to the registered thread set.
+        Registers the current thread in the container.
+
+        Depending on `ignore_tracking`, either adds to a set or creates a Records entry.
         """
         thread_id = self._get_thread_id()
         with self._lock:
             if not self._active:
                 self._active = True
-            if thread_id in self._registered_threads:
-                return
-            self._registered_threads.add(thread_id)
+            if self._ignore_tracking:
+                self._registered_threads.add(thread_id)
+            else:
+                if thread_id not in self._registered_threads:
+                    self._registered_threads[thread_id] = Records()
 
     def _get_thread_id(self) -> ULID:
-        """Returns the current thread's factory ID."""
+        """
+        Returns the current thread's factory_id (ULID), which uniquely identifies it.
+
+        Returns:
+            ULID: The factory_id for the calling thread.
+        """
         return threading.current_thread().factory_id
 
     def _should_exit(self) -> bool:
         """
-        Returns True if current thread is in the externally marked unregistration set.
+        Determines whether the current thread is marked for unregistration.
+
+        Returns:
+            bool: True if the thread should unregister and exit.
         """
-        thread_id = self._get_thread_id()
-        return thread_id in self._unregistered_threads
+        return self._get_thread_id() in self._unregistered_threads
 
     def _finalize_unregistration(self):
         """
-        Cleanly unregisters the current thread.
+        Final cleanup for a thread that is leaving the container.
+        Disposes its tracking record and removes it from the active registry.
         """
         thread_id = self._get_thread_id()
-        self._registered_threads.discard(thread_id)
+        if not self._ignore_tracking:
+            if records := self._registered_threads.get(thread_id):
+                records.dispose()
+        if self._ignore_tracking:
+            self._registered_threads.discard(thread_id)
+        else:
+            self._registered_threads.pop(thread_id, None)
 
+        # If the registry is now empty, mark inactive
         if len(self._registered_threads) == 0:
             self._active = False
+        # If no more threads left to unregister, unset the check flag
         if len(self._unregistered_threads) == 0:
             self._unregister_thread_check = False
 
     def _unregister_thread(self, thread_id: ULID):
         """
-        Flags a thread to exit its container loop on next SwitchLock cycle.
+        Marks a thread for unregistration and notifies it if it's waiting.
+
+        Args:
+            thread_id (ULID): The ID of the thread to unregister.
         """
         self._unregistered_threads.add(thread_id)
-
         with self._lock:
             self._unregister_thread_check = True
+
+        # If thread is currently waiting on switch lock, wake it up
+        if thread_id in self._switch_lock._cond._waiters:
+            self._switch_lock.notify(factory_ids=[thread_id], awaited_caller=False)
+
+    def _change_bias(self, bias: int):
+        """
+        Adjusts the bias threshold of the SwitchLock.
+
+        Args:
+            bias (int): New bias threshold value.
+        """
+        self._switch_lock.set_bias_threshold(bias)
+
+    def _notify_callable(self, worker_count: int, work_request: Callable):
+        """
+        Notifies up to `worker_count` threads with a callable to execute.
+
+        The awakened threads will execute the callable themselves.
+
+        Args:
+            worker_count (int): Number of threads to wake.
+            work_request (Callable): The callable to be passed to each thread.
+        """
+        self._switch_lock.notify(n=worker_count, awaited_caller=True, callback=work_request)
+
+    def _notify_priority_callable(self, worker_count: int, work_request: Callable):
+        """
+        Notifies threads by bypassing the SwitchLock's bias logic.
+
+        This ensures all targeted threads are woken up immediately.
+
+        Args:
+            worker_count (int): Number of threads to wake.
+            work_request (Callable): The callable to pass to awakened threads.
+        """
+        self._switch_lock.bypass_bias_and_notify(n=worker_count, awaited_caller=True, callback=work_request)
+
 
 class AgenticPool(IDisposable):
     """
