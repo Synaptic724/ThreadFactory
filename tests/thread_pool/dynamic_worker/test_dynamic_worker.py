@@ -4,8 +4,8 @@ import threading
 from datetime import datetime
 from thread_factory.runtime import WorkerState
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus
-from thread_factory.dynamic_thread_pool.worker.dynamic_worker import DynamicWorker
-from thread_factory.dynamic_thread_pool.help_request.help_request import ValueWork
+from thread_factory.dynamic_thread_pool.dynamic_worker.dynamic_worker import DynamicWorker
+from thread_factory.dynamic_thread_pool.help_request.help_request import HelpRequest
 from ulid import ULID
 
 
@@ -15,7 +15,7 @@ class TestDynamicWorker(unittest.TestCase):
         """Set up before each test."""
         # Initialize DynamicWorker with the factory_id explicitly defined
         self.worker = DynamicWorker(factory_id="worker1", factory=None)
-        self.mock_value_work = Mock(spec=ValueWork)
+        self.mock_value_work = Mock(spec=HelpRequest)
 
         # Mock the record attribute and its getter method to return it
         self.mock_value_work.record = Mock()

@@ -5,10 +5,10 @@ import ulid
 import ctypes
 import time
 from typing import Callable, Any, Union, Optional
-from thread_factory.concurrency import ConcurrentQueue, Empty, ConcurrentList
-from thread_factory.utils import IDisposable # Assumed to raise NotImplementedError for dispose()
+from thread_factory.concurrency import ConcurrentQueue, ConcurrentList
+from thread_factory.utils import IDisposable, Empty
 from thread_factory.runtime.orchestrator.monitoring.records.records import Records, Record, WorkStatus
-from thread_factory.runtime.factory.operations.work.work import Work # Assumed to be the corrected version
+from thread_factory.runtime.factory.operations.work.work import Work
 
 class WorkerState(Enum):
     """

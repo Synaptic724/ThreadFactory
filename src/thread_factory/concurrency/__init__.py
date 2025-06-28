@@ -7,7 +7,6 @@ from thread_factory.concurrency.concurrent_stack import ConcurrentStack
 from thread_factory.concurrency.concurrent_buffer import ConcurrentBuffer
 from thread_factory.concurrency.concurrent_collection import ConcurrentCollection
 from thread_factory.concurrency.concurrent_set import ConcurrentSet
-from thread_factory.utils import Empty
 
 __all__ = [
     "ConcurrentBag",
@@ -18,6 +17,5 @@ __all__ = [
     "ConcurrentStack",
     "ConcurrentBuffer",
     "ConcurrentCollection",
-    "ConcurrentSet",
-    "Empty"
+    "ConcurrentSet"
 ]
