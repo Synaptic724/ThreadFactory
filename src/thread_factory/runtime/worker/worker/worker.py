@@ -199,31 +199,22 @@ class Worker(threading.Thread, IDisposable):
         Checks if a new hour has elapsed since the last hourly metric reset.
         Also, removes records older than an hour to keep the data manageable.
         """
-        # Get the current time
         current_time = datetime.now()
-
-        # Calculate how many hours have passed since the last reset
         hours_elapsed = (current_time - self._last_hourly_reset).total_seconds() / 3600.0
 
         self._send_records_to_factory()
 
-        # Clean up records older than 1 hour from self.records.records
-        self.records.records = ConcurrentList([record for record in self.records.records if
-                                               (current_time - record.timestamp_creation_time).total_seconds() < 3600])
+        # Clean up records older than 1 hour from self.records.records (now a dict)
+        self.records.records = {
+            k: v for k, v in self.records.records.items()
+            if (current_time - v.timestamp_creation_time).total_seconds() < 3600
+        }
 
         while hours_elapsed >= 1.0:
-            # Append the current units per minute to the hourly record (using ConcurrentList)
             self.units_per_hour.append(self.units_per_minute)
-
-            # Instead of resetting immediately, accumulate the work for the next hour
             self.units_per_minute = 0
-
-            # Update the last reset time
             self._last_hourly_reset += timedelta(hours=1)
-
-            # Recalculate the hours elapsed to account for the new reset
             hours_elapsed -= 1.0
-
 
     def _send_records_to_factory(self):
         """
