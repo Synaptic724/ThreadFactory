@@ -119,6 +119,42 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertEqual(results[:2], ["before-1", "before-2"])
         self.assertCountEqual(results[2:], ["after-1", "after-2"])
 
+    def test_is_spent_returns_true_after_threshold_met_and_not_reusable(self):
+        sema = ThresholdSemaphore(threshold=2, reusable=False)
+        t1 = threading.Thread(target=sema.wait)
+        t2 = threading.Thread(target=sema.wait)
+
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        self.assertTrue(sema.is_spent())
+
+    def test_is_spent_returns_false_if_not_triggered(self):
+        sema = ThresholdSemaphore(threshold=3, reusable=False)
+
+        def slow_wait():
+            sema.wait(timeout=0.2)  # Let it timeout
+
+        t1 = threading.Thread(target=slow_wait)
+        t1.start()
+        t1.join()
+
+        self.assertFalse(sema.is_spent())
+
+    def test_is_spent_returns_false_if_reusable(self):
+        sema = ThresholdSemaphore(threshold=2, reusable=True)
+        t1 = threading.Thread(target=sema.wait)
+        t2 = threading.Thread(target=sema.wait)
+
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        self.assertFalse(sema.is_spent())  # Because it resets automatically
+
     def test_error_if_threshold_reached_but_not_reusable(self):
         barrier = ThresholdSemaphore(threshold=2, reusable=False)
         result = []

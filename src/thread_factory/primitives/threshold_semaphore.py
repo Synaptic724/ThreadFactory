@@ -2,7 +2,6 @@ import threading
 from typing import Optional, Callable
 from thread_factory.utils import IDisposable
 
-
 class ThresholdSemaphore(IDisposable):
     """
     ThresholdSemaphore
@@ -41,6 +40,14 @@ class ThresholdSemaphore(IDisposable):
         self._disposed = True
         with self._condition:
             self._condition.notify_all()
+
+    def is_spent(self) -> bool:
+        """
+        Returns:
+            bool: True if the threshold has already been reached and this semaphore
+            is no longer reusable (i.e., it's 'spent').
+        """
+        return self._released and not self._reusable
 
     def notify_all_override(self) -> None:
         """
