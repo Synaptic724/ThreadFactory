@@ -1,11 +1,11 @@
 import threading
 from typing import Callable, Any, Union, Optional
 from thread_factory.runtime import Worker, WorkerState
-from thread_factory.agent_thread_pool.help_request.help_request import HelpRequest
+from thread_factory.dynamic_thread_pool.help_request.help_request import HelpRequest
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 
 
-class AgenticWorker(Worker):
+class DynamicWorker(Worker):
     """
     AgenticWorker class enhances the base Worker class by supporting agentic execution
     with dynamic behaviors and external task handling. This worker is suited for use
@@ -21,7 +21,7 @@ class AgenticWorker(Worker):
         self.locations: dict[str, Callable[[], None]] = {}
         self._event_loop: Optional[Callable[[], None]] = None # Usually the pool location
         self._value_work: HelpRequest | None = None  # Work Associated with this worker
-        self._worker_type = "agentic"  # Type of worker, can be used for identification
+        self._worker_type = "dynamic"  # Type of worker, can be used for identification
 
     # State-mutation wrappers
     def set_work_state(self, new_state: WorkStatus):

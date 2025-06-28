@@ -382,7 +382,7 @@ class HelpRequest(IDisposable):
         thread = threading.current_thread()
         if not hasattr(thread, '_worker_type'):
             raise RuntimeError("Thread is not properly initialized as an AgenticWorker.")
-        if thread._worker_type != "agentic":
+        if thread._worker_type != "dynamic":
             return  # This is only for dynamic threads
         thread._value_work = self
         if not callable(self._work_callable):

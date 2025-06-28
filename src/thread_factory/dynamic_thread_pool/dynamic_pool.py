@@ -2,15 +2,15 @@ from typing import Callable, Optional
 import threading
 from ulid import ULID
 from thread_factory.concurrency import ConcurrentSet, ConcurrentQueue, ConcurrentList, ConcurrentDict
-from thread_factory.agent_thread_pool import AgenticWorker
+from thread_factory.dynamic_thread_pool import DynamicWorker
 from thread_factory.primitives.switchlock import SwitchLock
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.runtime.orchestrator.monitoring.records.records import Record, WorkStatus, Records
 
 
-class _AgentPoolContainer(IDisposable):
+class _DynamicPoolContainer(IDisposable):
     """
-    _AgenticPoolContainer
+    _DynamicPoolContainer
     ---------------------
     Internal coordination structure for managing a set of AgenticWorker threads.
 
@@ -129,7 +129,7 @@ class _AgentPoolContainer(IDisposable):
         Ensures the calling thread is a valid AgenticWorker.
         """
         current_thread = threading.current_thread()
-        if not isinstance(current_thread, AgenticWorker):
+        if not isinstance(current_thread, DynamicWorker):
             raise TypeError("Current thread must be an instance of AgenticWorker")
 
     def _register_thread(self):
@@ -236,13 +236,13 @@ class _AgentPoolContainer(IDisposable):
         self._switch_lock.bypass_bias_and_notify(n=worker_count, awaited_caller=True, callback=work_request)
 
 
-class AgentPool(IDisposable):
+class DynamicPool(IDisposable):
     """
-    AgenticPool
+    DynamicPool
     -----------
     A cooperative thread assistance system based on agentic execution principles.
 
-    Unlike traditional thread pools that offload tasks into queues, AgenticPool enables
+    Unlike traditional thread pools that offload tasks into queues, DynamicPool enables
     the calling thread to immediately begin executing work while optionally requesting
     help from agentic workers via `HelpRequest` contracts.
 
@@ -271,18 +271,18 @@ class AgentPool(IDisposable):
     🧵 Philosophy:
     --------------
     Threads are not subordinates—they are peers in a dynamic execution model.
-    AgenticPool empowers them to negotiate, respond, and collaborate under load.
+    DynamicPool empowers them to negotiate, respond, and collaborate under load.
 
     🧩 Integration Note:
     --------------------
-    AgenticPool is a foundational component of the larger `MainPool` architecture,
+    DynamicPool is a foundational component of the larger `MainPool` architecture,
     but it can also be used independently for standalone agentic threading needs.
     """
     def __init__(self, max_workers: int, min_workers: int = 1):
         super().__init__()
         self.max_workers = max_workers
         self.min_workers = min_workers
-        self.worker_pool: ConcurrentList['AgenticWorker'] = ConcurrentList()
+        self.worker_pool: ConcurrentList['DynamicWorker'] = ConcurrentList()
         self.task_queue = ConcurrentQueue()
         self.lock = threading.Lock()
 
@@ -294,7 +294,7 @@ class AgentPool(IDisposable):
         Creates workers and starts them.
         """
         for worker_id in range(len(self.worker_pool), len(self.worker_pool) + num_workers):
-            worker = AgenticWorker()
+            worker = DynamicWorker()
             self.worker_pool.append(worker)
             worker.start()
 
