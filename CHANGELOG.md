@@ -8,7 +8,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.2.9] - 2025-06-26
+## [1.3.0] - 2025-06-26
 
 # 🚀 ThreadFactory Changelog – Massive Concurrency Upgrade
 
@@ -41,6 +41,18 @@ Ideal for:
 - Systems where load fluctuates and **concurrency must flex**
 
 🧠 Just change the number of active permits — **no restart required**.
+
+---
+
+### 🎯 `ThresholdSemaphore` — *Group Activation Barrier*
+
+A reusable **threshold gate** that blocks threads until a required number arrive with optional callable execution.
+Ideal for:
+- Thread group synchronization  
+- Step-based orchestration  
+- Batched execution coordination  
+
+🧠 All threads are released **only when the threshold is met** — with optional reuse for cyclic control.
 
 ---
 
