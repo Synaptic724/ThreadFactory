@@ -4,8 +4,8 @@ import threading
 from datetime import datetime
 from thread_factory.runtime import WorkerState
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus
-from thread_factory.dynamic_thread_pool.dynamic_worker.dynamic_worker import DynamicWorker
-from thread_factory.dynamic_thread_pool.help_request.help_request import HelpRequest
+from thread_factory.agentic_thread_pool.dynamic_worker.agentic_worker import AgenticWorker
+from thread_factory.agentic_thread_pool.help_request.help_request import HelpRequest
 from ulid import ULID
 
 
@@ -14,7 +14,7 @@ class TestDynamicWorker(unittest.TestCase):
     def setUp(self):
         """Set up before each test."""
         # Initialize DynamicWorker with the factory_id explicitly defined
-        self.worker = DynamicWorker(factory_id="worker1", factory=None)
+        self.worker = AgenticWorker(factory_id="worker1", factory=None)
         self.mock_value_work = Mock(spec=HelpRequest)
 
         # Mock the record attribute and its getter method to return it
@@ -201,7 +201,7 @@ class TestDynamicWorker(unittest.TestCase):
 
         # Create and start multiple workers in threads
         for i in range(num_workers):
-            worker = DynamicWorker(factory_id=f"worker_{i}", factory=None)
+            worker = AgenticWorker(factory_id=f"worker_{i}", factory=None)
             worker.set_home(Mock())
             thread = threading.Thread(target=worker.run)
             thread.start()

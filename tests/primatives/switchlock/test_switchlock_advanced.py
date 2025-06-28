@@ -16,13 +16,13 @@ import unittest
 from contextlib import ExitStack
 
 from thread_factory.primitives import SwitchLock
-from thread_factory.dynamic_thread_pool.dynamic_worker.dynamic_worker import DynamicWorker
+from thread_factory.agentic_thread_pool.dynamic_worker.agentic_worker import AgenticWorker
 
 
 # --------------------------------------------------------------------------- #
 #  Tiny compatibility layer                                                   #
 # --------------------------------------------------------------------------- #
-class Worker(DynamicWorker):
+class Worker(AgenticWorker):
     """
     Fire-and-forget wrapper: run target once, then stop().
     """

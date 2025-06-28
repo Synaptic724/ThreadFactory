@@ -1,13 +1,13 @@
 import threading
 from typing import Callable, Any, Union, Optional
 from thread_factory.runtime import Worker, WorkerState
-from thread_factory.dynamic_thread_pool.help_request.help_request import HelpRequest
+from thread_factory.agentic_thread_pool.help_request.help_request import HelpRequest
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 
 
-class DynamicWorker(Worker):
+class AgenticWorker(Worker):
     """
-    DynamicWorker class enhances the base Worker class by supporting agentic execution
+    AgenticWorker class enhances the base Worker class by supporting agentic execution
     with dynamic behaviors and external task handling. This worker is suited for use
     in systems that require long-lived threads that respond to signals and change
     behavior dynamically.
@@ -22,7 +22,7 @@ class DynamicWorker(Worker):
         self.locations: dict[str, Callable[[], None]] = {}
         self._event_loop: Optional[Callable[[], None]] = None
         self._value_work: HelpRequest | None = None  # Work Associated with this worker
-        self._worker_type = "dynamic"  # Type of worker, can be used for identification
+        self._worker_type = "agentic"  # Type of worker, can be used for identification
 
     # State-mutation wrappers
     def set_work_state(self, new_state: WorkStatus):
@@ -172,6 +172,6 @@ class DynamicWorker(Worker):
 
     def __repr__(self):
         """
-        String representation for debugging/logging, reflecting dynamic behavior.
+        String representation for debugging/logging, reflecting agentic behavior.
         """
-        return f"<DynamicWorker id={self.factory_id} state={self.state.name}>"
+        return f"<AgenticWorker id={self.factory_id} state={self.state.name}>"

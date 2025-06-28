@@ -20,13 +20,13 @@ from time import perf_counter
 from typing import Iterable, Union, Optional, Callable
 
 from thread_factory.primitives import SwitchLock
-from thread_factory.dynamic_thread_pool.dynamic_worker.dynamic_worker import DynamicWorker
+from thread_factory.agentic_thread_pool.dynamic_worker.agentic_worker import AgenticWorker
 
 
 # --------------------------------------------------------------------------- #
 #  Tiny Worker wrapper (fire-and-forget)                                      #
 # --------------------------------------------------------------------------- #
-class Worker(DynamicWorker):
+class Worker(AgenticWorker):
     def __init__(self, *, target=None, args=(), kwargs=None, name=None):
         super().__init__(name=name)
         self._target = target

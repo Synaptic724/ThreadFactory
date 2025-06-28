@@ -4,7 +4,7 @@ from datetime import datetime
 from unittest.mock import Mock
 from ulid import ULID
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
-from thread_factory.dynamic_thread_pool.help_request.help_request import HelpRequest
+from thread_factory.agentic_thread_pool.help_request.help_request import HelpRequest
 
 class TestValueWork(unittest.TestCase):
 

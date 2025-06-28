@@ -9,13 +9,13 @@ import ulid
 import unittest
 import random
 from thread_factory.primitives import SwitchLock
-from thread_factory.dynamic_thread_pool.dynamic_worker.dynamic_worker import DynamicWorker
+from thread_factory.agentic_thread_pool.dynamic_worker.agentic_worker import AgenticWorker
 
 
 # --------------------------------------------------------------------------- #
 #  Tiny compatibility layer                                                   #
 # --------------------------------------------------------------------------- #
-class Worker(DynamicWorker):
+class Worker(AgenticWorker):
     """
     A one-shot façade around DynamicWorker so the legacy tests that expect a
     simple `Worker(target=…, args=…, kwargs=…)` continue to work unchanged.

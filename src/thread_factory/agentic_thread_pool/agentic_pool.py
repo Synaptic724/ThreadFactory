@@ -3,11 +3,11 @@ from queue import Queue
 from typing import Callable, Optional
 from ulid import ULID
 from thread_factory.concurrency import ConcurrentList
-from thread_factory.dynamic_thread_pool import DynamicWorker
+from thread_factory.agentic_thread_pool import AgenticWorker
 from thread_factory.primitives.switchlock import SwitchLock
 from thread_factory.utils.interfaces.disposable import IDisposable
 
-class _DynamicPoolContainer(IDisposable):
+class _AgenticPoolContainer(IDisposable):
     def __init__(self):
         super().__init__()
         self._switch_lock = SwitchLock(0)
@@ -37,7 +37,7 @@ class _DynamicPoolContainer(IDisposable):
         Checks if a thread is registered in the container.
         """
         current_thread = threading.current_thread()
-        if not isinstance(current_thread, DynamicWorker):
+        if not isinstance(current_thread, AgenticWorker):
             raise TypeError("Current thread must be an instance of DynamicWorker")
 
     def _register_thread(self):
@@ -78,7 +78,37 @@ class _DynamicPoolContainer(IDisposable):
                 self._active = False
 
 # Dynapool class to manage the pool of workers and tasks
-class DynamicPool(IDisposable):
+class AgenticPool(IDisposable):
+    """
+    AgenticPool
+    -----------
+    A cooperative thread assistance system built on agentic execution principles.
+
+    This pool enables threads to *request* help via `HelpRequest` objects instead of offloading
+    tasks blindly. The calling thread remains the owner of the task and is responsible for managing
+    its lifecycle, regardless of whether agentic threads respond.
+
+    Philosophy:
+    -----------
+    • Threads do not delegate work — they summon assistance.
+    • Agents (DynamicWorkers) respond voluntarily to `HelpRequest` contracts.
+    • Help may arrive now, later, or not at all — the system supports all outcomes.
+
+    Features:
+    ---------
+    • Backpressure-aware: Threads can block, proceed solo, or monitor for later execution.
+    • Lifecycle-transparent: Every request has a complete record of its journey.
+    • Agentic coordination: Workers act independently, honoring contract states and returning to the pool.
+
+    Use Cases:
+    ----------
+    - Distributed execution with fallback to local thread completion.
+    - Agent-style threading where cooperation replaces strict task scheduling.
+    - Adaptive concurrency models that favor intent over delegation.
+
+    This system is ideal for intelligent runtime environments where threads behave as first-class citizens,
+    capable of negotiating workload distribution rather than merely pushing tasks into queues.
+    """
     def __init__(self, max_workers: int, min_workers: int = 1):
         super().__init__()
         self.max_workers = max_workers
