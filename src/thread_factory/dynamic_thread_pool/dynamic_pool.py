@@ -4,7 +4,7 @@ from typing import Callable, Optional
 from ulid import ULID
 from thread_factory.concurrency import ConcurrentList
 from thread_factory.dynamic_thread_pool import DynamicWorker
-from thread_factory.primatives.switchlock import SwitchLock
+from thread_factory.primitives.switchlock import SwitchLock
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 class _DynamicPoolContainer(IDisposable):

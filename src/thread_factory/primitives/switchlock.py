@@ -3,7 +3,7 @@ import time
 from typing import Optional, Union, Iterable, Any, Callable
 from thread_factory.concurrency import ConcurrentList
 from thread_factory.utils import IDisposable
-from thread_factory.primatives.smart_condition import SmartCondition
+from thread_factory.primitives.smart_condition import SmartCondition
 
 
 class SwitchLock(IDisposable):

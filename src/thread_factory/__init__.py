@@ -29,7 +29,7 @@ from thread_factory.concurrency import __all__ as concurrency_all
 from thread_factory.utils import Empty, Stopwatch, AutoResetTimer
 
 # ---- Runtime Primitives ----
-from thread_factory.primatives import __all__ as primatives_all
+from thread_factory.primitives import __all__ as primatives_all
 
 # ---- Operations ----
 from thread_factory.runtime.factory.operations import (
