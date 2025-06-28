@@ -1,14 +1,14 @@
 # ThreadFactory
 
 [![PyPI version](https://badge.fury.io/py/threadfactory.svg)](https://badge.fury.io/py/threadfactory)
-[![License](https://img.shields.io/github/license/Synaptic724/threadfactory)](https://github.com/Synaptic724/ThreadFactory/blob/production/LICENSE)
+[![License](https://img.shields.io/github/license/Synaptic724/threadfactory)](https://github.com/Synaptic724/threadfactory/blob/production/LICENSE)
 [![Python Version](https://img.shields.io/pypi/pyversions/threadfactory)](https://pypi.org/project/threadfactory)
 
 [![PyPI Downloads](https://static.pepy.tech/badge/threadfactory/month)](https://pepy.tech/projects/threadfactory)
 [![PyPI Downloads](https://static.pepy.tech/badge/threadfactory/week)](https://pepy.tech/projects/threadfactory)
 [![PyPI Downloads](https://static.pepy.tech/badge/threadfactory)](https://pepy.tech/projects/threadfactory)
 
-[![Upload Python Package](https://github.com/Synaptic724/ThreadFactory/actions/workflows/python-publish.yml/badge.svg)](https://github.com/Synaptic724/ThreadFactory/actions/workflows/python-publish.yml)
+[![Upload Python Package](https://github.com/Synaptic724/ThreadFactory/actions/workflows/python-publish.yml/badge.svg)](https://github.com/Synaptic724/threadfactory/actions/workflows/python-publish.yml)
 [![Docs](https://readthedocs.org/projects/threadfactory/badge/?version=latest)](https://threadfactory.readthedocs.io/en/latest/)
 
 
@@ -23,14 +23,14 @@ High-performance **thread-safe** (No-GIL–friendly) data structures and paralle
 
 Please see the benchmarks at the bottom of this page and if you are interested there are more in the repository.  
 
-[Repository Benchmarks 🚀](https://github.com/Synaptic724/ThreadFactory/blob/production/benchmarks/benchmark_data/general_benchmarks.md)  
+[Repository Benchmarks 🚀](https://github.com/Synaptic724/threadfactory/blob/production/benchmarks/benchmark_data/general_benchmarks.md)  
 [Jump to Benchmarks Below🔥](#-benchmark-results-10000000-ops--10-producers--10-consumers)
 
 ---
 
 ## 🌟 Support the Project
 
-If you find **ThreadFactory** useful, **please consider [starring the repository](https://github.com/Synaptic724/ThreadFactory/)** and **watching it for updates** 🔔!
+If you find **ThreadFactory** useful, **please consider [starring the repository](https://github.com/Synaptic724/threadfactory/)** and **watching it for updates** 🔔!
 
 Your support helps:
 - Grow awareness 🧠  
@@ -40,7 +40,7 @@ Your support helps:
 Every ⭐ star shows there's a need for **GIL-free, scalable concurrency** in Python.  
 Thank you for helping make that vision real ❤️
 
-> You can also [open an issue](https://github.com/Synaptic724/ThreadFactory/issues) or [start a discussion](https://github.com/Synaptic724/ThreadFactory/discussions) — I’d love to hear how you're using ThreadFactory or what you'd like to see next!
+> You can also [open an issue](https://github.com/Synaptic724/ThreadFactory/issues) or [start a discussion](https://github.com/Synaptic724/threadfactory/discussions) — I’d love to hear how you're using ThreadFactory or what you'd like to see next!
 > If you really love my work please connect with me on [LinkedIn](https://www.linkedin.com/in/mark-geleta/) and feel free to chat with me there. (p.s I'm super busy coding so I may not respond right away, but I will try to get back to you as soon as I can!)
 ---
 
@@ -276,7 +276,7 @@ Threadfactory is coming soon...
 ---
 
 > All benchmark tests below are available if you clone the library and run the tests.  
-> See the [Benchmark Details 🚀](https://github.com/Synaptic724/ThreadFactory/blob/production/benchmarks/benchmark_data/general_benchmarks.md) for more benchmark stats.
+> See the [Benchmark Details 🚀](https://github.com/Synaptic724/threadfactory/blob/production/benchmarks/benchmark_data/general_benchmarks.md) for more benchmark stats.
 
 ## 🔥 Benchmark Results (10,000,000 ops — 10 producers / 10 consumers)
 
