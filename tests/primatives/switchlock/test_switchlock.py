@@ -7,13 +7,13 @@ import threading
 import time
 import unittest
 from thread_factory.primitives import SwitchLock
-from thread_factory.dynamic_thread_pool.dynamic_worker import AgenticWorker
+from thread_factory.dynamic_thread_pool.dynamic_worker import DynamicWorker
 
 
 # --------------------------------------------------------------------------- #
 #  Tiny compatibility layer                                                   #
 # --------------------------------------------------------------------------- #
-class Worker(AgenticWorker):
+class Worker(DynamicWorker):
     """
     A one-shot façade around DynamicWorker so the legacy tests that expect a
     simple `Worker(target=…, args=…, kwargs=…)` continue to work unchanged.

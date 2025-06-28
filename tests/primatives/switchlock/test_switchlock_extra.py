@@ -19,13 +19,13 @@ import unittest
 from time import perf_counter
 
 from thread_factory.primitives import SwitchLock
-from thread_factory.dynamic_thread_pool.dynamic_worker import AgenticWorker
+from thread_factory.dynamic_thread_pool.dynamic_worker import DynamicWorker
 
 
 # --------------------------------------------------------------------------- #
 #  Tiny Worker wrapper (fire-and-forget)                                      #
 # --------------------------------------------------------------------------- #
-class Worker(AgenticWorker):
+class Worker(DynamicWorker):
     def __init__(self, *, target=None, args=(), kwargs=None, name=None):
         super().__init__(name=name)
         self._target = target

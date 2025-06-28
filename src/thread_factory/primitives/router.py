@@ -1,7 +1,6 @@
 import threading
 import time
 from typing import List, Optional, Callable
-from thread_factory.primitives.router import RoutedGroup, RouterMode, RouterExitMode, SyncPolicy
 from thread_factory.primitives.threshold_semaphore import ThresholdSemaphore
 
 class Router:
