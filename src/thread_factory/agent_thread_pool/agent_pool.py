@@ -2,13 +2,13 @@ from typing import Callable, Optional
 import threading
 from ulid import ULID
 from thread_factory.concurrency import ConcurrentSet, ConcurrentQueue, ConcurrentList, ConcurrentDict
-from thread_factory.agentic_thread_pool import AgenticWorker
+from thread_factory.agent_thread_pool import AgenticWorker
 from thread_factory.primitives.switchlock import SwitchLock
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.runtime.orchestrator.monitoring.records.records import Record, WorkStatus, Records
 
 
-class _AgenticPoolContainer(IDisposable):
+class _AgentPoolContainer(IDisposable):
     """
     _AgenticPoolContainer
     ---------------------
@@ -236,7 +236,7 @@ class _AgenticPoolContainer(IDisposable):
         self._switch_lock.bypass_bias_and_notify(n=worker_count, awaited_caller=True, callback=work_request)
 
 
-class AgenticPool(IDisposable):
+class AgentPool(IDisposable):
     """
     AgenticPool
     -----------

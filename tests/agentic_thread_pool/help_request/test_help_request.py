@@ -6,7 +6,7 @@ from ulid import ULID
 
 from thread_factory import ConcurrentList, ConcurrentSet
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
-from thread_factory.agentic_thread_pool.help_request.help_request import HelpRequest
+from thread_factory.agent_thread_pool.help_request.help_request import HelpRequest
 
 
 class TestValueWork(unittest.TestCase):

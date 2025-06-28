@@ -20,7 +20,7 @@ from time import perf_counter
 from typing import Iterable, Union, Optional, Callable
 
 from thread_factory.primitives import SwitchLock
-from thread_factory.agentic_thread_pool.agentic_worker.agentic_worker import AgenticWorker
+from thread_factory.agent_thread_pool.agentic_worker.agentic_worker import AgenticWorker
 
 
 # --------------------------------------------------------------------------- #
