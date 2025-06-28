@@ -1,22 +1,117 @@
-class DynamicCoordinator:
+from typing import Callable, Optional
+import threading
+from typing import Callable, Optional, List
+from thread_factory.utils import IDisposable
+from thread_factory.primitives.threshold_semaphore import ThresholdSemaphore
+
+
+class DynamicCoordinator(IDisposable):
     """
     DynamicCoordinator
-    ----------------
-    A thread participation engine where YOUR thread becomes part of the execution.
+    ------------------
+    A coordination primitive for dynamic thread groups.
 
-    Every thread that submits work is also expected to contribute — making the system cooperative, not delegate-driven.
-    Similar to an executor but with a focus on active participation rather than passive waiting.
+    The calling thread *participates* as a worker.
 
-    This design enables advanced thread participation strategies, optimal CPU utilization, and
-    encourages agentic thread behavior where your thread is not idle, but actively collaborating.
+    Threads join the coordinator via `run()`, which blocks until enough threads
+    have arrived to meet the required `group_size`. Once the group is complete,
+    the provided `callable` is executed by all participating threads (including the caller).
 
-    Typical usage: coordination of logic where multiple threads rendezvous, share execution responsibility,
-    or take turns handling distributed work pools. You would spawn a thread before using this class or use it with your main thread.
+    Behavior:
+    - Requires at least `group_size` threads to proceed.
+    - If `strict=True`, throws if not enough threads are available.
+    - If `strict=False`, allows partial groups and ensures initiator thread still runs the task.
 
-    It does not work with asyncio coroutines or async/await patterns, as it is designed for traditional threading models.
+    Parameters:
+        group_size (int): Required number of threads.
+        fn (Callable): The task to be executed by all participants.
+        strict (bool): Whether to enforce exact group count (default: True).
 
-    This object is designed for novice programmers who want to understand how to coordinate threads in a cooperative manner.
-    It is not intended for advanced users who are familiar with threading concepts and patterns however using it can
-    streamline development by providing a simple interface for thread coordination.
+    Example::
+
+        def group_task():
+            print(f"Thread running in group: {threading.current_thread().name}")
+
+        coordinator = DynamicCoordinator(group_size=3, fn=group_task, strict=True)
+
+        # Assume you have a pool, you'd do something like:
+        for _ in range(2):
+            pool.submit(coordinator.run)
+
+        # And then the initiating thread calls:
+        coordinator.run()
     """
-    pass
+
+    def __init__(self, group_size: int, fn: Callable, strict: bool = True):
+        if group_size <= 0:
+            raise ValueError("group_size must be positive")
+
+        super().__init__()
+        self.group_size = group_size
+        self.fn = fn
+        self.strict = strict
+
+        self._lock = threading.Lock()
+        self._barrier = ThresholdSemaphore(threshold=group_size, reusable=False, callback=self._trigger_execution)
+        self._execution_ready = threading.Event()
+        self._exceptions: List[BaseException] = []
+
+    def _trigger_execution(self):
+        """Called once threshold is met; sets event to release waiting threads."""
+        self._execution_ready.set()
+
+    def run(self):
+        """
+        Join the group and execute the shared task once the group is formed.
+        The calling thread is part of the execution group.
+        """
+        if self._disposed:
+            raise RuntimeError("Coordinator has been disposed.")
+
+        released = self._barrier.wait()
+
+        if not released:
+            if self.strict:
+                raise RuntimeError(f"DynamicCoordinator failed to form required group of {self.group_size}.")
+            # Soft mode: just execute alone
+            try:
+                self.fn()
+            except BaseException as e:
+                with self._lock:
+                    self._exceptions.append(e)
+            return
+
+        # Wait for signal
+        self._execution_ready.wait()
+
+        # Execute shared task
+        try:
+            self.fn()
+        except BaseException as e:
+            with self._lock:
+                self._exceptions.append(e)
+
+    def get_exceptions(self) -> List[BaseException]:
+        """Returns any exceptions encountered by group members."""
+        with self._lock:
+            return list(self._exceptions)
+
+    def dispose(self):
+        if self._disposed:
+            return
+        self._disposed = True
+        self._barrier.dispose()
+        self._execution_ready.set()
+
+class GroupPlan:
+    def __init__(
+        self,
+        required: int,
+        task: Callable,
+        synchronized: bool = True,         # Must get all N or throw
+        allow_partial: bool = False,       # Try with fewer if needed
+        fallback_fn: Optional[Callable] = None,  # Alternative work plan
+        strict: bool = True,               # Whether to throw or ignore
+        metadata: Optional[dict] = None,   # For tracing/debug/logging
+    ):
+        pass

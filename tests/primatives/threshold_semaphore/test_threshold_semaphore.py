@@ -180,6 +180,116 @@ class TestThresholdSemaphore(unittest.TestCase):
         t3.join()
 
         self.assertEqual(result[0], False)
+    def test_manual_release_blocks_until_called(self):
+        barrier = ThresholdSemaphore(threshold=3, manual_release=True)
+        released = []
+
+        def worker(i):
+            barrier.wait()
+            released.append(i)
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(3)]
+        for t in threads:
+            t.start()
+
+        # Threads should be waiting
+        time.sleep(0.1)
+        self.assertEqual(len(released), 0)
+
+        # Manual release
+        barrier.release()
+
+        for t in threads:
+            t.join()
+
+        self.assertCountEqual(released, [0, 1, 2])
+
+    def test_manual_release_with_reusable_true(self):
+        barrier = ThresholdSemaphore(threshold=2, reusable=True, manual_release=True)
+        results = []
+
+        def worker(i):
+            for _ in range(2):
+                barrier.wait()
+                results.append(i)
+
+        t1 = threading.Thread(target=worker, args=(1,))
+        t2 = threading.Thread(target=worker, args=(2,))
+
+        t1.start()
+        t2.start()
+
+        time.sleep(0.1)
+        barrier.release()  # Round 1
+        time.sleep(0.1)
+        barrier.release()  # Round 2
+
+        t1.join()
+        t2.join()
+
+        self.assertEqual(len(results), 4)
+
+    def test_release_does_nothing_if_threshold_not_met(self):
+        barrier = ThresholdSemaphore(threshold=3, manual_release=True)
+        result = []
+
+        def worker():
+            result.append(barrier.wait(timeout=0.3))
+
+        threads = [threading.Thread(target=worker) for _ in range(2)]
+        for t in threads:
+            t.start()
+
+        time.sleep(0.1)
+        barrier.release()  # Should NOT release anything
+
+        for t in threads:
+            t.join()
+
+        self.assertEqual(result, [False, False])
+
+    def test_callback_fires_only_once_on_manual_release(self):
+        called = {"count": 0}
+
+        def cb():
+            called["count"] += 1
+
+        barrier = ThresholdSemaphore(threshold=2, manual_release=True, callback=cb)
+
+        threads = [
+            threading.Thread(target=barrier.wait)
+            for _ in range(2)
+        ]
+        for t in threads:
+            t.start()
+
+        time.sleep(0.1)
+        barrier.release()
+
+        for t in threads:
+            t.join()
+
+        self.assertEqual(called["count"], 1)
+
+    def test_notify_all_override_respects_manual_mode(self):
+        barrier = ThresholdSemaphore(threshold=4, manual_release=True)
+        results = []
+
+        def worker(i):
+            out = barrier.wait()
+            results.append(i)
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
+        for t in threads:
+            t.start()
+
+        time.sleep(0.1)
+        barrier.notify_all_override()
+
+        for t in threads:
+            t.join()
+
+        self.assertCountEqual(results, [0, 1, 2, 3])
 
     def test_callback_only_triggers_once_in_reusable_false(self):
         call_count = {"count": 0}

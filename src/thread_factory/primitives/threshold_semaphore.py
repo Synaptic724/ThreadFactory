@@ -2,6 +2,7 @@ import threading
 from typing import Optional, Callable
 from thread_factory.utils import IDisposable
 
+
 class ThresholdSemaphore(IDisposable):
     """
     ThresholdSemaphore
@@ -9,18 +10,29 @@ class ThresholdSemaphore(IDisposable):
     A reusable barrier-like semaphore that unblocks all waiting threads once
     a predefined threshold is reached.
 
+    Supports both automatic and manual release modes:
+    - Auto-release when `manual_release=False` (default).
+    - Manual control when `manual_release=True`, using `release()`.
+
     Useful for:
     - Coordinating N threads before beginning a task
     - Group-based task launches
-    - Controlling group entry points in orchestration systems
+    - Controlling execution phases
 
     Parameters:
         threshold (int): Number of threads required to trigger release.
         callback (Optional[Callable[[], None]]): Optional hook when threshold is reached.
         reusable (bool): If True, resets after triggering (default: False).
+        manual_release (bool): If True, waits after threshold until release() is called.
     """
 
-    def __init__(self, threshold: int, callback: Optional[Callable[[], None]] = None, reusable: bool = False):
+    def __init__(
+        self,
+        threshold: int,
+        callback: Optional[Callable[[], None]] = None,
+        reusable: bool = False,
+        manual_release: bool = False
+    ):
         super().__init__()
         if threshold <= 0:
             raise ValueError("Threshold must be greater than 0")
@@ -28,6 +40,7 @@ class ThresholdSemaphore(IDisposable):
         self._threshold = threshold
         self._callback = callback
         self._reusable = reusable
+        self._manual_release = manual_release
 
         self._lock = threading.Lock()
         self._condition = threading.Condition(self._lock)
@@ -67,6 +80,18 @@ class ThresholdSemaphore(IDisposable):
             self._count = 0  # Reset for reuse
             self._condition.notify_all()
 
+    def release(self) -> None:
+        """
+        Manually releases all waiting threads.
+
+        Only applicable when `manual_release=True` and threshold has already been reached.
+        """
+        with self._condition:
+            if self._disposed:
+                return
+            if self._manual_release and self._count >= self._threshold and not self._released:
+                self._released = True
+                self._condition.notify_all()
 
     def wait(self, timeout: Optional[float] = None) -> bool:
         """
@@ -84,16 +109,17 @@ class ThresholdSemaphore(IDisposable):
 
             self._count += 1
 
-            # Threshold reached: fire callback, release all
             if self._count == self._threshold:
-                self._released = True
                 if self._callback:
                     try:
                         self._callback()
-                    except Exception as e:
+                    except Exception:
                         pass
-                self._condition.notify_all()
-                return True
+
+                if not self._manual_release:
+                    self._released = True
+                    self._condition.notify_all()
+                    return True  # Current thread triggered it
 
             # Wait for release or timeout
             released = self._condition.wait_for(lambda: self._released or self._disposed, timeout=timeout)
@@ -102,4 +128,5 @@ class ThresholdSemaphore(IDisposable):
                 self._count -= 1
                 if self._count == 0:
                     self._released = False  # Reset for next round
+
             return released and not self._disposed
