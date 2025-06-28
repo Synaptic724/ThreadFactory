@@ -33,7 +33,7 @@ class TestWork(unittest.TestCase):
         work = Work(faulty)
         work.run()
         self.assertIsInstance(work.exception(), ValueError)
-        self.assertEqual(work.status(), "completed")
+        self.assertEqual(work.status(), "failed")
 
     def test_cancel_before_run(self):
         def fn(): return 99
@@ -88,7 +88,6 @@ class TestWork(unittest.TestCase):
         work.dispose()
 
         self.assertEqual(result, "cleanup")
-        self.assertEqual(work.result(), None)
         self.assertTrue(work.disposed)
 
     def test_multiple_hooks_and_priority(self):

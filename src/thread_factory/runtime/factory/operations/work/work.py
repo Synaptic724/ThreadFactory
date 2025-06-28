@@ -50,7 +50,25 @@ class Work(Future, IDisposable):
         self.pre_hooks: List[Callable[['Work', str], None]] = []
         self.post_hooks: List[Callable[['Work', str], None]] = []
 
-    # --- Overriding Future methods to synchronize Work's custom state ---
+    def dispose(self):
+        """
+        Manually clear internal references and state for this Work object.
+        This implementation does NOT call super().dispose() as per design.
+        """
+        with self._lock:
+            if self._disposed:
+                return
+            self._disposed = True  # Manually set disposed flag
+
+            # Clear resources specific to Work
+            self.fn = None
+            self.args = None
+            self.kwargs = None
+            self.metadata = None
+            self.pre_hooks.clear()
+            self.post_hooks.clear()
+            self._done_callbacks = None
+
     def set_result(self, result):
         """Set the result of the Future and update Work's custom state."""
         super().set_result(result)
@@ -108,7 +126,34 @@ class Work(Future, IDisposable):
             # The Worker's _execute_task will handle calling dispose on this Work object
             # and collecting its record once Work.run() completes.
 
-    # ... (add_done_callback, add_hook, execute_pre_hooks, execute_post_hooks as before) ...
+    def add_done_callback(self, fn: Callable[['Work'], None]):
+        """
+        Add a callback to be executed when the Work is done.
+        This callback will receive the Work instance itself.
+        """
+        if not callable(fn):
+            raise TypeError(f"Expected a callable, got type '{type(fn).__name__}' instead.")
+        super().add_done_callback(fn)
+
+    def add_hook(self, hook: Callable[['Work', str], None], phase: str):
+        """
+        Register a hook to be executed before or after the task execution.
+
+        Args:
+            hook (Callable[['Work', str], None]): The hook function to register.
+            phase (str): Either "before" for pre-execution or "after" for post-execution hooks.
+
+        Raises:
+            ValueError: If phase is not "before" or "after".
+        """
+        if not callable(hook):
+            raise TypeError(f"Expected a callable, got type '{type(hook).__name__}' instead.")
+        if phase == "before":
+            self.pre_hooks.append(hook)
+        elif phase == "after":
+            self.post_hooks.append(hook)
+        else:
+            raise ValueError("Phase must be either 'before' or 'after'.")
 
     def execute_pre_hooks(self):
         """
@@ -155,31 +200,6 @@ class Work(Future, IDisposable):
     def __enter__(self):
         """Enable Work to be used with a `with` statement."""
         return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Dispose Work automatically upon exit from context manager. (If not disposed by Worker)"""
-        if not self._disposed: # Only dispose if not already disposed by Worker
-            self.dispose()
-
-    def dispose(self):
-        """
-        Manually clear internal references and state for this Work object.
-        This implementation does NOT call super().dispose() as per design.
-        """
-        with self._lock:
-            if self._disposed:
-                return
-            self._disposed = True # Manually set disposed flag
-
-            # Clear resources specific to Work
-            self.fn = None
-            self.args = None
-            self.kwargs = None
-            self.metadata = None
-            self.pre_hooks.clear()
-            self.post_hooks.clear()
-            # Do NOT clear _done_callbacks, _result, _exception, as these are managed by Future base.
-            # IMPORTANT: Do NOT set self.record = None here. The Worker needs access to it.
 
     def __repr__(self):
         """Provide a concise summary of the Work unit's metadata and state."""
