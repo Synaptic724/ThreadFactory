@@ -44,9 +44,9 @@ class SignalCondition(IDisposable):
     Performance Tradeoff:
     - Approximately 6.4x slower than bare `RLock` due to user logic hooks, but massively safer and clearer.
     """
-    __slots__ = IDisposable.__slots__ + (
+    __slots__ = IDisposable.__slots__ + [
         "_lock", "acquire", "release", "_waiters", "_default_callback",
-    )
+    ]
     def __init__(self, lock: Optional[threading.Lock] = None):
         """
         Initialize the SignalCondition.

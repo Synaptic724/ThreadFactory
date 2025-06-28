@@ -636,25 +636,6 @@ class DirectedAcyclicWorkGraph(IDisposable):
                 # 5) current_wave = next_wave
                 current_wave = next_wave
 
-    def generate_dot_file(self, file_path):
-        """
-        Generates a .dot file representation of the DAG for visualization using tools like Graphviz.
-
-        The .dot file describes the nodes and edges of the graph in a format that can be
-        rendered into a visual diagram.
-
-        Args:
-            file_path: The path to the file where the .dot representation will be written.
-        """
-        with self._lock:  # Acquire the lock to get a copy of the edges
-            edges_copy = list(self._edges)
-
-        with open(file_path, 'w') as writer:
-            writer.write("digraph G {\n")  # Start of the .dot file content
-            for edge in edges_copy:
-                writer.write(f'    "{edge.from_node.id}" -> "{edge.to_node.id}";\n')  # Write an edge definition
-            writer.write("}\n")  # End of the .dot file content
-
     def dispose(self):
         """
         Disposes of all nodes and edges in the DAG, releasing their resources.

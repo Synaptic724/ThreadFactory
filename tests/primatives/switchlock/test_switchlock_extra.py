@@ -17,10 +17,9 @@ import threading
 import time
 import unittest
 from time import perf_counter
-from typing import Iterable, Union, Optional, Callable
 
 from thread_factory.primitives import SwitchLock
-from thread_factory.dynamic_thread_pool.dynamic_worker.dynamic_worker import AgenticWorker
+from thread_factory.dynamic_thread_pool.dynamic_worker import AgenticWorker
 
 
 # --------------------------------------------------------------------------- #

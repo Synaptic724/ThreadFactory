@@ -1,7 +1,6 @@
-import threading
-from typing import Callable, Any, Union, Optional
+from typing import Callable, Optional
 from thread_factory.runtime import Worker, WorkerState
-from thread_factory.dynamic_thread_pool.help_request.help_request import HelpRequest
+from thread_factory.dynamic_thread_pool.help_request import HelpRequest
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 
 

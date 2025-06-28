@@ -37,11 +37,11 @@ class ClockBarrier(IDisposable):
     - Thread-safe via a single internal lock.
     - Calling `dispose()` will break the barrier and wake all waiters.
     """
-    __slots__ = IDisposable.__slots__ + (
+    __slots__ = IDisposable.__slots__ + [
         "_parties", "_timeout", "_on_broken",
         "_lock", "_cond",
         "_count", "_start_time", "_broken", "_generation"
-    )
+    ]
     def __init__(
         self,
         parties: int,

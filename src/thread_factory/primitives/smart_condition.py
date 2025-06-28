@@ -59,9 +59,9 @@ class SmartCondition(IDisposable):
     with minimal overhead and clean callback integration.
     """
 
-    __slots__ = IDisposable.__slots__ + (
+    __slots__ = IDisposable.__slots__ + [
     "_lock", "acquire", "release", "_waiters", "_callback_registry", "_default_callback",
-    )
+    ]
     def __init__(self, lock: Optional[threading.Lock] = None):
         """
         Initializes the SmartCondition.

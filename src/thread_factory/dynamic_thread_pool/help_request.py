@@ -66,9 +66,9 @@ class HelpRequest(IDisposable):
     DynamicPools. It provides clarity, safety, and observability in environments where
     threads operate as autonomous responders to distributed work requests.
     """
-    __slots__ = IDisposable.__slots__ + (
+    __slots__ = IDisposable.__slots__ + [
         "_work_state", "_lock", "record", "_work_callable", "_return_to_pool",
-    )
+    ]
     def __init__(self, work_callable: Callable):
         """
         Initialize a new HelpRequest instance with a unique task ID and a callable to execute the work.

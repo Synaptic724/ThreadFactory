@@ -16,7 +16,7 @@ import unittest
 from contextlib import ExitStack
 
 from thread_factory.primitives import SwitchLock
-from thread_factory.dynamic_thread_pool.dynamic_worker.dynamic_worker import AgenticWorker
+from thread_factory.dynamic_thread_pool.dynamic_worker import AgenticWorker
 
 
 # --------------------------------------------------------------------------- #

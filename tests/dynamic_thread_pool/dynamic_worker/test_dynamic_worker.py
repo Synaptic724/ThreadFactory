@@ -1,12 +1,10 @@
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 import threading
-from datetime import datetime
 from thread_factory.runtime import WorkerState
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus
-from thread_factory.dynamic_thread_pool.dynamic_worker.dynamic_worker import DynamicWorker
-from thread_factory.dynamic_thread_pool.help_request.help_request import HelpRequest
-from ulid import ULID
+from thread_factory.dynamic_thread_pool.dynamic_worker import DynamicWorker
+from thread_factory.dynamic_thread_pool.help_request import HelpRequest
 
 
 class TestDynamicWorker(unittest.TestCase):
