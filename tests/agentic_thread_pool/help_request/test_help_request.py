@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import Mock
 from ulid import ULID
 
-from thread_factory import ConcurrentList
+from thread_factory import ConcurrentList, ConcurrentSet
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 from thread_factory.agentic_thread_pool.help_request.help_request import HelpRequest
 
@@ -134,7 +134,7 @@ class TestValueWork(unittest.TestCase):
 
         # Now, factory_id should be a ConcurrentList with 2 entries
         factory_id = help_request.record.factory_id
-        self.assertIsInstance(factory_id, ConcurrentList)
+        self.assertIsInstance(factory_id, ConcurrentSet)
         self.assertEqual(len(factory_id), 2)
 
     def test_bind_value_work_raises_without_worker_type(self):

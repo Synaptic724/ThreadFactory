@@ -5,7 +5,7 @@ from enum import auto, Enum
 import ulid
 
 from thread_factory import ConcurrentDict
-from thread_factory.concurrency import ConcurrentList
+from thread_factory.concurrency import ConcurrentSet
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 
@@ -33,7 +33,7 @@ class Record:
     task_id: ulid.ULID
     status: WorkStatus
     timestamp_creation_time: datetime.datetime
-    factory_id: ConcurrentList[ulid.ULID] | ulid.ULID = None
+    factory_id: ConcurrentSet[ulid.ULID] | ulid.ULID = None
     timestamp_execution_time: datetime.datetime = None
     timestamp_completion_time: datetime.datetime = None
 
@@ -43,26 +43,19 @@ class Record:
     def add_factory_id(self, factory_id: ulid.ULID):
         """
         Registers the factory ID of a thread that worked on this task.
-        Promotes the field to a ConcurrentList if needed.
+        Promotes the field to a ConcurrentSet if needed.
         """
-        if factory_id is None:
-            raise ValueError("factory_id must not be None")
-
         if self.factory_id is None:
             self.factory_id = factory_id
             return
 
-        if isinstance(self.factory_id, ConcurrentList):
-            if factory_id in self.factory_id:
-                raise ValueError("factory_id already exists in the ConcurrentList")
-            self.factory_id.append(factory_id)
-
+        if isinstance(self.factory_id, ConcurrentSet):
+            self.factory_id.add(factory_id)
         elif isinstance(self.factory_id, ulid.ULID):
             if factory_id != self.factory_id:
-                self.factory_id = ConcurrentList([self.factory_id, factory_id])
-
+                self.factory_id = ConcurrentSet([self.factory_id, factory_id])
         else:
-            raise TypeError("factory_id must be a ULID or a ConcurrentList of ULIDs")
+            raise TypeError("factory_id must be a ULID or a ConcurrentSet of ULIDs")
 
 
 class Records(IDisposable):

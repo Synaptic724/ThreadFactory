@@ -191,8 +191,6 @@ class HelpRequest(IDisposable):
         with self._lock:
             if self._disposed:
                 raise RuntimeError("HelpRequest object is disposed")
-            if self.record is None:
-                raise ValueError(f"[HelpRequest] {self.task_id} has no record.")
             return self.record.status  # Return the state of the record
 
     def mark_in_progress(self):
@@ -298,7 +296,7 @@ class HelpRequest(IDisposable):
         Returns:
             str: A string representation of the HelpRequest instance.
         """
-        return f"<HelpRequest task_id={self.task_id}, state={self.get_state().name}, record={self.record}>"
+        return f"<HelpRequest task_id={self.record.task_id}, state={self.get_state().name}, record={self.record}>"
 
     def get_record(self) -> Record:
         """
@@ -310,7 +308,7 @@ class HelpRequest(IDisposable):
             Record: The current record associated with the task.
         """
         if self._disposed:
-            raise RuntimeError(f"[HelpRequest] {self.task_id} has been disposed and cannot return a record.")
+            raise RuntimeError(f"[HelpRequest] {self.record.task_id} has been disposed and cannot return a record.")
         return self.record
 
     def acquire_work(self):
@@ -321,7 +319,7 @@ class HelpRequest(IDisposable):
         work callable. If the work is completed or fails, the task is marked accordingly.
         """
         if self._disposed:
-            raise ValueError(f"[HelpRequest] {self.task_id} has already been disposed.")
+            raise ValueError(f"[HelpRequest] {self.record.task_id} has already been disposed.")
 
         # Acquire lock for state-changing operations only (marking in progress, completion, failure)
         with self._lock:
@@ -350,7 +348,7 @@ class HelpRequest(IDisposable):
             return
         with self._lock:
             if self._disposed:
-                raise ValueError(f"[HelpRequest] {self.task_id} has been disposed.")
+                raise ValueError(f"[HelpRequest] {self.record.task_id} has been disposed.")
 
             # Prevent cancellation if the task is already completed
             if self._work_state == WorkStatus.COMPLETED:
@@ -368,7 +366,7 @@ class HelpRequest(IDisposable):
         a factory ID set.
         """
         if self._work_callable is None or not callable(self._work_callable):
-            raise RuntimeError(f"[HelpRequest] {self.task_id} does not have a valid callable.")
+            raise RuntimeError(f"[HelpRequest] {self.record.task_id} does not have a valid callable.")
 
     def bind_value_work(self) -> None:
         """
