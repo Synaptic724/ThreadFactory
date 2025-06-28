@@ -23,7 +23,7 @@ class WorkStatus(Enum):
     CANCELLED = auto()
     FAILED = auto()
 
-@dataclass
+@dataclass(slots=True)
 class Record:
     """
     Represents a single ULID record of completed work.
@@ -64,7 +64,7 @@ class Records(IDisposable):
 
     This object is intended to store history of executed tasks for audit/logging.
     """
-
+    __slots__ = IDisposable.__slots__ + ("_lock", "records")
     def __init__(self):
         super().__init__()
         self._lock = threading.RLock()

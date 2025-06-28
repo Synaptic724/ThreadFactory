@@ -37,7 +37,11 @@ class ClockBarrier(IDisposable):
     - Thread-safe via a single internal lock.
     - Calling `dispose()` will break the barrier and wake all waiters.
     """
-
+    __slots__ = IDisposable.__slots__ + (
+        "_parties", "_timeout", "_on_broken",
+        "_lock", "_cond",
+        "_count", "_start_time", "_broken", "_generation"
+    )
     def __init__(
         self,
         parties: int,
@@ -54,15 +58,14 @@ class ClockBarrier(IDisposable):
         self._parties = parties
         self._timeout = timeout
         self._on_broken = on_broken
-
         self._lock = threading.Lock()
         self._cond = threading.Condition(self._lock)
 
-        # Generation-specific state
-        self._count = 0                   # Number of threads currently waiting
-        self._start_time = None           # Time when the first thread arrived
-        self._broken = False              # Whether the barrier is broken
-        self._generation = 0             # Tracks successful or reset generations
+        # Internal state
+        self._count = 0
+        self._start_time = None
+        self._broken = False
+        self._generation = 0
 
     def is_broken(self) -> bool:
         """

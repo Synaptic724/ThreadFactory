@@ -42,7 +42,9 @@ class Dynaphore(threading.Semaphore, IDisposable):
         re_entrant (bool): If True (default), uses an RLock in the internal Condition.
 
     """
-
+    __slots__ = IDisposable.__slots__ + (
+        "_cond",
+    )
     def __init__(self, value: int = 1, re_entrant: bool = True):
         super().__init__(value)
         if re_entrant:

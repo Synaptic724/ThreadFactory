@@ -12,7 +12,6 @@ class DynamicWorker(Worker):
     in systems that require long-lived threads that respond to signals and change
     behavior dynamically.
     """
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

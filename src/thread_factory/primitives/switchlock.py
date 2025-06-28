@@ -54,7 +54,9 @@ class SwitchLock(IDisposable):
         ideal for controlled concurrency and thread orchestration.
 
     """
-
+    __slots__ = IDisposable.__slots__ + (
+    "_cond", "_value", "_log_ids", "_bias_threshold", "_pending_permits"
+    )
     def __init__(self, value: int = 1, bias_threshold: Optional[int] = None):
         """
         Initializes a new SwitchLock instance.

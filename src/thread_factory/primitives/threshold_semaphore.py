@@ -25,7 +25,10 @@ class ThresholdSemaphore(IDisposable):
         reusable (bool): If True, resets after triggering (default: False).
         manual_release (bool): If True, waits after threshold until release() is called.
     """
-
+    __slots__ = IDisposable.__slots__ + (
+    "_threshold", "_callback", "_reusable", "_manual_release",
+    "_lock", "_condition", "_count", "_released",
+    )
     def __init__(
         self,
         threshold: int,
