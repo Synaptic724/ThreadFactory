@@ -53,7 +53,7 @@ class Conductor(IDisposable):
 
         # MODIFICATION: Handle both a single callable and a list of callables.
         self._callback: List[Callable[[], None]] = []
-        self._results = []
+
         if callback is not None:
             if callable(callback):
                 # If a single function is passed, wrap it in a list.
