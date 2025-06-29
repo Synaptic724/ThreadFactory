@@ -299,6 +299,31 @@ class TestTransitGate1(_Base):
         self.assertEqual(self.call_count, 2)  # t3 never got in
         self.assertEqual(len(gate.outcomes()), 1)
 
+    def test_callable_with_parameters_is_bound_correctly(self):
+        def greet(name: str):
+            return self.record(f"Hi {name}!")
+
+        gate = TransitGate(func=greet, limit=1, name="Mark")
+        gate.transit()
+
+        self.assertEqual(self.call_count, 1)
+        self.assertEqual(gate.outcomes()[0].result(), "Hi Mark!")
+
+    def test_callable_with_multiple_parameters(self):
+        def add(a, b):
+            return self.record(a + b)
+
+        gate = TransitGate(func=add, limit=1, a=10, b=20)
+        gate.transit()
+
+        self.assertEqual(self.call_count, 1)
+        self.assertEqual(gate.outcomes()[0].result(), 30)
+
+
+    def test_lambda_with_bound_params(self):
+        gate = TransitGate(func=lambda: self.record(7 * 3), limit=1)
+        gate.transit()
+        self.assertEqual(gate.outcomes()[0].result(), 21)
 
 # --------------------------------------------------------------------------
 # 2. STRESS + ADVANCED

@@ -2,63 +2,59 @@ import threading
 from thread_factory.utils import IDisposable
 
 
-class Dynaphore(threading.Semaphore, IDisposable):
+class Dynaphore(IDisposable):
     """
     Dynaphore
     ---------
     A dynamic semaphore for thread coordination in high-performance environments.
 
-    This class extends Python’s standard `threading.Semaphore` with the ability to
-    dynamically scale the number of permits up or down at runtime.
+    This class replaces Python’s standard `threading.Semaphore` with a fully controlled
+    implementation that allows dynamic adjustment of available permits at runtime.
 
-    Unlike standard semaphores, Dynaphore provides:
-    - A public `Condition` object for external wait/notify signaling.
-    - Runtime-safe scaling of permits using `increase_permits()` and `decrease_permits()`.
-    - Explicit permit acquisition via `wait_for_permit()` and release via `release_permit()`.
-    - Optional use of `RLock` or plain `Lock` for re-entrant or non-reentrant access.
-
-    This class is useful for:
-    - Resource pool regulation
-    - Adaptive throttling
-    - Runtime coordination across multiple threads and systems
+    Key Features:
+    - Runtime-safe permit scaling using `increase_permits()` and `decrease_permits()`.
+    - Explicit blocking acquisition via `wait_for_permit()` with timeout support.
+    - Internal counter (_permits) is fully managed in Python, allowing zero or negative values safely.
+    - Supports external condition access via `.condition` for integration with custom coordination logic.
+    - Optional reentrant lock support for use in nested thread structures.
 
     Example:
-        ```python
-        dyn = Dynaphore(value=2)
+        >>> dyn = Dynaphore(value=2)
+        >>> dyn.decrease_permits(2)  # Prevents any permits from being acquired
+        >>> dyn.increase_permits(3)  # Now 3 available
 
         def worker():
-            if dyn.wait_for_permit():
+            if dyn.wait_for_permit(timeout=5):
                 try:
                     do_work()
                 finally:
                     dyn.release_permit()
-
-        # Add more capacity dynamically
-        dyn.increase_permits(3)
-        ```
-
-    Parameters:
-        value (int): Initial number of permits (must be >= 0).
-        re_entrant (bool): If True (default), uses an RLock in the internal Condition.
-
     """
+
     __slots__ = IDisposable.__slots__ + [
-        "_cond",
+        "_cond", "_permits"
     ]
+
     def __init__(self, value: int = 1, re_entrant: bool = True):
-        super().__init__(value)
-        IDisposable.__init__(self)
-        if re_entrant:
-            self._cond = threading.Condition()  # Uses RLock by default
-        else:
-            self._cond = threading.Condition(threading.Lock())
+        """
+        Initializes a new Dynaphore instance.
+
+        Args:
+            value (int): The initial number of available permits. Must be >= 0.
+            re_entrant (bool): If True, uses RLock for the internal Condition (default).
+        """
+        super().__init__()
+        if value < 0:
+            raise ValueError("Initial permit value must be non-negative.")
+
+        self._permits = value
+        self._cond = threading.Condition() if re_entrant else threading.Condition(threading.Lock())
 
     def dispose(self):
         """
         Cleans up the Dynaphore and notifies all waiting threads.
 
-        This method should be called when the Dynaphore is no longer needed
-        to ensure no threads remain blocked on the internal condition.
+        This should be called during shutdown to prevent deadlocks.
         """
         if self._disposed:
             return
@@ -71,84 +67,108 @@ class Dynaphore(threading.Semaphore, IDisposable):
     def condition(self) -> threading.Condition:
         """
         Returns:
-            threading.Condition: The internal condition used for thread coordination.
-
-        This allows external callers to manually wait, notify, or build complex multi-condition logic.
+            threading.Condition: The internal condition for external coordination.
         """
         return self._cond
 
     def increase_permits(self, n: int = 1) -> None:
         """
-        Increases the number of available permits and notifies waiting threads.
+        Adds additional permits to the semaphore and wakes waiting threads.
 
-        Parameters:
+        Args:
             n (int): Number of permits to add (must be >= 0).
 
         Raises:
-            ValueError: If `n` is negative.
+            ValueError: If n < 0.
         """
         if n < 0:
-            raise ValueError("Cannot increase permits by a negative value")
+            raise ValueError("Cannot increase permits by a negative value.")
 
         with self._cond:
-            self._value += n
+            self._permits += n
             for _ in range(n):
                 self._cond.notify()
 
     def decrease_permits(self, n: int = 1) -> None:
         """
-        Decreases the number of available permits.
+        Reduces the number of available permits (e.g., to pause usage).
 
-        Parameters:
-            n (int): Number of permits to remove (must be >= 0 and <= current value).
+        Args:
+            n (int): Number of permits to subtract. Must be <= current permits.
 
         Raises:
-            ValueError: If `n` is negative or exceeds available permits.
+            ValueError: If n < 0 or greater than current permit count.
         """
         if n < 0:
-            raise ValueError("Cannot decrease permits by a negative value")
+            raise ValueError("Cannot decrease permits by a negative value.")
 
         with self._cond:
-            if n > self._value:
-                raise ValueError("Cannot decrease more permits than available")
-            self._value -= n
+            if n > self._permits:
+                raise ValueError("Cannot decrease more permits than currently available.")
+            self._permits -= n
+
+    def set_permits(self, value: int):
+        """
+        Directly sets the internal permit count to a new value.
+
+        Args:
+            value (int): New permit value. Must be >= 0.
+
+        Raises:
+            ValueError: If value < 0.
+        """
+        if value < 0:
+            raise ValueError("Permit count cannot be negative.")
+
+        with self._cond:
+            delta = value - self._permits
+            self._permits = value
+            if delta > 0:
+                for _ in range(delta):
+                    self._cond.notify()
 
     def wait_for_permit(self, timeout: float = None) -> bool:
         """
-        Waits until at least one permit becomes available, then reserves it.
+        Attempts to acquire a permit, blocking if necessary.
 
-        Parameters:
-            timeout (float, optional): Max time in seconds to wait. If None, waits indefinitely.
+        Args:
+            timeout (float): Max time to wait (in seconds). None means wait forever.
 
         Returns:
             bool: True if a permit was acquired, False if timed out.
-
-        Behavior:
-            This method blocks the thread until a permit becomes available or timeout occurs.
         """
+        if self._disposed:
+            return False
+
         with self._cond:
-            result = self._cond.wait_for(lambda: self._value > 0, timeout=timeout)
-            if result:
-                self._value -= 1
-            return result
+            success = self._cond.wait_for(lambda: self._permits > 0, timeout=timeout)
+            if success:
+                self._permits -= 1
+            return success
 
-    def release_permit(self, n: int = 1):
+    def release_permit(self, n: int = 1) -> None:
         """
-        Releases one or more permits back to the pool.
+        Returns one or more permits back to the pool.
 
-        Parameters:
+        Args:
             n (int): Number of permits to release.
 
-        Behavior:
-            Delegates to `Semaphore.release()` but prints helpful diagnostics.
+        Raises:
+            ValueError: If n < 1.
         """
-        self.release(n)
+        if n < 1:
+            raise ValueError("Must release at least one permit.")
 
+        with self._cond:
+            self._permits += n
+            for _ in range(n):
+                self._cond.notify()
 
     def release_all(self):
         """
-        Releases all permits and notifies all waiting threads.
+        Wakes all threads waiting on the internal condition.
 
-        This method resets the semaphore to its initial state.
+        Note: This does *not* reset the permit count.
         """
-        self._cond.notify_all()
+        with self._cond:
+            self._cond.notify_all()

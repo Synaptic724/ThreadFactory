@@ -2,6 +2,10 @@ import inspect
 import threading
 import time
 from typing import Optional, Callable, List, Union, Any
+
+from thread_factory import Dynaphore
+from thread_factory.primitives import ClockBarrier
+from thread_factory.primitives.threshold_semaphore import ThresholdSemaphore
 from thread_factory.utils import IDisposable
 
 
@@ -103,12 +107,28 @@ class Conductor(IDisposable):
                 self.tasks.append(task)
         self.outcomes = None
         self.create_outcomes()  # Initialize outcomes for tasks
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._condition = threading.Condition(self._lock)
         self._count = 0
         self._released = False
         self._broken = False
         self._start_time = None
+        self._clock_barrier = None
+        self._threshold_semaphore = None
+        self._dynaphore = Dynaphore(self.threshold)
+        self._loop_reset_event = threading.Event()
+
+        if timeout is not None:
+            if timeout <= 0:
+                raise ValueError("Timeout must be a positive number.")
+            self._clock_barrier = ClockBarrier(
+                parties=threshold,
+                timeout=timeout,
+                on_broken=self.notify_all_override
+            )
+        else:
+            self._threshold_semaphore = ThresholdSemaphore(self.threshold, reusable=True)
+
 
     def create_outcomes(self) -> None:
         """Creates Outcome objects for each task.
@@ -134,6 +154,10 @@ class Conductor(IDisposable):
             self._broken = True
             self._released = True
             self._condition.notify_all()
+            if self._timeout is not None:
+                self._clock_barrier.reset()
+            elif self._threshold_semaphore is not None:
+                self._threshold_semaphore.reset()
 
     def reset(self):
         """Resets the conductor to its initial state for reuse.
@@ -193,74 +217,105 @@ class Conductor(IDisposable):
             self._broken = True
             self._condition.notify_all()
 
-    def wait(self, timeout: Optional[float] = None) -> bool:
-        """Blocks the calling thread until the conductor is released.
+
+    def _clock_barrier_wait(self) -> bool:
+        """Internal method to handle waiting with the ClockBarrier.
+
+        This method is used to wait for the conductor's threshold using a
+        ClockBarrier, which provides timeout functionality.
 
         Args:
             timeout (Optional[float]): A per-call timeout that can override
                 the global timeout for this specific wait.
 
         Returns:
+            bool: True if the threshold was met and tasks executed, False if
+                the wait timed out or was broken by an override.
+        """
+        if self._clock_barrier is None:
+            raise RuntimeError("ClockBarrier is not initialized. Use wait() instead.")
+        try:
+            if self._timeout:
+                return self._clock_barrier.wait()
+        except Exception as e:
+            if self._raise_on_timeout:
+                raise TimeoutError(f"Conductor wait timed out after {self._timeout}s.") from e
+            else:
+                pass
+
+    def _execute_operations(self):
+        """
+        Executes the tasks associated with the conductor once the threshold is met.
+        """
+        for i, task in enumerate(self.tasks):
+            outcome = self.outcomes[i]
+            try:
+                result = task()
+                outcome.set_result(result)
+            except Exception as e:
+                outcome.set_exception(e)
+
+        if not self.manual_release:
+            self._released = True
+            self._condition.notify_all()
+
+    def wait(self) -> bool:
+        """Blocks the calling thread until the conductor is released.
+
+        Returns:
             bool: `True` for a successful release. `False` if the wait timed
-                out, the conductor was disposed, or it was broken by an override.
+                  out, the conductor was disposed, or it was broken by an override.
 
         Raises:
-            TimeoutError: If the global `raise_on_timeout` is True and the
-                wait times out.
+            TimeoutError: If `raise_on_timeout` is True and the wait times out.
         """
-        with self._condition:
-            # Check for terminal states first.
-            if self._disposed: return False
-            if self._broken: return False
-            # If a non-reusable conductor is already released, it acts as an open latch.
-            if self._released and not self.reusable: return True
+        if self._disposed or self._broken:
+            return False
 
-            if self._start_time is None: self._start_time = time.monotonic()
+        # If already released and not reusable, it acts like an open latch.
+        if self._released and not self.reusable:
+            return True
 
+        # Register this thread as waiting
+        with self._lock:
             self._count += 1
 
-            # The thread that meets the threshold is responsible for execution.
-            if self._count == self.threshold and not self._released:
-                for i, task in enumerate(self.tasks):
-                    outcome = self.outcomes[i]
-                    try:
-                        result = task()
-                        outcome.set_result(result)
-                    except Exception as e:
-                        outcome.set_exception(e)
+        was_released = False
+        try:
+            # Wait for threshold based on config
+            if self._timeout:
+                was_released = self._clock_barrier_wait()
+            else:
+                was_released = self._threshold_semaphore.wait()
 
-                if not self.manual_release:
-                    self._released = True
-                    self._condition.notify_all()
+            # Block further entry until operation finishes
+            self._dynaphore.wait_for_permit()
 
-            # Calculate the remaining time to wait, considering the global timeout.
-            effective_timeout = timeout if timeout is not None else self._timeout
-            remaining = effective_timeout
-            if self._start_time is not None and effective_timeout is not None:
-                elapsed = time.monotonic() - self._start_time
-                remaining = max(0, effective_timeout - elapsed)
+            try:
+                # 🔧 Inject your actual execution logic here
+                self._execute_operations()
+            finally:
+                self._dynaphore.release()
+        except Exception as e:
+            was_released = False
+            if self._raise_on_timeout:
+                raise TimeoutError(f"Conductor wait timed out after {self._timeout}s.") from e
 
-            was_released = self._condition.wait_for(
-                lambda: self._released or self._disposed, timeout=remaining
-            )
-
-            # Capture the state AT THIS MOMENT, before any reset logic runs.
-            # This is the critical fix for the reusable/override race condition.
-            is_broken_on_exit = self._broken
-
-            # Handle the case where the wait ended due to timeout.
-            if not was_released and not self._disposed:
+        # If timeout or error occurred, break the barrier
+        if not was_released and not self._disposed:
+            with self._condition:
                 self._broken = True
-                self._released = True  # Release any other waiting threads.
+                self._released = True
                 self._condition.notify_all()
-                if self._raise_on_timeout:
-                    raise TimeoutError(f"Conductor wait timed out after {effective_timeout}s.")
 
-            # In reusable mode, the last thread out resets the conductor.
-            if self.reusable and self._released:
+        # Reset if reusable and last thread out
+        if self.reusable and was_released:
+            with self._lock:
                 self._count -= 1
                 if self._count == 0:
                     self.reset()
+        else:
+            with self._lock:
+                self._count -= 1
 
-            # The final return value depends on the captured "broken" state.
-            return was_released and not self._disposed and not is_broken_on_exit
+        return was_released and not self._disposed and not self._broken
