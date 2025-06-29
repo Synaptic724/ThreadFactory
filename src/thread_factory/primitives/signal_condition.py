@@ -1,4 +1,5 @@
 import threading
+import time
 from typing import Optional, Callable, Any, List
 from dataclasses import dataclass
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
@@ -47,7 +48,7 @@ class SignalCondition(IDisposable):
     __slots__ = IDisposable.__slots__ + [
         "_lock", "acquire", "release", "_waiters", "_default_callback",
     ]
-    def __init__(self, lock: Optional[threading.Lock] = None):
+    def __init__(self, lock = None):
         """
         Initialize the SignalCondition.
 
@@ -122,6 +123,51 @@ class SignalCondition(IDisposable):
             List[Waiter]: A shallow list copy of all current waiters for diagnostics.
         """
         return list(self._waiters)
+
+    def wait_for(self, predicate: Callable[[], bool], timeout: Optional[float] = None) -> bool:
+        """
+        Waits until a given `predicate` function evaluates to `True`, or until an
+        optional `timeout` occurs. The `predicate` is checked repeatedly: initially,
+        and then after each time the thread is woken from `wait()`.
+
+        The calling thread **must hold the `SmartCondition`'s internal lock (`self._lock`)**
+        when calling this method. Internally, `self.wait()` will temporarily release `self._lock`
+        while blocking, and then re-acquire it before returning.
+
+        Args:
+            predicate (Callable[[], bool]): A callable (function or method) that takes no
+                                           arguments and returns a boolean value. `wait_for`
+                                           will continue waiting as long as `predicate()` is `False`.
+                                           It is evaluated while `self._lock` is held, ensuring thread safety.
+            timeout (Optional[float]): The maximum time (in seconds) to wait for the predicate
+                                       to become true. If `None`, the thread waits indefinitely.
+
+        Returns:
+            bool: `True` if the `predicate` became `True` before the `timeout` expired,
+                  `False` otherwise (i.e., `timeout` occurred and `predicate` was still `False`).
+        """
+        # Ensure the condition's internal lock is held throughout the `wait_for` method.
+        # This is the standard pattern for condition variables: the caller holds the lock,
+        # which `self.wait()` then releases and re-acquires.
+        with self._lock:
+            endtime = time.time() + timeout if timeout is not None else None
+            while True:
+                # First, evaluate the predicate. If it's already true, we can return immediately.
+                if predicate():
+                    return True  # Predicate satisfied
+
+                # If the predicate is false, calculate the remaining time for the timeout.
+                if endtime is not None:
+                    remaining = endtime - time.time()
+                    if remaining <= 0:
+                        # If the timeout has expired, check the predicate one last time
+                        # and return its current state.
+                        return predicate()
+
+                # If the predicate is false and there's still time, wait for a notification.
+                # `self.wait()` will temporarily release `self._lock` (because it's within this `with` block)
+                # and re-acquire it when woken or after timeout.
+                self.wait(timeout=remaining if endtime else None)
 
     def wait(self, timeout: Optional[float] = None) -> bool:
         """

@@ -1,16 +1,13 @@
 import threading
-import time
 from typing import Any, Optional, Type
-
 import ulid
-
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 
 class Outcome(IDisposable):
     """
     A lightweight, self-contained, Future-like object to hold the eventual
-    result or exception of a unit of work.
+    result or exception to a unit of work.
 
     This object is thread-safe.
     """

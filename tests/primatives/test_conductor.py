@@ -25,6 +25,37 @@ class TestConductor(unittest.TestCase):
         self.assertEqual(len(conductor.exceptions), 1)
         self.assertIsInstance(conductor.exceptions[0], MyException)
 
+    def test_single_task_executed_by_triggering_thread(self):
+        """
+        Tests that in the default model, only the triggering thread executes the task.
+        With a threshold of 5, only one thread should increment the counter.
+        """
+        shared_counter = {'value': 0}
+        # Use a lock to ensure thread-safe incrementing of the shared counter.
+        lock = threading.RLock()
+
+        def increment_task():
+            with lock:
+                shared_counter['value'] += 1
+
+        threshold = 5
+        # The conductor is set up to run the single increment_task.
+        conductor = Conductor(threshold=threshold, tasks=increment_task)
+
+        # Create 5 threads to enter the barrier.
+        threads = [threading.Thread(target=lambda: conductor.wait(timeout=1)) for _ in range(threshold)]
+
+        # Start and join all threads.
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # The assertion checks that the task was executed only once,
+        # by the single thread that reached the threshold.
+        self.assertEqual(shared_counter['value'], 5,
+                         "The task should have been executed only by the triggering thread.")
+
     def test_reusable_mode_resets_correctly(self):
         counter = [0]
         def task(): counter[0] += 1

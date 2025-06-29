@@ -5,7 +5,7 @@ from thread_factory.utils import IDisposable, Group
 
 class SignalBarrier(IDisposable):
     """
-    SignalBarrier (V2 - Integrated with Data-Aware Group)
+    SignalBarrier (Integrated with Data-Aware Group)
     -------------
     A coordinated multi-group barrier that blocks threads until each group meets
     its own threshold. Once all groups are "ready", the barrier releases all waiting
