@@ -1,7 +1,6 @@
 import threading
 from typing import Optional, Callable, List
-from thread_factory.primitives.conductor import Group
-from thread_factory.utils import IDisposable
+from thread_factory.utils import IDisposable, Group
 
 
 
