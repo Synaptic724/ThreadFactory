@@ -3,6 +3,7 @@ import time
 from typing import List, Optional, Callable
 from thread_factory.primitives.threshold_semaphore import ThresholdSemaphore
 
+
 class Router:
     """
     RouterNode
