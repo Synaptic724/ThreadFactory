@@ -5,12 +5,45 @@ from thread_factory.utils import IDisposable, Group
 
 class SignalBarrier(IDisposable):
     """
-    SignalBarrier (Integrated with Data-Aware Group)
+    SignalBarrier
     -------------
-    A coordinated multi-group barrier that blocks threads until each group meets
-    its own threshold. Once all groups are "ready", the barrier releases all waiting
-    threads. This version is integrated with a data-aware `Group` class, allowing
-    it to execute tasks and collect outcomes when a group becomes ready.
+    A coordinated, multi-group thread barrier that integrates **event-driven callable execution**
+    with traditional threshold-based synchronization.
+
+    Each thread belongs to a named `Group`. When enough threads (defined by `threshold`) arrive
+    at a group, that group is marked **ready**. Once all groups are ready, the barrier releases
+    all waiting threads.
+
+    It's best to use a shared context object to pass data between callables assigned
+    to different groups, as the barrier does not manage data flow between them.
+    You would generally use this class when you want to coordinate state between
+    stages of work.
+
+    🔧 Group-Triggered Callables
+    ----------------------------
+    Each `Group` can register one or more **callables**. When the group reaches readiness:
+
+    • One thread (the completer) executes all associated callables.
+    • The return values or exceptions are stored in outcome holders.
+    • These can be used to track logging, state transitions, progress updates, or broadcast signals.
+    • This execution is **transit-based**, not polling: it happens once, on group completion.
+
+    🧵 Barrier Thread Behavior
+    --------------------------
+    • Threads call `wait(group_index)` and block until barrier release.
+    • Barrier releases when all groups are ready.
+    • If `manual_release=True`, release must be explicitly triggered via `release()`.
+
+    🔁 Reusability
+    -------------
+    • If `reusable=True`, the barrier resets automatically after all threads exit.
+    • Supports repeated coordination cycles (generations).
+
+    ✅ Use Cases
+    -----------
+    • Multi-phase thread orchestration.
+    • Per-group transition logging or checkpointing.
+    • Coordinated work loop where signal transit should fire exactly once per group.
     """
 
     def __init__(

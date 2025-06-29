@@ -254,7 +254,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         call_info = {"count": 0}
         lock = threading.Lock()
         num_threads = 5
-        barrier = ActionBarrier(threshold=num_threads, callback=lambda: self._increment_count(call_info, lock))
+        barrier = ActionBarrier(threshold=num_threads, transit=lambda: self._increment_count(call_info, lock))
 
         threads = [threading.Thread(target=barrier.wait) for _ in range(num_threads)]
         for t in threads:
@@ -294,7 +294,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         def cb():
             called["count"] += 1
 
-        barrier = ActionBarrier(threshold=2, manual_release=True, callback=cb)
+        barrier = ActionBarrier(threshold=2, manual_release=True, transit=cb)
         threads = [threading.Thread(target=barrier.wait) for _ in range(2)]
         for t in threads: t.start()
         time.sleep(0.1)
@@ -312,7 +312,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         def cb():
             call_count["count"] += 1
 
-        barrier = ActionBarrier(threshold=3, reusable=False, callback=cb)
+        barrier = ActionBarrier(threshold=3, reusable=False, transit=cb)
 
         threads = [
             threading.Thread(target=barrier.wait)
@@ -358,7 +358,7 @@ class TestThresholdSemaphore(unittest.TestCase):
             with lock:
                 flag["called"] = True
 
-        barrier = ActionBarrier(threshold=2, callback=callback)
+        barrier = ActionBarrier(threshold=2, transit=callback)
 
         t1 = threading.Thread(target=barrier.wait)
         t2 = threading.Thread(target=barrier.wait)
