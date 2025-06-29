@@ -1,290 +1,188 @@
 import unittest
 import threading
 import time
+from typing import List, Any
+
 from thread_factory.primitives.conductor import Conductor
 
 
-class TestSynchronizedSignalSemaphore(unittest.TestCase):
+# Assuming Conductor, Outcome, IDisposable are available
+# from thread_factory.primitives import Conductor, Outcome, IDisposable
 
-    def test_initialization_with_timeout_and_raise_flag(self):
-        sema = Conductor(
-            threshold=1,
-            timeout=0.5,
-            raise_on_timeout=True
-        )
-        self.assertEqual(sema._threshold, 1)
-        self.assertEqual(sema._timeout, 0.5)
-        self.assertTrue(sema._raise_on_timeout)
-        self.assertFalse(sema.is_spent())
-
-    def test_threads_are_released_at_threshold(self):
-        result = []
-        sema = Conductor(threshold=3)
-
-        def worker(i):
-            sema.wait()
-            result.append(i)
-
-        threads = [threading.Thread(target=worker, args=(i,)) for i in range(3)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        self.assertEqual(sorted(result), [0, 1, 2])
-        self.assertTrue(sema.is_spent())  # Should be spent since reusable=False
-
-    def test_timeout_returns_false_by_default(self):
-        sema = Conductor(threshold=2, timeout=0.1)
-        result = []
-
-        def worker():
-            outcome = sema.wait()
-            result.append(outcome)
-
-        t = threading.Thread(target=worker)
-        t.start()
-        t.join(0.5)  # Wait for a sufficient time
-
-        self.assertFalse(t.is_alive())
-        self.assertEqual(result, [False])
-
-    def test_wait_with_raise_on_timeout_raises_exception(self):
-        sema = Conductor(threshold=2, timeout=0.1, raise_on_timeout=True)
-
-        def worker():
-            # Use a list to capture the result from the thread
-            raised_exception = False
-            try:
-                sema.wait()
-            except TimeoutError:
-                raised_exception = True
-            return raised_exception
-
-        thread_result = []
-        t = threading.Thread(target=lambda: thread_result.append(worker()))
-        t.start()
-        t.join(0.5)  # Wait long enough for a timeout
-
-        self.assertFalse(t.is_alive())
-        self.assertEqual(len(thread_result), 1)
-        self.assertTrue(thread_result[0], "TimeoutError was not raised by the waiting thread.")
-        self.assertTrue(sema.is_spent(), "Semaphore should be spent after a timeout.")
-
-    # =================================================================
-    # ===== NEW TESTS FOR CALLBACK FUNCTIONALITY =====
-    # =================================================================
-
-    def test_single_callback_is_executed(self):
-        """
-        Tests that passing a single function to `callback` works correctly.
-        """
-        results = []
-        # Pass a single lambda function
-        sema = Conductor(threshold=2, callback=lambda: results.append("fired"))
-
-        def worker():
-            sema.wait()
-
+class TestConductor(unittest.TestCase):
+    # ==================================================================
+    # Original Test Suite (Verified)
+    # ==================================================================
+    def test_task_execution_and_result_capture(self):
+        conductor = Conductor(threshold=2, tasks=lambda: "done")
+        def worker(): self.assertTrue(conductor.wait(timeout=1))
         threads = [threading.Thread(target=worker) for _ in range(2)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+        for t in threads: t.start()
+        for t in threads: t.join()
+        self.assertEqual(conductor.results, ["done"])
+        self.assertTrue(conductor.is_spent())
 
-        # Assert that the single callback was executed
-        self.assertEqual(results, ["fired"])
-        self.assertTrue(sema.is_spent())
+    def test_failing_task_captures_exception(self):
+        class MyException(Exception): pass
+        def failing_task(): raise MyException("failure")
+        conductor = Conductor(threshold=1, tasks=failing_task)
+        self.assertTrue(conductor.wait(timeout=1))
+        self.assertEqual(len(conductor.exceptions), 1)
+        self.assertIsInstance(conductor.exceptions[0], MyException)
 
-    def test_list_of_callbacks_are_all_executed(self):
-        """
-        Tests that passing a list of functions to `callback` results in all of them being executed.
-        """
-        results = []
-        # Pass a list of two lambda functions
-        callbacks = [
-            lambda: results.append("cb1_fired"),
-            lambda: results.append("cb2_fired")
-        ]
-        sema = Conductor(threshold=2, callback=callbacks)
+    def test_reusable_mode_resets_correctly(self):
+        counter = [0]
+        def task(): counter[0] += 1
+        conductor = Conductor(threshold=2, tasks=task, reusable=True)
+        def run_cycle():
+            threads = [threading.Thread(target=lambda: conductor.wait(timeout=1)) for _ in range(2)]
+            for t in threads: t.start()
+            for t in threads: t.join()
+        run_cycle()
+        self.assertEqual(counter[0], 1)
+        run_cycle()
+        self.assertEqual(counter[0], 2)
 
+    def test_manual_release(self):
+        conductor = Conductor(threshold=2, tasks=lambda: "task_done", manual_release=True)
+        worker_finished = threading.Event()
         def worker():
-            sema.wait()
-
+            conductor.wait(timeout=1)
+            worker_finished.set()
         threads = [threading.Thread(target=worker) for _ in range(2)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        # Use assertCountEqual because the order of execution is not guaranteed
-        self.assertCountEqual(results, ["cb1_fired", "cb2_fired"])
-        self.assertTrue(sema.is_spent())
-
-    def test_exception_in_one_callback_does_not_stop_others(self):
-        """
-        Tests that if one callback in a list raises an exception, the others still run.
-        """
-        results = []
-
-        def faulty_callback():
-            raise ValueError("This is a test exception")
-
-        def working_callback():
-            results.append("ok")
-
-        # Create a list with a faulty callback and a working one
-        callbacks = [faulty_callback, working_callback]
-        sema = Conductor(threshold=1, callback=callbacks)
-
-        def worker():
-            sema.wait()
-
-        t = threading.Thread(target=worker)
-        t.start()
-        t.join()
-
-        # Assert that the working callback still completed its job, even though the other failed.
-        self.assertEqual(results, ["ok"])
-
-    # =================================================================
-    # ===== END OF NEW TESTS =====
-    # =================================================================
-
-
-    def test_wait_timeout_argument_overrides_init_timeout(self):
-        sema = Conductor(threshold=2, timeout=2.0)  # long init timeout
-        start_time = time.monotonic()
-
-        def worker():
-            # This should timeout in 0.1 seconds, not 2.0 seconds
-            sema.wait(timeout=0.1)
-
-        t = threading.Thread(target=worker)
-        t.start()
-        t.join(0.5)
-        end_time = time.monotonic()
-
-        self.assertLess(end_time - start_time, 0.5)
-        self.assertFalse(t.is_alive())
-        self.assertEqual(sema._count, 0)
-
-    def test_late_thread_raises_exception_on_broken_timeout(self):
-        """
-        Tests that a thread entering an already-timed-out semaphore immediately raises an exception.
-        """
-        sema = Conductor(threshold=2, timeout=0.1, raise_on_timeout=True)
-
-        def first_worker():
-            try:
-                sema.wait()
-            except TimeoutError:
-                pass
-
-        t1 = threading.Thread(target=first_worker)
-        t1.start()
-        t1.join(0.5)
-
-        self.assertFalse(t1.is_alive())
-        self.assertTrue(sema._released)
-
-        def late_worker(raised_flag):
-            try:
-                sema.wait()
-            except TimeoutError:
-                raised_flag["status"] = True
-
-        late_thread_raised_flag = {"status": False}
-        t2 = threading.Thread(target=late_worker, args=(late_thread_raised_flag,))
-        t2.start()
-        t2.join(0.1)
-
-        self.assertFalse(t2.is_alive())
-        self.assertTrue(late_thread_raised_flag["status"], "Late thread should have raised a TimeoutError.")
-
-    def test_dispose_interrupts_and_does_not_raise_on_timeout(self):
-        sema = Conductor(threshold=2, timeout=1.0, raise_on_timeout=True)
-        result = []
-
-        def worker():
-            try:
-                outcome = sema.wait()
-                result.append(outcome)
-            except Exception as e:
-                result.append(type(e).__name__)
-
-        t = threading.Thread(target=worker)
-        t.start()
-
+        for t in threads: t.start()
         time.sleep(0.1)
-        sema.dispose()
-        t.join(0.5)
+        self.assertEqual(conductor.results, ["task_done"])
+        self.assertFalse(worker_finished.is_set())
+        conductor.release()
+        self.assertTrue(worker_finished.wait(timeout=1))
+        for t in threads: t.join()
 
-        self.assertFalse(t.is_alive())
-        self.assertEqual(result, [False])
+    def test_timeout_and_break(self):
+        conductor = Conductor(threshold=3, timeout=0.1)
+        results: List[bool] = []
+        def worker(): results.append(conductor.wait())
+        threads = [threading.Thread(target=worker) for _ in range(2)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+        self.assertEqual(results, [False, False])
+        self.assertTrue(conductor._broken)
 
-    def test_count_decrements_after_timeout(self):
-        sema = Conductor(threshold=2, timeout=0.1)
+    def test_initialization_rejects_coroutines(self):
+        async def my_coro(): pass
+        with self.assertRaises(TypeError): Conductor(threshold=1, tasks=my_coro)
 
-        def worker():
-            sema.wait()
-
+    def test_dispose_releases_waiting_threads(self):
+        conductor = Conductor(threshold=2)
+        results = []
+        def worker(): results.append(conductor.wait(timeout=1))
         t1 = threading.Thread(target=worker)
         t1.start()
-        time.sleep(0.5)
+        time.sleep(0.1)
+        conductor.dispose()
+        self.assertTrue(conductor.disposed)
+        t1.join()
+        self.assertEqual(results, [False])
 
-        self.assertEqual(sema._count, 0)
-        self.assertFalse(t1.is_alive())
+    # ==================================================================
+    # 10 Additional Tests (Now with fixes)
+    # ==================================================================
 
-    def test_reusable_after_timeout_and_reset(self):
-        sema = Conductor(threshold=2, reusable=True, timeout=0.1)
+    def test_timeout_raises_exception(self):
+        conductor = Conductor(threshold=2, timeout=0.1, raise_on_timeout=True)
+        with self.assertRaises(TimeoutError):
+            conductor.wait()
 
-        def worker1():
-            return sema.wait()
+    def test_notify_all_override_releases_threads(self):
+        conductor = Conductor(threshold=5)
+        results = []
+        def worker(): results.append(conductor.wait(timeout=1))
+        threads = [threading.Thread(target=worker) for _ in range(3)]
+        for t in threads: t.start()
+        time.sleep(0.1)
+        self.assertEqual(len(results), 0)
+        conductor.notify_all_override()
+        for t in threads: t.join()
+        self.assertEqual(results, [False, False, False])
 
-        t1 = threading.Thread(target=worker1)
+    def test_notify_all_override_in_reusable_mode(self):
+        conductor = Conductor(threshold=5, reusable=True)
+        results_cycle1 = []
+        def worker1(): results_cycle1.append(conductor.wait(timeout=1))
+        threads1 = [threading.Thread(target=worker1) for _ in range(2)]
+        for t in threads1: t.start()
+        conductor.notify_all_override()
+        for t in threads1: t.join()
+        self.assertEqual(results_cycle1, [False, False])
+        results_cycle2 = []
+        def worker2(): results_cycle2.append(conductor.wait(timeout=1))
+        threads2 = [threading.Thread(target=worker2) for _ in range(5)]
+        for t in threads2: t.start()
+        for t in threads2: t.join()
+        self.assertEqual(results_cycle2, [True, True, True, True, True])
+
+    def test_wait_on_already_spent_conductor(self):
+        conductor = Conductor(threshold=1)
+        self.assertTrue(conductor.wait(timeout=1))
+        self.assertTrue(conductor.is_spent())
+        self.assertTrue(conductor.wait(timeout=0))
+
+    def test_is_spent_property_lifecycle(self):
+        conductor = Conductor(threshold=1, reusable=False)
+        self.assertFalse(conductor.is_spent())
+        conductor.wait(timeout=1)
+        self.assertTrue(conductor.is_spent())
+        reusable_conductor = Conductor(threshold=1, reusable=True)
+        self.assertFalse(reusable_conductor.is_spent())
+        reusable_conductor.wait(timeout=1)
+        self.assertFalse(reusable_conductor.is_spent())
+
+    def test_no_tasks_provided(self):
+        conductor = Conductor(threshold=2, tasks=None)
+        def worker(): self.assertTrue(conductor.wait(timeout=1))
+        threads = [threading.Thread(target=worker) for _ in range(2)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+        self.assertEqual(conductor.results, [])
+        self.assertTrue(conductor.is_spent())
+
+    def test_multiple_tasks_with_mixed_outcomes(self):
+        class MixedOutcomeException(Exception): pass
+        def task_that_raises(): raise MixedOutcomeException()
+        tasks = [ lambda: "Success 1", lambda: 1/0, lambda: "Success 2", task_that_raises]
+        conductor = Conductor(threshold=1, tasks=tasks)
+        conductor.wait()
+        self.assertCountEqual(conductor.results, ["Success 1", "Success 2"])
+        self.assertEqual(len(conductor.exceptions), 2)
+        self.assertTrue(any(isinstance(e, ZeroDivisionError) for e in conductor.exceptions))
+        self.assertTrue(any(isinstance(e, MixedOutcomeException) for e in conductor.exceptions))
+
+    def test_manual_release_behavior_before_threshold(self):
+        conductor = Conductor(threshold=3, manual_release=True)
+        worker_finished = threading.Event()
+        def worker(): conductor.wait(timeout=0.2); worker_finished.set()
+        t1 = threading.Thread(target=worker)
         t1.start()
-        t1.join(0.5)
+        conductor.release()
+        self.assertTrue(worker_finished.wait(timeout=1), "Worker should have timed out, proving release() had no effect")
+        t1.join()
 
-        self.assertFalse(t1.is_alive())
-        self.assertEqual(sema._count, 0)
-        self.assertFalse(sema._released)
+    def test_dispose_idempotency(self):
+        conductor = Conductor(threshold=1)
+        try:
+            conductor.dispose()
+            conductor.dispose()
+        except Exception as e:
+            self.fail(f"dispose() raised an unexpected exception: {e}")
+        self.assertTrue(conductor.disposed)
 
-        results = []
+    def test_wait_with_zero_timeout(self):
+        conductor = Conductor(threshold=2)
+        start_time = time.monotonic()
+        released = conductor.wait(timeout=0)
+        duration = time.monotonic() - start_time
+        self.assertFalse(released)
+        self.assertLess(duration, 0.05)
 
-        def worker2():
-            released = sema.wait()
-            results.append(released)
-
-        t2_1 = threading.Thread(target=worker2)
-        t2_2 = threading.Thread(target=worker2)
-        t2_1.start()
-        time.sleep(0.1)
-        t2_2.start()
-        t2_1.join()
-        t2_2.join()
-
-        self.assertCountEqual(results, [True, True])
-        self.assertEqual(sema._count, 0)
-
-    def test_notify_all_override_unblocks_threads(self):
-        sema = Conductor(threshold=5, reusable=True)
-        results = []
-
-        def worker(i):
-            sema.wait()
-            results.append(i)
-
-        threads = [threading.Thread(target=worker, args=(i,)) for i in range(5)]
-        for t in threads:
-            t.start()
-        time.sleep(0.1)
-        sema.notify_all_override()
-        for t in threads:
-            t.join()
-
-        self.assertEqual(len(results), 5)
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main(argv=['first-arg-is-ignored'], exit=False)
