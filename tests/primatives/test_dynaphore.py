@@ -10,24 +10,24 @@ class TestDynaphore(unittest.TestCase):
 
     def test_basic_acquire_release(self):
         sema = Dynaphore(2)
-        self.assertEqual(sema._permits, 2)
+        self.assertEqual(sema._value, 2)
 
         acquired = sema.wait_for_permit(timeout=1)
         self.assertTrue(acquired)
-        self.assertEqual(sema._permits, 1)
+        self.assertEqual(sema._value, 1)
 
         sema.release_permit()
-        self.assertEqual(sema._permits, 2)
+        self.assertEqual(sema._value, 2)
 
     def test_increase_permits(self):
         sema = Dynaphore(1)
         sema.increase_permits(3)
-        self.assertEqual(sema._permits, 4)
+        self.assertEqual(sema._value, 4)
 
     def test_decrease_permits(self):
         sema = Dynaphore(8)
         sema.decrease_permits(3)
-        self.assertEqual(sema._permits, 5)
+        self.assertEqual(sema._value, 5)
 
         with self.assertRaises(ValueError):
             sema.decrease_permits(10)  # 10 > 5 triggers error
@@ -85,7 +85,7 @@ class TestDynaphore(unittest.TestCase):
         sema.increase_permits(1)   # now predicate true, thread acquires
         t.join(timeout=1)
         self.assertTrue(flag['awake'])
-        self.assertEqual(sema._permits, 0)   # 1 was consumed
+        self.assertEqual(sema._value, 0)   # 1 was consumed
 
 
     def test_pause_and_resume(self):
@@ -99,7 +99,7 @@ class TestDynaphore(unittest.TestCase):
     def test_over_release_is_allowed(self):
         sema = Dynaphore(0)
         sema.release_permit(5)              # over-release (never acquired)
-        self.assertEqual(sema._permits, 5)
+        self.assertEqual(sema._value, 5)
 
     def test_dispose_unblocks_waiters(self):
         sema = Dynaphore(0)
@@ -206,10 +206,10 @@ class TestDynaphore(unittest.TestCase):
     def test_set_permits_directly(self):
         sema = Dynaphore(0)
         sema.set_permits(5)
-        self.assertEqual(sema._permits, 5)
+        self.assertEqual(sema._value, 5)
 
         sema.set_permits(0)
-        self.assertEqual(sema._permits, 0)
+        self.assertEqual(sema._value, 0)
 
         with self.assertRaises(ValueError):
             sema.set_permits(-1)
@@ -222,4 +222,3 @@ def show_lingering():
 
 if __name__ == '__main__':
     unittest.main()
-
