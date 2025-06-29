@@ -4,9 +4,9 @@ from typing import Optional, Callable
 from thread_factory.utils import IDisposable
 
 
-class SynchronizedThresholdSemaphore(IDisposable):
+class SynchronizedSignalSemaphore(IDisposable):
     """
-    SynchronizedThresholdSemaphore
+    SynchronizedSignalSemaphore
     ------------------------------
     A reusable barrier-like semaphore that unblocks all waiting threads once
     a predefined threshold is reached.

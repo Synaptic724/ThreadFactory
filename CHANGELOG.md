@@ -44,7 +44,7 @@ Ideal for:
 
 ---
 
-### 🎯 `ThresholdSemaphore` — *Group Activation Barrier*
+### 🎯 `ThresholdSemaphore` — *Multi-thread Activation Semaphore*
 
 A reusable **threshold gate** that blocks threads until a required number arrive with optional callable execution.
 Ideal for:
@@ -56,7 +56,7 @@ Ideal for:
 
 ---
 
-### 🚦 `SynchronizedThresholdSemaphore` — *Robust, Time-Aware Group Coordination*
+### 🚦 `SynchronizedSignalSemaphore` — *Robust, Time-Aware Group Coordination*
 
 A **reusable, fault-tolerant threshold gate** that waits for a required number of threads to arrive, offering advanced control over its lifecycle. It combines the simplicity of a barrier with sophisticated timeout and error-handling features.
 
