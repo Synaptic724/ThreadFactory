@@ -4,6 +4,8 @@ from typing import Optional, Callable, List
 from thread_factory.utils import IDisposable, Group
 
 
+# Assuming Group class is defined as above
+
 class SynchronizedSignalBarrier(IDisposable):
     """
     SynchronizedSignalBarrier
@@ -84,17 +86,17 @@ class SynchronizedSignalBarrier(IDisposable):
                 return i
         raise ValueError("No group matched the provided condition.")
 
-    def add_group(self, threshold: int, callback: Optional[Callable] = None):
+    def add_group(self, threshold: int, callbacks: Optional[List[Callable]] = None):
         """
         Adds a new group to the barrier. Must be called before enable().
 
         Args:
             threshold (int): The number of threads required for this group to be ready.
-            callback (Optional[Callable]): A function to be called when this group's threshold is met.
+            callbacks (Optional[List[Callable]]): A list of functions to be called when this group's threshold is met.
         """
         if self._enabled:
             raise RuntimeError("Cannot add groups after enable()")
-        self.groups.append(Group(threshold, callback))
+        self.groups.append(Group(threshold, callbacks))
 
     def enable(self):
         """
@@ -160,11 +162,13 @@ class SynchronizedSignalBarrier(IDisposable):
             if group.count >= group.threshold and not group._released_once:
                 group.ready = True
                 group._released_once = True
-                if group.callback:
-                    try:
-                        group.callback()
-                    except Exception:
-                        pass
+                if group.callbacks:
+                    for callback in group.callbacks:
+                        try:
+                            callback()
+                        except Exception:
+                            # Log the exception or handle it as needed
+                            pass
 
             # Check if ALL groups are ready and we are not in manual release mode.
             if all(g.ready for g in self.groups) and not self.manual_release:
@@ -215,7 +219,6 @@ class SynchronizedSignalBarrier(IDisposable):
 
             # Return True if the thread was released successfully, False otherwise.
             return released and not self._disposed
-
 
     def notify_all_override(self):
         """
