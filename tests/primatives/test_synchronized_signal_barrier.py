@@ -167,6 +167,7 @@ class TestSignalBarrier(unittest.TestCase):
         thread.join(0.5)
 
         self.assertTrue(barrier._disposed)
+        self.assertTrue(barrier._broken)
         self.assertFalse(thread.is_alive())
 
 
@@ -361,6 +362,84 @@ class TestSignalBarrier(unittest.TestCase):
         self.assertTrue(barrier._disposed)
         self.assertTrue(barrier._broken)
         self.assertFalse(thread1.is_alive())
+
+    def test_timeout_raises_exception(self):
+        """
+        Test that `raise_on_timeout=True` causes the waiting thread to raise a TimeoutError.
+        """
+        barrier = SynchronizedSignalBarrier(groups=[Group(2)], timeout=0.1, raise_on_timeout=True)
+        barrier.enable()
+
+        def thread_func():
+            # The exception will be raised here.
+            try:
+                barrier.wait(0)
+            except TimeoutError as e:
+                # Catch the exception and return True to indicate it was caught.
+                return True, str(e)
+            return False, None # Should not be reached
+
+        thread1 = threading.Thread(target=lambda: self.result.append(thread_func()))
+        self.result = [] # Use a shared list to get the result from the thread.
+        thread1.start()
+
+        # Wait for the timeout to occur.
+        thread1.join(0.5)
+
+        # Assert that the thread exited and raised the correct exception.
+        self.assertFalse(thread1.is_alive())
+        self.assertEqual(len(self.result), 1)
+        # Check if the function returned True (indicating exception was caught) and the message is correct.
+        self.assertTrue(self.result[0][0])
+        self.assertIn("Barrier wait timed out", self.result[0][1])
+
+        # Assert the barrier is in a broken state.
+        self.assertTrue(barrier._broken)
+        self.assertTrue(barrier._released)
+
+    def test_late_thread_raises_exception_on_broken_barrier(self):
+        """
+        Test that a thread entering an already broken barrier also raises a TimeoutError
+        when `raise_on_timeout` is True.
+        """
+        # First, set up a barrier that will break due to timeout.
+        barrier = SynchronizedSignalBarrier(groups=[Group(2)], timeout=0.1, raise_on_timeout=True)
+        barrier.enable()
+
+        def thread_func():
+            # This thread will time out and break the barrier.
+            try:
+                barrier.wait(0)
+            except TimeoutError:
+                pass # Suppress the exception in this thread for the test's purpose.
+
+        # Start the thread that will cause the timeout.
+        thread1 = threading.Thread(target=thread_func)
+        thread1.start()
+        thread1.join(0.5) # Wait for it to time out and exit.
+
+        # Now, the barrier is in a broken state.
+        self.assertTrue(barrier._broken)
+
+        # Start a new thread (the "late" thread) that tries to enter the broken barrier.
+        late_thread_raised = False
+        def late_thread_func():
+            nonlocal late_thread_raised
+            try:
+                barrier.wait(0)
+            except TimeoutError:
+                late_thread_raised = True
+            except Exception:
+                pass # Catch any other exceptions
+
+        thread2 = threading.Thread(target=late_thread_func)
+        thread2.start()
+        thread2.join(0.1) # Give it a chance to run.
+
+        # Assert that the late thread raised the exception.
+        self.assertFalse(thread2.is_alive())
+        self.assertTrue(late_thread_raised, "The late thread should have raised a TimeoutError.")
+
 
 if __name__ == "__main__":
     unittest.main(argv=['first-arg-is-ignored'], exit=False)

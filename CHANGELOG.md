@@ -113,7 +113,25 @@ A **coordinated, threshold-aware barrier** that waits for **groups of threads** 
 - 🔒 **Manual or auto release**: Full control over when threads are unblocked
 - 🔁 **Reusable mode**: Automatically resets after all threads exit
 - 🧼 **Disposable**: Cleanly shuts down and unblocks all waiters
-- 
+
+---
+
+
+### 🧱 `SynchronizedSignalBarrier` — *Multi-Group Thread Coordination with Threshold Control and Timeout Control*
+
+A **coordinated, threshold-aware barrier** that blocks threads until **multiple, independent groups** each meet their own predefined thread count. 
+Once all groups are "ready," the barrier releases all waiting threads. 
+Think of it as a series of locks that all must be turned before a single door opens, with each lock having its own key requirement.
+
+#### 🔑 Key Features:
+- 🧮 **Per-Group Thresholds**: Each group can have a unique thread count it must meet (e.g., Group A needs 3 threads, Group B needs 5).
+- 🧠 **Per-Group Callbacks**: Execute a specific function precisely when a group's threshold is met, before the main barrier releases.
+- 🔒 **Manual or Auto Release**: Configure the barrier to release automatically when all groups are ready, or manually via a `release()` method.
+- ⏰ **Timeout Control**: Prevent indefinite blocking by setting a maximum waiting time for the entire barrier.
+- 🔁 **Reusable Mode**: Automatically resets the barrier's state after all threads are released, preparing it for the next wave of synchronization.
+- 💥 **Robust Failure Handling**: Becomes "broken" upon timeout or disposal, cleanly unblocking all threads and signaling a failure state.
+- 🧼 **Disposable**: Cleanly shuts down the barrier, immediately unblocking all waiting threads and preventing further use.
+
 ---
 
 ### ⏲️ `AutoResetTimer` — *Heartbeat for Workers*

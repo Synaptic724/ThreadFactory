@@ -14,6 +14,8 @@ class Group:
     - A `ready` flag to indicate the group has satisfied its threshold
     """
     def __init__(self, threshold: int, callback: Optional[Callable] = None):
+        if threshold <= 0:
+            raise ValueError("Threshold must be a positive integer.")
         self.threshold = threshold
         self.callback = callback
         self.count = 0
