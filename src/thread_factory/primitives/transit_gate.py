@@ -70,7 +70,7 @@ class TransitGate(IDisposable):
         self._collapsed = False
         self._outcomes: List[Outcome] = []
         self._dynaphore = Dynaphore(limit)
-        self._threshold_sema = ThresholdSemaphore(limit)
+        self._threshold_sema = ThresholdSemaphore(limit, reusable=True)
 
         self._outcome_set = False
 
@@ -85,10 +85,12 @@ class TransitGate(IDisposable):
         if self._disposed:
             return None
 
+        if self._collapsed or self._count >= self._limit:
+            return None
         with self._lock:
             if self._collapsed or self._count >= self._limit:
                 return None
-            self._count += 1
+        self._increase_count()
 
         # Acquire the dynaphore to limit concurrent executions
         for item in range(len(self._func)):
@@ -99,7 +101,7 @@ class TransitGate(IDisposable):
                 self._set_exception(e)
             finally:
                 with self._lock:
-                    self._count -= 1
+                    self._decrement_count()
 
             self._dynaphore.release()
             self._threshold_sema.wait()

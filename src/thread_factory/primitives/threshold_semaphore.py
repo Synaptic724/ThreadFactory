@@ -122,6 +122,16 @@ class ThresholdSemaphore(IDisposable):
                 # Wake up all waiting threads if the new threshold is met
                 self._condition.notify_all()
 
+    def reset(self):
+        """
+        Resets the semaphore's internal state, allowing it to be reused for a new cycle.
+        """
+        with self._condition:
+            self._count = 0
+            self._released = False
+            # Notifying all here prevents any threads from getting stuck if they were waiting
+            self._condition.notify_all()
+
 
     def wait(self, timeout: Optional[float] = None) -> bool:
         """
