@@ -2,8 +2,6 @@ import inspect
 import threading
 import time
 from typing import Optional, Callable, List, Union, Any
-
-from thread_factory import Dynaphore
 from thread_factory.primitives import ClockBarrier
 from thread_factory.primitives.threshold_semaphore import ThresholdSemaphore
 from thread_factory.utils import IDisposable

@@ -2,95 +2,97 @@ import unittest
 import threading
 import time
 import random
-from thread_factory import Dynaphore
+from thread_factory.primitives.dynaphore import Dynaphore
 
 class TestDynaphore(unittest.TestCase):
 
     def test_basic_acquire_release(self):
         sema = Dynaphore(2)
-        self.assertEqual(sema._value, 2)
+        self.assertEqual(sema._permits, 2)
 
-        sema.acquire()
-        self.assertEqual(sema._value, 1)
+        acquired = sema.wait_for_permit(timeout=1)
+        self.assertTrue(acquired)
+        self.assertEqual(sema._permits, 1)
 
-        sema.release()
-        self.assertEqual(sema._value, 2)
+        sema.release_permit()
+        self.assertEqual(sema._permits, 2)
 
     def test_increase_permits(self):
         sema = Dynaphore(1)
         sema.increase_permits(3)
-        self.assertEqual(sema._value, 4)
+        self.assertEqual(sema._permits, 4)
 
     def test_decrease_permits(self):
-        sema = Dynaphore(8)  # Start higher to avoid negative cases
+        sema = Dynaphore(8)
         sema.decrease_permits(3)
-        print(sema._value)
-        self.assertEqual(sema._value, 5)
+        self.assertEqual(sema._permits, 5)
 
-        # Now test decreasing beyond the current permits (should raise)
         with self.assertRaises(ValueError):
-            sema.decrease_permits(10)  # 10 > 5 -> triggers error
+            sema.decrease_permits(10)  # 10 > 5 triggers error
 
     def test_concurrent_acquire_release(self):
         sema = Dynaphore(0)
         acquired_threads = []
+        lock = threading.Lock()
 
         def worker(thread_id):
-            sema.acquire()
-            acquired_threads.append(thread_id)
-            time.sleep(random.uniform(0.1, 0.5))
-            sema.release()
+            if sema.wait_for_permit(timeout=3):
+                with lock:
+                    acquired_threads.append(thread_id)
+                time.sleep(random.uniform(0.1, 0.3))
+                sema.release_permit()
 
-        threads = []
-        for i in range(10):
-            t = threading.Thread(target=worker, args=(i,))
-            threads.append(t)
-            t.start()
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(10)]
+        for t in threads: t.start()
 
-        # Give runtime a chance to block
         time.sleep(0.5)
-
-        # Release 10 permits so they can proceed
         sema.increase_permits(10)
 
         for t in threads:
-            t.join()
+            t.join(timeout=2)
 
         self.assertEqual(len(acquired_threads), 10)
 
     def test_stress_dynaphore(self):
         sema = Dynaphore(0)
-        threads = []
         results = []
+        lock = threading.Lock()
         num_threads = 20
 
         def worker(thread_id):
-            sema.acquire()
-            results.append(thread_id)
-            time.sleep(random.uniform(0.2, 1.0))
-            sema.release()
+            if sema.wait_for_permit(timeout=5):
+                with lock:
+                    results.append(thread_id)
+                time.sleep(random.uniform(0.2, 0.5))
+                sema.release_permit()
 
-        for i in range(num_threads):
-            t = threading.Thread(target=worker, args=(i,))
-            threads.append(t)
-            t.start()
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(num_threads)]
+        for t in threads: t.start()
 
-        # Dynamic orchestration
         for _ in range(5):
-            time.sleep(1)
-            permits_to_add = random.randint(5, 10)
-            sema.increase_permits(permits_to_add)
-
-            permits_to_decrease = random.randint(0, permits_to_add)
+            time.sleep(0.5)
+            permits = random.randint(5, 10)
+            sema.increase_permits(permits)
             try:
-                sema.decrease_permits(permits_to_decrease)
+                sema.decrease_permits(random.randint(0, permits))
             except ValueError:
-                pass  # Expected sometimes, fine for the test
+                pass  # Expected in some rounds
 
         for t in threads:
-            t.join()
+            t.join(timeout=3)
 
         self.assertEqual(len(results), num_threads)
+
+    def test_set_permits_directly(self):
+        sema = Dynaphore(0)
+        sema.set_permits(5)
+        self.assertEqual(sema._permits, 5)
+
+        sema.set_permits(0)
+        self.assertEqual(sema._permits, 0)
+
+        with self.assertRaises(ValueError):
+            sema.set_permits(-1)
 
 if __name__ == '__main__':
     unittest.main()
