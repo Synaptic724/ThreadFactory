@@ -1,6 +1,6 @@
 import threading
 import time
-from typing import Optional, Callable
+from typing import Optional, Callable, List, Union
 from thread_factory.utils import IDisposable
 
 
@@ -20,7 +20,7 @@ class SynchronizedSignalSemaphore(IDisposable):
 
     Parameters:
         threshold (int): Number of threads required to trigger release.
-        callback (Optional[Callable[[], None]]): Optional hook when threshold is reached.
+        callback (Optional[Union[Callable, List[Callable]]]): A function or list of functions to be called when the threshold is reached.
         reusable (bool): If True, resets after triggering (default: False).
         manual_release (bool): If True, waits after threshold until release() is called.
         timeout (Optional[float]): The maximum time in seconds to wait for the threshold to be met.
@@ -35,7 +35,7 @@ class SynchronizedSignalSemaphore(IDisposable):
     def __init__(
             self,
             threshold: int,
-            callback: Optional[Callable[[], None]] = None,
+            callback: Optional[Union[Callable[[], None], List[Callable[[], None]]]] = None,
             reusable: bool = False,
             manual_release: bool = False,
             timeout: Optional[float] = None,
@@ -46,11 +46,23 @@ class SynchronizedSignalSemaphore(IDisposable):
             raise ValueError("Threshold must be greater than 0")
 
         self._threshold = threshold
-        self._callback = callback
         self._reusable = reusable
         self._manual_release = manual_release
         self._timeout = timeout
         self._raise_on_timeout = raise_on_timeout
+
+        # MODIFICATION: Handle both a single callable and a list of callables.
+        self._callback: List[Callable[[], None]] = []
+        if callback is not None:
+            if callable(callback):
+                # If a single function is passed, wrap it in a list.
+                self._callback = [callback]
+            elif isinstance(callback, list) and all(callable(cb) for cb in callback):
+                # If a list is passed, use it directly after validation.
+                self._callback = callback
+            else:
+                # Otherwise, the type is incorrect.
+                raise TypeError("callback must be a callable function or a list of callable functions.")
 
         self._lock = threading.Lock()
         self._condition = threading.Condition(self._lock)
@@ -134,11 +146,14 @@ class SynchronizedSignalSemaphore(IDisposable):
             self._count += 1
 
             if self._count == self._threshold and not self._released:
+                # MODIFICATION: Iterate over the list of callbacks.
                 if self._callback:
-                    try:
-                        self._callback()
-                    except Exception:
-                        pass
+                    for cb in self._callback:
+                        try:
+                            cb()
+                        except Exception:
+                            # Depending on requirements, you might want to log this exception.
+                            pass
                 if not self._manual_release:
                     self._released = True
                     self._condition.notify_all()
@@ -159,7 +174,16 @@ class SynchronizedSignalSemaphore(IDisposable):
                 timeout=remaining
             )
 
-            self._count -= 1
+            # This needs to be outside the lambda for correct post-wait logic
+            if self._reusable and self._released:
+                self._count -= 1
+                if self._count == 0:
+                    self.reset()
+            else:
+                 # In non-reusable cases, we might not want to decrement,
+                 # or decrement but not reset. Let's decrement for consistency.
+                 self._count -= 1
+
 
             # Check if wait_for timed out
             if not released and not self._disposed:
@@ -168,10 +192,10 @@ class SynchronizedSignalSemaphore(IDisposable):
                 self._condition.notify_all()
                 if self._raise_on_timeout:
                     raise TimeoutError("Semaphore wait timed out.")
+                # After timeout, if reusable, reset when last thread leaves
+                if self._reusable and self._count == 0:
+                     self.reset()
 
-            # If this is the last thread and the semaphore is reusable, reset it
-            if self._reusable and self._count == 0 and self._released:
-                self.reset()
 
             # Return status based on whether it was released or disposed
             return released and not self._disposed

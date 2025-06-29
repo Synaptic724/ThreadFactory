@@ -69,9 +69,88 @@ class TestSynchronizedSignalSemaphore(unittest.TestCase):
         self.assertFalse(t.is_alive())
         self.assertEqual(len(thread_result), 1)
         self.assertTrue(thread_result[0], "TimeoutError was not raised by the waiting thread.")
-        # CORRECTED ASSERTION:
-        # After a timeout, a non-reusable semaphore is spent because its cycle has concluded (with a failure).
         self.assertTrue(sema.is_spent(), "Semaphore should be spent after a timeout.")
+
+    # =================================================================
+    # ===== NEW TESTS FOR CALLBACK FUNCTIONALITY =====
+    # =================================================================
+
+    def test_single_callback_is_executed(self):
+        """
+        Tests that passing a single function to `callback` works correctly.
+        """
+        results = []
+        # Pass a single lambda function
+        sema = SynchronizedSignalSemaphore(threshold=2, callback=lambda: results.append("fired"))
+
+        def worker():
+            sema.wait()
+
+        threads = [threading.Thread(target=worker) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Assert that the single callback was executed
+        self.assertEqual(results, ["fired"])
+        self.assertTrue(sema.is_spent())
+
+    def test_list_of_callbacks_are_all_executed(self):
+        """
+        Tests that passing a list of functions to `callback` results in all of them being executed.
+        """
+        results = []
+        # Pass a list of two lambda functions
+        callbacks = [
+            lambda: results.append("cb1_fired"),
+            lambda: results.append("cb2_fired")
+        ]
+        sema = SynchronizedSignalSemaphore(threshold=2, callback=callbacks)
+
+        def worker():
+            sema.wait()
+
+        threads = [threading.Thread(target=worker) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Use assertCountEqual because the order of execution is not guaranteed
+        self.assertCountEqual(results, ["cb1_fired", "cb2_fired"])
+        self.assertTrue(sema.is_spent())
+
+    def test_exception_in_one_callback_does_not_stop_others(self):
+        """
+        Tests that if one callback in a list raises an exception, the others still run.
+        """
+        results = []
+
+        def faulty_callback():
+            raise ValueError("This is a test exception")
+
+        def working_callback():
+            results.append("ok")
+
+        # Create a list with a faulty callback and a working one
+        callbacks = [faulty_callback, working_callback]
+        sema = SynchronizedSignalSemaphore(threshold=1, callback=callbacks)
+
+        def worker():
+            sema.wait()
+
+        t = threading.Thread(target=worker)
+        t.start()
+        t.join()
+
+        # Assert that the working callback still completed its job, even though the other failed.
+        self.assertEqual(results, ["ok"])
+
+    # =================================================================
+    # ===== END OF NEW TESTS =====
+    # =================================================================
+
 
     def test_wait_timeout_argument_overrides_init_timeout(self):
         sema = SynchronizedSignalSemaphore(threshold=2, timeout=2.0)  # long init timeout
@@ -88,34 +167,27 @@ class TestSynchronizedSignalSemaphore(unittest.TestCase):
 
         self.assertLess(end_time - start_time, 0.5)
         self.assertFalse(t.is_alive())
-        self.assertEqual(sema._count, 0)  # Counter should be reset
+        self.assertEqual(sema._count, 0)
 
     def test_late_thread_raises_exception_on_broken_timeout(self):
         """
         Tests that a thread entering an already-timed-out semaphore immediately raises an exception.
         """
-        # Create a semaphore that will time out and raise an exception.
         sema = SynchronizedSignalSemaphore(threshold=2, timeout=0.1, raise_on_timeout=True)
 
         def first_worker():
-            # This thread will time out and break the semaphore's internal state.
             try:
                 sema.wait()
             except TimeoutError:
-                # This thread is expected to time out and raise, so we catch it.
                 pass
 
-        # Start the first thread and wait for it to time out.
         t1 = threading.Thread(target=first_worker)
         t1.start()
         t1.join(0.5)
 
-        # Assert that the semaphore is in the expected broken state after the timeout.
         self.assertFalse(t1.is_alive())
-        # The semaphore is in a released state to unblock other threads, but it's not 'spent' in the logical sense.
         self.assertTrue(sema._released)
 
-        # Now, start a second thread to enter the "broken" semaphore.
         def late_worker(raised_flag):
             try:
                 sema.wait()
@@ -125,9 +197,8 @@ class TestSynchronizedSignalSemaphore(unittest.TestCase):
         late_thread_raised_flag = {"status": False}
         t2 = threading.Thread(target=late_worker, args=(late_thread_raised_flag,))
         t2.start()
-        t2.join(0.1)  # Give it time to run the check at the start of wait()
+        t2.join(0.1)
 
-        # Assert that the late thread immediately raised the exception.
         self.assertFalse(t2.is_alive())
         self.assertTrue(late_thread_raised_flag["status"], "Late thread should have raised a TimeoutError.")
 
@@ -145,12 +216,11 @@ class TestSynchronizedSignalSemaphore(unittest.TestCase):
         t = threading.Thread(target=worker)
         t.start()
 
-        time.sleep(0.1)  # Let the thread start waiting
+        time.sleep(0.1)
         sema.dispose()
         t.join(0.5)
 
         self.assertFalse(t.is_alive())
-        # The result should be False, not a TimeoutError, because dispose() takes precedence.
         self.assertEqual(result, [False])
 
     def test_count_decrements_after_timeout(self):
@@ -161,33 +231,25 @@ class TestSynchronizedSignalSemaphore(unittest.TestCase):
 
         t1 = threading.Thread(target=worker)
         t1.start()
-
-        # Wait for the thread to timeout and exit the wait() method.
         time.sleep(0.5)
 
-        # The thread's wait() call has exited, so the counter should have been decremented.
         self.assertEqual(sema._count, 0)
         self.assertFalse(t1.is_alive())
 
     def test_reusable_after_timeout_and_reset(self):
-        """
-        Tests that a reusable semaphore can be used again after a timeout.
-        """
         sema = SynchronizedSignalSemaphore(threshold=2, reusable=True, timeout=0.1)
 
-        # --- First round: Cause a timeout ---
         def worker1():
             return sema.wait()
 
         t1 = threading.Thread(target=worker1)
         t1.start()
-        t1.join(0.5)  # Wait for it to time out
+        t1.join(0.5)
 
         self.assertFalse(t1.is_alive())
-        self.assertEqual(sema._count, 0)  # Counter should have been decremented
-        self.assertFalse(sema._released)  # Should have reset after the thread left
+        self.assertEqual(sema._count, 0)
+        self.assertFalse(sema._released)
 
-        # --- Second round: Use it for a normal release ---
         results = []
 
         def worker2():
@@ -196,16 +258,14 @@ class TestSynchronizedSignalSemaphore(unittest.TestCase):
 
         t2_1 = threading.Thread(target=worker2)
         t2_2 = threading.Thread(target=worker2)
-
         t2_1.start()
         time.sleep(0.1)
         t2_2.start()
-
         t2_1.join()
         t2_2.join()
 
         self.assertCountEqual(results, [True, True])
-        self.assertEqual(sema._count, 0)  # Should be reset again
+        self.assertEqual(sema._count, 0)
 
     def test_notify_all_override_unblocks_threads(self):
         sema = SynchronizedSignalSemaphore(threshold=5, reusable=True)
@@ -216,13 +276,10 @@ class TestSynchronizedSignalSemaphore(unittest.TestCase):
             results.append(i)
 
         threads = [threading.Thread(target=worker, args=(i,)) for i in range(5)]
-
         for t in threads:
             t.start()
-
-        time.sleep(0.1)  # Let threads block
+        time.sleep(0.1)
         sema.notify_all_override()
-
         for t in threads:
             t.join()
 
@@ -230,5 +287,4 @@ class TestSynchronizedSignalSemaphore(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    # Use argv=[] to prevent unittest from trying to parse command-line arguments.
     unittest.main(argv=['first-arg-is-ignored'], exit=False)

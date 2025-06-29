@@ -357,6 +357,83 @@ class TestSignalBarrier(unittest.TestCase):
         self.assertTrue(barrier._broken)
         self.assertTrue(barrier._released)
 
+        # =================================================================
+        # ===== NEW TESTS FOR ADVANCED CALLBACK FUNCTIONALITY =====
+        # =================================================================
+
+    def test_group_with_single_direct_callback(self):
+        """
+        Tests that a group works correctly when a single callable is passed
+        directly to the `callbacks` argument without being in a list.
+        """
+        results = []
+        # Pass a single lambda function directly
+        barrier = SynchronizedSignalBarrier(groups=[Group(2, callbacks=lambda: results.append("fired"))])
+        barrier.enable()
+
+        def thread_func():
+            barrier.wait(0)
+
+        threads = [threading.Thread(target=thread_func) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Assert that the single callback was executed
+        self.assertEqual(results, ["fired"])
+
+    def test_group_with_multiple_callbacks_in_list(self):
+        """
+        Tests that for a single group, a list of multiple callbacks are all executed.
+        """
+        results = []
+        # Pass a list of two lambda functions to a single group
+        callbacks = [
+            lambda: results.append("cb1_fired"),
+            lambda: results.append("cb2_fired")
+        ]
+        barrier = SynchronizedSignalBarrier(groups=[Group(2, callbacks=callbacks)])
+        barrier.enable()
+
+        def thread_func():
+            barrier.wait(0)
+
+        threads = [threading.Thread(target=thread_func) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Use assertCountEqual because the execution order isn't guaranteed
+        self.assertCountEqual(results, ["cb1_fired", "cb2_fired"])
+
+    def test_exception_in_group_callback_does_not_stop_others(self):
+        """
+        Tests that if one callback in a group's list raises an exception, the others still run.
+        """
+        results = []
+
+        def faulty_callback():
+            raise ValueError("This is a test exception")
+
+        def working_callback():
+            results.append("ok")
+
+        # Create a list with a faulty callback and a working one for the group
+        callbacks = [faulty_callback, working_callback]
+        barrier = SynchronizedSignalBarrier(groups=[Group(1, callbacks=callbacks)])
+        barrier.enable()
+
+        def thread_func():
+            barrier.wait(0)
+
+        t = threading.Thread(target=thread_func)
+        t.start()
+        t.join()
+
+        # Assert that the working callback still completed its job, even though the other failed.
+        self.assertEqual(results, ["ok"])
     def test_late_thread_raises_exception_on_broken_barrier(self):
         barrier = SynchronizedSignalBarrier(groups=[Group(2)], timeout=0.1, raise_on_timeout=True)
         barrier.enable()
