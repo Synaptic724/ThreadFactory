@@ -1,8 +1,7 @@
 from typing import Callable, List, Optional
 import threading
 from thread_factory.utils import IDisposable, RouterGroup, Group
-from thread_factory.primitives.signal_barrier import SignalBarrier
-from thread_factory.primitives.dynaphore import Dynaphore
+from thread_factory.primitives import MultiConductor, Dynaphore, Conductor
 
 
 class Router(IDisposable):

@@ -58,7 +58,7 @@ Ideal for:
 
 ---
 
-### 🚦 `SynchronizedSignalSemaphore` — *Robust, Time-Aware Group Coordination*
+### 🚦 `Conductor` — *Robust, Time-Aware Group Coordination*
 
 A **reusable, fault-tolerant threshold gate** that waits for a required number of threads to arrive, offering advanced control over its lifecycle. It combines the simplicity of a barrier with sophisticated timeout and error-handling features.
 
@@ -137,7 +137,7 @@ A **coordinated, threshold-aware barrier** that waits for **groups of threads** 
 ---
 
 
-### 🧱 `SynchronizedSignalBarrier` — *Multi-Group Thread Coordination with Threshold Control and Timeout Control*
+### 🧱 `MultiConductor` — *Multi-Group Thread Coordination with Threshold Control and Timeout Control*
 
 A **coordinated, threshold-aware barrier** that blocks threads until **multiple, independent groups** each meet their own predefined thread count. 
 Once all groups are "ready," the barrier releases all waiting threads. 
