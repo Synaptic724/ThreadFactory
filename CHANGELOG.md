@@ -47,6 +47,8 @@ Ideal for:
 ### 🎯 `ThresholdSemaphore` — *Multi-thread Activation Semaphore*
 
 A reusable **threshold gate** that blocks threads until a required number arrive with optional callable execution.
+Basically a barrier with a callable trigger.
+
 Ideal for:
 - Thread group synchronization  
 - Step-based orchestration  

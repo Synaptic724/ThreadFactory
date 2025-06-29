@@ -1,7 +1,7 @@
 import unittest
 import threading
 import time
-from thread_factory.primitives.synchronized_signal_semaphore import SynchronizedSignalSemaphore
+from thread_factory.primitives.conductor import SynchronizedSignalSemaphore
 
 
 class TestSynchronizedSignalSemaphore(unittest.TestCase):

@@ -6,9 +6,9 @@ from thread_factory.utils import IDisposable, Group
 
 # Assuming Group class is defined as above
 
-class SynchronizedSignalBarrier(IDisposable):
+class MultiConductor(IDisposable):
     """
-    SynchronizedSignalBarrier
+    MultiConductor
     -------------
     A coordinated multi-group barrier that blocks threads until each group meets
     its own threshold. Once all groups are "ready", the barrier releases all waiting
@@ -24,7 +24,7 @@ class SynchronizedSignalBarrier(IDisposable):
             raise_on_timeout: bool = False
     ):
         """
-        Initializes the SynchronizedSignalBarrier.
+        Initializes the MultiConductor.
 
         Args:
             groups (Optional[List[Group]]): A list of Group objects, each with a threshold.

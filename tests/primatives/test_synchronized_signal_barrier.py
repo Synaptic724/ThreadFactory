@@ -45,7 +45,7 @@ class IDisposable:
 
 
 # Assuming SynchronizedSignalBarrier is in this path and uses the updated Group
-from thread_factory.primitives.synchronized_signal_barrier import SynchronizedSignalBarrier
+from thread_factory.primitives.multi_conductor import SynchronizedSignalBarrier
 
 
 class TestSignalBarrier(unittest.TestCase):
