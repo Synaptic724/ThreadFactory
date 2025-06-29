@@ -1,6 +1,9 @@
 import threading
 import time
 from typing import Any, Optional, Type
+
+import ulid
+
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 
@@ -14,6 +17,7 @@ class Outcome(IDisposable):
 
     def __init__(self):
         super().__init__()
+        self._task_id: Optional[ulid.ULID] = None
         self._result: Any = None
         self._exception: Optional[Exception] = None
         self._is_done: bool = False

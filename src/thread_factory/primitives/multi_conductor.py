@@ -1,11 +1,7 @@
 import threading
 import time
 from typing import Any, Callable, List, Optional
-
-# Assuming Group, Outcome, IDisposable, and inspect are available
-# from your project structure.
 from thread_factory.utils import Group, IDisposable
-from thread_factory.utils.coordination.outcome import Outcome
 
 
 class MultiConductor(IDisposable):
@@ -95,7 +91,7 @@ class MultiConductor(IDisposable):
         self._total_waiting_threads = 0
 
     @property
-    def all_outcomes(self) -> List[Outcome]:
+    def all_outcomes(self) -> List['Outcome']:
         """A convenience property to get a flat list of all outcomes from all groups."""
         if self.disposed: return []
         return [outcome for group in self.groups for outcome in group.outcomes]

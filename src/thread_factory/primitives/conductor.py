@@ -2,9 +2,7 @@ import inspect
 import threading
 import time
 from typing import Optional, Callable, List, Union, Any
-
-# Assuming IDisposable and Outcome are available from a utils package
-from thread_factory.utils import IDisposable, Outcome
+from thread_factory.utils import IDisposable
 
 
 class Conductor(IDisposable):
@@ -103,14 +101,23 @@ class Conductor(IDisposable):
                 if inspect.iscoroutinefunction(task):
                     raise TypeError("Coroutines are not supported; only synchronous callables are allowed.")
                 self.tasks.append(task)
-
-        self.outcomes: List[Outcome] = [Outcome() for _ in self.tasks]
+        self.outcomes = None
+        self.create_outcomes()  # Initialize outcomes for tasks
         self._lock = threading.Lock()
         self._condition = threading.Condition(self._lock)
         self._count = 0
         self._released = False
         self._broken = False
         self._start_time = None
+
+    def create_outcomes(self) -> None:
+        """Creates Outcome objects for each task.
+
+        This method is called internally to ensure that outcomes are created
+        when the conductor is initialized or reset.
+        """
+        from thread_factory.utils import Outcome
+        self.outcomes = [Outcome() for _ in self.tasks]
 
     def dispose(self):
         """Safely terminates the conductor, releasing all waiting threads.
@@ -135,7 +142,7 @@ class Conductor(IDisposable):
         generally not be called publicly. It clears all previous outcomes.
         """
         for o in self.outcomes: o.dispose()
-        self.outcomes = [Outcome() for _ in self.tasks]
+        self.create_outcomes()
         self._released = False
         self._broken = False
         self._start_time = None

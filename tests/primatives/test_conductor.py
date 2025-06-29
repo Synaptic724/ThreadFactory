@@ -2,12 +2,7 @@ import unittest
 import threading
 import time
 from typing import List, Any
-
 from thread_factory.primitives.conductor import Conductor
-
-
-# Assuming Conductor, Outcome, IDisposable are available
-# from thread_factory.primitives import Conductor, Outcome, IDisposable
 
 class TestConductor(unittest.TestCase):
     # ==================================================================
