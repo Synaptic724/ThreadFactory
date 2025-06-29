@@ -8,7 +8,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.3.0] - 2025-06-26
+## [1.3.0] - 2025-06-29
 
 # 🚀 ThreadFactory Changelog – Massive Concurrency Upgrade
 
@@ -53,6 +53,24 @@ Ideal for:
 - Batched execution coordination  
 
 🧠 All threads are released **only when the threshold is met** — with optional reuse for cyclic control.
+
+---
+
+### 🚦 `SynchronizedThresholdSemaphore` — *Robust, Time-Aware Group Coordination*
+
+A **reusable, fault-tolerant threshold gate** that waits for a required number of threads to arrive, offering advanced control over its lifecycle. It combines the simplicity of a barrier with sophisticated timeout and error-handling features.
+
+#### 🔑 Key Features:
+- 🕰️ **Timeout Control**: Prevents deadlocks by automatically releasing threads after a specified duration.
+- 💥 **Failure Signaling**: Can be configured to **raise a `TimeoutError`** instead of just returning `False`.
+- 🔄 **Reusable Mode**: Automatically resets its state after all threads are released, ready for the next cycle.
+- 🛑 **Broken State**: Transitions to a "broken" state upon timeout or manual override, preventing new threads from waiting.
+- 🧼 **Disposable**: Safely and cleanly unblocks all waiters during shutdown.
+
+🧠 Best for:
+- Reliable parallel processing stages
+- Coordinated task-launching with deadlines
+- Resilient group synchronization where failure is handled gracefully
 
 ---
 
