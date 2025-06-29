@@ -47,6 +47,7 @@ class Dynaphore(threading.Semaphore, IDisposable):
     ]
     def __init__(self, value: int = 1, re_entrant: bool = True):
         super().__init__(value)
+        IDisposable.__init__(self)
         if re_entrant:
             self._cond = threading.Condition()  # Uses RLock by default
         else:

@@ -835,5 +835,53 @@ class TestThresholdSemaphore(unittest.TestCase):
             semaphore.set_threshold(-1)
 
 
+    def test_increase_threshold_above_current_count(self):
+        """
+        Tests that increasing the threshold does not release threads,
+        but allows more threads to be added to meet the new threshold.
+        """
+        initial_threshold = 3
+        new_threshold = 5
+        sema = ThresholdSemaphore(threshold=initial_threshold)
+        results = []
+
+        # Start 3 threads, which will meet the initial threshold and release
+        threads_part1 = [threading.Thread(target=lambda: results.append(sema.wait())) for _ in range(initial_threshold)]
+        for t in threads_part1: t.start()
+        for t in threads_part1: t.join()
+
+        # At this point, the semaphore is spent (reusable=False by default), so change threshold has no effect.
+        # To properly test this, we need a reusable semaphore.
+        sema_reusable = ThresholdSemaphore(threshold=initial_threshold, reusable=True)
+        results_reusable = []
+
+        def worker_reusable():
+            results_reusable.append(sema_reusable.wait())
+
+        # Start 2 threads (less than the threshold)
+        threads_part1 = [threading.Thread(target=worker_reusable) for _ in range(2)]
+        for t in threads_part1: t.start()
+
+        # Wait for them to block
+        time.sleep(0.1)
+        self.assertEqual(len(results_reusable), 0)  # Should be blocked
+
+        # Now increase the threshold. They should remain blocked.
+        sema_reusable.set_threshold(new_threshold)
+        time.sleep(0.1)  # Give time for state to update
+        self.assertEqual(len(results_reusable), 0)  # Still blocked
+
+        # Now start the remaining threads to meet the new threshold
+        threads_part2 = [threading.Thread(target=worker_reusable) for _ in range(new_threshold - 2)]
+        for t in threads_part2: t.start()
+
+        # Wait for all threads to finish
+        for t in threads_part1 + threads_part2:
+            t.join()
+
+        self.assertEqual(len(results_reusable), new_threshold)  # All 5 should be released
+        self.assertTrue(all(results_reusable))
+
+
 if __name__ == '__main__':
     unittest.main()
