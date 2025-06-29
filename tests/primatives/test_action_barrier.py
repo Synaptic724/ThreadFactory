@@ -209,9 +209,11 @@ class TestThresholdSemaphore(unittest.TestCase):
     def test_manual_release_with_reusable_true(self):
         barrier = ActionBarrier(threshold=2, reusable=True, manual_release=True)
         results = []
+        ready = threading.Barrier(3)  # Main thread + 2 workers
 
         def worker(i):
             for _ in range(2):
+                ready.wait()  # Sync point to ensure both threads reach before we release
                 barrier.wait()
                 results.append(i)
 
@@ -221,10 +223,10 @@ class TestThresholdSemaphore(unittest.TestCase):
         t1.start()
         t2.start()
 
-        time.sleep(0.1)
-        barrier.release()  # Round 1
-        time.sleep(0.1)
-        barrier.release()  # Round 2
+        for _ in range(2):  # Trigger release twice
+            ready.wait()  # Wait for both threads to be ready at the barrier
+            time.sleep(0.05)  # Ensure wait() has been entered
+            barrier.release()  # Manually release the current cycle
 
         t1.join()
         t2.join()

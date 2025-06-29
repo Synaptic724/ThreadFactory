@@ -213,7 +213,7 @@ class SignalCondition(IDisposable):
                     try:
                         cb()
                     except Exception as exc:
-                        print(f"[SignalCondition] Callback error: {exc}")
+                        pass
             else:
                 # If the wait timed out, clean up the queue entry.
                 self._waiters.remove_item(waiter)
