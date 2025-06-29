@@ -1,122 +1,90 @@
 import threading
-from typing import Optional, Callable, List
+from typing import Optional, Callable, List, Union
+
 from thread_factory.utils import IDisposable, Group
 
 
 class SignalBarrier(IDisposable):
     """
-    SignalBarrier
+    SignalBarrier (V2 - Integrated with Data-Aware Group)
     -------------
     A coordinated multi-group barrier that blocks threads until each group meets
     its own threshold. Once all groups are "ready", the barrier releases all waiting
-    threads. Reusability and manual release modes are also supported.
-
-    Key Features:
-    - Thread groups are independently tracked by threshold.
-    - Supports per-group callbacks once a group is ready.
-    - Global release occurs only when all groups are ready.
-    - Reusable mode resets after all threads exit.
-    - Manual release defers release until `release()` is explicitly called.
-    - Disposable for safe shutdown.
-
-    Parameters:
-        groups (List[Group]): List of group configurations (thresholds + callbacks).
-        reusable (bool): If True, resets barrier after release.
-        manual_release (bool): If True, requires `release()` call after all groups are ready.
+    threads. This version is integrated with a data-aware `Group` class, allowing
+    it to execute tasks and collect outcomes when a group becomes ready.
     """
 
     def __init__(
-        self,
-        groups: Optional[List[Group]] = None,
-        reusable: bool = False,
-        manual_release: bool = False
+            self,
+            groups: Optional[List[Group]] = None,
+            reusable: bool = False,
+            manual_release: bool = False
     ):
         super().__init__()
-        self.groups = groups if groups is not None else []     # List of Group objects managing thresholds
-        self._enabled = bool(groups)                           # Auto-enable if groups are pre-supplied
-        self.reusable = reusable                               # Determines if barrier resets after release
-        self.manual_release = manual_release                   # If True, requires explicit call to `release()`
-        self._lock = threading.Lock()                          # Lock for thread-safe operations
-        self._condition = threading.Condition(self._lock)      # Condition variable for thread coordination
-        self._released = False                                 # Tracks global barrier release state
+        self.groups = groups if groups is not None else []
+        self._enabled = bool(groups)
+        self.reusable = reusable
+        self.manual_release = manual_release
+        self._lock = threading.RLock()
+        self._condition = threading.Condition(self._lock)
+        self._released = False
 
     def dispose(self):
         """
-        Terminates the barrier and releases all waiting threads immediately.
+        Disposes of the barrier and all associated groups, releasing waiting threads.
         Once disposed, the object cannot be reused.
         """
         if self._disposed:
             return
-        self._disposed = True
+
         with self._condition:
+            self._disposed = True
+            if self.groups:
+                for group in self.groups:
+                    group.dispose()
+                self.groups.clear()
+
             self._released = True
             self._condition.notify_all()
 
-    def get_group_index(self, match: Callable[[Group], bool]) -> int:
+    def add_group(self, threshold: int, tasks: Optional[Union[Callable, List[Callable]]] = None):
         """
-        Dynamically retrieves the index of the first group matching a condition.
+        Adds a data-aware group to the barrier before it is enabled.
 
         Args:
-            match (Callable): A predicate that returns True for the matching group.
-
-        Returns:
-            int: The index of the matched group.
-
-        Raises:
-            ValueError: If no matching group is found.
-        """
-        for i, g in enumerate(self.groups):
-            if match(g):
-                return i
-        raise ValueError("No group matched the provided condition.")
-
-    def add_group(self, threshold: int, callback: Optional[Callable] = None):
-        """
-        Adds a group to the barrier before it is enabled.
-
-        Args:
-            threshold (int): Number of threads required to mark the group as 'ready'.
-            callback (Callable, optional): Called when the group's threshold is reached.
-
-        Raises:
-            RuntimeError: If called after the barrier is enabled.
+            threshold (int): Number of threads required for the group to be 'ready'.
+            tasks (Optional): A function or list of functions to be executed
+                              when the group's threshold is reached.
         """
         if self._enabled:
-            raise RuntimeError("Cannot add groups after enable()")
-        self.groups.append(Group(threshold, callback))
+            raise RuntimeError("Cannot add groups after the barrier is enabled.")
+        self.groups.append(Group(threshold, tasks))
 
     def enable(self):
         """
-        Enables the barrier. Must be called if no groups were passed to constructor.
-
-        Raises:
-            ValueError: If no groups were added before enabling.
+        Enables the barrier. Must be called if no groups were passed to the constructor.
         """
         if self._enabled:
             return
         if not self.groups:
-            raise ValueError("No groups to enable.")
+            raise ValueError("Cannot enable the barrier with no groups added.")
         self._enabled = True
 
     def release(self):
         """
-        Manually releases the barrier after all groups are marked ready.
-        Only applicable when `manual_release=True`.
+        Manually releases the barrier if all groups are ready.
+        Only effective when `manual_release=True`.
         """
         with self._condition:
-            if self._disposed:
-                return
+            if self._disposed: return
             if self.manual_release and not self._released and all(g.ready for g in self.groups):
                 self._released = True
                 self._condition.notify_all()
 
     def wait(self, group_index: int, timeout: Optional[float] = None) -> bool:
         """
-        Waits until the barrier is released. Threads are grouped via `group_index`.
-
-        - If a group's threshold is met, its `callback` is triggered.
-        - Barrier is released when *all groups* are ready.
-        - If `manual_release=True`, barrier will only release after `release()` is called.
+        A thread calls this to wait until the barrier is released. When its group's
+        threshold is met, that group's tasks are executed by the completing thread.
 
         Args:
             group_index (int): Index of the group this thread belongs to.
@@ -124,9 +92,6 @@ class SignalBarrier(IDisposable):
 
         Returns:
             bool: True if released successfully, False if disposed or timed out.
-
-        Raises:
-            RuntimeError: If `enable()` hasn't been called.
         """
         if not self._enabled:
             raise RuntimeError("SignalBarrier not enabled. Call enable() or provide groups.")
@@ -138,55 +103,54 @@ class SignalBarrier(IDisposable):
 
             group.count += 1
 
-            if group.count == group.threshold and not group._released_once:
+            # If this thread completes the group, it becomes responsible for running the tasks.
+            if group.count == group.threshold and not group.ready:
                 group.ready = True
-                group._released_once = True
-                if group.callback:
-                    try:
-                        group.callback()
-                    except Exception:
-                        pass  # Do not let callback failures halt barrier logic
 
+                # Execute all tasks associated with this group
+                for i, task in enumerate(group.tasks):
+                    outcome = group.outcomes[i]
+                    try:
+                        result = task()
+                        outcome.set_result(result)
+                    except Exception as e:
+                        outcome.set_exception(e)
+
+            # Check if all groups are now ready to globally release the barrier
             if all(g.ready for g in self.groups) and not self.manual_release:
                 self._released = True
                 self._condition.notify_all()
 
+            # Wait for the global release signal (_released = True)
             released = self._condition.wait_for(lambda: self._released or self._disposed, timeout=timeout)
 
-            # Reset logic if reusable
+            # If reusable, decrement count and reset states as threads exit
             if released and self.reusable:
                 group.count -= 1
+                # If this was the last thread to exit the group, reset the group
                 if group.count == 0:
-                    group.ready = False
-                    group._released_once = False
+                    group.reset()
+
+                # If all threads from all groups have exited, reset the barrier
                 if all(g.count == 0 for g in self.groups):
                     self._released = False
 
             return released and not self._disposed
 
+    # Other helper methods from your original class
+    def get_group_index(self, match: Callable[[Group], bool]) -> int:
+        for i, g in enumerate(self.groups):
+            if match(g):
+                return i
+        raise ValueError("No group matched the provided condition.")
+
     def notify_all_override(self):
-        """
-        Immediately overrides group readiness and releases all waiting threads.
-
-        - Marks all groups as ready
-        - Sets `_released = True`
-        - Notifies all threads
-
-        Useful for shutdown, testing, or admin overrides.
-        """
         with self._condition:
-            if self._disposed:
-                return
+            if self._disposed: return
             self._released = True
             for g in self.groups:
                 g.ready = True
             self._condition.notify_all()
 
     def is_spent(self) -> bool:
-        """
-        Checks if the barrier has released and is no longer reusable.
-
-        Returns:
-            bool: True if the barrier has completed and won't reset.
-        """
         return self._released and not self.reusable
