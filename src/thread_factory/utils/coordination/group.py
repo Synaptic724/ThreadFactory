@@ -13,9 +13,9 @@ class Group:
     - A live `count` of threads that have entered the group
     - A `ready` flag to indicate the group has satisfied its threshold
     """
-
-    def __init__(self, threshold: int, callback: Optional[Callable[[], None]] = None):
+    def __init__(self, threshold: int, callback: Optional[Callable] = None):
         self.threshold = threshold
         self.callback = callback
         self.count = 0
         self.ready = False
+        self._released_once = False

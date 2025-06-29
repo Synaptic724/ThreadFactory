@@ -117,19 +117,21 @@ class TestSignalBarrier(unittest.TestCase):
         triggered = []
 
         def wait_and_mark():
-            if barrier.wait(0):
-                triggered.append("unblocked")
+            result = barrier.wait(0)
+            triggered.append(result)
 
         t1 = threading.Thread(target=wait_and_mark)
         t2 = threading.Thread(target=wait_and_mark)
 
-        t1.start(); t2.start()
+        t1.start();
+        t2.start()
         time.sleep(0.1)
         barrier.dispose()
-        t1.join(); t2.join()
+        t1.join();
+        t2.join()
 
         self.assertTrue(barrier._disposed)
-        self.assertEqual(len(triggered), 2)  # Both were woken up due to dispose but did not proceed with work
+        self.assertEqual(triggered, [True, True])
 
     def test_multiple_groups_all_synchronize(self):
         triggered_groups = []
@@ -149,7 +151,6 @@ class TestSignalBarrier(unittest.TestCase):
         results: list[tuple[int, bool]] = []
         threads = []
 
-        # Launch 2 threads for each group (6 total)
         for i in range(3):
             for _ in range(2):
                 t = threading.Thread(target=worker, args=(i, results))
@@ -161,7 +162,7 @@ class TestSignalBarrier(unittest.TestCase):
 
         self.assertEqual(len(results), 6)
         self.assertTrue(all(released for (_, released) in results))
-        self.assertEqual(sorted(triggered_groups), [0, 1, 2])  # All callbacks ran
+        self.assertEqual(sorted(triggered_groups), [0, 1, 2])
 
     def test_reusable_barrier_allows_multiple_cycles(self):
         call_count = [0, 0]
@@ -177,7 +178,7 @@ class TestSignalBarrier(unittest.TestCase):
         ]
         barrier = SignalBarrier(groups, reusable=True)
 
-        def run_cycle(result_store: list[bool]):
+        def run_cycle(result_store: list[list[bool]]):
             local = []
 
             def thread_fn(idx):
@@ -195,7 +196,6 @@ class TestSignalBarrier(unittest.TestCase):
         run_cycle(result_storage)
         run_cycle(result_storage)
 
-        # Two full cycles
         self.assertEqual(call_count, [2, 2])
         for cycle_result in result_storage:
             self.assertTrue(all(cycle_result))
@@ -219,7 +219,7 @@ class TestSignalBarrier(unittest.TestCase):
         for t in threads:
             t.start()
 
-        time.sleep(0.2)  # Let threads reach barrier
+        time.sleep(0.2)
         barrier.release()
 
         for t in threads:
