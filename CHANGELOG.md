@@ -12,7 +12,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 # 🚀 ThreadFactory Changelog – Massive Concurrency Upgrade
 
-## 🧠 New Primitives – Welcome to the Age of Agentic Threads
+## 🧠 New Primitives – Welcome to the Age of Dynamic Threads
 
 ---
 
@@ -101,6 +101,19 @@ Lightweight condition primitive with:
   - One-shot wakeups
   - Embedded coordination where `SmartCondition` would be overkill
 
+---
+
+### 🧱 `SignalBarrier` — *Multi-Group Thread Coordination with Threshold Control*
+
+A **coordinated, threshold-aware barrier** that waits for **groups of threads** to reach readiness before proceeding. Think of it as a **multi-latch** that only opens when *all* teams are in position.
+
+#### 🔑 Key Features:
+- 🧮 **Per-group thresholds**: Each group waits for a specific number of threads
+- 🧠 **Per-group callbacks**: Trigger logic once a group is ready
+- 🔒 **Manual or auto release**: Full control over when threads are unblocked
+- 🔁 **Reusable mode**: Automatically resets after all threads exit
+- 🧼 **Disposable**: Cleanly shuts down and unblocks all waiters
+- 
 ---
 
 ### ⏲️ `AutoResetTimer` — *Heartbeat for Workers*

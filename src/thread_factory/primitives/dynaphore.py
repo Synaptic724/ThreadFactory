@@ -142,3 +142,12 @@ class Dynaphore(threading.Semaphore, IDisposable):
             Delegates to `Semaphore.release()` but prints helpful diagnostics.
         """
         self.release(n)
+
+
+    def release_all(self):
+        """
+        Releases all permits and notifies all waiting threads.
+
+        This method resets the semaphore to its initial state.
+        """
+        self._cond.notify_all()

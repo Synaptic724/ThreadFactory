@@ -232,6 +232,26 @@ class TestClockBarrier(unittest.TestCase):
         self.assertEqual(flag["hits"], 1)
 
     # ------------------------------------------------------------------ #
+    # 16 – single thread timeout when requiring more
+    # ------------------------------------------------------------------ #
+    def test_single_thread_timeout(self):
+        # Create a barrier requiring 2 threads to pass
+        barrier = ClockBarrier(2, timeout=0.05)
+
+        # Define the worker that will wait at the barrier
+        def worker():
+            with self.assertRaises(BROKEN):
+                barrier.wait()
+
+        # Start a single thread, which will timeout
+        t1 = threading.Thread(target=worker)
+        t1.start()
+        t1.join()
+
+        # Check if the barrier is broken
+        self.assertTrue(barrier.is_broken())
+
+    # ------------------------------------------------------------------ #
     # 12 – successive successful generations
     # ------------------------------------------------------------------ #
     def test_repeated_success_without_reset(self):
