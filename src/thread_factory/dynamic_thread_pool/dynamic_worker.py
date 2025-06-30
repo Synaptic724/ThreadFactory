@@ -2,8 +2,8 @@ from typing import Callable, Optional, Any
 from thread_factory.runtime import Worker, WorkerState
 from thread_factory.dynamic_thread_pool.help_request import HelpRequest
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
+from thread_factory.utils.general_helpers.coroutine_helpers import CoroutineHelpers
 import threading
-
 
 class DynamicWorker(Worker):
     """
@@ -40,6 +40,62 @@ class DynamicWorker(Worker):
     This class is ideal for scenarios requiring autonomous agents, long-running
     processes with state, and dynamic task execution in thread-pooled systems.
 
+    Attributes:
+        _save_points (dict[str, Callable[[], None]]):
+            A private dictionary storing named callable functions. These functions
+            represent points in the worker's execution flow that can be returned to,
+            serving as "checkpoints" or "resume points" for complex behaviors.
+            Each key is a string name, and each value is a parameterless callable.
+            Exposed via `get_save_points_dict()`.
+
+        _locations (dict[str, Callable[[], None]]):
+            A private dictionary storing named callable functions. These functions
+            represent distinct "execution zones" or specialized behaviors that the
+            worker can dynamically "move into" or invoke.
+            Each key is a string name, and each value is a parameterless callable.
+            Exposed via `get_locations_dict()`.
+
+        _event_loop (Optional[Callable[[], None]]):
+            A private, optional callable that defines the worker's primary
+            or "home" execution loop. This function is invoked when the worker's
+            `run` method is called, dictating its default behavior. It must be
+            set before the worker starts via `set_home()`.
+
+        _value_work (HelpRequest | None):
+            A private, optional `HelpRequest` instance. When set, this
+            represents the specific unit of work (job) that this `DynamicWorker`
+            is currently responsible for processing. Its lifecycle is managed
+            by methods within this class (e.g., `set_value_work()`, `get_value_work()`).
+
+        _worker_type (str):
+            A string identifier specifying the type of this worker.
+            Hardcoded to "dynamic" to distinguish it from other worker types.
+
+        _inventory (threading.local):
+            A `threading.local()` object. This ensures that the `data` dictionary
+            stored within it (`_inventory.data`) is strictly private and accessible
+            only to the thread associated with this specific `DynamicWorker` instance.
+            It prevents data conflicts in multi-threaded environments. This acts as
+            the worker's personal memory or scratchpad. Data is accessed via
+            `bind_to_inventory()` and `get_from_inventory()`.
+
+        _shared_inventory (dict[str, Any]):
+            A private, standard Python dictionary that serves as a global repository
+            for data accessible by all `DynamicWorker` instances (and potentially
+            other components of the system). Access to this inventory should consider
+            thread-safety mechanisms if concurrent writes are expected from multiple workers.
+            Accessed via `set_shared_inventory_item()`, `get_shared_inventory_item()`,
+            and `get_shared_inventory()`.
+
+        _data_transfer (dict[str, Callable[..., Any]]):
+            A private dictionary mapping string names to callable functions.
+            These callables are designed to facilitate data movement or processing
+            within the worker. They act as named pipelines or transformations
+            that can be invoked to handle specific data-related operations via
+            `execute_transfer()`. Each callable should typically be parameterless
+            for direct execution via `execute_transfer()`.
+            Exposed via `get_data_transfer_dict()` and `register_data_transfer()`.
+
     Example Usage:
     ```python
     from thread_factory.runtime import WorkerConfig
@@ -54,7 +110,7 @@ class DynamicWorker(Worker):
 
     def my_home_behavior():
         print(f"Worker {threading.current_thread().factory_id} is at home, checking for work...")
-        if worker._value_work:
+        if worker.get_value_work(): # Use getter
             worker.acquire_and_run_work()
             if worker.get_work_state() == WorkStatus.COMPLETED:
                 print(f"Worker {threading.current_thread().factory_id} successfully completed work!")
@@ -64,8 +120,8 @@ class DynamicWorker(Worker):
         else:
             print(f"Worker {threading.current_thread().factory_id} has no work bound.")
         # Optionally, move to a registered location or save point
-        if "upload" in worker.locations:
-            worker.locations["upload"]()
+        if "upload_process" in worker.get_locations_dict(): # Use getter
+            worker.get_locations_dict()["upload_process"]() # Use getter
 
 
     # Create a DynamicWorker instance
@@ -82,9 +138,9 @@ class DynamicWorker(Worker):
     # Set the worker's default 'home' behavior
     worker.set_home(my_home_behavior)
 
-    # Create a dummy HelpRequest and bind it
+    # Create a dummy HelpRequest and bind it (using new setter)
     dummy_request = HelpRequest(job_id="job_001", job_data={"file": "report.pdf"})
-    worker._value_work = dummy_request # Directly binding for example purposes
+    worker.set_value_work(dummy_request) # Using the new setter method
 
     # Start the worker thread
     worker.start()
@@ -109,54 +165,19 @@ class DynamicWorker(Worker):
         """
         super().__init__(*args, **kwargs)
 
-        # --- Behavior Coordination ---
-        # `save_points`: A dictionary storing named callable functions. These functions
-        # represent points in the worker's execution flow that can be returned to,
-        # serving as "checkpoints" or "resume points" for complex behaviors.
-        # Each key is a string name, and each value is a parameterless callable.
-        self.save_points: dict[str, Callable[[], None]] = {}
-        # `locations`: A dictionary storing named callable functions. These functions
-        # represent distinct "execution zones" or specialized behaviors that the
-        # worker can dynamically "move into" or invoke. Similar to save_points,
-        # each key is a string name, and each value is a parameterless callable.
-        self.locations: dict[str, Callable[[], None]] = {}
-        # `_event_loop`: An optional callable that defines the worker's primary
-        # or "home" execution loop. This function is invoked when the worker's
-        # `run` method is called, dictating its default behavior. It must be
-        # set before the worker starts.
+        # --- Behavior Coordination (Private Attributes) ---
+        self._save_points: dict[str, Callable[[], None]] = {}
+        self._locations: dict[str, Callable[[], None]] = {}
         self._event_loop: Optional[Callable[[], None]] = None
-        # `_value_work`: An optional `HelpRequest` instance. When set, this
-        # represents the specific unit of work (job) that this `DynamicWorker`
-        # is currently responsible for processing. Its lifecycle is managed
-        # by methods within this class.
         self._value_work: HelpRequest | None = None
-        # `_worker_type`: A string identifier specifying the type of this worker.
-        # Hardcoded to "dynamic" to distinguish it from other worker types.
         self._worker_type = "dynamic"
 
-        # --- Agentic Memory (Inventory) ---
-        # `_inventory`: A `threading.local()` object. This ensures that the
-        # `data` dictionary stored within it is strictly private and accessible
-        # only to the thread associated with this specific `DynamicWorker` instance.
-        # It prevents data conflicts in multi-threaded environments.
+        # --- Agentic Memory (Inventory) (Private Attributes) ---
         self._inventory = threading.local()
-        # `_inventory.data`: The actual dictionary used to store thread-local,
-        # private key-value data for this worker. This acts as the worker's
-        # personal memory or scratchpad.
         self._inventory.data = {}
-        # `shared_inventory`: A standard Python dictionary that serves as a
-        # global repository for data accessible by all `DynamicWorker` instances
-        # (and potentially other components of the system). Access to this
-        # inventory should consider thread-safety mechanisms if concurrent writes
-        # are expected from multiple workers.
-        self.shared_inventory: dict[str, Any] = {}
-        # `data_transfer`: A dictionary mapping string names to callable functions.
-        # These callables are designed to facilitate data movement or processing
-        # within the worker. They act as named pipelines or transformations
-        # that can be invoked to handle specific data-related operations.
-        # Each callable should typically be parameterless for direct execution
-        # via `execute_transfer`.
-        self.data_transfer: dict[str, Callable[..., Any]] = {}
+        self._shared_inventory: dict[str, Any] = {}
+        self._data_transfer: dict[str, Callable[..., Any]] = {}
+
 
     # --- Core Work Lifecycle Handling ---
     def set_work_state(self, new_state: WorkStatus) -> None:
@@ -170,9 +191,7 @@ class DynamicWorker(Worker):
             new_state (WorkStatus): The new status to apply to the bound work
                                     (e.g., WorkStatus.IN_PROGRESS, WorkStatus.COMPLETED).
         """
-        # Checks if a HelpRequest (`_value_work`) is currently bound to this worker.
         if self._value_work:
-            # Delegates the state update to the bound HelpRequest object.
             self._value_work.set_state(new_state)
 
     def get_work_state(self) -> Optional[WorkStatus]:
@@ -187,12 +206,33 @@ class DynamicWorker(Worker):
                                   WorkStatus.PENDING, WorkStatus.COMPLETED),
                                   or `None` if no `HelpRequest` is currently bound.
         """
-        # Checks if a HelpRequest (`_value_work`) is currently bound to this worker.
         if self._value_work:
-            # Returns the current status directly from the bound HelpRequest.
             return self._value_work.get_state()
-        # If no work is bound, indicates by returning None.
         return None
+
+    def get_value_work(self) -> Optional[HelpRequest]:
+        """
+        Retrieves the `HelpRequest` instance currently bound to this worker.
+
+        This provides controlled read access to the active work item.
+
+        Returns:
+            Optional[HelpRequest]: The bound `HelpRequest` object, or `None` if
+                                   no work is currently assigned.
+        """
+        return self._value_work
+
+    def set_value_work(self, help_request: HelpRequest) -> None:
+        """
+        Binds a `HelpRequest` instance to this worker.
+
+        This method assigns a specific unit of work for the `DynamicWorker`
+        to process.
+
+        Args:
+            help_request (HelpRequest): The `HelpRequest` object to bind to the worker.
+        """
+        self._value_work = help_request
 
     def mark_work_in_progress(self) -> None:
         """
@@ -201,9 +241,7 @@ class DynamicWorker(Worker):
         This is a convenience method for quickly updating the work status
         to indicate active processing.
         """
-        # Checks if a HelpRequest is bound.
         if self._value_work:
-            # Updates the state of the bound HelpRequest to WorkStatus.IN_PROGRESS.
             self._value_work.mark_in_progress()
 
     def mark_work_completed(self) -> None:
@@ -212,9 +250,7 @@ class DynamicWorker(Worker):
 
         This signals successful conclusion of the assigned work.
         """
-        # Checks if a HelpRequest is bound.
         if self._value_work:
-            # Updates the state of the bound HelpRequest to WorkStatus.COMPLETED.
             self._value_work.mark_completed()
 
     def mark_work_failed(self) -> None:
@@ -223,9 +259,7 @@ class DynamicWorker(Worker):
 
         This indicates that the assigned work could not be successfully completed.
         """
-        # Checks if a HelpRequest is bound.
         if self._value_work:
-            # Updates the state of the bound HelpRequest to WorkStatus.FAILED.
             self._value_work.mark_failed()
 
     def mark_work_cancelled(self) -> None:
@@ -234,9 +268,7 @@ class DynamicWorker(Worker):
 
         This is used when the assigned work has been externally aborted or withdrawn.
         """
-        # Checks if a HelpRequest is bound.
         if self._value_work:
-            # Updates the state of the bound HelpRequest to WorkStatus.CANCELLED.
             self._value_work.mark_cancelled()
 
     def reset_work(self) -> None:
@@ -245,9 +277,7 @@ class DynamicWorker(Worker):
 
         This can be useful for retrying failed work or re-queuing a task.
         """
-        # Checks if a HelpRequest is bound.
         if self._value_work:
-            # Resets the state of the bound HelpRequest to WorkStatus.PENDING.
             self._value_work.reset()
 
     def get_work_record(self) -> Optional[Record]:
@@ -260,11 +290,8 @@ class DynamicWorker(Worker):
         Returns:
             Optional[Record]: The `Record` instance if work is bound, otherwise `None`.
         """
-        # Checks if a HelpRequest is bound.
         if self._value_work:
-            # Returns the Record object from the bound HelpRequest.
             return self._value_work.get_record()
-        # Returns None if no work is currently bound.
         return None
 
     def acquire_and_run_work(self):
@@ -275,10 +302,7 @@ class DynamicWorker(Worker):
         its designated task. The actual work logic resides within the `HelpRequest`
         implementation.
         """
-        # Checks if a HelpRequest is currently bound to the worker.
         if self._value_work:
-            # Calls the `acquire_work` method on the bound HelpRequest, which typically
-            # handles the execution of the work item.
             self._value_work.acquire_work()
 
     def cancel_bound_job(self):
@@ -288,9 +312,7 @@ class DynamicWorker(Worker):
         This method triggers the cancellation mechanism defined within the
         `HelpRequest`, potentially stopping ongoing work gracefully.
         """
-        # Checks if a HelpRequest is currently bound.
         if self._value_work:
-            # Invokes the `cancel_job` method on the bound HelpRequest.
             self._value_work.cancel_job()
 
     def dispose_work(self) -> None:
@@ -301,11 +323,8 @@ class DynamicWorker(Worker):
         This is typically called when a work item is no longer needed or after
         its completion/failure, allowing for resource cleanup.
         """
-        # Checks if a HelpRequest is currently bound.
         if self._value_work:
-            # Calls the `dispose` method on the bound HelpRequest for cleanup.
             self._value_work.dispose()
-            # Clears the reference to the HelpRequest, effectively detaching it.
             self._value_work = None
 
     # --- Behavior Routing ---
@@ -323,8 +342,29 @@ class DynamicWorker(Worker):
             fn (Callable[[], None]): A parameterless callable function that
                                      encapsulates the behavior associated with this
                                      save point.
+
+        Raises:
+            TypeError: If the provided `fn` is a coroutine function, as `DynamicWorker`
+                       is not designed to `await` coroutines directly in its synchronous
+                       execution loop.
         """
-        self.save_points[name] = fn
+        if CoroutineHelpers.is_coroutine(fn):
+            raise TypeError(f"Cannot register coroutine function '{name}' as a save point. DynamicWorker runs synchronously.")
+        self._save_points[name] = fn
+
+    def get_save_points_dict(self) -> dict[str, Callable[[], None]]:
+        """
+        Retrieves a copy of the dictionary of registered save points.
+
+        This method provides read-only access to the collection of named callable
+        functions that represent checkpoints for the worker's execution.
+
+        Returns:
+            dict[str, Callable[[], None]]: A dictionary where keys are save point names
+                                           and values are the associated callable functions.
+                                           Returns a shallow copy to prevent external modification.
+        """
+        return self._save_points.copy()
 
     def register_location(self, name: str, fn: Callable[[], None]) -> None:
         """
@@ -339,8 +379,29 @@ class DynamicWorker(Worker):
             fn (Callable[[], None]): A parameterless callable function that
                                      defines the behavior or set of operations
                                      performed when the worker is at this location.
+
+        Raises:
+            TypeError: If the provided `fn` is a coroutine function, as `DynamicWorker`
+                       is not designed to `await` coroutines directly in its synchronous
+                       execution loop.
         """
-        self.locations[name] = fn
+        if CoroutineHelpers.is_coroutine(fn):
+            raise TypeError(f"Cannot register coroutine function '{name}' as a location. DynamicWorker runs synchronously.")
+        self._locations[name] = fn
+
+    def get_locations_dict(self) -> dict[str, Callable[[], None]]:
+        """
+        Retrieves a copy of the dictionary of registered locations.
+
+        This method provides read-only access to the collection of named callable
+        functions that represent distinct execution zones or behaviors for the worker.
+
+        Returns:
+            dict[str, Callable[[], None]]: A dictionary where keys are location names
+                                           and values are the associated callable functions.
+                                           Returns a shallow copy to prevent external modification.
+        """
+        return self._locations.copy()
 
     def set_home(self, fn: Callable[[], None]) -> None:
         """
@@ -355,7 +416,14 @@ class DynamicWorker(Worker):
                                      represents the worker's main operational loop.
                                      This function will be executed repeatedly
                                      (or once, if designed that way) by the worker thread.
+
+        Raises:
+            TypeError: If the provided `fn` is a coroutine function, as `DynamicWorker`
+                       is not designed to `await` coroutines directly in its synchronous
+                       execution loop.
         """
+        if CoroutineHelpers.is_coroutine(fn):
+            raise TypeError("Cannot set a coroutine function as home. DynamicWorker runs synchronously.")
         self._event_loop = fn
 
     def run(self):
@@ -369,21 +437,11 @@ class DynamicWorker(Worker):
         is raised. Upon completion of the home function, it signals its
         imminent death.
         """
-        # Binds the unique factory ID of this worker to the current thread.
-        # This is crucial for ID-based access controls and tracing.
         self._bind_factory_id()
-        # Updates the worker's internal state to indicate that it is beginning execution.
         self.state = WorkerState.STARTING
-        # Critically checks if a "home" function (`_event_loop`) has been assigned.
-        # A worker cannot operate without a defined main behavior.
         if self._event_loop is None:
-            # If no home function is set, raises an error, indicating a misconfiguration.
             raise RuntimeError(f"[Worker {self.factory_id}] No home() set before thread start.")
-        # Executes the primary, "home" behavior defined for this worker.
-        # All core operational logic typically flows from this single call.
         self._event_loop()
-        # Sets the `death_event`, signaling to any waiting components (e.g., the pool)
-        # that this worker has completed its execution and is ready for termination/cleanup.
         self.death_event.set()
 
     # --- Inventory Management ---
@@ -406,11 +464,8 @@ class DynamicWorker(Worker):
                                matches `factory_id` (or this worker's own ID if
                                `factory_id` is None). Raises `PermissionError` on mismatch.
         """
-        # If `enforce_id` is True, validate that the calling thread has the correct factory ID.
         if enforce_id:
             self._validate_caller(factory_id)
-        # Store the `value` in the thread-local `_inventory.data` dictionary
-        # under the specified `key`. This data is private to this worker's thread.
         self._inventory.data[key] = value
 
     def get_from_inventory(self, key: str, default=None, factory_id: Optional[str] = None, enforce_id: bool = False) -> Any:
@@ -435,16 +490,82 @@ class DynamicWorker(Worker):
         Returns:
             Any: The value associated with the `key` if found, otherwise the `default` value.
         """
-        # If `enforce_id` is True, validate that the calling thread has the correct factory ID.
         if enforce_id:
             self._validate_caller(factory_id)
-        # Retrieve the value associated with the `key` from the thread-local inventory.
-        # If the key is not found, return the specified `default` value.
         return self._inventory.data.get(key, default)
+
+    def set_shared_inventory_item(self, key: str, value: Any) -> None:
+        """
+        Sets a key-value pair in the shared inventory.
+
+        The shared inventory is accessible across all `DynamicWorker` instances
+        and other components that can reach this worker object.
+
+        Args:
+            key (str): The key under which to store the value.
+            value (Any): The value to store.
+        """
+        self._shared_inventory[key] = value
+
+    def get_shared_inventory_item(self, key: str, default: Any = None) -> Any:
+        """
+        Retrieves a value from the shared inventory.
+
+        Args:
+            key (str): The key of the item to retrieve.
+            default (Any, optional): The value to return if the key is not found. Defaults to `None`.
+
+        Returns:
+            Any: The value associated with the key, or the default value if not found.
+        """
+        return self._shared_inventory.get(key, default)
+
+    def get_shared_inventory(self) -> dict[str, Any]:
+        """
+        Retrieves the entire shared inventory dictionary.
+
+        Note: This returns a direct reference to the internal dictionary.
+        Modifications to the returned dictionary will affect the worker's
+        shared state. Use `set_shared_inventory_item` for controlled updates.
+
+        Returns:
+            dict[str, Any]: The shared inventory dictionary.
+        """
+        return self._shared_inventory
+
+    def register_data_transfer(self, name: str, fn: Callable[..., Any]) -> None:
+        """
+        Registers a callable function for data transfer operations.
+
+        These functions can be invoked via `execute_transfer` to perform specific
+        data processing or movement tasks.
+
+        Args:
+            name (str): The unique name for the data transfer function.
+            fn (Callable[..., Any]): The callable function to register. It should
+                                     typically be parameterless for use with `execute_transfer`.
+
+        Raises:
+            TypeError: If the provided `fn` is a coroutine function.
+        """
+        if CoroutineHelpers.is_coroutine(fn):
+            raise TypeError(f"Cannot register coroutine function '{name}' for data transfer. DynamicWorker runs synchronously.")
+        self._data_transfer[name] = fn
+
+    def get_data_transfer_dict(self) -> dict[str, Callable[..., Any]]:
+        """
+        Retrieves a copy of the dictionary of registered data transfer functions.
+
+        Returns:
+            dict[str, Callable[..., Any]]: A dictionary where keys are transfer names
+                                           and values are the associated callable functions.
+                                           Returns a shallow copy to prevent external modification.
+        """
+        return self._data_transfer.copy()
 
     def execute_transfer(self, name: str, factory_id: Optional[str] = None, enforce_id: bool = False) -> Any:
         """
-        Executes a callable function registered within the `data_transfer` dictionary.
+        Executes a callable function registered within the `_data_transfer` dictionary.
 
         This method allows for the invocation of predefined data handling routines
         or pipelines by their registered name. It can also enforce access control
@@ -452,7 +573,7 @@ class DynamicWorker(Worker):
 
         Args:
             name (str): The unique string name of the transfer callable to execute.
-                        This name must correspond to a key in the `self.data_transfer`
+                        This name must correspond to a key in the `self._data_transfer`
                         dictionary.
             factory_id (Optional[str]): If provided and `enforce_id` is True, this
                                        `factory_id` is used to validate the caller's
@@ -471,15 +592,11 @@ class DynamicWorker(Worker):
             PermissionError: If `enforce_id` is True and the caller's thread ID does
                              not match the expected `factory_id`.
         """
-        # If ID enforcement is active, perform a security check on the calling thread.
         if enforce_id:
             self._validate_caller(factory_id)
-        # Check if a callable function is registered under the given `name` in `data_transfer`.
-        if name not in self.data_transfer:
-            # If not found, raise a KeyError to indicate an invalid transfer name.
+        if name not in self._data_transfer:
             raise KeyError(f"No data_transfer entry named '{name}'")
-        # Execute the registered callable
-        return self.data_transfer[name]()
+        return self._data_transfer[name]()
 
     def _validate_caller(self, factory_id: Optional[str] = None) -> None:
         """
@@ -503,7 +620,6 @@ class DynamicWorker(Worker):
         expected = factory_id or self.factory_id
         current_id = getattr(threading.current_thread(), "factory_id", None)
         if current_id != expected:
-            # If they do not match, raise a PermissionError to deny access.
             raise PermissionError(
                 f"[Access Denied] Caller factory_id={current_id} does not match expected={expected}"
             )
@@ -587,9 +703,7 @@ class DynamicWorker(Worker):
             Optional['DynamicWorker']: The `DynamicWorker` instance if found, otherwise `None`.
         """
         if self.factory and hasattr(self.factory, "get_worker_by_id"):
-            # If available, use the factory's method to retrieve the target worker.
             return self.factory.get_worker_by_id(factory_id)
-
         return None
 
     # --- Disposal ---
@@ -603,19 +717,18 @@ class DynamicWorker(Worker):
         side effects upon worker termination or recycling. It's safe to call
         multiple times.
         """
-        # Check if the worker has already been disposed to prevent redundant cleanup.
         if self.disposed:
             return
         self.dispose_work()
-        if self.save_points is not None:
-            self.save_points.clear()
-        self.save_points = None
-        # garbage collected.
-        if self.locations is not None:
-            self.locations.clear()
-        self.locations = None
+        if self._save_points is not None:
+            self._save_points.clear()
+        self._save_points = None
+        if self._locations is not None:
+            self._locations.clear()
+        self._locations = None
         self._event_loop = None
-        super().dispose()
+        self._disposed = True
+        self.state = WorkerState.DISPOSED
 
     def __repr__(self):
         """
