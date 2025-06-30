@@ -1,253 +1,204 @@
-import dataclasses
 import threading
-import time
-from typing import Callable, List, Optional, Tuple
-import inspect
-
 import ulid
+from typing import Callable, Optional
+from thread_factory.primitives.signal_condition import SignalCondition
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 
-@dataclasses.dataclass(slots=True)
-class ForkUnit:
+class SignalLatch(IDisposable):
     """
-    Represents a single entry point (or 'gate') in a Fork.
-
-    Each ForkUnit wraps:
-    - `fork_callable`: A user-defined function to execute.
-    - `usage_cap`: Maximum number of threads allowed to use this unit.
-    - `gate`: Marks whether this unit is exhausted (True when max uses are hit).
-    - `gate_uses`: Tracks how many times this unit has been used.
-    - `lock`: A thread-safe lock protecting the state of this unit.
-
-    These are internal structures managed by the `Fork` system to coordinate
-    concurrent access and enforce execution limits per callable.
-    """
-
-    fork_callable: Callable
-    usage_cap: int
-    lock: threading.Lock = dataclasses.field(default_factory=threading.RLock)
-    # The 'gate' is now a consumable resource. True means it's consumed.
-    gate: bool = False
-    gate_uses: int = 0
-
-
-class Fork:
-    """
-    A concurrent fork dispatcher for routing threads across multiple callables.
-
-    This class creates a "fork" in thread execution. Each fork represents a
-    callable with a usage cap (how many threads may execute it).
-
-    When a thread calls `use_fork()`, the dispatcher:
-    - Iterates over all `ForkUnit`s.
-    - Locks each unit and checks if it’s still usable.
-    - Executes the first available callable directly in the calling thread.
-    - Tracks usage count per unit.
-    - Once all units are exhausted, marks the fork as closed.
-
-    If `reusable=True` is set, the fork can be reset via `reset()`.
-
-    ------
-    Example Use
+    SignalLatch
     -----------
-    >>> def worker_a(): print("Worker A executed")
-    >>> def worker_b(): print("Worker B executed")
-    >>> fork = Fork(2, [(3, worker_a), (2, worker_b)])
+    A blocking latch that *signals* an external observer **before** each thread
+    actually blocks. Internally, it leverages `SignalCondition` for its
+    wait/notify mechanisms but offers a simplified API:
 
-    Calling `fork.use_fork()` 5 times will dispatch the workers according to
-    their caps (3 and 2 uses). Further calls raise `RuntimeError` unless reusable.
+    -   ``wait()``: Fires configured callbacks/notifications, then blocks the calling thread.
+    -   ``open()``: Releases all currently waiting threads and keeps the latch
+        permanently open.
+    -   ``reset()``: Closes the latch, causing subsequent ``wait()`` calls to block.
+    -   ``is_open()``: Checks if the latch is currently open.
 
-    ------
     Parameters
     ----------
-    number_of_forks : int
-        Number of callable paths (must match the length of `callables`).
-
-    callables : List[Tuple[int, Callable]]
-        A list of tuples, each containing:
-            - `usage_cap`: Max number of thread executions for this callable.
-            - A synchronous function to execute.
-
-    reusable : bool (default False)
-        If True, the fork can be reset and reused after exhaustion.
-
-    ------
-    Methods
-    -------
-    use_fork():
-        Attempts to execute one of the available callables.
-
-    reset():
-        Resets internal counters and gates for reuse (if allowed).
+    signal_callback : Callable[[str, bool], None], optional
+        A generic function invoked as ``signal_callback(self.id, self.signal_value)``
+        right before a thread is suspended in ``wait()``. This is a general-purpose
+        notification mechanism. Defaults to ``None``.
+    signal_value : bool
+        The boolean value forwarded with every invocation of ``signal_callback``
+        and exposed via the ``signal_value`` property for direct controller inspection.
+        Defaults to ``True``.
+    cond : SignalCondition, optional
+        An existing ``SignalCondition`` instance to use internally. If ``None``,
+        a new one will be created.
+    controller : object, optional
+        An optional controller object that will be directly notified by the latch.
+        If the controller has a ``register_latch(latch: 'SignalLatch')`` method,
+        it will be called during initialization, allowing the controller to store
+        references to the latch's control methods (e.g., open, reset).
+        The controller should also have a ``notify_controller(latch: 'SignalLatch')``
+        method, which will be called just before a thread blocks in `wait()`.
     """
 
-    # Removed _usage_cap from __slots__ as it is no longer a class-level attribute.
-    __slots__ = ["_list_of_forks", "_reusable", "_forks_closed", "_rotate_selectors", "_selector_step", "_selector_step_counter", "_selector_lock", "_id"]
+    __slots__ = [
+        "_id",
+        "_cond",
+        "_open",
+        "_signal_callback",
+        "_signal_value",
+        "_lock",
+        "_disposed",
+        "_controller",
+    ]
 
-    def __init__(self, number_of_forks: int, callables: List[Tuple[int, Callable]], reusable: bool = False,
-                 rotate_selectors: bool = False, selector_step: int = 1):
-        if number_of_forks != len(callables):
-            raise ValueError("The number of forks must match the number of callables.")
+    def __init__(
+            self,
+            signal_callback: Optional[Callable[[str, bool], None]] = None,
+            signal_value: bool = True,
+            cond: Optional[SignalCondition] = None,
+            controller: Optional[object] = None,
+    ):
+        super().__init__()
+        self._id: str = str(ulid.ULID())
+        self._cond: SignalCondition = cond or SignalCondition()
+        self._open: bool = False
+        self._signal_callback = signal_callback
+        self._signal_value = signal_value
+        self._lock = threading.RLock()
+        self._disposed = False
+        self._controller = controller
 
-        # --- Validation: Ensure correct input format and callable type ---
-        for i, item in enumerate(callables):
-            # 1. Check if the item is a tuple and has two elements.
-            if not isinstance(item, tuple) or len(item) != 2:
-                raise TypeError(
-                    f"Expected a tuple of (int, Callable) at index {i}, but received {type(item).__name__} or a tuple of incorrect size.")
+        # Register this latch instance with the controller, if provided.
+        if self._controller:
+            try:
+                # The controller is expected to have a method to register the latch.
+                # This is a cleaner Inversion of Control pattern.
+                self._controller.register(self)
+            except AttributeError:
+                # Silently fail if the controller does not support registration.
+                # A warning could be logged here for debugging.
+                # print(f"Warning: Controller {self._controller} does not have 'register_latch(latch)' method.")
+                pass
+            except Exception as e:
+                # Log any other exceptions during registration.
+                # print(f"Error registering latch with controller {self._id}: {e}")
+                pass
 
-            # 2. Check if the first element is an integer (the usage_cap).
-            if not isinstance(item[0], int):
-                raise TypeError(
-                    f"The first element of the tuple at index {i} must be an integer, but received {type(item[0]).__name__}.")
-
-            # 3. Check if the second element is a callable function.
-            if not callable(item[1]):
-                raise TypeError(
-                    f"The second element of the tuple at index {i} must be a callable, but received {type(item[1]).__name__}.")
-
-            # 4. Check if the callable is a coroutine function.
-            if inspect.iscoroutinefunction(item[1]):
-                raise TypeError(
-                    f"Coroutine functions are not supported for ForkUnit at index {i}. Received a coroutine: {item[1].__name__}")
-
-        # Use tuple unpacking to set the individual usage_cap for each ForkUnit.
-        self._list_of_forks: List[ForkUnit] = [
-            ForkUnit(fork_callable=call, usage_cap=cap) for cap, call in callables
-        ]
-
-        self._id = str(ulid.ULID())
-        self._reusable = reusable
-        self._forks_closed = False
-        self._rotate_selectors = rotate_selectors
-        self._selector_step = selector_step
-        self._selector_step_counter = 0
-        self._selector_lock = threading.RLock()
-
-    def reset(self) -> None:
+    @property
+    def id(self) -> str:
         """
-        Resets the state of all ForkUnits, allowing the fork to be reused.
-
-        If `reusable=True`, this method can be called after exhaustion to reset:
-        - All gates (marking them as open again).
-        - All usage counters.
-        - The selector step counter.
-
-        Raises:
-            Nothing. Safe to call even if the fork hasn't been used.
+        Returns the unique ULID identifier for this latch.
         """
+        return self._id
 
-        for unit in self._list_of_forks:
-            with unit.lock:
-                # Reset the gate and its uses.
-                unit.gate = False
-                unit.gate_uses = 0
-        # Reset the selector counter as well.
-        self._selector_step_counter = 0
-        # This state should be reset once all units have been reset.
-        self._forks_closed = False
-
-    def _select_fork_unit(self) -> Optional['ForkUnit']:
+    @property
+    def signal_value(self) -> bool:
         """
-        Selects an available ForkUnit using a time-based scan split.
-
-        Uses the low bit of a monotonic clock to alternate between the first and
-        second half of the list, improving concurrency and reducing contention.
-
-        Returns:
-            ForkUnit if available, otherwise None (if all units are exhausted).
+        Returns the boolean value that is passed with the signal callback.
         """
+        return self._signal_value
 
-        if self._forks_closed and not self._reusable:
-            return None
-
-        flip = time.monotonic_ns() & 1
-        mid = len(self._list_of_forks) // 2
-        scan_range = range(0, mid) if flip == 0 else range(mid, len(self._list_of_forks))
-
-        for idx in scan_range:
-            unit = self._list_of_forks[idx]
-            with unit.lock:
-                if not unit.gate or unit.gate_uses < unit.usage_cap:
-                    return unit
-
-        # If nothing found in primary range, try the backup range
-        backup_range = range(mid, len(self._list_of_forks)) if flip == 0 else range(0, mid)
-        for idx in backup_range:
-            unit = self._list_of_forks[idx]
-            with unit.lock:
-                if not unit.gate or unit.gate_uses < unit.usage_cap:
-                    return unit
-
-        # All forks are exhausted
-        self._forks_closed = True
-        return None
-
-    def _select_fork_unit_step(self) -> Optional['ForkUnit']:
+    def wait(self, timeout: float | None = None) -> bool:
         """
-        Selects an available ForkUnit using a rotating step index.
+        Fires the generic ``signal_callback`` (if provided) and notifies the
+        direct ``controller`` (if provided), then blocks until this latch is opened.
 
-        Starts at the current `self._selector_step_counter` and steps through
-        the list by `self._selector_step`, with wraparound. Distributes fork
-        access more evenly under heavy concurrency.
-
-        Returns:
-            ForkUnit if available, otherwise None (if all units are exhausted).
+        Returns `True` if the latch was opened, `False` if the wait timed out.
         """
+        if self._disposed:
+            raise RuntimeError("SignalLatch has been disposed")
 
-        if self._forks_closed and not self._reusable:
-            return None
+        # Before waiting, check if the latch is already open.
+        # This check is crucial and must be done before signaling.
+        with self._cond:
+            if self._open:
+                return True
 
-        length = len(self._list_of_forks)
+        # If not open, proceed with signaling.
+        # Path 1: Invoke the generic signal callback.
+        if self._signal_callback:
+            try:
+                self._signal_callback(self._id, self._signal_value)
+            except Exception:
+                # Log or handle exceptions from user code silently.
+                pass
 
-        with self._selector_lock:
-            start_index = self._selector_step_counter % length
+        # Path 2: Invoke the direct controller's specific method.
+        if self._controller:
+            try:
+                # Pass the latch instance itself to the controller for state inspection.
+                self._controller.notify_controller(self)
+            except AttributeError:
+                # Silently fail if the controller doesn't have the method.
+                pass
+            except Exception:
+                # Log or handle exceptions from user code silently.
+                pass
 
-            for i in range(length):
-                idx = (start_index + i * self._selector_step) % length
-                unit = self._list_of_forks[idx]
-                with unit.lock:
-                    if not unit.gate or unit.gate_uses < unit.usage_cap:
-                        self._selector_step_counter = idx + 1
-                        return unit
+        # Acquire the internal condition lock and proceed to block.
+        with self._cond:
+            # Re-check the _open flag in case it was changed between the first
+            # check and acquiring the lock. This is a critical double-check.
+            if self._open:
+                return True
+            return self._cond.wait_for(lambda: self._open, timeout=timeout)
 
-        self._forks_closed = True
-        return None
-
-    def use_fork(self) -> None:
+    def open(self):
         """
-        Routes the calling thread through an available fork unit.
-
-        - Prevents overuse via in-lock guards.
-        - Serializes threads **within each unit** to simulate critical section behavior
-          (especially important when using a single fork).
-        - Maintains full parallelism **across units** because each has its own lock.
-
-        Raises:
-            RuntimeError: If no units are available and the fork is not reusable.
+        Opens the latch and permanently releases all waiting threads.
+        This method is idempotent.
         """
-
-        if self._forks_closed and not self._reusable:
-            raise RuntimeError("Forks are closed and not reusable. Cannot use fork.")
-
-        while True:                     # ⟳ Retry until we truly reserve a slot
-            unit = (self._select_fork_unit() if self._rotate_selectors
-                    else self._select_fork_unit_step())
-
-            if unit is None:
-                raise RuntimeError("No available forks to use, all forks are at capacity.")
-
-            # 🛡️ Atomic reservation & execution
-            with unit.lock:
-                if unit.gate_uses >= unit.usage_cap:
-                    # Lost the race—try another unit
-                    continue
-
-                unit.gate_uses += 1
-                if unit.gate_uses >= unit.usage_cap:
-                    unit.gate = True
-
-                # Execute while still holding the unit’s lock to serialize
-                # threads *on this unit* (needed for the single-fork test).
-                unit.fork_callable()
+        if self._disposed:
+            return
+        with self._cond:
+            if self._open:
                 return
+            self._open = True
+            self._cond.notify_all()
+
+    def reset(self):
+        """
+        Resets the latch to the *closed* state, allowing it to be reused.
+        """
+        if self._disposed:
+            raise RuntimeError("Cannot reset a disposed SignalLatch")
+        with self._cond:
+            self._open = False
+
+    def is_open(self) -> bool:
+        """
+        Checks if the latch is currently in the open state.
+        """
+        # No lock needed for a simple boolean read if atomicity is guaranteed.
+        # However, using the lock ensures the most up-to-date state is read
+        # relative to other operations.
+        with self._cond:
+            return self._open
+
+    def dispose(self):
+        """
+        Disposes the latch, releasing all blocked threads and preventing
+        further use. This action is irreversible.
+        """
+        if self._disposed:
+            return
+
+        with self._lock:  # Outer lock for the dispose process
+            if self._disposed:
+                return
+            self._disposed = True
+
+        with self._cond:
+            # Mark as open to ensure all waiters pass immediately.
+            self._open = True
+            self._cond.notify_all()
+
+        # Dispose the internal SignalCondition, cleaning up its resources.
+        if hasattr(self._cond, 'dispose'):
+            self._cond.dispose()
+
+        # Clear references to aid garbage collection and prevent accidental use.
+        self._signal_callback = None
+        self._signal_value = None
+        self._controller = None
