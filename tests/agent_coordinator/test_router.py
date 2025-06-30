@@ -1,6 +1,6 @@
 import unittest
 import threading
-from thread_factory.coordinator.router.router import Router
+from thread_factory.synchronization.orchestrators.router.router import Router
 from thread_factory.utils import RouterGroup
 
 

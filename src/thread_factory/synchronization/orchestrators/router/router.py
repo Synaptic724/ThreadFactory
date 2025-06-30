@@ -1,6 +1,6 @@
 from typing import Callable, List, Optional
 import threading
-from thread_factory.primitives import MultiConductor, Dynaphore, SignalBarrier, Conductor
+from thread_factory.synchronization import MultiConductor, Dynaphore, SignalBarrier, Conductor
 from thread_factory.utils import IDisposable, RouterGroup, Group
 
 
