@@ -5,7 +5,7 @@ import threading
 from thread_factory.synchronization.primitives import Dynaphore
 from typing import Optional, Callable, List, Union, Any
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
-from thread_factory.synchronization.primitives.threshold_semaphore import ThresholdSemaphore
+from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
 
 
 class Conductor(IDisposable):

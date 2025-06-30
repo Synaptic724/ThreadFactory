@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, call
 
 # Import the real objects to be tested
 from thread_factory.synchronization.controllers.controller import Controller
-from thread_factory.synchronization.primitives.threshold_semaphore import ThresholdSemaphore
+from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
 
 
 class TestComprehensiveControllerSemaphore(unittest.TestCase):
@@ -30,9 +30,9 @@ class TestComprehensiveControllerSemaphore(unittest.TestCase):
             self.controller.dispose()
         self.controller = None
 
-    def _make_semaphore(self, threshold: int, **kwargs) -> ThresholdSemaphore:
+    def _make_semaphore(self, threshold: int, **kwargs) -> SignalBarrier:
         """Helper to create a ThresholdSemaphore already wired to the controller."""
-        return ThresholdSemaphore(
+        return SignalBarrier(
             threshold=threshold,
             controller=self.controller,
             signal_callback=self.controller.on_wait_starting,

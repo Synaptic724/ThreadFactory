@@ -3,7 +3,6 @@ from thread_factory.synchronization.coordinators.multi_conductor import MultiCon
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
 from thread_factory.synchronization.coordinators.transit_barrier import TransitBarrier
 from thread_factory.synchronization.coordinators.scout import Scout
-from thread_factory.synchronization.coordinators.phased_signal_barrier import PhasedSignalBarrier
 
 __all__ = [
     'Conductor',
@@ -11,5 +10,4 @@ __all__ = [
     'ClockBarrier',
     'TransitBarrier',
     'Scout',
-    'PhasedSignalBarrier',
 ]

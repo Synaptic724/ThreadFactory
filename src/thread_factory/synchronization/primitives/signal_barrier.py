@@ -8,9 +8,9 @@ from thread_factory.utils import IDisposable
 # from thread_factory.controller import Controller
 
 
-class ThresholdSemaphore(IDisposable):
+class SignalBarrier(IDisposable):
     """
-    ThresholdSemaphore
+    SignalBarrier
     ------------------
     A reusable, synchronization primitive that acts like a *count-to-N barrier*.
     Once a predefined number of threads (the `threshold`) have called `wait()`, all
@@ -69,7 +69,7 @@ class ThresholdSemaphore(IDisposable):
     🧪 Typical Use Case:
     --------------------
         # With 5 threads
-        semaphore = ThresholdSemaphore(threshold=5, reusable=True)
+        semaphore = SignalBarrier(threshold=5, reusable=True)
 
         def worker():
             print("Thread waiting")
@@ -284,7 +284,7 @@ class ThresholdSemaphore(IDisposable):
             self._count = 0
             self._released = False
 
-    # In the ThresholdSemaphore class...
+    # In the SignalBarrier class...
 
     def wait(self, timeout: Optional[float] = None) -> bool:
         """

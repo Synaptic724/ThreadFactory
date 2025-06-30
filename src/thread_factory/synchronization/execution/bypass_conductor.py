@@ -4,7 +4,7 @@ import threading
 from typing import Callable, Optional, List, Any, Union
 import ulid
 from thread_factory.synchronization.primitives.dynaphore import Dynaphore
-from thread_factory.synchronization.primitives.threshold_semaphore import ThresholdSemaphore
+from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
 from thread_factory.utils import IDisposable, Outcome
 
 
@@ -66,7 +66,7 @@ class BypassConductor(IDisposable):
         self._collapsed = False
         self._outcomes: List[Outcome] = []
         self._dynaphore = Dynaphore(limit)
-        self._threshold_sema = ThresholdSemaphore(limit, reusable=True)
+        self._threshold_sema = SignalBarrier(limit, reusable=True)
         self._outcome_set = False
 
     # --- NEW HELPER METHOD TO FIX RACE CONDITION ---

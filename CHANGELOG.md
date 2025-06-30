@@ -21,7 +21,7 @@ ThreadFactory now introduces a modular concurrency stack built from first princi
 ### 🎛 `Dynaphore`
 A dynamically resizable permit gate. Ideal for adaptive queues, resource throttling, and elastic thread pools.
 
-### 🔁 `SwitchLock`
+### 🔁 `FlowRegulator`
 Smart semaphore with factory ID targeting, callback routing, and bias buffering. Great for agentic workers and dynamic wakeups.
 
 ### 🧠 `SmartCondition`
@@ -36,12 +36,9 @@ Latch with observer signaling support. Can notify a controller before blocking. 
 ### 🔒 `Latch`
 Classic reusable latch. Once opened, all threads are released permanently until reset.
 
-### 🧱 `ThresholdSemaphore`
-Reusable gate that opens when a thread threshold is reached. Supports auto and manual release. Good for batch coordination.
-
 ---
 
-## ⚡ Orchestrators – `synchronization.orchestrators`
+## ⚡ New Coordinators – `synchronization.orchestrators`
 
 ### 🎯 `TransitBarrier`
 Reusable barrier with threshold coordination and optional callable execution once threshold is met.
@@ -55,22 +52,19 @@ Reusable group synchronizer. Executes tasks after a threshold is met. Supports t
 ### 🧠 `MultiConductor`
 Manages multiple `Group` objects with per-group thresholds. Executes per-group tasks and performs global release.
 
-### 🧬 `SignalBarrier`
-Group-based coordination system. Waits for all groups to signal readiness. Executes per-group callables transitively.
-
 ### 🔍 `Scout`
 Predicate-based monitor. One thread blocks while evaluating a predicate with timeout and success/failure callbacks.
 
 ---
 
-## 🚉 Execution Gates – `synchronization.execution`
+## 🚉 New Execution Gates – `synchronization.execution`
 
 ### 🔀 `TransitGate`
 Allows up to `N` threads to execute a pre-bound callable pipeline. Captures results via `Outcome`. Collapses once the cap is reached. Great for controlled bootstraps or one-time initializers.
 
 ---
 
-## 🎛 Dispatchers – `synchronization.dispatchers`
+## 🎛 New Dispatchers – `synchronization.dispatchers`
 
 ### 🔧 `Fork`
 Thread dispatcher that assigns callables based on usage caps. Ensures each callable executes a fixed number of times. Good for simple routing or round-robin-like workloads.
@@ -80,7 +74,7 @@ Dispatcher that coordinates N threads into callable groups. All callables execut
 
 ---
 
-## 🧠 Controllers – `synchronization.controller`
+## 🧠 New Controllers – `synchronization.controller`
 
 ### 🎮 `Controller`
 Central registry for lifecycle-managed objects. Supports:

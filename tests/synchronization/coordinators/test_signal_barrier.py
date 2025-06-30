@@ -1,14 +1,14 @@
 import unittest
 import threading
 import time
-from thread_factory.synchronization.primitives.threshold_semaphore import ThresholdSemaphore
+from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
 
 
-class TestThresholdSemaphore(unittest.TestCase):
+class TestSignalBarrier(unittest.TestCase):
 
     def test_threads_are_released_at_threshold(self):
         result = []
-        barrier = ThresholdSemaphore(threshold=3)
+        barrier = SignalBarrier(threshold=3)
 
         def worker(i):
             barrier.wait()
@@ -23,7 +23,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertEqual(sorted(result), [0, 1, 2])
 
     def test_notify_all_override_unblocks_threads(self):
-        barrier = ThresholdSemaphore(threshold=5, reusable=True)
+        barrier = SignalBarrier(threshold=5, reusable=True)
         results = []
 
         def worker(i):
@@ -45,7 +45,7 @@ class TestThresholdSemaphore(unittest.TestCase):
 
 
     def test_multiple_groups_waiting_serially(self):
-        barrier = ThresholdSemaphore(threshold=3, reusable=True)
+        barrier = SignalBarrier(threshold=3, reusable=True)
         result = []
 
         def worker(group_id):
@@ -76,7 +76,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertEqual(result.count(2), 3)
 
     def test_high_volume_workers(self):
-        barrier = ThresholdSemaphore(threshold=10)
+        barrier = SignalBarrier(threshold=10)
         results = []
         lock = threading.Lock()
 
@@ -95,7 +95,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertCountEqual(results, list(range(10)))
 
     def test_waiters_get_blocked_properly(self):
-        barrier = ThresholdSemaphore(threshold=2)
+        barrier = SignalBarrier(threshold=2)
         results = []
 
         def first():
@@ -120,7 +120,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertCountEqual(results[2:], ["after-1", "after-2"])
 
     def test_is_spent_returns_true_after_threshold_met_and_not_reusable(self):
-        sema = ThresholdSemaphore(threshold=2, reusable=False)
+        sema = SignalBarrier(threshold=2, reusable=False)
         t1 = threading.Thread(target=sema.wait)
         t2 = threading.Thread(target=sema.wait)
 
@@ -132,7 +132,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertTrue(sema.is_spent())
 
     def test_is_spent_returns_false_if_not_triggered(self):
-        sema = ThresholdSemaphore(threshold=3, reusable=False)
+        sema = SignalBarrier(threshold=3, reusable=False)
 
         def slow_wait():
             sema.wait(timeout=0.2)  # Let it timeout
@@ -144,7 +144,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertFalse(sema.is_spent())
 
     def test_is_spent_returns_false_if_reusable(self):
-        sema = ThresholdSemaphore(threshold=2, reusable=True)
+        sema = SignalBarrier(threshold=2, reusable=True)
         t1 = threading.Thread(target=sema.wait)
         t2 = threading.Thread(target=sema.wait)
 
@@ -156,7 +156,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertFalse(sema.is_spent())  # Because it resets automatically
 
     def test_error_if_threshold_reached_but_not_reusable(self):
-        barrier = ThresholdSemaphore(threshold=2, reusable=False)
+        barrier = SignalBarrier(threshold=2, reusable=False)
         result = []
 
         def early():
@@ -181,7 +181,7 @@ class TestThresholdSemaphore(unittest.TestCase):
 
         self.assertEqual(result[0], False)
     def test_manual_release_blocks_until_called(self):
-        barrier = ThresholdSemaphore(threshold=3, manual_release=True)
+        barrier = SignalBarrier(threshold=3, manual_release=True)
         released = []
 
         def worker(i):
@@ -205,7 +205,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertCountEqual(released, [0, 1, 2])
 
     def test_manual_release_with_reusable_true(self):
-        barrier = ThresholdSemaphore(threshold=2, reusable=True, manual_release=True)
+        barrier = SignalBarrier(threshold=2, reusable=True, manual_release=True)
         results = []
 
         def worker(i):
@@ -230,7 +230,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertEqual(len(results), 4)
 
     def test_release_does_nothing_if_threshold_not_met(self):
-        barrier = ThresholdSemaphore(threshold=3, manual_release=True)
+        barrier = SignalBarrier(threshold=3, manual_release=True)
         result = []
 
         def worker():
@@ -254,7 +254,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         def cb():
             called["count"] += 1
 
-        barrier = ThresholdSemaphore(threshold=2, manual_release=True, callback=cb)
+        barrier = SignalBarrier(threshold=2, manual_release=True, callback=cb)
 
         threads = [
             threading.Thread(target=barrier.wait)
@@ -272,7 +272,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertEqual(called["count"], 1)
 
     def test_notify_all_override_respects_manual_mode(self):
-        barrier = ThresholdSemaphore(threshold=4, manual_release=True)
+        barrier = SignalBarrier(threshold=4, manual_release=True)
         results = []
 
         def worker(i):
@@ -297,7 +297,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         def cb():
             call_count["count"] += 1
 
-        barrier = ThresholdSemaphore(threshold=3, reusable=False, callback=cb)
+        barrier = SignalBarrier(threshold=3, reusable=False, callback=cb)
 
         threads = [
             threading.Thread(target=barrier.wait)
@@ -318,7 +318,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertEqual(call_count["count"], 1)  # Still 1
 
     def test_timeout_behavior(self):
-        barrier = ThresholdSemaphore(threshold=3)
+        barrier = SignalBarrier(threshold=3)
         result = []
 
         def worker():
@@ -337,7 +337,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         def callback():
             flag["called"] = True
 
-        barrier = ThresholdSemaphore(threshold=2, callback=callback)
+        barrier = SignalBarrier(threshold=2, callback=callback)
 
         t1 = threading.Thread(target=barrier.wait)
         t2 = threading.Thread(target=barrier.wait)
@@ -350,7 +350,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertTrue(flag["called"])
 
     def test_reusable_threshold(self):
-        barrier = ThresholdSemaphore(threshold=2, reusable=True)
+        barrier = SignalBarrier(threshold=2, reusable=True)
         counter = []
         lock = threading.Lock()
 
@@ -372,7 +372,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         self.assertEqual(len(counter), 4)
 
     def test_dispose_interrupts_waiters(self):
-        barrier = ThresholdSemaphore(threshold=3)
+        barrier = SignalBarrier(threshold=3)
         result = []
 
         def waiter():
@@ -394,7 +394,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         """
         initial_threshold = 5
         new_threshold = 2
-        semaphore = ThresholdSemaphore(threshold=initial_threshold)
+        semaphore = SignalBarrier(threshold=initial_threshold)
         results = []
 
         def worker():
@@ -422,7 +422,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         Tests that changing the threshold does not trigger an auto-release
         when the semaphore is in manual mode.
         """
-        semaphore = ThresholdSemaphore(threshold=5, manual_release=True)
+        semaphore = SignalBarrier(threshold=5, manual_release=True)
         results = []
 
         def worker():
@@ -454,7 +454,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         """
         Tests that setting a non-positive threshold raises a ValueError.
         """
-        semaphore = ThresholdSemaphore(threshold=5)
+        semaphore = SignalBarrier(threshold=5)
         with self.assertRaises(ValueError):
             semaphore.set_threshold(0)
         with self.assertRaises(ValueError):
@@ -468,7 +468,7 @@ class TestThresholdSemaphore(unittest.TestCase):
         """
         initial_threshold = 3
         new_threshold = 5
-        sema = ThresholdSemaphore(threshold=initial_threshold)
+        sema = SignalBarrier(threshold=initial_threshold)
         results = []
 
         # Start 3 threads, which will meet the initial threshold and release
@@ -478,7 +478,7 @@ class TestThresholdSemaphore(unittest.TestCase):
 
         # At this point, the semaphore is spent (reusable=False by default), so change threshold has no effect.
         # To properly test this, we need a reusable semaphore.
-        sema_reusable = ThresholdSemaphore(threshold=initial_threshold, reusable=True)
+        sema_reusable = SignalBarrier(threshold=initial_threshold, reusable=True)
         results_reusable = []
 
         def worker_reusable():
