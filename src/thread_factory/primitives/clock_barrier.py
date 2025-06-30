@@ -23,7 +23,7 @@ class ClockBarrier(IDisposable):
 
     Parameters:
     -----------
-    parties : int
+    threshold : int
         The number of threads required for the barrier to pass.
     timeout : float
         Maximum allowed time (in seconds) between the first and last thread.
@@ -38,24 +38,24 @@ class ClockBarrier(IDisposable):
     - Calling `dispose()` will break the barrier and wake all waiters.
     """
     __slots__ = IDisposable.__slots__ + [
-        "_parties", "_timeout", "_on_broken",
+        "_threshold", "_timeout", "_on_broken",
         "_lock", "_cond",
         "_count", "_start_time", "_broken", "_generation"
     ]
     def __init__(
         self,
-        parties: int,
+        threshold: int,
         timeout: float = 0.01,
         on_broken: Optional[Callable[[], None]] = None,
     ):
         super().__init__()
 
-        if parties < 1:
+        if threshold < 1:
             raise ValueError("ClockBarrier requires at least one party.")
         if timeout <= 0:
             raise ValueError("ClockBarrier timeout must be > 0.")
 
-        self._parties = parties
+        self._threshold = threshold
         self._timeout = timeout
         self._on_broken = on_broken
         self._lock = threading.Lock()
@@ -114,7 +114,7 @@ class ClockBarrier(IDisposable):
                 # First thread starts the timer
                 self._start_time = time.monotonic()
 
-            if self._count == self._parties:
+            if self._count == self._threshold:
                 # All required threads have arrived
                 self._advance_generation()
                 return True

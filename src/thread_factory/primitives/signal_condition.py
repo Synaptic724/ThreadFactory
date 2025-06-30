@@ -53,7 +53,7 @@ class SignalCondition(IDisposable):
         Initialize the SignalCondition.
 
         Args:
-            lock (Optional[threading.Lock]): Custom lock object to use (must be RLock-compatible).
+            lock: Custom lock object to use (must be RLock-compatible).
                                              If None, a new RLock is created internally.
         """
         super().__init__()

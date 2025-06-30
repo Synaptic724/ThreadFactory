@@ -54,12 +54,17 @@ class Conductor(IDisposable):
     __slots__ = IDisposable.__slots__ + [
         "threshold", "tasks", "reusable", "manual_release",
         "_timeout", "_raise_on_timeout", "outcomes",
-        "_lock", "_condition", "_count", "_released", "_broken", "_start_time"
+        "_lock", "_released", "_broken", "_clock_barrier",
+        "_threshold_semaphore", "_dynaphore", "_loop_reset_event"''
+        "_max_threshold", "_minimum_threads", "_create_field"
+        "_internal_threshold_sema", "_entrance_sema", "_outcome_set"
+        "_index"
     ]
 
     def __init__(
             self,
-            threshold: int,
+            min_threads: int,
+            max_threads: Optional[int] = None,
             tasks: Optional[Union[Callable, List[Callable]]] = None,
             reusable: bool = False,
             manual_release: bool = False,
@@ -84,16 +89,10 @@ class Conductor(IDisposable):
                 global timeout is exceeded instead of returning False.
         """
         super().__init__()
-        if threshold <= 0:
+        if min_threads <= 0:
             raise ValueError("Threshold must be a positive integer.")
-
-        self.threshold = threshold
-        self.reusable = reusable
-        self.manual_release = manual_release
-        self._timeout = timeout
-        self._raise_on_timeout = raise_on_timeout
-
         self.tasks: List[Callable] = []
+
         if tasks:
             task_list = [tasks] if callable(tasks) else tasks
             if not isinstance(task_list, list) or not all(callable(cb) for cb in task_list):
@@ -104,29 +103,45 @@ class Conductor(IDisposable):
                 if inspect.iscoroutinefunction(task):
                     raise TypeError("Coroutines are not supported; only synchronous callables are allowed.")
                 self.tasks.append(task)
+
+        # Settings and validations
+        self._max_threshold = max_threads
+        self._threshold = min_threads
+        self.reusable = reusable
+        self.manual_release = manual_release
+        self._timeout = timeout
+        self._raise_on_timeout = raise_on_timeout
+
+        # Outputs
         self.outcomes = None
         self.create_outcomes()  # Initialize outcomes for tasks
-        self._lock = threading.RLock()
-        self._condition = threading.Condition(self._lock)
-        self._count = 0
+
+        # Initialize internal state
         self._released = False
         self._broken = False
-        self._start_time = None
+        self._create_field = False
+        self._outcome_set = False
+        self._index = 0
+
+        # Initialize synchronization primitives
+        self._lock = threading.RLock()
         self._clock_barrier = None
         self._threshold_semaphore = None
-        self._dynaphore = Dynaphore(self.threshold)
-        self._loop_reset_event = threading.Event()
+        self._dynaphore = Dynaphore(self._threshold)
+        self._entrance_sema = None
+        self._internal_threshold_sema = None
+
 
         if timeout is not None:
             if timeout <= 0:
                 raise ValueError("Timeout must be a positive number.")
             self._clock_barrier = ClockBarrier(
-                parties=threshold,
+                threshold=self._threshold,
                 timeout=timeout,
                 on_broken=self.notify_all_override
             )
         else:
-            self._threshold_semaphore = ThresholdSemaphore(self.threshold, reusable=True)
+            self._threshold_semaphore = ThresholdSemaphore(self._threshold, reusable=True)
 
 
     def create_outcomes(self) -> None:
@@ -146,17 +161,12 @@ class Conductor(IDisposable):
         This operation is idempotent (safe to call multiple times).
         """
         if self._disposed: return
-        with self._condition:
+        with self._lock:
             self._disposed = True
             for outcome in self.outcomes: outcome.dispose()
             self.outcomes.clear()
             self._broken = True
             self._released = True
-            self._condition.notify_all()
-            if self._timeout is not None:
-                self._clock_barrier.reset()
-            elif self._threshold_semaphore is not None:
-                self._threshold_semaphore.reset()
 
     def reset(self):
         """Resets the conductor to its initial state for reuse.
@@ -168,8 +178,10 @@ class Conductor(IDisposable):
         self.create_outcomes()
         self._released = False
         self._broken = False
-        self._start_time = None
-        self._count = 0
+        if self._timeout is not None:
+            self._clock_barrier.reset()
+        elif self._threshold_semaphore is not None:
+            self._threshold_semaphore.reset()
 
     @property
     def results(self) -> List[Any]:
@@ -197,11 +209,11 @@ class Conductor(IDisposable):
         This method is only effective when `manual_release=True` and the
         thread count has already met or exceeded the threshold.
         """
-        with self._condition:
+        with self._lock:
             if self._disposed: return
-            if self.manual_release and self._count >= self.threshold and not self._released:
+            if self.manual_release and not self._released:
                 self._released = True
-                self._condition.notify_all()
+                self._lock.release()
 
     def notify_all_override(self) -> None:
         """Forcefully breaks the barrier and releases all waiting threads.
@@ -210,12 +222,12 @@ class Conductor(IDisposable):
         Waiting threads will receive a `False` return value from `wait()`.
         In reusable mode, the exiting threads are responsible for the reset.
         """
-        with self._condition:
+        with self._lock:
             if self._disposed or self._released: return
             self._released = True
             self._broken = True
-            self._condition.notify_all()
-
+            # This is where you would normally notify all, but a lock doesn't have a notify_all.
+            # The wait() method will need to be updated to handle this change.
 
     def _clock_barrier_wait(self) -> bool:
         """Internal method to handle waiting with the ClockBarrier.
@@ -234,29 +246,74 @@ class Conductor(IDisposable):
         if self._clock_barrier is None:
             raise RuntimeError("ClockBarrier is not initialized. Use wait() instead.")
         try:
-            if self._timeout:
-                return self._clock_barrier.wait()
+            return self._clock_barrier.wait()
         except Exception as e:
             if self._raise_on_timeout:
                 raise TimeoutError(f"Conductor wait timed out after {self._timeout}s.") from e
             else:
-                pass
+                return True
 
     def _execute_operations(self):
         """
         Executes the tasks associated with the conductor once the threshold is met.
         """
-        for i, task in enumerate(self.tasks):
-            outcome = self.outcomes[i]
+        if not self._create_field:
+            with self._lock:
+                if not self._create_field:
+                    self._create_execute_operations_field()
+
+        for index, task in enumerate(self.tasks):
+            with self._lock:
+                self._index = index
+            self._entrance_sema.wait()
             try:
-                result = task()
-                outcome.set_result(result)
+                self._set_result(task())
             except Exception as e:
-                outcome.set_exception(e)
+                self._set_exception(e)
+            self._internal_threshold_sema.wait()
 
         if not self.manual_release:
             self._released = True
-            self._condition.notify_all()
+
+    def _set_result(self, result: Any):
+        """
+        Sets the result of the callable execution.
+        This method is called internally after the callable completes.
+        """
+        if self._outcome_set:
+            return
+        with self._lock:
+            if self._outcome_set:
+                return
+            self._outcome_set = True
+            outcome.set_result(result)
+            self._outcomes.append(outcome)
+
+    def _set_exception(self, e: Exception):
+        """
+        Sets the exception of the callable execution.
+        This method is called internally if the callable raises an exception.
+        """
+        if self._outcome_set:
+            return
+        with self._lock:
+            if self._outcome_set:
+                return
+            self._outcome_set = True
+            outcome.set_exception(e)
+            self._outcomes.append(outcome)
+
+    def _create_execute_operations_field(self):
+        """Creates a field for executing operations.
+
+        This method is used to ensure that the tasks are executed when the
+        threshold is met. It can be overridden to customize the execution logic.
+        """
+        if not self.tasks:
+            raise ValueError("No tasks provided to execute.")
+        self.entrance_sema = ThresholdSemaphore(self._threshold, reusable=False)
+        self.internal_threshold_sema = ThresholdSemaphore(self._threshold, reusable=True)
+        self._create_field = True
 
     def wait(self) -> bool:
         """Blocks the calling thread until the conductor is released.
@@ -275,11 +332,6 @@ class Conductor(IDisposable):
         if self._released and not self.reusable:
             return True
 
-        # Register this thread as waiting
-        with self._lock:
-            self._count += 1
-
-        was_released = False
         try:
             # Wait for threshold based on config
             if self._timeout:
@@ -302,19 +354,14 @@ class Conductor(IDisposable):
 
         # If timeout or error occurred, break the barrier
         if not was_released and not self._disposed:
-            with self._condition:
+            with self._lock:
                 self._broken = True
                 self._released = True
-                self._condition.notify_all()
+                # No notify_all() equivalent on RLock, so threads will unblock when they can acquire the lock.
 
         # Reset if reusable and last thread out
         if self.reusable and was_released:
             with self._lock:
-                self._count -= 1
-                if self._count == 0:
-                    self.reset()
-        else:
-            with self._lock:
-                self._count -= 1
+                self.reset()
 
         return was_released and not self._disposed and not self._broken
