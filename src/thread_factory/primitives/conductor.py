@@ -1,3 +1,5 @@
+import ulid
+
 from thread_factory.utils import IDisposable
 import inspect
 import threading
@@ -58,7 +60,7 @@ class Conductor(IDisposable):
         "_threshold_semaphore", "_dynaphore", "_loop_reset_event"''
         "_max_threshold", "_minimum_threads", "_create_field"
         "_internal_threshold_sema", "_entrance_sema", "_outcome_set"
-        "_index"
+        "_index", "_id"
     ]
 
     def __init__(
@@ -113,6 +115,7 @@ class Conductor(IDisposable):
         self._raise_on_timeout = raise_on_timeout
 
         # Outputs
+        self._id = str(ulid.ULID())
         self.outcomes = None
         self.create_outcomes()  # Initialize outcomes for tasks
 

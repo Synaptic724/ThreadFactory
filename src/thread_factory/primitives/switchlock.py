@@ -1,6 +1,9 @@
 import threading
 import time
 from typing import Optional, Union, Iterable, Any, Callable
+
+import ulid
+
 from thread_factory import ConcurrentSet
 from thread_factory.utils import IDisposable
 from thread_factory.primitives import SmartCondition
@@ -55,7 +58,8 @@ class SwitchLock(IDisposable):
 
     """
     __slots__ = IDisposable.__slots__ + [
-    "_cond", "_value", "_log_ids", "_bias_threshold", "_pending_permits"
+    "_cond", "_value", "_log_ids", "_bias_threshold", "_pending_permits",
+        "_id"
     ]
     def __init__(self, value: int = 1, bias_threshold: Optional[int] = None):
         """
@@ -71,6 +75,7 @@ class SwitchLock(IDisposable):
         if value < 0:
             raise ValueError("SwitchLock initial value must be >= 0")
 
+        self._id = str(ulid.ULID())
         self._cond: SmartCondition = SmartCondition()
         self._value: int = value  # Current count of available permits
         self._log_ids: ConcurrentSet[str] = ConcurrentSet() # Stores unique identifiers of threads that attempted to acquire the lock

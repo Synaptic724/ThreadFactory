@@ -60,7 +60,7 @@ class SmartCondition(IDisposable):
     """
 
     __slots__ = IDisposable.__slots__ + [
-    "_lock", "acquire", "release", "_waiters", "_callback_registry", "_default_callback",
+    "_lock", "acquire", "release", "_waiters", "_callback_registry", "_default_callback", "_id",
     ]
     def __init__(self, lock: Optional[threading.Lock] = None):
         """
@@ -77,6 +77,7 @@ class SmartCondition(IDisposable):
                                              to be acquired by the calling thread.
         """
         super().__init__()
+        self._id = str(ulid.ULID())
         self._lock: threading.RLock = lock or threading.RLock()
         self.acquire: Callable = self._lock.acquire  # Expose acquire method of the internal lock
         self.release: Callable = self._lock.release  # Expose release method of the internal lock

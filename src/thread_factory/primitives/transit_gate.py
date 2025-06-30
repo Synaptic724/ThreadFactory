@@ -2,6 +2,9 @@ import functools
 import inspect
 import threading
 from typing import Callable, Optional, List, Any, Union
+
+import ulid
+
 from thread_factory.primitives.dynaphore import Dynaphore
 from thread_factory.primitives.threshold_semaphore import ThresholdSemaphore
 from thread_factory.utils import IDisposable, Outcome
@@ -26,7 +29,7 @@ class TransitGate(IDisposable):
 
     __slots__ = IDisposable.__slots__ + [
         "_limit", "_count", "_lock", "_collapsed", "_outcomes", "_func",
-        "_dynaphore", "_threshold_sema", "_outcome_set"
+        "_dynaphore", "_threshold_sema", "_outcome_set", "_id"
     ]
 
     def __init__(self, func: Union[Callable, list[Callable]], limit: int = 1, *args, **kwargs):
@@ -64,6 +67,7 @@ class TransitGate(IDisposable):
             if inspect.iscoroutinefunction(f):
                 raise TypeError("TransitGate does not support coroutine functions.")
 
+        self._id = str(ulid.ULID())
         self._limit = limit
         self._count = 0
         self._lock = threading.RLock()

@@ -496,6 +496,144 @@ class TestSyncFork(unittest.TestCase):
         t_init_scout.join(timeout=5)  # Join the thread that initiated the scout.
         self.assertFalse(t_init_scout.is_alive())
 
+
+    # ------------------------------------------------------------------ #
+    #                    ✨  Additional Edge-Case Tests  ✨               #
+    # ------------------------------------------------------------------ #
+
+    def test_multiple_timeout_reset_cycles(self):
+        """
+        Reproduce a timeout → reset → reuse loop several times to be sure
+        Scout and SyncFork state never leak across cycles.
+        """
+        fork = SyncFork(
+            number_of_forks=2,
+            callables=[(1, dummy_func_factory("A", self.log)),
+                       (1, dummy_func_factory("B", self.log))],
+            timeout_duration=0.05   # intentionally short
+        )
+
+        for cycle in range(3):
+            # Fire only one thread so the barrier must time-out
+            t = threading.Thread(target=thread_use_fork,
+                                 args=(fork, self.log, f"C{cycle}", 0.001))
+            t.start(); t.join(timeout=5); self.assertFalse(t.is_alive())
+
+            # Every cycle should produce *exactly one* timeout log line
+            self.assertTrue(any("barrier timed out" in s for s in self.log),
+                            f"Cycle {cycle} produced no timeout log.")
+            self.assertEqual(self.log.count("A"), 0)
+            self.assertEqual(self.log.count("B"), 0)
+
+            # Reset and verify clean state
+            fork.reset()
+            self.assertFalse(fork._timed_out)
+            self.assertFalse(fork._forks_closed)
+            self.assertFalse(fork._threading_event.is_set())
+
+            self.log.clear()
+
+        fork.dispose()
+
+    def test_threads_arriving_after_timeout(self):
+        """
+        After a timeout fires, any *late* threads should wake immediately
+        and raise RuntimeError — never executing a callable.
+        """
+        callables = [(1, dummy_func_factory("LATE_A", self.log)),
+                     (1, dummy_func_factory("LATE_B", self.log))]
+        fork = SyncFork(2, callables, timeout_duration=0.05)
+
+        # Launch only one thread -> will cause timeout
+        t1 = threading.Thread(target=thread_use_fork, args=(fork, self.log, "Early", 0.001))
+        t1.start(); t1.join(timeout=5)
+
+        # Give timeout time to propagate
+        time.sleep(0.08)
+
+        # Now launch *extra* threads after timeout
+        late_threads = [threading.Thread(target=thread_use_fork,
+                                         args=(fork, self.log, f"Late-{i}", 0.0))
+                        for i in range(3)]
+        for t in late_threads: t.start()
+        for t in late_threads: t.join(timeout=5)
+
+        self.assertTrue(all("barrier timed out" in s for s in self.log))
+        self.assertEqual(self.log.count("LATE_A"), 0)
+        self.assertEqual(self.log.count("LATE_B"), 0)
+        fork.dispose()
+
+    def test_dispose_while_threads_wait(self):
+        """
+        Dispose the SyncFork while threads are blocked at the barrier and
+        verify all threads exit quickly with RuntimeError.
+        """
+        callables = [(2, dummy_func_factory("D", self.log))]
+        fork = SyncFork(1, callables, timeout_duration=None)
+
+        # Start just one of two required threads -> it will block
+        t_blocked = threading.Thread(target=thread_use_fork, args=(fork, self.log, "Blocked"))
+        t_blocked.start()
+        time.sleep(0.02)  # ensure it's inside use_fork() waiting
+
+        fork.dispose()    # nuke while barrier isn't full
+
+        t_blocked.join(timeout=5)
+        self.assertFalse(t_blocked.is_alive())
+        self.assertIn("Blocked raised RuntimeError: Cannot use a disposed SyncFork.", self.log)
+        self.assertEqual(self.log.count("D"), 0)
+
+    def test_near_timeout_race_success(self):
+        """
+        Start second thread just before the timeout should fire; barrier
+        must succeed (no timeout triggered).
+        """
+        callables = [(1, dummy_func_factory("Race_A", self.log)),
+                     (1, dummy_func_factory("Race_B", self.log))]
+        fork = SyncFork(2, callables, timeout_duration=0.1)
+
+        # First thread starts Scout at t≈0
+        t_first = threading.Thread(target=thread_use_fork,
+                                   args=(fork, self.log, "R1", 0.001))
+        t_first.start()
+
+        # Second thread sneaks in at t≈0.09 (just shy of the timeout)
+        time.sleep(0.09)
+        t_second = threading.Thread(target=thread_use_fork,
+                                    args=(fork, self.log, "R2", 0.0))
+        t_second.start()
+
+        for t in (t_first, t_second):
+            t.join(timeout=5)
+            self.assertFalse(t.is_alive())
+
+        self.assertEqual(self.log.count("Race_A"), 1)
+        self.assertEqual(self.log.count("Race_B"), 1)
+        # No timeout messages should exist
+        self.assertFalse(any("timed out" in s for s in self.log))
+        fork.dispose()
+
+    def test_non_uniform_capacity_distribution(self):
+        """
+        Very unbalanced capacities: ensure selector still finds available
+        units and executes them exactly as many times as allowed.
+        """
+        callables = [(1, dummy_func_factory("Tiny", self.log)),
+                     (10, dummy_func_factory("Huge", self.log))]
+        fork = SyncFork(2, callables, selector_step=3)
+
+        num_threads = 11
+        threads = [threading.Thread(target=thread_use_fork,
+                                    args=(fork, self.log, f"NU-{i}", 0.0))
+                   for i in range(num_threads)]
+        for t in threads: t.start()
+        for t in threads: t.join(timeout=5)
+
+        self.assertEqual(self.log.count("Tiny"), 1)
+        self.assertEqual(self.log.count("Huge"), 10)
+        self.assertEqual(len([s for s in self.log if "executed callable" in s]), 11)
+        fork.dispose()
+
     def test_reset_clears_timeout_state(self):
         # Configured for 2 slots, so sending 1 thread will cause timeout
         callables_list = [(1, dummy_func_factory("A", self.log)), (1, dummy_func_factory("B", self.log))]

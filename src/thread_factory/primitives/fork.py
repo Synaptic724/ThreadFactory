@@ -4,6 +4,8 @@ import time
 from typing import Callable, List, Optional, Tuple
 import inspect
 
+import ulid
+
 
 @dataclasses.dataclass(slots=True)
 class ForkUnit:
@@ -86,7 +88,7 @@ class Fork:
     """
 
     # Removed _reusable from __slots__
-    __slots__ = ["_list_of_forks", "_forks_closed", "_rotate_selectors", "_selector_step", "_selector_step_counter", "_selector_lock"]
+    __slots__ = ["_list_of_forks", "_forks_closed", "_rotate_selectors", "_selector_step", "_selector_step_counter", "_selector_lock", "_id"]
 
     def __init__(self, number_of_forks: int, callables: List[Tuple[int, Callable]],
                  rotate_selectors: bool = False, selector_step: int = 1):
@@ -120,6 +122,8 @@ class Fork:
             ForkUnit(fork_callable=call, usage_cap=cap) for cap, call in callables
         ]
         # _reusable removed
+
+        self._id = str(ulid.ULID())
         self._forks_closed = False
         self._rotate_selectors = rotate_selectors
         self._selector_step = selector_step

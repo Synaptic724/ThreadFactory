@@ -1,5 +1,8 @@
 import threading
 from typing import Optional, Callable
+
+import ulid
+
 from thread_factory.utils import IDisposable
 
 
@@ -27,7 +30,7 @@ class ThresholdSemaphore(IDisposable):
     """
     __slots__ = IDisposable.__slots__ + [
     "_threshold", "_callback", "_reusable", "_manual_release",
-    "_lock", "_condition", "_count", "_released",
+    "_lock", "_condition", "_count", "_released", "_id",
     ]
     def __init__(
         self,
@@ -40,6 +43,7 @@ class ThresholdSemaphore(IDisposable):
         if threshold <= 0:
             raise ValueError("Threshold must be greater than 0")
 
+        self._id = str(ulid.ULID())
         self._threshold = threshold
         self._callback = callback
         self._reusable = reusable

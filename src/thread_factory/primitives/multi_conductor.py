@@ -1,6 +1,9 @@
 import threading
 import time
 from typing import Any, Callable, List, Optional
+
+import ulid
+
 from thread_factory.utils import Group, IDisposable
 
 
@@ -51,7 +54,7 @@ class MultiConductor(IDisposable):
     __slots__ = IDisposable.__slots__ + [
         "groups", "reusable", "manual_release", "timeout", "raise_on_timeout",
         "_enabled", "_lock", "_condition", "_released", "_start_time",
-        "_broken", "_total_waiting_threads"
+        "_broken", "_total_waiting_threads", "_id"
     ]
 
     def __init__(
@@ -81,6 +84,7 @@ class MultiConductor(IDisposable):
         self.manual_release = manual_release
         self.timeout = timeout
         self.raise_on_timeout = raise_on_timeout
+        self._id = str(ulid.ULID())
 
         self._enabled = bool(self.groups)
         self._lock = threading.Lock()

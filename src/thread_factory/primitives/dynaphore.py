@@ -1,4 +1,7 @@
 import threading
+
+import ulid
+
 from thread_factory.utils import IDisposable
 
 
@@ -43,11 +46,13 @@ class Dynaphore(threading.Semaphore, IDisposable):
 
     """
     __slots__ = IDisposable.__slots__ + [
-        "_cond",
+        "_cond", "_id",
     ]
     def __init__(self, value: int = 1, re_entrant: bool = True):
         super().__init__(value)
         IDisposable.__init__(self)
+
+        self._id = str(ulid.ULID())
         if re_entrant:
             self._cond = threading.Condition()  # Uses RLock by default
         else:

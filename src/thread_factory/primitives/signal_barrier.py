@@ -1,5 +1,8 @@
 import threading
 from typing import Optional, Callable, List, Union
+
+import ulid
+
 from thread_factory.utils import IDisposable, Group
 
 
@@ -45,6 +48,10 @@ class SignalBarrier(IDisposable):
     • Per-group transition logging or checkpointing.
     • Coordinated work loop where signal transit should fire exactly once per group.
     """
+    __slots__ = IDisposable.__slots__ + [
+        "_id", "groups", "_enabled", "reusable", "manual_release",
+        "_lock", "_condition", "_released"
+    ]
 
     def __init__(
             self,
@@ -53,6 +60,7 @@ class SignalBarrier(IDisposable):
             manual_release: bool = False
     ):
         super().__init__()
+        self._id = str(ulid.ULID())
         self.groups = groups if groups is not None else []
         self._enabled = bool(groups)
         self.reusable = reusable

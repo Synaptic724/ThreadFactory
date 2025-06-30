@@ -3,6 +3,9 @@
 import threading
 import time
 from typing import Callable, Optional
+
+import ulid
+
 from thread_factory.utils import IDisposable
 
 
@@ -40,7 +43,7 @@ class ClockBarrier(IDisposable):
     __slots__ = IDisposable.__slots__ + [
         "_threshold", "_timeout", "_on_broken",
         "_lock", "_cond",
-        "_count", "_start_time", "_broken", "_generation"
+        "_count", "_start_time", "_broken", "_generation", "_id"
     ]
     def __init__(
         self,
@@ -55,6 +58,7 @@ class ClockBarrier(IDisposable):
         if timeout <= 0:
             raise ValueError("ClockBarrier timeout must be > 0.")
 
+        self._id = str(ulid.ULID())
         self._threshold = threshold
         self._timeout = timeout
         self._on_broken = on_broken

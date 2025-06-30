@@ -1,26 +1,8 @@
 import threading
 import traceback
 from typing import Callable, Optional
-
-
-# Re-defining IDisposable as it might not be globally available
-class IDisposable:
-    """
-    A simple interface for disposable objects, akin to .NET's IDisposable.
-    """
-
-    def __init__(self):
-        # _disposed is managed by the inheriting class directly per user's request
-        # and not via super().dispose() to avoid potential errors in the provided
-        # IDisposable implementation.
-        self._disposed = False  # Keep track of disposal state
-
-    def dispose(self):
-        """
-        Base dispose method. Child classes should implement their cleanup
-        and set self._disposed = True. This base method does nothing.
-        """
-        pass  # Overridden by child classes, no super() call here
+import ulid
+from thread_factory.utils import IDisposable
 
 
 class Scout(IDisposable):
@@ -40,6 +22,11 @@ class Scout(IDisposable):
     where the predicate is evaluated under the condition's lock.
     """
 
+    __slots__ = IDisposable.__slots__ + [
+        "_id", "_predicate", "_timeout_duration", "_on_timeout_callable",
+        "_on_success_callable", "_autoreset_on_exit", "_condition",
+        "_is_active_monitoring", "_monitoring_cycle_completed", "_id"
+    ]
     def __init__(
             self,
             predicate: Callable[[], bool],
@@ -73,6 +60,7 @@ class Scout(IDisposable):
         if on_success_callable is not None and not callable(on_success_callable):
             raise TypeError("on_success_callable must be a callable function or None.")
 
+        self._id = str(ulid.ULID())
         self._predicate = predicate
         self._timeout_duration = timeout_duration
         self._on_timeout_callable = on_timeout_callable

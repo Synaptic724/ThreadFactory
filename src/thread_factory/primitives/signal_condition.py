@@ -2,6 +2,9 @@ import threading
 import time
 from typing import Optional, Callable, Any, List
 from dataclasses import dataclass
+
+import ulid
+
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from thread_factory.utils.interfaces.disposable import IDisposable
 
@@ -46,7 +49,7 @@ class SignalCondition(IDisposable):
     - Approximately 6.4x slower than bare `RLock` due to user logic hooks, but massively safer and clearer.
     """
     __slots__ = IDisposable.__slots__ + [
-        "_lock", "acquire", "release", "_waiters", "_default_callback",
+        "_lock", "acquire", "release", "_waiters", "_default_callback", "_id",
     ]
     def __init__(self, lock = None):
         """
@@ -57,6 +60,7 @@ class SignalCondition(IDisposable):
                                              If None, a new RLock is created internally.
         """
         super().__init__()
+        self._id = str(ulid.ULID())
         self._lock: threading.RLock = lock or threading.RLock()
         self.acquire: Callable = self._lock.acquire
         self.release: Callable = self._lock.release
