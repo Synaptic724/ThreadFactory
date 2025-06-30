@@ -1,13 +1,8 @@
-# src/thread_factory/primitives/clock_barrier.py
-
 import threading
 import time
 from typing import Callable, Optional
-
 import ulid
-
 from thread_factory.utils import IDisposable
-
 
 class ClockBarrier(IDisposable):
     """

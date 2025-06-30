@@ -9,7 +9,7 @@ try:
     _HYP = True
 except ImportError:  # pragma: no cover – property tests will be skipped
     _HYP = False
-from thread_factory.primitives.transit_gate import TransitGate
+from thread_factory.synchronization.execution.transit_gate import TransitGate
 
 
 class TestTransitGate(unittest.TestCase):

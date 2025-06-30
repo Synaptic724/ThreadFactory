@@ -1,14 +1,21 @@
 import threading
 import ulid
 from typing import Callable, Optional, Any, Dict
-from thread_factory.primitives.signal_condition import SignalCondition
+from thread_factory.synchronization.primitives.signal_condition import SignalCondition
 from thread_factory.utils.interfaces.disposable import IDisposable
-
 
 class SignalLatch(IDisposable):
     """
     A blocking latch that can signal an external observer before blocking.
     It is designed to be managed by an optional, generic Controller.
+
+    Args:
+        signal_callback: A function to call with the latch's ID just
+                         before a thread blocks. Defaults to None.
+        cond: An optional, existing SignalCondition to use internally.
+        controller: An optional Controller instance to register with. If provided,
+                    you should also pass a controller method (like
+                    controller.on_wait_starting) as the signal_callback.
     """
     def __init__(
         self,
@@ -19,13 +26,7 @@ class SignalLatch(IDisposable):
         """
         Initializes the SignalLatch.
 
-        Args:
-            signal_callback: A function to call with the latch's ID just
-                             before a thread blocks. Defaults to None.
-            cond: An optional, existing SignalCondition to use internally.
-            controller: An optional Controller instance to register with. If provided,
-                        you should also pass a controller method (like
-                        controller.on_wait_starting) as the signal_callback.
+
         """
         super().__init__()
         self._id: str = str(ulid.ULID())

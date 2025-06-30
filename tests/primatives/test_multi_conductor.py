@@ -1,9 +1,8 @@
 import unittest
 import threading
 import time
-from typing import List, Any
 
-from thread_factory.primitives.multi_conductor import MultiConductor
+from thread_factory.synchronization.orchestrators.multi_conductor import MultiConductor
 from thread_factory.utils import Group
 
 

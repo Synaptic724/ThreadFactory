@@ -1,8 +1,6 @@
 import threading
 from typing import Optional, Callable
-
 import ulid
-
 from thread_factory.utils import IDisposable
 
 

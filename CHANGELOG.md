@@ -8,240 +8,172 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.3.0] - 2025-06-29
+## [1.3.0] - 2025-06-30
 
 # 🚀 ThreadFactory Changelog – Massive Concurrency Upgrade
 
-## 🧠 New Primitives – Welcome to the Age of Dynamic Threads
+ThreadFactory now introduces a modular concurrency stack built from first principles. This version splits the system into high-performance primitives, orchestrators, dispatchers, and dynamic thread management tools.
 
 ---
 
-### 🧱 `ValueWork` — *The Inverted Future*
+## 🧠 New Primitives – `synchronization.primitives`
 
-A structured, thread-safe **unit of work** designed for **thread-controlled execution**.  
-Tracks full lifecycle transitions:  
-`pending → running → completed | cancelled | failed`
+### 🎛 `Dynaphore`
+A dynamically resizable permit gate. Ideal for adaptive queues, resource throttling, and elastic thread pools.
 
-Includes:
-- Lifecycle timestamps
-- Status tracking (`WorkStatus`)
-- Cancelation support
-- Hooks for post-run logic
+### 🔁 `SwitchLock`
+Smart semaphore with factory ID targeting, callback routing, and bias buffering. Great for agentic workers and dynamic wakeups.
 
-🔗 Perfect for use with `DynamicWorker`, where threads control their own futures.
+### 🧠 `SmartCondition`
+Thread-aware `Condition` alternative. Allows targeted wakeups, ULID tracking, and callback delivery to waiting threads.
 
----
+### 🔔 `SignalCondition`
+Minimalist wait/notify condition. Callback always executes inside the waiting thread. Lightweight and FIFO-safe.
 
-### 🎛 `Dynaphore` — *Elastic Semaphore Control*
+### 🛑 `SignalLatch`
+Latch with observer signaling support. Can notify a controller before blocking. Uses `SignalCondition` internally.
 
-A dynamically resizable **permit gate** for concurrency.  
-Ideal for:
-- Adaptive thread pools
-- Runtime-scalable queues
-- Systems where load fluctuates and **concurrency must flex**
+### 🔒 `Latch`
+Classic reusable latch. Once opened, all threads are released permanently until reset.
 
-🧠 Just change the number of active permits — **no restart required**.
+### 🧱 `ThresholdSemaphore`
+Reusable gate that opens when a thread threshold is reached. Supports auto and manual release. Good for batch coordination.
 
 ---
 
-### 🎯 `ActionBarrier` — *Activation Barrier*
+## ⚡ Orchestrators – `synchronization.orchestrators`
 
-A reusable **threshold gate** that blocks threads until a required number arrive with optional callable execution.
-Basically a barrier with a callable trigger.
+### 🎯 `ActionBarrier`
+Reusable barrier with threshold coordination and optional callable execution once threshold is met.
 
-Ideal for:
-- Thread group synchronization  
-- Step-based orchestration  
-- Batched execution coordination  
+### ⏰ `ClockBarrier`
+Barrier with global timeout. If not all threads arrive before timeout, the barrier breaks and raises.
 
-🧠 All threads are released **only when the threshold is met** — with optional reuse for cyclic control.
+### 🚦 `Conductor`
+Reusable group synchronizer. Executes tasks after a threshold is met. Supports timeout and failure states.
 
----
+### 🧠 `MultiConductor`
+Manages multiple `Group` objects with per-group thresholds. Executes per-group tasks and performs global release.
 
-### 🚦 `Conductor` — *Robust, Time-Aware Group Coordination*
+### 🧬 `SignalBarrier`
+Group-based coordination system. Waits for all groups to signal readiness. Executes per-group callables transitively.
 
-A **reusable, fault-tolerant threshold gate** that waits for a required number of threads to arrive, offering advanced control over its lifecycle. It combines the simplicity of a barrier with sophisticated timeout and error-handling features.
-
-#### 🔑 Key Features:
-- 🕰️ **Timeout Control**: Prevents deadlocks by automatically releasing threads after a specified duration.
-- 💥 **Failure Signaling**: Can be configured to **raise a `TimeoutError`** instead of just returning `False`.
-- 🔄 **Reusable Mode**: Automatically resets its state after all threads are released, ready for the next cycle.
-- 🛑 **Broken State**: Transitions to a "broken" state upon timeout or manual override, preventing new threads from waiting.
-- 🧼 **Disposable**: Safely and cleanly unblocks all waiters during shutdown.
-
-🧠 Best for:
-- Reliable parallel processing stages
-- Coordinated task-launching with deadlines
-- Resilient group synchronization where failure is handled gracefully
+### 🔍 `Scout`
+Predicate-based monitor. One thread blocks while evaluating a predicate with timeout and success/failure callbacks.
 
 ---
 
-### 🧠 `SmartCondition` — *Identity-Aware Synchronization*
+## 🚉 Execution Gates – `synchronization.execution`
 
-A next-gen condition variable with:
-- 🔁 `notify(factory_ids=...)` for **targeted wakeups**
-- 🧬 ULID-based identity assignment (`factory_id`)
-- ✅ Callback routing
-- 🧭 Full waiter inspection & tracking
-
-🔧 Supports intelligent signaling **without subclassing threads** — drop-in compatible with `threading.Thread`.
+### 🔀 `TransitGate`
+Allows up to `N` threads to execute a pre-bound callable pipeline. Captures results via `Outcome`. Collapses once the cap is reached. Great for controlled bootstraps or one-time initializers.
 
 ---
 
-### 🌀 `SwitchLock` — *Call-Driven Agentic Thread Orchestration*
+## 🎛 Dispatchers – `synchronization.dispatchers`
 
-Forget semaphores. This is **not** a lock — it’s a **programmable execution gate**.
+### 🔧 `Fork`
+Thread dispatcher that assigns callables based on usage caps. Ensures each callable executes a fixed number of times. Good for simple routing or round-robin-like workloads.
 
-Key powers:
-- 🔁 **Permit buffering with bias thresholding** — control bursts, prevent starvation
-- 🎯 **Targeted wakeups** — notify exact threads via `factory_id`
-- 📞 **Callback routing** — run logic in the thread that *wakes up*
-- 💬 `awaited_caller=True` — let the *woken* thread execute the callback (like an agent returning to the field)
-- 🚪 Works with **vanilla threads** — threads get a `factory_id` automatically
-- 🔍 Logs all attempting threads for postmortem analysis
-
-Use it for:
-- Work stealing
-- Adaptive queues
-- Room-based thread signaling
-- Agent awakening systems
-- ⚡️ Cooperative multitasking — not just raw contention
-
-💡 This isn't a lock. It's a **router for attention**.
+### 🔄 `SyncFork`
+Dispatcher that coordinates N threads into callable groups. All callables execute simultaneously once all slots are filled. Supports timeouts and reuse.
 
 ---
 
-### 🔔 `SignalCondition` — *Minimalist Thread Sync*
+## 🧠 Controllers – `synchronization.controller`
 
-Lightweight condition primitive with:
-- No identity targeting
-- Always executes callbacks in the **awaiting thread**
-- 🚦 Best for:
-  - Producer-consumer queues
-  - One-shot wakeups
-  - Embedded coordination where `SmartCondition` would be overkill
+### 🎮 `Controller`
+Central registry for lifecycle-managed objects. Supports:
+- `register()` / `unregister()`
+- `invoke()` with pre/post hooks
+- Event notification (`notify`)
+- Full-thread-safe `dispose()` that recursively tears down all managed objects
 
----
-
-### 🧱 `SignalBarrier` — *Multi-Group Thread Coordination with Threshold Control*
-
-A **coordinated, threshold-aware barrier** that waits for **groups of threads** to reach readiness before proceeding. Think of it as a **multi-latch** that only opens when *all* teams are in position.
-
-#### 🔑 Key Features:
-- 🧮 **Per-group thresholds**: Each group waits for a specific number of threads
-- 🧠 **Per-group callbacks**: Trigger logic once a group is ready
-- 🔒 **Manual or auto release**: Full control over when threads are unblocked
-- 🔁 **Reusable mode**: Automatically resets after all threads exit
-- 🧼 **Disposable**: Cleanly shuts down and unblocks all waiters
+It forms the backbone for global coordination, status tracking, and command dispatch.
 
 ---
 
+## 🧱 Work Abstractions – `thread_factory.core.work`
 
-### 🧱 `MultiConductor` — *Multi-Group Thread Coordination with Threshold Control and Timeout Control*
-
-A **coordinated, threshold-aware barrier** that blocks threads until **multiple, independent groups** each meet their own predefined thread count. 
-Once all groups are "ready," the barrier releases all waiting threads. 
-Think of it as a series of locks that all must be turned before a single door opens, with each lock having its own key requirement.
-
-#### 🔑 Key Features:
-- 🧮 **Per-Group Thresholds**: Each group can have a unique thread count it must meet (e.g., Group A needs 3 threads, Group B needs 5).
-- 🧠 **Per-Group Callbacks**: Execute a specific function precisely when a group's threshold is met, before the main barrier releases.
-- 🔒 **Manual or Auto Release**: Configure the barrier to release automatically when all groups are ready, or manually via a `release()` method.
-- ⏰ **Timeout Control**: Prevent indefinite blocking by setting a maximum waiting time for the entire barrier.
-- 🔁 **Reusable Mode**: Automatically resets the barrier's state after all threads are released, preparing it for the next wave of synchronization.
-- 💥 **Robust Failure Handling**: Becomes "broken" upon timeout or disposal, cleanly unblocking all threads and signaling a failure state.
-- 🧼 **Disposable**: Cleanly shuts down the barrier, immediately unblocking all waiting threads and preventing further use.
+### 🪄 `ValueWork`
+Inverted `Future` managed by threads themselves. Tracks status (`pending`, `running`, `completed`, `cancelled`, `failed`) and timestamps. Can be used with dynamic workers for agentic execution and result orchestration.
 
 ---
 
-### ⏲️ `AutoResetTimer` — *Heartbeat for Workers*
+## ⏱️ Timing Utilities – `thread_factory.utils.timing`
 
-A compact backoff timer that **resets automatically** after expiration.  
-✅ Ideal for:
-- Retry logic
-- Gate polling
-- Periodic wakeups in agents and consumers
+### ⏲️ `AutoResetTimer`
+Timer that auto-resets after use. Useful for cyclic backoff, loop pacing, and heartbeat monitoring.
 
----
-
-### ⏱️ `Stopwatch` — *True Nanosecond Profiling*
-
-Fast and dead-simple:
-- `start()`, `stop()`, `elapsed_ns()`
-- Fine-grained profiling for:
-  - Task durations
-  - Waiter latency
-  - Queue throughput
-
-📊 Precision timing made practical for every worker.
+### 🕰️ `Stopwatch`
+Simple nanosecond-precision profiler. Used for queue stats, lock contention tracking, and execution spans.
 
 ---
 
-### 🧠 Work Abstraction
+## 🧵 Dynamic Execution Engine – `thread_factory.dynamic`
 
-- Introduced the **`ValueWork`** class:
-  - Auto-dispose behavior for cleanup after result collection
-  - Lifecycle hook system (`before`, `after`) for side-effect orchestration
-  - Metadata: timestamps, task ID
-  - Cancellation via `CancelledError`
----
-
-### 🧵 Dynamic Execution Engine
-
-- Added **`DynamicWorker`** prototype:
-  - Executes `ValueWork` with lifecycle awareness
-  - Waits using `SwitchLock` with ID-based control
-  - Supports checkpointing and behavior swapping via named callables
-  - Controlled wake/sleep logic via `SmartCondition`
+### 🔄 `DynamicWorker`
+Prototype worker with the following features:
+- Executes `ValueWork` atomically
+- Integrates with `SmartCondition` and `SwitchLock` for coordination
+- Supports behavior injection, lifecycle checkpoints, and agent-style wake/sleep loops
 
 ---
 
-### 🎛️ Queue + Locking Enhancements
+## 📦 Queues and Stacks – `thread_factory.concurrency`
 
-- **`ConcurrentQueue`** and **`ConcurrentStack`**
-  - Added `is_empty()` for zero-contention guard checks
-  - Batch-steal support for improved throughput under high load
----
-
-### 🧪 Performance Notes
-
-#### ⏱ Lock Timing Comparisons
-- threading.Lock │ 0.07 µs
-- SwitchLock (this) │ 4.40 µs
-- Thread Spawn (bare) │ 195.8 µs
-
-#### 🧠 SmartCondition vs. RLock
-- Raw RLock.acquire()/release(): ~0.00196s
-- SignalCondition wait()/notify(): ~0.01256s
-- SignalCondition is ~6.4× slower in low contention.
+### 🪜 `ConcurrentQueue` / `ConcurrentStack`
+New features:
+- `is_empty()` added for shutdown checks
+- `batch_steal()` support for optimized consumer loops
+- Thread-safe with no-lock peek/guard patterns
 
 ---
 
-### 🏗️ ThreadFactory (Scaffolded)
+## 🧪 Performance Benchmarks
 
-- Introduced initial structure for the `ThreadFactory` execution framework:
-  - Modular producer-consumer threading
-  - Queue-to-worker routing logic
-  - Plans for scaling policies, diagnostics, and `multithreaded-asyncio` integration
-
----
-
-### ✅ Improvements & Fixes
-
-- Added `__slots__` to all concurrency classes:
-  - Reduced memory overhead
-  - Improved attribute access speed
-  - Lowered GC churn under heavy threading loads
+| Primitive      | Avg Time |
+|----------------|----------|
+| `threading.Lock` | 0.07 µs |
+| `SwitchLock`      | 4.40 µs |
+| `threading.Thread()` startup | 195.8 µs |
+| `SignalCondition.wait()` | ~6.4× slower than bare RLock |
 
 ---
 
-### 📌 Notes for Developers
+## ✅ Structural Improvements
 
-- Migrate worker coordination logic to `SmartCondition` and `SwitchLock`
-- Use `ValueWork` as the core unit of execution across sync and async flows
-- Adopt `Stopwatch` and `AutoResetTimer` for all time-based tasks and metrics
-- Use `SignalCondition` for basic waits, `SmartCondition` for ID-based signaling
-- Leverage `ConcurrentQueue.is_empty()` for graceful shutdown and polling guards
+- 🔐 **All concurrency classes now use `__slots__`**
+  - Reduced memory footprint
+  - Faster attribute access
+  - Less GC churn under stress
+
+- 📁 **New Folder Structure**
+- synchronization/
+- ├── primitives/
+- ├── orchestrators/
+- ├── dispatchers/
+- ├── execution/
+- └── controller/
+
+
+Each category maps directly to purpose:
+- `primitives`: Low-level synchronization building blocks
+- `orchestrators`: Group coordination & flow control
+- `dispatchers`: Thread-callable routing logic
+- `execution`: Execution gates & work-limited runners
+- `controller`: Lifecycle and command management
+
+---
+
+## 📌 Developer Notes
+
+- Prefer `SwitchLock` + `SmartCondition` for agent-oriented design.
+- Use `ValueWork` as the new core unit of thread-initiated tasks.
+- For fork-like behavior, use `Fork` or `SyncFork`.
+- Adopt `Stopwatch` and `AutoResetTimer` for instrumentation.
+- Use `SignalCondition` for simplicity, `SmartCondition` for targeting.
+- Use `ConcurrentQueue.is_empty()` to manage graceful shutdowns.
 
 ---
 

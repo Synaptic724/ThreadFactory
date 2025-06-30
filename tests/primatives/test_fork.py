@@ -1,7 +1,7 @@
 import unittest
 import threading
 import time
-from thread_factory.primitives.fork import Fork
+from thread_factory.synchronization.dispatchers.fork import Fork
 
 
 def dummy_func_factory(name, log, delay=0):

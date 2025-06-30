@@ -1,9 +1,6 @@
 import threading
-
 import ulid
-
 from thread_factory.utils import IDisposable
-
 
 class Dynaphore(threading.Semaphore, IDisposable):
     """

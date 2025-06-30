@@ -1,10 +1,10 @@
 import threading
 import time
 import unittest
-from typing import Any, Dict, Callable
+from typing import Any
 
 # Import the new, refactored SignalLatch
-from thread_factory.primitives.signal_latch import SignalLatch, SignalCondition
+from thread_factory.synchronization.primitives.signal_latch import SignalLatch, SignalCondition
 
 # Assuming a placeholder IDisposable for testing context
 class IDisposable:

@@ -1,10 +1,8 @@
 import unittest
 import threading
 import time
-from typing import List, Tuple, Callable
-from concurrent.futures import ThreadPoolExecutor
-from thread_factory.primitives.sync_fork import SyncFork
-from thread_factory.primitives.scout import Scout  # Import Scout explicitly
+from typing import List
+from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
 
 
 # --- Helper Functions for Testing ---

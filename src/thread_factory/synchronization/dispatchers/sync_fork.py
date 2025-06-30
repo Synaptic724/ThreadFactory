@@ -1,12 +1,9 @@
 import dataclasses
 import threading
-import time
 from typing import Callable, List, Optional, Tuple
 import inspect
-
 import ulid
-
-from thread_factory.primitives.scout import Scout
+from thread_factory.synchronization.orchestrators.scout import Scout
 from thread_factory.utils import IDisposable
 
 

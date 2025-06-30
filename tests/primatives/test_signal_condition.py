@@ -2,7 +2,7 @@ import threading
 import time
 import unittest
 from typing import List
-from thread_factory.primitives.signal_condition import SignalCondition
+from thread_factory.synchronization.primitives.signal_condition import SignalCondition
 
 # ---------------------------------------------------------------------------
 # Helper thread classes

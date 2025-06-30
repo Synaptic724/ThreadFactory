@@ -3,7 +3,7 @@ import time
 import unittest
 from unittest.mock import Mock
 
-from thread_factory.primitives.scout import Scout
+from thread_factory.synchronization.orchestrators.scout import Scout
 
 
 class TestScout(unittest.TestCase):

@@ -1,8 +1,7 @@
 import unittest
-import threading
 import time
 import random
-from thread_factory.primitives.dynaphore import Dynaphore
+from thread_factory.synchronization.primitives.dynaphore import Dynaphore
 
 import threading, atexit
 

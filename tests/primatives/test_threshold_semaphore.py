@@ -1,7 +1,7 @@
 import unittest
 import threading
 import time
-from thread_factory.primitives.threshold_semaphore import ThresholdSemaphore
+from thread_factory.synchronization.primitives.threshold_semaphore import ThresholdSemaphore
 
 
 class TestThresholdSemaphore(unittest.TestCase):

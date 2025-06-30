@@ -2,7 +2,7 @@ import unittest
 import threading
 import time
 
-from thread_factory.primitives.smart_condition import SmartCondition
+from thread_factory.synchronization.primitives.smart_condition import SmartCondition
 
 class TestSmartCondition(unittest.TestCase):
 

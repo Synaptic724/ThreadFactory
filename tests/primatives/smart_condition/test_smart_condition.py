@@ -4,7 +4,7 @@ import random
 import threading
 import ulid
 import queue
-from thread_factory.primitives.smart_condition import SmartCondition, Waiter
+from thread_factory.synchronization.primitives.smart_condition import SmartCondition, Waiter
 from thread_factory.runtime.worker.worker import Worker
 
 class GenericTestThread(threading.Thread):

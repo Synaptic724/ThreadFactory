@@ -1,11 +1,11 @@
-from typing import Callable, Optional
+from typing import Callable
 import threading
 from ulid import ULID
 from thread_factory.concurrency import ConcurrentSet, ConcurrentQueue, ConcurrentList, ConcurrentDict
 from thread_factory.dynamic_thread_pool import DynamicWorker
-from thread_factory.primitives.switchlock import SwitchLock
+from thread_factory.synchronization.primitives.switchlock import SwitchLock
 from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.runtime.orchestrator.monitoring.records.records import Record, WorkStatus, Records
+from thread_factory.runtime.orchestrator.monitoring.records.records import Records
 
 
 class _DynamicPoolContainer(IDisposable):

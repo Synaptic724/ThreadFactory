@@ -1,13 +1,11 @@
 import ulid
-
 from thread_factory.utils import IDisposable
 import inspect
 import threading
-import time
 from thread_factory.primitives import Dynaphore
 from typing import Optional, Callable, List, Union, Any
 from thread_factory.primitives import ClockBarrier
-from thread_factory.primitives.threshold_semaphore import ThresholdSemaphore
+from thread_factory.synchronization.primitives.threshold_semaphore import ThresholdSemaphore
 
 
 class Conductor(IDisposable):

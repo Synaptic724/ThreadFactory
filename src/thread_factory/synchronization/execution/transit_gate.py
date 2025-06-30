@@ -2,11 +2,9 @@ import functools
 import inspect
 import threading
 from typing import Callable, Optional, List, Any, Union
-
 import ulid
-
-from thread_factory.primitives.dynaphore import Dynaphore
-from thread_factory.primitives.threshold_semaphore import ThresholdSemaphore
+from thread_factory.synchronization.primitives.dynaphore import Dynaphore
+from thread_factory.synchronization.primitives.threshold_semaphore import ThresholdSemaphore
 from thread_factory.utils import IDisposable, Outcome
 
 
@@ -21,6 +19,15 @@ class TransitGate(IDisposable):
     • Up to `limit` threads may execute the callable; others skip.
     • Each successful execution returns an Outcome tracking result or exception.
 
+    Args:
+        func (Union[Callable, list[Callable]]): A synchronous function or a list
+                                                 of functions to execute in a pipeline.
+                                                 If a single callable, it can accept arguments
+                                                 passed via *args and **kwargs.
+        limit (int): Maximum number of allowed executions.
+        *args: Positional args to pass to the callable if it's a single item.
+        **kwargs: Keyword args to pass to the callable if it's a single item.
+
     Example Use:
     >>> def log_task(): print("Task complete")
     >>> gate = TransitGate(log_task, limit=3)
@@ -33,18 +40,6 @@ class TransitGate(IDisposable):
     ]
 
     def __init__(self, func: Union[Callable, list[Callable]], limit: int = 1, *args, **kwargs):
-        """
-        Initializes the gate with a callable or a list of callables.
-
-        Args:
-            func (Union[Callable, list[Callable]]): A synchronous function or a list
-                                                     of functions to execute in a pipeline.
-                                                     If a single callable, it can accept arguments
-                                                     passed via *args and **kwargs.
-            limit (int): Maximum number of allowed executions.
-            *args: Positional args to pass to the callable if it's a single item.
-            **kwargs: Keyword args to pass to the callable if it's a single item.
-        """
         super().__init__()
 
         if limit < 0:

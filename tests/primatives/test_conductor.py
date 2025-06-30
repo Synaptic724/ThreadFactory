@@ -1,8 +1,8 @@
 import unittest
 import threading
 import time
-from typing import List, Any
-from thread_factory.primitives.conductor import Conductor
+from typing import List
+from thread_factory.synchronization.orchestrators.conductor import Conductor
 
 class TestConductor(unittest.TestCase):
     # ==================================================================

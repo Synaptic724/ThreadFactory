@@ -1,8 +1,7 @@
 import unittest
 import threading
 import time
-from thread_factory.primitives.signal_barrier import SignalBarrier, Group, IDisposable
-from thread_factory.utils.coordination.outcome import Outcome
+from thread_factory.synchronization.orchestrators.signal_barrier import SignalBarrier, Group
 
 
 class TestSignalBarrier(unittest.TestCase):

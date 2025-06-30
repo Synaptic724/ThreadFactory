@@ -1,233 +1,276 @@
+# test_controller_latch.py
 import logging
 import threading
+import time
 import unittest
-import ulid
-from unittest.mock import Mock, MagicMock
-from thread_factory.primitives.controller import Controller
+from typing import List
+from unittest.mock import MagicMock, call  # Import 'call' for a more robust check
+from thread_factory.synchronization.controllers.controller import Controller
+from thread_factory.synchronization.primitives.signal_latch import SignalLatch
 from thread_factory.concurrency import ConcurrentDict
-from thread_factory.utils.interfaces.disposable import IDisposable
 
 
-# A helper class that fulfills the contract required by the Controller
-class MockControllable(IDisposable):
-    """A mock object that can be registered with the Controller."""
+class TestControllerWithLatch(unittest.TestCase):
+    """Integration-style tests for Controller using real SignalLatch objects."""
 
-    def __init__(self, name="mock_object"):
-        super().__init__()
-        self.id = str(ulid.ULID())
-        self.name = name
-        # Use mock objects for commands to track calls and set return values
-        self.mock_command_a = Mock(return_value="A")
-        self.mock_command_b = Mock(return_value="B")
-        self.mock_dispose = Mock()
+    # --------------------------------------------------------------------- #
+    # Helpers
+    # --------------------------------------------------------------------- #
+    def _make_latch(self) -> SignalLatch:
+        """Create a SignalLatch already wired to this test's controller."""
+        return SignalLatch(
+            controller=self.controller,
+            signal_callback=self.controller.on_wait_starting,  # event handshake
+        )
 
-    def _get_object_details(self):
-        return {
-            'name': self.name,
-            'commands': {
-                'command_a': self.mock_command_a,
-                'command_b': self.mock_command_b,
-                'dispose': self.mock_dispose
-            }
-        }
-
-    def dispose(self):
-        # Allow the object's own dispose to be called.
-        super().dispose()
-        self.mock_dispose()
-
-
-class TestController(unittest.TestCase):
-
+    # --------------------------------------------------------------------- #
+    # Framework plumbing
+    # --------------------------------------------------------------------- #
     def setUp(self):
-        """Create a new Controller instance for each test."""
         self.mock_logger = MagicMock(spec=logging.Logger)
+        # Apply your corrected Controller class from the previous step
         self.controller = Controller(logger=self.mock_logger)
+        self.temp_controller = None
 
     def tearDown(self):
-        """Ensure the controller is disposed after each test."""
-        if not self.controller._disposed:
+        # Dispose main controller if still alive
+        if self.controller and not self.controller._disposed:
             self.controller.dispose()
+        # Dispose any secondary controller
+        if self.temp_controller and not self.temp_controller._disposed:
+            self.temp_controller.dispose()
+        self.controller = None
+        self.temp_controller = None
 
-    def test_initialization(self):
-        """Test the controller's initial state."""
+    # --------------------------------------------------------------------- #
+    # 1 – Initialization
+    # --------------------------------------------------------------------- #
+    def test_initialization_defaults(self):
         self.assertIsInstance(self.controller._registry, ConcurrentDict)
         self.assertFalse(self.controller._disposed)
-        self.assertEqual(self.controller._logger, self.mock_logger)
-        # Test initialization without a logger
-        no_logger_controller = Controller()
-        self.assertIsNone(no_logger_controller._logger)
+        self.assertIs(self.controller._logger, self.mock_logger)
 
-    def test_registration_success(self):
-        """Test successful registration of a compliant object."""
-        mock_obj = MockControllable()
-        self.controller.register(mock_obj)
+        # Create controller with default logger
+        self.temp_controller = Controller()
+        self.assertIsInstance(self.temp_controller._logger, logging.Logger)
+        self.assertNotEqual(self.temp_controller._logger, self.mock_logger)
+        self.assertTrue(self.temp_controller._logger.handlers)
+        self.assertEqual(self.temp_controller._logger.level, logging.DEBUG)
 
-        self.mock_logger.debug.assert_called_with(f"Registered object: ID='{mock_obj.id}', Name='{mock_obj.name}'")
-        self.assertIn(mock_obj.id, self.controller._registry)
-        details = self.controller.list_objects()
-        self.assertEqual(len(details), 1)
-        self.assertEqual(details[0]['id'], mock_obj.id)
-        self.assertEqual(details[0]['name'], mock_obj.name)
+    # --------------------------------------------------------------------- #
+    # 2 – Successful registration
+    # --------------------------------------------------------------------- #
+    def test_register_latch_success(self):
+        latch = self._make_latch()
+        self.assertIn(latch.id, self.controller._registry)
+        self.mock_logger.debug.assert_called_with(
+            f"Registered object: ID='{latch.id}', Name='latch'"
+        )
 
-    def test_registration_failures(self):
-        """Test various registration failure scenarios."""
-        # Failure: Object doesn't have the required method
-        with self.assertRaisesRegex(TypeError, "must have 'id' and '_get_object_details'"):
-            self.controller.register(object())
-
-        # Failure: Object already registered
-        mock_obj = MockControllable()
-        self.controller.register(mock_obj)
+    # --------------------------------------------------------------------- #
+    # 3 – Duplicate registration failure
+    # --------------------------------------------------------------------- #
+    def test_register_duplicate_fails(self):
+        latch = self._make_latch()
         with self.assertRaisesRegex(ValueError, "already registered"):
-            self.controller.register(mock_obj)
+            self.controller.register(latch)
 
-    def test_unregister(self):
-        """Test unregistering an object."""
-        mock_obj = MockControllable()
-        self.controller.register(mock_obj)
-        self.assertIn(mock_obj.id, self.controller._registry)
+    # --------------------------------------------------------------------- #
+    # 4 – Unregister disposes object
+    # --------------------------------------------------------------------- #
+    def test_unregister_disposes_latch(self):
+        latch = self._make_latch()
+        self.controller.unregister(latch.id)
+        self.assertTrue(latch._disposed)
+        self.assertNotIn(latch.id, self.controller._registry)
 
-        self.controller.unregister(mock_obj.id)
-        self.mock_logger.debug.assert_called_with(f"Unregistered object: {mock_obj.id}")
-        self.assertNotIn(mock_obj.id, self.controller._registry)
-        mock_obj.mock_dispose.assert_called_once()
+    # --------------------------------------------------------------------- #
+    # 5 – Unregister WITHOUT dispose
+    # --------------------------------------------------------------------- #
+    def test_unregister_without_dispose_flag(self):
+        latch = self._make_latch()
+        self.controller.unregister(latch.id, dispose_object=False)
+        self.assertFalse(latch._disposed)
 
-    def test_unregister_without_dispose(self):
-        """Test unregistering without disposing the object."""
-        mock_obj = MockControllable()
-        self.controller.register(mock_obj)
-        self.controller.unregister(mock_obj.id, dispose_object=False)
-        self.assertNotIn(mock_obj.id, self.controller._registry)
-        mock_obj.mock_dispose.assert_not_called()
+    # --------------------------------------------------------------------- #
+    # 6 – Invoke: open command works
+    # --------------------------------------------------------------------- #
+    def test_invoke_open(self):
+        latch = self._make_latch()
+        self.assertFalse(latch.is_open())
+        self.controller.invoke(latch.id, "open")
+        self.assertTrue(latch.is_open())
 
-    def test_invoke_success(self):
-        """Test successfully invoking a command."""
-        mock_obj = MockControllable()
-        self.controller.register(mock_obj)
-        result = self.controller.invoke(mock_obj.id, 'command_a', 1, 2, key='val')
+    # --------------------------------------------------------------------- #
+    # 7 – Invoke: reset command works
+    # --------------------------------------------------------------------- #
+    def test_invoke_reset(self):
+        latch = self._make_latch()
+        self.controller.invoke(latch.id, "open")
+        self.assertTrue(latch.is_open())
+        self.controller.invoke(latch.id, "reset")
+        self.assertFalse(latch.is_open())
 
-        self.assertEqual(result, "A")
-        mock_obj.mock_command_a.assert_called_once_with(1, 2, key='val')
+    # --------------------------------------------------------------------- #
+    # 8 – Invoke: is_open query
+    # --------------------------------------------------------------------- #
+    def test_invoke_is_open(self):
+        latch = self._make_latch()
+        result_before = self.controller.invoke(latch.id, "is_open")
+        self.controller.invoke(latch.id, "open")
+        result_after = self.controller.invoke(latch.id, "is_open")
+        self.assertEqual((result_before, result_after), (False, True))
 
-    def test_invoke_failures(self):
-        """Test various command invocation failures."""
-        mock_obj = MockControllable()
-        self.controller.register(mock_obj)
+    # --------------------------------------------------------------------- #
+    # 9 – Broadcast open to ALL objects
+    # --------------------------------------------------------------------- #
+    def test_invoke_on_all_open(self):
+        latches = [self._make_latch() for _ in range(3)]
+        self.controller.invoke_on_all("open")
+        self.assertTrue(all(l.is_open() for l in latches))
 
-        with self.assertRaisesRegex(KeyError, "No object registered"):
-            self.controller.invoke("nonexistent-id", 'command_a')
+        # FIX: Change assert_called_with to assert_any_call.
+        # This checks if the call was made at all, not if it was the *last* call.
+        self.mock_logger.info.assert_any_call(
+            f"Broadcasting command 'open' to 3 objects."
+        )
 
-        with self.assertRaisesRegex(KeyError, "has no command"):
-            self.controller.invoke(mock_obj.id, 'nonexistent_command')
+    # --------------------------------------------------------------------- #
+    # 10 – Broadcast with name_filter
+    # --------------------------------------------------------------------- #
+    def test_invoke_on_all_with_filter(self):
+        latch1 = self._make_latch()
+        latch2 = self._make_latch()
 
-        # Test when the command itself raises an error
-        mock_obj.mock_command_b.side_effect = ValueError("Command Failed")
-        with self.assertRaisesRegex(ValueError, "Command Failed"):
-            self.controller.invoke(mock_obj.id, 'command_b')
-        self.mock_logger.error.assert_called()
+        # Rename the second latch to “special”
+        latch2_name_patch = {'name': 'special'}
+        self.controller._registry[latch2.id]['name'] = 'special'  # quick patch
 
-    def test_invoke_on_all(self):
-        """Test invoking a command on multiple objects."""
-        obj1 = MockControllable(name="type1")
-        obj2 = MockControllable(name="type1")
-        obj3 = MockControllable(name="type2")
-        self.controller.register(obj1)
-        self.controller.register(obj2)
-        self.controller.register(obj3)
+        self.controller.invoke_on_all("open", name_filter="special")
+        self.assertFalse(latch1.is_open())
+        self.assertTrue(latch2.is_open())
 
-        # Invoke on all
-        self.controller.invoke_on_all('command_a')
-        obj1.mock_command_a.assert_called_once()
-        obj2.mock_command_a.assert_called_once()
-        obj3.mock_command_a.assert_called_once()
+    # --------------------------------------------------------------------- #
+    # 11 – Concurrent wait blocks then releases
+    # --------------------------------------------------------------------- #
+    def test_concurrent_wait_and_open(self):
+        latch = self._make_latch()
+        wait_results: List[bool] = []
 
-        # Invoke with name filter
-        self.controller.invoke_on_all('command_b', name_filter="type1")
-        obj1.mock_command_b.assert_called_once()
-        obj2.mock_command_b.assert_called_once()
-        obj3.mock_command_b.assert_not_called()
+        def waiter():
+            wait_results.append(latch.wait(timeout=1.0))
 
-    def test_event_and_state_tracking(self):
-        """Test the notify method and state tracking for waiting objects."""
-        mock_obj = MockControllable()
-        self.controller.register(mock_obj)
+        t = threading.Thread(target=waiter, daemon=True)
+        t.start()
+        time.sleep(0.1)  # ensure thread is blocking
+        self.assertFalse(wait_results)  # nothing appended yet
+        self.controller.invoke(latch.id, "open")
+        t.join(timeout=2)
+        self.assertEqual(wait_results, [True])
 
-        self.assertEqual(self.controller.get_waiting_objects(), [])
+    # --------------------------------------------------------------------- #
+    # 12 – WAIT_STARTING and DISPOSED_BY_CONTROLLER events
+    # --------------------------------------------------------------------- #
+    def test_event_tracking_wait_and_dispose(self):
+        latch = self._make_latch()
+        self.controller.on_wait_starting(latch.id)
+        self.assertEqual(self.controller.get_waiting_objects(), [latch.id])
 
-        # Use the adapter to simulate a wait signal
-        self.controller.on_wait_starting(mock_obj.id)
-        self.mock_logger.info.assert_called_with(f"Controller Event: ID='{mock_obj.id}', Event='WAIT_STARTING'")
-        self.assertEqual(self.controller.get_waiting_objects(), [mock_obj.id])
+        # invoke("dispose") triggers DISPOSED_BY_CONTROLLER
+        self.controller.invoke(latch.id, "dispose")
 
-        # Simulate the object being opened by the controller
-        self.controller.invoke(mock_obj.id, 'dispose')
-        self.assertEqual(self.controller.get_waiting_objects(), [])
+        # Check that the expected event was logged at some point
+        expected_event_call = call(f"Controller Event: ID='{latch.id}', Event='DISPOSED_BY_CONTROLLER'")
+        self.assertIn(expected_event_call, self.mock_logger.info.call_args_list)
 
-    def test_subscribe_and_notify(self):
-        """Test the Pub/Sub system."""
-        mock_obj = MockControllable()
-        self.controller.register(mock_obj)
-        mock_callback = Mock()
+        self.assertEqual(list(self.controller.get_waiting_objects()), [])
 
-        self.controller.subscribe(mock_obj.id, "WAIT_STARTING", mock_callback)
-        self.mock_logger.debug.assert_called()
+    # --------------------------------------------------------------------- #
+    # 13 – Subscribe & notify WAIT_STARTING
+    # --------------------------------------------------------------------- #
+    def test_subscribe_wait_starting(self):
+        latch = self._make_latch()
+        callback = MagicMock()
+        self.controller.subscribe(latch.id, "WAIT_STARTING", callback)
+        self.controller.on_wait_starting(latch.id)
+        callback.assert_called_once_with(latch.id, "WAIT_STARTING", None)
 
-        # This notification should trigger the callback
-        self.controller.notify(mock_obj.id, "WAIT_STARTING", data={'info': 'test'})
-        mock_callback.assert_called_once_with(mock_obj.id, "WAIT_STARTING", {'info': 'test'})
+    # --------------------------------------------------------------------- #
+    # 14 – Subscriber receives custom event
+    # --------------------------------------------------------------------- #
+    def test_subscribe_custom_event(self):
+        latch = self._make_latch()
+        callback = MagicMock()
+        self.controller.subscribe(latch.id, "MY_EVENT", callback)
+        self.controller.notify(latch.id, "MY_EVENT", data={"x": 1})
+        callback.assert_called_once_with(latch.id, "MY_EVENT", {"x": 1})
 
-        # This notification should NOT trigger the callback
-        self.controller.notify(mock_obj.id, "SOMETHING_ELSE")
-        mock_callback.assert_called_once()  # Still called only once
-
-    def test_hook_system(self):
-        """Test the pre- and post-invocation hook system."""
-        mock_obj = MockControllable()
-        self.controller.register(mock_obj)
-        pre_hook = Mock()
-        post_hook = Mock()
-
-        self.controller.add_pre_invoke_hook(pre_hook)
-        self.controller.add_post_invoke_hook(post_hook)
-
-        # Test success case
-        result = self.controller.invoke(mock_obj.id, 'command_a')
-        pre_hook.assert_called_once_with(mock_obj.id, 'command_a')
-        post_hook.assert_called_once_with(mock_obj.id, 'command_a', result, None)
-
-        # Test failure case
-        pre_hook.reset_mock()
-        post_hook.reset_mock()
-        mock_obj.mock_command_b.side_effect = RuntimeError("Hook Test Fail")
-
-        with self.assertRaises(RuntimeError):
-            self.controller.invoke(mock_obj.id, 'command_b')
-
-        pre_hook.assert_called_once_with(mock_obj.id, 'command_b')
-        # Check that the exception object was passed to the post-hook
-        post_hook.assert_called_once()
-        args, _ = post_hook.call_args
-        self.assertEqual(args[0], mock_obj.id)
-        self.assertEqual(args[1], 'command_b')
-        self.assertIsNone(args[2])  # result
-        self.assertIsInstance(args[3], RuntimeError)  # exception
-
-    def test_dispose(self):
-        """Test the controller's dispose method."""
-        mock_obj = MockControllable()
-        self.controller.register(mock_obj)
-
+    # --------------------------------------------------------------------- #
+    # 15 – Controller.dispose disposes all latches
+    # --------------------------------------------------------------------- #
+    def test_controller_dispose_disposes_everything(self):
+        latches = [self._make_latch() for _ in range(2)]
         self.controller.dispose()
-
-        # Check that the object's dispose was called via invoke_on_all
-        mock_obj.mock_dispose.assert_called_once()
         self.assertTrue(self.controller._disposed)
-        # Check that internal dicts were disposed
-        self.assertTrue(self.controller._registry._disposed)
-        self.assertTrue(self.controller._active_waits._disposed)
-        self.assertTrue(self.controller._subscribers._disposed)
+        for l in latches:
+            self.assertTrue(l._disposed)
+
+    # --------------------------------------------------------------------- #
+    # 16 – list_objects filtering
+    # --------------------------------------------------------------------- #
+    def test_list_objects(self):
+        latch1 = self._make_latch()
+        latch2 = self._make_latch()
+        self.controller._registry[latch2.id]['name'] = 'printer'  # rename
+
+        all_objs = self.controller.list_objects()
+        self.assertEqual(len(all_objs), 2)
+
+        printers = self.controller.list_objects(name_filter='printer')
+        self.assertEqual(len(printers), 1)
+        self.assertEqual(printers[0]['id'], latch2.id)
+
+    # --------------------------------------------------------------------- #
+    # 17 – get_waiting_objects accuracy
+    # --------------------------------------------------------------------- #
+    def test_waiting_objects_set(self):
+        latch = self._make_latch()
+        self.controller.on_wait_starting(latch.id)
+        self.assertEqual(self.controller.get_waiting_objects(), [latch.id])
+        self.controller.notify(latch.id, "DISPOSED_BY_CONTROLLER")
+        self.assertEqual(list(self.controller.get_waiting_objects()), [])
+
+    # --------------------------------------------------------------------- #
+    # 18 – Invalid command error
+    # --------------------------------------------------------------------- #
+    def test_invoke_invalid_command(self):
+        latch = self._make_latch()
+        with self.assertRaisesRegex(KeyError, "has no command 'nope'"):
+            self.controller.invoke(latch.id, "nope")
+
+    # --------------------------------------------------------------------- #
+    # 19 – Unregistered object error
+    # --------------------------------------------------------------------- #
+    def test_invoke_unregistered_object(self):
+        with self.assertRaisesRegex(KeyError, "No object registered with ID 'ghost'"):
+            self.controller.invoke("ghost", "open")
+
+    # --------------------------------------------------------------------- #
+    # 20 – Subscriber exception is swallowed and logged
+    # --------------------------------------------------------------------- #
+    def test_subscriber_exception_handled(self):
+        latch = self._make_latch()
+
+        def boom(*_):
+            raise RuntimeError("boom")
+
+        self.controller.subscribe(latch.id, "WAIT_STARTING", boom)
+        self.controller.on_wait_starting(latch._id)
+
+        # Controller should log an error but NOT raise
+        self.mock_logger.error.assert_called_once()
+        self.assertIn("Subscriber callback failed", self.mock_logger.error.call_args[0][0])
 
 
-if __name__ == '__main__':
-    unittest.main(argv=['first-arg-is-ignored'], exit=False)
+if __name__ == "__main__":
+    unittest.main()

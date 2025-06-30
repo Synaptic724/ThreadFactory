@@ -1,5 +1,4 @@
 import threading
-import traceback
 from typing import Callable, Optional
 import ulid
 from thread_factory.utils import IDisposable
@@ -20,8 +19,18 @@ class Scout(IDisposable):
 
     It uses a threading.Condition internally for its waiting mechanism,
     where the predicate is evaluated under the condition's lock.
+    Args:
+        predicate (Callable[[], bool]): A callable that takes no arguments and returns a boolean.
+                                       The Scout will wait for this predicate to return True.
+                                       This callable will be invoked while holding the Scout's
+                                       internal condition lock.
+        timeout_duration (float): The maximum time (in seconds) to wait for the predicate to become True.
+        on_timeout_callable (Callable): Mandatory function to call if the timeout is reached.
+        on_success_callable (Optional[Callable]): Optional function to call if the predicate becomes True within the timeout.
+        autoreset_on_exit (bool): If True, the Scout will automatically re-arm itself after each cycle
+                                  (success or timeout). If False, it completes one cycle and becomes latched,
+                                  requiring explicit `reset()` for reuse. Defaults to False.
     """
-
     __slots__ = IDisposable.__slots__ + [
         "_id", "_predicate", "_timeout_duration", "_on_timeout_callable",
         "_on_success_callable", "_autoreset_on_exit", "_condition",
@@ -36,19 +45,7 @@ class Scout(IDisposable):
             autoreset_on_exit: bool = False,
     ):
         """
-        Initializes the Scout.
 
-        Args:
-            predicate (Callable[[], bool]): A callable that takes no arguments and returns a boolean.
-                                           The Scout will wait for this predicate to return True.
-                                           This callable will be invoked while holding the Scout's
-                                           internal condition lock.
-            timeout_duration (float): The maximum time (in seconds) to wait for the predicate to become True.
-            on_timeout_callable (Callable): Mandatory function to call if the timeout is reached.
-            on_success_callable (Optional[Callable]): Optional function to call if the predicate becomes True within the timeout.
-            autoreset_on_exit (bool): If True, the Scout will automatically re-arm itself after each cycle
-                                      (success or timeout). If False, it completes one cycle and becomes latched,
-                                      requiring explicit `reset()` for reuse. Defaults to False.
         """
         super().__init__()  # Initialize _disposed = False
         if not callable(predicate):

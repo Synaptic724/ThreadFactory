@@ -2,10 +2,9 @@ import threading
 import ulid
 from thread_factory.utils import IDisposable
 
-
 class Latch(IDisposable):
     """
-    SimpleLatch
+    Latch
     -----------
     A lightweight synchronization primitive that blocks threads until it is manually opened.
 
