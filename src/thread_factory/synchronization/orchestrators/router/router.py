@@ -59,11 +59,6 @@ class Router(IDisposable):
             # Create a Dynaphore for each phase, allowing one permit for the leader
             self._phase_dynaphores.append(Dynaphore(group.threshold))
 
-            # Create a SignalBarrier for each phase with one group for synchronization
-            self._phase_barriers.append(
-                SignalBarrier(groups=[Group(threshold=group.threshold)], reusable=True)
-            )
-
     def add_group(self, group: RouterGroup):
         """
         Adds a group to the router before it is enabled.
