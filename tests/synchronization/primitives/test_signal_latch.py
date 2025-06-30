@@ -4,7 +4,7 @@ import unittest
 from typing import Any
 
 # Import the new, refactored SignalLatch
-from thread_factory.synchronization.primitives.signal_latch import SignalLatch, SignalCondition
+from thread_factory.synchronization.primitives.signal_latch import SignalLatch, TransitCondition
 
 # Assuming a placeholder IDisposable for testing context
 class IDisposable:
@@ -58,13 +58,13 @@ class TestSignalLatch(unittest.TestCase):
         latch = SignalLatch()
         self.assertIsInstance(latch.id, str)
         self.assertFalse(latch.is_open())
-        self.assertIsInstance(latch._cond, SignalCondition)
+        self.assertIsInstance(latch._cond, TransitCondition)
         self.assertIsNone(latch._signal_callback)
         self.assertIsNone(latch._controller)
 
     def test_initialization_with_args(self):
         """Test latch initializes with provided arguments."""
-        mock_cond = SignalCondition()
+        mock_cond = TransitCondition()
         latch = SignalLatch(
             signal_callback=self.mock_signal_callback,
             cond=mock_cond,

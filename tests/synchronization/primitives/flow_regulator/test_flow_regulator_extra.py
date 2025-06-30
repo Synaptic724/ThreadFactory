@@ -1,5 +1,5 @@
 """
-Extra stress & edge-case tests for thread_factory.primatives.SwitchLock.
+Extra stress & edge-case tests for thread_factory.primatives.FlowRegulator.
 
 Covers
 1. Fairness / starvation check
@@ -18,8 +18,8 @@ import time
 import unittest
 from time import perf_counter
 
-from thread_factory.synchronization.primitives.switchlock import SwitchLock
-from thread_factory.dynamic_thread_pool.dynamic_worker import DynamicWorker
+from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
+from thread_factory.agent_thread_pool.agent import DynamicWorker
 
 
 # --------------------------------------------------------------------------- #
@@ -42,7 +42,7 @@ class Worker(DynamicWorker):
 # --------------------------------------------------------------------------- #
 #  Helpers                                                                    #
 # --------------------------------------------------------------------------- #
-def wait_for_waiters(lock: SwitchLock, expected: int, timeout: float = 2.0):
+def wait_for_waiters(lock: FlowRegulator, expected: int, timeout: float = 2.0):
     """Spin-wait until at least `expected` threads are registered as waiters."""
     start = time.time()
     while time.time() - start < timeout:
@@ -58,13 +58,13 @@ def wait_for_waiters(lock: SwitchLock, expected: int, timeout: float = 2.0):
 # --------------------------------------------------------------------------- #
 #  Test-suite                                                                 #
 # --------------------------------------------------------------------------- #
-class TestSwitchLockExtra(unittest.TestCase):
+class TestFlowRegulatorExtra(unittest.TestCase):
 
     # ------------------------------------------------------------------- #
     # 1. Fairness / starvation                                            #
     # ------------------------------------------------------------------- #
     def test_fairness_no_starvation(self):
-        lock = SwitchLock(value=1)
+        lock = FlowRegulator(value=1)
         acquired_ctr = {f"A{i}": 0 for i in range(5)} | {f"B{i}": 0 for i in range(5)}
         stop_flag = threading.Event()
 
@@ -98,7 +98,7 @@ class TestSwitchLockExtra(unittest.TestCase):
     # 2. Explicit dispose wakes waiters                                   #
     # ------------------------------------------------------------------- #
     def test_dispose_wakes_waiters(self):
-        lock     = SwitchLock(value=0)
+        lock     = FlowRegulator(value=0)
         woke_evt = threading.Event()
 
         def waiter():
@@ -115,7 +115,7 @@ class TestSwitchLockExtra(unittest.TestCase):
     # 3. Recursive acquire guard                                          #
     # ------------------------------------------------------------------- #
     def test_recursive_acquire_raises(self):
-        lock = SwitchLock(value=1)
+        lock = FlowRegulator(value=1)
 
         def naughty():
             with self.assertRaises(RuntimeError):
@@ -129,7 +129,7 @@ class TestSwitchLockExtra(unittest.TestCase):
     # 4. Duplicate factory-ID targeted notify                             #
     # ------------------------------------------------------------------- #
     def test_duplicate_factory_id_targeted_notify(self):
-        lock   = SwitchLock(value=0)
+        lock   = FlowRegulator(value=0)
         dup_id = "DUP-XYZ"
         ev1, ev2 = threading.Event(), threading.Event()
 
@@ -163,7 +163,7 @@ class TestSwitchLockExtra(unittest.TestCase):
         ITER = 1_000
         q    = queue.Queue()
 
-        def bench(name: str, lock_obj: SwitchLock):
+        def bench(name: str, lock_obj: FlowRegulator):
             # warm-up
             for _ in range(10):
                 lock_obj.acquire(); lock_obj.release()
@@ -173,12 +173,12 @@ class TestSwitchLockExtra(unittest.TestCase):
             q.put((name, perf_counter() - start))
 
         # ---------- uncontended case ---------- #
-        lock_fast = SwitchLock(value=1)
+        lock_fast = FlowRegulator(value=1)
         fast_worker = Worker(target=bench, args=("fast", lock_fast), name="BenchFast")
         fast_worker.start()
 
         # ---------- contended case ---------- #
-        lock_slow = SwitchLock(value=1)
+        lock_slow = FlowRegulator(value=1)
 
         def blocker():
             if lock_slow.acquire(timeout=5):
@@ -230,7 +230,7 @@ class TestSwitchLockExtra(unittest.TestCase):
         BIAS_THRESHOLD  = 10
         RELEASE_COUNT   = 3
 
-        lock = SwitchLock(value=0, bias_threshold=BIAS_THRESHOLD)
+        lock = FlowRegulator(value=0, bias_threshold=BIAS_THRESHOLD)
         events = [threading.Event() for _ in range(TOTAL_THREADS)]
 
         def waiter(evt):
@@ -269,7 +269,7 @@ class TestSwitchLockExtra(unittest.TestCase):
         """
         TOTAL_THREADS   = 13
         BIAS_THRESHOLD  = 10
-        lock = SwitchLock(value=0, bias_threshold=BIAS_THRESHOLD)
+        lock = FlowRegulator(value=0, bias_threshold=BIAS_THRESHOLD)
         events = [threading.Event() for _ in range(TOTAL_THREADS)]
 
         def waiter(evt):

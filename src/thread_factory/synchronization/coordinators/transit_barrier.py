@@ -2,11 +2,11 @@ import threading
 from typing import Optional, Callable
 import ulid
 from thread_factory.utils import IDisposable
-from thread_factory.synchronization.primitives.signal_condition import SignalCondition
+from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 
-class ActionBarrier(IDisposable):
+class TransitBarrier(IDisposable):
     """
-    ActionBarrier
+    TransitBarrier
     ------------------
     A reusable barrier-like semaphore that unblocks all waiting threads once
     a predefined threshold is reached.
@@ -49,7 +49,7 @@ class ActionBarrier(IDisposable):
         self._manual_release = manual_release
 
         self._lock = threading.RLock()
-        self._condition = SignalCondition(self._lock)
+        self._condition = TransitCondition(self._lock)
         self._count = 0
         self._released = False
         self._transit_fired = False

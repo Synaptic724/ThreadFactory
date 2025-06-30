@@ -22,9 +22,9 @@ class Waiter:
     callback: Optional[Callable[[], None]] = None
 
 
-class SignalCondition(IDisposable):
+class TransitCondition(IDisposable):
     """
-    SignalCondition
+    TransitCondition
     ----------------
     A lightweight, simplified condition-like primitive designed for event-based synchronization
     and minimal contention environments.

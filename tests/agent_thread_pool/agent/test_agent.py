@@ -7,8 +7,8 @@ import inspect # Required for testing async functions
 # Assuming these imports are correct based on the provided code structure
 from thread_factory.runtime import Worker, WorkerState
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
-from thread_factory.dynamic_thread_pool.help_request import HelpRequest
-from thread_factory.dynamic_thread_pool.dynamic_worker import DynamicWorker
+from thread_factory.agent_thread_pool.help_request import HelpRequest
+from thread_factory.agent_thread_pool.agent import Agent
 from thread_factory.utils.general_helpers.coroutine_helpers import CoroutineHelpers # Import the helper
 
 
@@ -21,16 +21,16 @@ def sync_test_func():
     pass
 
 
-class TestDynamicWorker(unittest.TestCase):
+class TestAgent(unittest.TestCase):
 
     def setUp(self):
         """
-        Set up common mock objects and a fresh DynamicWorker instance before each test.
+        Set up common mock objects and a fresh Agent instance before each test.
         """
         # Mock the factory that would typically manage this worker.
         self.mock_factory = Mock()
-        # Initialize DynamicWorker with a specific factory_id and the mocked factory.
-        self.worker = DynamicWorker(factory_id="worker1", factory=self.mock_factory)
+        # Initialize Agent with a specific factory_id and the mocked factory.
+        self.worker = Agent(factory_id="worker1", factory=self.mock_factory)
 
         # Mock a HelpRequest instance to simulate bound work.
         self.mock_value_work = Mock(spec=HelpRequest)
@@ -275,7 +275,7 @@ class TestDynamicWorker(unittest.TestCase):
 
         # Create and start multiple workers in threads
         for i in range(num_workers):
-            worker = DynamicWorker(factory_id=f"worker_{i}", factory=None)
+            worker = Agent(factory_id=f"worker_{i}", factory=None)
             worker.set_home(Mock())
             thread = threading.Thread(target=worker.run)
             thread.start()
@@ -458,7 +458,7 @@ class TestDynamicWorker(unittest.TestCase):
         Test binding a value to another worker's inventory by its `factory_id`.
         This involves mocking the `factory` to return a mock target worker.
         """
-        mock_target_worker = Mock(spec=DynamicWorker)
+        mock_target_worker = Mock(spec=Agent)
         self.mock_factory.get_worker_by_id.return_value = mock_target_worker
 
         self.worker.bind_to_inventory_by_id("target_worker_id", "external_key", "external_value")
@@ -482,7 +482,7 @@ class TestDynamicWorker(unittest.TestCase):
         Test getting a value from another worker's inventory by its `factory_id`.
         This also involves mocking the `factory` to return a mock target worker.
         """
-        mock_target_worker = Mock(spec=DynamicWorker)
+        mock_target_worker = Mock(spec=Agent)
         mock_target_worker.get_from_inventory.return_value = "retrieved_value"
         self.mock_factory.get_worker_by_id.return_value = mock_target_worker
 

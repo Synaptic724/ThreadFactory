@@ -1,5 +1,5 @@
 """
-Advanced / edge-case tests for thread_factory.primatives.SwitchLock.
+Advanced / edge-case tests for thread_factory.primatives.FlowRegulator.
 
 Changelog (2025-06-24):
 • All lock users are now DynamicWorkers → no “outside worker context” errors.
@@ -15,8 +15,8 @@ import time
 import unittest
 from contextlib import ExitStack
 
-from thread_factory.synchronization.primitives.switchlock import SwitchLock
-from thread_factory.dynamic_thread_pool.dynamic_worker import DynamicWorker
+from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
+from thread_factory.agent_thread_pool.agent import DynamicWorker
 
 
 # --------------------------------------------------------------------------- #
@@ -43,7 +43,7 @@ class Worker(DynamicWorker):
 # --------------------------------------------------------------------------- #
 #  Helpers                                                                    #
 # --------------------------------------------------------------------------- #
-def wait_for_waiters(lock: SwitchLock, expected: int, timeout: float = 2.0):
+def wait_for_waiters(lock: FlowRegulator, expected: int, timeout: float = 2.0):
     start = time.time()
     while time.time() - start < timeout:
         if len(lock.get_all_waiting_factory_ids()) >= expected:
@@ -58,13 +58,13 @@ def wait_for_waiters(lock: SwitchLock, expected: int, timeout: float = 2.0):
 # --------------------------------------------------------------------------- #
 #  Test-suite                                                                 #
 # --------------------------------------------------------------------------- #
-class TestSwitchLockEdgeCases(unittest.TestCase):
+class TestFlowRegulatorEdgeCases(unittest.TestCase):
     # ----------------------------------------------------------------------- #
     # 1. Ultra-contention shutdown                                            #
     # ----------------------------------------------------------------------- #
     def test_ultra_contention_dispose(self):
         n_threads = 200
-        lock      = SwitchLock(value=0)          # every thread blocks
+        lock      = FlowRegulator(value=0)          # every thread blocks
         done      = [threading.Event() for _ in range(n_threads)]
 
         def waiter(idx):
@@ -86,7 +86,7 @@ class TestSwitchLockEdgeCases(unittest.TestCase):
     # 2. Callback chaos (exception path)                                      #
     # ----------------------------------------------------------------------- #
     def test_callback_exception_is_swallowed(self):
-        lock   = SwitchLock(value=0)
+        lock   = FlowRegulator(value=0)
         flag   = threading.Event()
 
         def bad_cb():
@@ -114,7 +114,7 @@ class TestSwitchLockEdgeCases(unittest.TestCase):
     # 3. Timeout vs notify race                                               #
     # ----------------------------------------------------------------------- #
     def test_timeout_vs_notify_race(self):
-        lock   = SwitchLock(value=0)
+        lock   = FlowRegulator(value=0)
         result = []
 
         def waiter():
@@ -144,7 +144,7 @@ class TestSwitchLockEdgeCases(unittest.TestCase):
         • Flush only wakes up to the number of permits
         • Remaining waiters can be awoken with more permits
         """
-        lock = SwitchLock(value=0, bias_threshold=10)
+        lock = FlowRegulator(value=0, bias_threshold=10)
         evs = [threading.Event() for _ in range(6)]
 
         # Step 1 — 6 waiters block
@@ -176,7 +176,7 @@ class TestSwitchLockEdgeCases(unittest.TestCase):
     # 5. Double-dispose idempotence                                           #
     # ----------------------------------------------------------------------- #
     def test_double_dispose(self):
-        lock   = SwitchLock(value=0)
+        lock   = FlowRegulator(value=0)
         wakies = []
 
         def waiter():
@@ -202,7 +202,7 @@ class TestSwitchLockEdgeCases(unittest.TestCase):
     # ----------------------------------------------------------------------- #
     def test_permit_leak_fuzzer(self):
         init_permits = 3
-        lock = SwitchLock(value=init_permits, bias_threshold=None)
+        lock = FlowRegulator(value=init_permits, bias_threshold=None)
         ops = 2000
 
         class ActorWorker(Worker):

@@ -2,15 +2,15 @@ import threading
 import time
 import unittest
 from typing import List
-from thread_factory.synchronization.primitives.signal_condition import SignalCondition
+from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 
 # ---------------------------------------------------------------------------
 # Helper thread classes
 # ---------------------------------------------------------------------------
 class SimpleWorker(threading.Thread):
-    """Worker that blocks on a SignalCondition and records a wake event."""
+    """Worker that blocks on a TransitCondition and records a wake event."""
 
-    def __init__(self, cond: SignalCondition, sink: List[str], name: str, cb_suffix: str = ""):
+    def __init__(self, cond: TransitCondition, sink: List[str], name: str, cb_suffix: str = ""):
         super().__init__(name=name)
         self._cond = cond
         self._sink = sink
@@ -35,13 +35,13 @@ class CallbackRecorder:
 
 
 # ---------------------------------------------------------------------------
-# Test‑suite for SignalCondition
+# Test‑suite for TransitCondition
 # ---------------------------------------------------------------------------
-class TestSignalConditionBasic(unittest.TestCase):
+class TestTransitConditionBasic(unittest.TestCase):
     """Re‑implements the original five basic tests (sanity coverage)."""
 
     def test_notify_wakes_exact_n(self):
-        cond, results = SignalCondition(), []
+        cond, results = TransitCondition(), []
         workers = [SimpleWorker(cond, results, f"t{i}") for i in range(4)]
         for w in workers:
             w.start()
@@ -57,7 +57,7 @@ class TestSignalConditionBasic(unittest.TestCase):
         self.assertEqual(len(results), 4)
 
     def test_notify_all_with_inline_callback(self):
-        cond, results, lock = SignalCondition(), [], threading.Lock()
+        cond, results, lock = TransitCondition(), [], threading.Lock()
         inline_cb = CallbackRecorder(results, "inline_cb")
         workers = [SimpleWorker(cond, results, f"w{i}") for i in range(3)]
         for w in workers:
@@ -71,7 +71,7 @@ class TestSignalConditionBasic(unittest.TestCase):
         self.assertEqual(sum(r.startswith("woken_") for r in results), 3)
 
     def test_dispose_clears_waiters_and_disallows_future_use(self):
-        cond = SignalCondition()
+        cond = TransitCondition()
         results = []
 
         class W(threading.Thread):
@@ -100,7 +100,7 @@ class TestSignalConditionBasic(unittest.TestCase):
                 cond.wait()
 
     def test_default_callback(self):
-        cond, results = SignalCondition(), []
+        cond, results = TransitCondition(), []
         cond.set_default_callback(CallbackRecorder(results, "default_cb"))
         worker = SimpleWorker(cond, results, "solo")
         worker.start(); time.sleep(0.02)
@@ -111,7 +111,7 @@ class TestSignalConditionBasic(unittest.TestCase):
         self.assertIn("woken_solo", results)
 
     def test_wait_timeout_removes_waiter(self):
-        cond, timed_out = SignalCondition(), []
+        cond, timed_out = TransitCondition(), []
 
         class TimeoutWorker(threading.Thread):
             def run(self):
@@ -124,7 +124,7 @@ class TestSignalConditionBasic(unittest.TestCase):
         self.assertEqual(cond.find_waiter_count(), 0)
 
     def test_get_all_waiters_snapshot(self):
-        cond, snapshot = SignalCondition(), []
+        cond, snapshot = TransitCondition(), []
 
         class W(threading.Thread):
             def run(self):
@@ -144,9 +144,9 @@ class TestSignalConditionBasic(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Advanced behavioural tests
 # ---------------------------------------------------------------------------
-class TestSignalConditionAdvanced(unittest.TestCase):
+class TestTransitConditionAdvanced(unittest.TestCase):
     def test_inline_overrides_default(self):
-        cond, results = SignalCondition(), []
+        cond, results = TransitCondition(), []
         cond.set_default_callback(CallbackRecorder(results, "default_cb"))
         inline_cb = CallbackRecorder(results, "inline_cb")
         worker = SimpleWorker(cond, results, "x")
@@ -158,7 +158,7 @@ class TestSignalConditionAdvanced(unittest.TestCase):
         self.assertNotIn("default_cb", results)
 
     def test_callback_exception_isolated(self):
-        cond, results = SignalCondition(), []
+        cond, results = TransitCondition(), []
 
         def bad_cb():
             results.append("bad_cb"); raise ValueError("boom")
@@ -176,7 +176,7 @@ class TestSignalConditionAdvanced(unittest.TestCase):
         # even though exception happened, second worker should still run its callback
 
     def test_fifo_order(self):
-        cond, awaken = SignalCondition(), []
+        cond, awaken = TransitCondition(), []
         workers = [SimpleWorker(cond, awaken, f"w{i}") for i in range(5)]
         for w in workers: w.start()
         time.sleep(0.05)
@@ -189,7 +189,7 @@ class TestSignalConditionAdvanced(unittest.TestCase):
         self.assertEqual(wake_sequence, [f"woken_w{i}" for i in range(5)], "Workers should wake FIFO")
 
     def test_notify_after_timeout_does_not_resurrect(self):
-        cond = SignalCondition(); done = []
+        cond = TransitCondition(); done = []
 
         class W(threading.Thread):
             def run(self):
@@ -205,7 +205,7 @@ class TestSignalConditionAdvanced(unittest.TestCase):
 
     def test_recursive_lock_safety(self):
         base_lock = threading.RLock()
-        cond = SignalCondition(base_lock)
+        cond = TransitCondition(base_lock)
         depth_entered = []
 
         def deep_fn(level):
@@ -218,7 +218,7 @@ class TestSignalConditionAdvanced(unittest.TestCase):
         self.assertEqual(depth_entered, [3])
 
     def test_high_contention_throughput(self):
-        cond = SignalCondition()
+        cond = TransitCondition()
         counter = 0
         counter_lock = threading.Lock()
 
@@ -261,13 +261,13 @@ class TestSignalConditionAdvanced(unittest.TestCase):
         print(f"✅ High-contention test passed in {elapsed:.6f} seconds")
 
 
-class TestRLockVsSignalCondition(unittest.TestCase):
+class TestRLockVsTransitCondition(unittest.TestCase):
     def test_signal_vs_reentrant_lock_baseline(self):
         NUM_THREADS = 50
         results = []
 
         def run_signal_condition():
-            cond = SignalCondition()
+            cond = TransitCondition()
             ready = threading.Event()
 
             def worker():
@@ -309,10 +309,10 @@ class TestRLockVsSignalCondition(unittest.TestCase):
         sig_time = run_signal_condition()
         rlock_time = run_reentrant_lock_only()
 
-        print(f"SignalCondition (full wait/wake): {sig_time:.6f} sec")
+        print(f"TransitCondition (full wait/wake): {sig_time:.6f} sec")
         print(f"RLock baseline (no wait):         {rlock_time:.6f} sec")
 
-        self.assertGreater(sig_time, rlock_time * 1.5, "SignalCondition should be slower than plain RLock")
+        self.assertGreater(sig_time, rlock_time * 1.5, "TransitCondition should be slower than plain RLock")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

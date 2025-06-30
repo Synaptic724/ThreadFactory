@@ -27,7 +27,7 @@ Smart semaphore with factory ID targeting, callback routing, and bias buffering.
 ### 🧠 `SmartCondition`
 Thread-aware `Condition` alternative. Allows targeted wakeups, ULID tracking, and callback delivery to waiting threads.
 
-### 🔔 `SignalCondition`
+### 🔔 `TransitCondition`
 Minimalist wait/notify condition. Callback always executes inside the waiting thread. Lightweight and FIFO-safe.
 
 ### 🛑 `SignalLatch`
@@ -43,7 +43,7 @@ Reusable gate that opens when a thread threshold is reached. Supports auto and m
 
 ## ⚡ Orchestrators – `synchronization.orchestrators`
 
-### 🎯 `ActionBarrier`
+### 🎯 `TransitBarrier`
 Reusable barrier with threshold coordination and optional callable execution once threshold is met.
 
 ### ⏰ `ClockBarrier`
@@ -174,8 +174,17 @@ Each category maps directly to purpose:
 - Adopt `Stopwatch` and `AutoResetTimer` for instrumentation.
 - Use `SignalCondition` for simplicity, `SmartCondition` for targeting.
 - Use `ConcurrentQueue.is_empty()` to manage graceful shutdowns.
+- 
 
 ---
+
+## Important Changes
+
+- *ActionBarrier* renamed to 'TransitBarrier' to better reflect its purpose.
+- *SignalCondition* renamed to 'TransitCondition' for consistency with the new naming scheme.
+
+---
+
 
 ## [1.2.4] - 2025-05-02
 

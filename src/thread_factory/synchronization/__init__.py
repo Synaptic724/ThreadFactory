@@ -6,21 +6,21 @@ from thread_factory.synchronization.dispatchers.fork import Fork
 from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
 
 # Execution
-from thread_factory.synchronization.execution.transit_gate import TransitGate
+from thread_factory.synchronization.execution.bypass_conductor import BypassConductor
 
 # Orchestrators
 from thread_factory.synchronization.coordinators.conductor import Conductor
 from thread_factory.synchronization.coordinators.multi_conductor import MultiConductor
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
-from thread_factory.synchronization.coordinators.action_barrier import ActionBarrier
+from thread_factory.synchronization.coordinators.transit_barrier import TransitBarrier
 from thread_factory.synchronization.coordinators.scout import Scout
 from thread_factory.synchronization.coordinators.signal_barrier import SignalBarrier
 
 # Synchronization primitives
 from thread_factory.synchronization.primitives.dynaphore import Dynaphore
-from thread_factory.synchronization.primitives.switchlock import SwitchLock
+from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
 from thread_factory.synchronization.primitives.threshold_semaphore import ThresholdSemaphore
-from thread_factory.synchronization.primitives.signal_condition import SignalCondition
+from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 from thread_factory.synchronization.primitives.smart_condition import SmartCondition
 from thread_factory.synchronization.primitives.latch import Latch
 from thread_factory.synchronization.primitives.signal_latch import SignalLatch
@@ -28,9 +28,9 @@ from thread_factory.synchronization.primitives.signal_latch import SignalLatch
 __all__ = [
 # Primitives
     'Dynaphore',
-    'SwitchLock',
+    'FlowRegulator',
     'ThresholdSemaphore',
-    'SignalCondition',
+    'TransitCondition',
     'SmartCondition',
     'Latch',
     'SignalLatch',
@@ -38,11 +38,11 @@ __all__ = [
     'Conductor',
     'MultiConductor',
     'ClockBarrier',
-    'ActionBarrier',
+    'TransitBarrier',
     'Scout',
     'SignalBarrier',
 # Execution
-    'TransitGate',
+    'BypassConductor',
 # Dispatchers
     'Fork',
     'SyncFork',

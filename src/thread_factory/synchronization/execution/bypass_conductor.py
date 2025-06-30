@@ -8,9 +8,9 @@ from thread_factory.synchronization.primitives.threshold_semaphore import Thresh
 from thread_factory.utils import IDisposable, Outcome
 
 
-class TransitGate(IDisposable):
+class BypassConductor(IDisposable):
     """
-    TransitGate
+    BypassConductor
     -----------
     A limited-entry execution gate that runs a pre-bound callable up to N times.
 
@@ -30,8 +30,8 @@ class TransitGate(IDisposable):
 
     Example Use:
     >>> def log_task(): print("Task complete")
-    >>> gate = TransitGate(log_task, limit=3)
-    >>> outcome = gate.transit()
+    >>> conductor = BypassConductor(log_task, limit=3) # Changed TransitGate to BypassConductor
+    >>> outcome = conductor.transit() # Changed gate.transit()
     """
 
     __slots__ = IDisposable.__slots__ + [
@@ -45,22 +45,19 @@ class TransitGate(IDisposable):
         if limit < 0:
             raise ValueError("Limit must be non-negative")
 
-        # --- Check if it's a single callable and wrap it in a list with bound arguments ---
         if callable(func):
-            # If it's a single callable, bind its parameters using functools.partial
             self._func = [functools.partial(func, *args, **kwargs)]
         elif isinstance(func, list):
             if not all(callable(f) for f in func):
                 raise TypeError("Provided list must contain only callables.")
-            # If it's a list, assume callables are already pre-bound if they need arguments
             self._func = func
         else:
             raise TypeError("Provided 'func' must be a callable or a list of callables.")
 
-        # --- Check for coroutine functions on all items in the list ---
         for f in self._func:
+            # Updated type error to reflect the correct class name
             if inspect.iscoroutinefunction(f):
-                raise TypeError("TransitGate does not support coroutine functions.")
+                raise TypeError("BypassConductor does not support coroutine functions.")
 
         self._id = str(ulid.ULID())
         self._limit = limit
@@ -70,42 +67,63 @@ class TransitGate(IDisposable):
         self._outcomes: List[Outcome] = []
         self._dynaphore = Dynaphore(limit)
         self._threshold_sema = ThresholdSemaphore(limit, reusable=True)
-
         self._outcome_set = False
 
+    # --- NEW HELPER METHOD TO FIX RACE CONDITION ---
+    def _try_claim_slot(self) -> bool:
+        """Atomically checks for a slot and claims it if available."""
+        # A quick unlocked check for performance on a busy gate
+        if self._collapsed or self._count >= self._limit:
+            return False
+
+        with self._lock:
+            # The definitive, locked check
+            if self._collapsed or self._count >= self._limit:
+                return False
+            self._count += 1
+            return True
+
+    # --- REVISED transit() METHOD ---
     def transit(self):
         """
-        Attempts to transit through the gate and run the callable.
+        Attempts to claim a slot and run the callable pipeline.
 
         Returns:
-            Outcome: If allowed and executed.
-            None: If skipped due to limit or collapse.
+            None: This method's return is for bypassing; results are in `.outcomes()`.
         """
         if self._disposed:
             return None
 
-        if self._collapsed or self._count >= self._limit:
+        # Atomically check and claim a slot. If it fails, we bypass.
+        if not self._try_claim_slot():
             return None
-        with self._lock:
-            if self._collapsed or self._count >= self._limit:
-                return None
-        self._increase_count()
 
-        # Acquire the dynaphore to limit concurrent executions
-        for item in range(len(self._func)):
-            self._dynaphore.acquire()
-            try:
-                self._set_result(self._func[item]())
-            except Exception as e:
-                self._set_exception(e)
-            finally:
-                with self._lock:
-                    self._decrement_count()
+        # If we get here, a slot is successfully claimed.
+        # We must decrement the count when done, so we use a finally block.
+        try:
+            for item in range(len(self._func)):
+                self._dynaphore.acquire()
+                try:
+                    # Execute one stage of the pipeline
+                    self._set_result(self._func[item]())
+                except Exception as e:
+                    self._set_exception(e)
+                finally:
+                    # Release the dynaphore, allowing another thread to start this stage
+                    self._dynaphore.release()
 
-            self._dynaphore.release()
-            self._threshold_sema.wait()
-            self._outcome_set = False
-        self._collapsed = True
+                # Wait at the barrier for all other participating threads
+                # to complete this stage before starting the next one.
+                self._threshold_sema.wait()
+                self._outcome_set = False  # Reset for the next stage
+
+            # The first thread to complete the whole pipeline collapses the gate
+            self._collapsed = True
+
+        finally:
+            # This now correctly executes exactly ONCE per thread that entered.
+            self._decrement_count()
+
         return None
 
     def increase_limit(self, n: int = 1):
@@ -134,8 +152,6 @@ class TransitGate(IDisposable):
         with self._lock:
             if self._count > 0:
                 self._count -= 1
-            if self._count < 0:
-                raise RuntimeError("Count cannot be negative")
 
     def decrease_limit(self, n: int = 1):
         if n < 0:
@@ -200,7 +216,9 @@ class TransitGate(IDisposable):
         with self._lock:
             self._collapsed = True
             self._outcomes.clear()
-            self._dynaphore.dispose()
-            self._dynaphore = None
-            self._threshold_sema.dispose()
-            self._threshold_sema = None
+            if self._dynaphore:
+                self._dynaphore.dispose()
+                self._dynaphore = None
+            if self._threshold_sema:
+                self._threshold_sema.dispose()
+                self._threshold_sema = None

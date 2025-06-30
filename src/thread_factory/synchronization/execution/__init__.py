@@ -1,6 +1,6 @@
-from thread_factory.synchronization.execution.transit_gate import TransitGate
+from thread_factory.synchronization.execution.bypass_conductor import BypassConductor
 
 __all__ = [
-    'TransitGate',
+    'BypassConductor',
 ]
 

@@ -9,11 +9,11 @@ try:
     _HYP = True
 except ImportError:  # pragma: no cover – property tests will be skipped
     _HYP = False
-from thread_factory.synchronization.execution.transit_gate import TransitGate
+from thread_factory.synchronization.execution.bypass_conductor import BypassConductor
 
 
-class TestTransitGate(unittest.TestCase):
-    """Revised test‑suite for `TransitGate` aligned with current semantics."""
+class TestBypassConductor(unittest.TestCase):
+    """Revised test‑suite for `BypassConductor` aligned with current semantics."""
 
     # ------------------------------------------------------------------ utils
     def setUp(self):
@@ -35,13 +35,13 @@ class TestTransitGate(unittest.TestCase):
 
     # ----------------------------------------------------------- 1. basics
     def test_single_thread_executes(self):
-        gate = TransitGate(func=[lambda: self.record("ok")], limit=1)
+        gate = BypassConductor(func=[lambda: self.record("ok")], limit=1)
         self.assertIsNone(gate.transit())
         self.assertEqual(len(gate.outcomes()), 1)
         self.assertEqual(gate.outcomes()[0].result(), "ok")
 
     def test_limit_respected(self):
-        gate = TransitGate(func=[lambda: self.record("run")], limit=3)
+        gate = BypassConductor(func=[lambda: self.record("run")], limit=3)
         threads = [threading.Thread(target=gate.transit) for _ in range(10)]
         for t in threads: t.start()
         for t in threads: t.join()
@@ -52,7 +52,7 @@ class TestTransitGate(unittest.TestCase):
 
     def test_blocking_tasks_wait(self):
         evt = threading.Event()
-        gate = TransitGate(func=[self.blocking_task(evt, "done")], limit=2)
+        gate = BypassConductor(func=[self.blocking_task(evt, "done")], limit=2)
         threads = [threading.Thread(target=gate.transit) for _ in range(3)]
         for t in threads: t.start()
         time.sleep(0.1)
@@ -70,14 +70,14 @@ class TestTransitGate(unittest.TestCase):
     def test_callable_with_params(self):
         def greet(msg):
             return self.record(msg)
-        gate = TransitGate(func=greet, limit=1, msg="hi")
+        gate = BypassConductor(func=greet, limit=1, msg="hi")
         gate.transit()
         self.assertEqual(gate.outcomes()[0].result(), "hi")
 
     def test_exception_captured(self):
         def boom():
             raise ValueError("x")
-        gate = TransitGate(func=[boom], limit=1)
+        gate = BypassConductor(func=[boom], limit=1)
         gate.transit()
         with self.assertRaises(ValueError):
             gate.outcomes()[0].result()
@@ -87,7 +87,7 @@ class TestTransitGate(unittest.TestCase):
         flags = {"a": False, "b": False}
         def a(): flags["a"] = True
         def b(): flags["b"] = True
-        gate = TransitGate(func=[a, b], limit=1)
+        gate = BypassConductor(func=[a, b], limit=1)
         gate.transit()
         self.assertTrue(all(flags.values()))
         self.assertEqual(len(gate.outcomes()), 2)
@@ -103,7 +103,7 @@ class TestTransitGate(unittest.TestCase):
         def stage2():
             stage_order.append("2")
 
-        gate = TransitGate(func=[stage1, stage2], limit=2)
+        gate = BypassConductor(func=[stage1, stage2], limit=2)
         t1 = threading.Thread(target=gate.transit)
         t2 = threading.Thread(target=gate.transit)
         t1.start(); t2.start(); t1.join(); t2.join()
@@ -114,17 +114,17 @@ class TestTransitGate(unittest.TestCase):
         self.assertEqual(stage_order.count("2"), 2)
 
     def test_outcome_per_stage(self):
-        gate = TransitGate(func=[lambda: "A", lambda: "B"], limit=1)
+        gate = BypassConductor(func=[lambda: "A", lambda: "B"], limit=1)
         gate.transit()
         self.assertEqual([o.result() for o in gate.outcomes()], ["A", "B"])
 
     def test_pipeline_collapse(self):
-        gate = TransitGate(func=[lambda: "x"], limit=1)
+        gate = BypassConductor(func=[lambda: "x"], limit=1)
         gate.transit(); self.assertTrue(gate._collapsed)
         self.assertIsNone(gate.transit())
 
     def test_pipeline_exception_continues(self):
-        gate = TransitGate(func=[lambda: "ok", lambda: (_ for _ in ()).throw(ValueError()), lambda: "ok"], limit=1)
+        gate = BypassConductor(func=[lambda: "ok", lambda: (_ for _ in ()).throw(ValueError()), lambda: "ok"], limit=1)
         gate.transit()
         a, b, c = gate.outcomes()
         self.assertEqual(a.result(), "ok")
@@ -136,7 +136,7 @@ class TestTransitGate(unittest.TestCase):
     def test_increase_limit_allows_concurrent_entry(self):
         """If we grow the limit *while a task is still inside*, another thread can enter."""
         block_event = threading.Event()
-        gate = TransitGate(func=[self.blocking_task(block_event, "run")], limit=1)
+        gate = BypassConductor(func=[self.blocking_task(block_event, "run")], limit=1)
 
         # Thread 1 grabs the sole permit and blocks inside the task
         t1 = threading.Thread(target=gate.transit)
@@ -162,7 +162,7 @@ class TestTransitGate(unittest.TestCase):
 
     def test_decrease_limit_blocks_new(self):
         evt = threading.Event()
-        gate = TransitGate(func=[self.blocking_task(evt, "run")], limit=3)
+        gate = BypassConductor(func=[self.blocking_task(evt, "run")], limit=3)
         t1 = threading.Thread(target=gate.transit); t2 = threading.Thread(target=gate.transit)
         t1.start(); t2.start(); time.sleep(0.2)
 
@@ -174,17 +174,17 @@ class TestTransitGate(unittest.TestCase):
         self.assertEqual(self.call_count, 2)
 
     def test_collapse(self):
-        gate = TransitGate(func=[lambda: "x"], limit=5)
+        gate = BypassConductor(func=[lambda: "x"], limit=5)
         gate.collapse(); self.assertIsNone(gate.transit())
 
     def test_reset(self):
-        gate = TransitGate(func=[lambda: self.record("x")], limit=1)
+        gate = BypassConductor(func=[lambda: self.record("x")], limit=1)
         gate.transit(); gate.reset(); gate.transit()
         self.assertEqual(self.call_count, 2)
         self.assertEqual(len(gate.outcomes()), 1)  # outcomes cleared on reset
 
     def test_dispose(self):
-        gate = TransitGate(func=[lambda: "x"], limit=1)
+        gate = BypassConductor(func=[lambda: "x"], limit=1)
         t = threading.Thread(target=gate.transit); t.start(); time.sleep(0.1)
         gate.dispose(); t.join(timeout=1)
         self.assertTrue(gate._disposed)
@@ -217,15 +217,15 @@ class _Base(unittest.TestCase):
 # --------------------------------------------------------------------------
 # 1. BASIC + PIPELINE + DYNAMIC (unchanged core expectations)
 # --------------------------------------------------------------------------
-class TestTransitGate1(_Base):
+class TestBypassConductor1(_Base):
     def test_single_thread_executes(self):
-        gate = TransitGate(func=[lambda: self.record("ok")], limit=1)
+        gate = BypassConductor(func=[lambda: self.record("ok")], limit=1)
         self.assertIsNone(gate.transit())
         self.assertEqual(self.call_count, 1)
         self.assertEqual(len(gate.outcomes()), 1)
 
     def test_limit_respected(self):
-        gate = TransitGate(func=[lambda: self.record("run")], limit=3)
+        gate = BypassConductor(func=[lambda: self.record("run")], limit=3)
         threads = [threading.Thread(target=gate.transit) for _ in range(10)]
         for t in threads: t.start()
         for t in threads: t.join()
@@ -234,7 +234,7 @@ class TestTransitGate1(_Base):
 
     def test_blocking_pass_through(self):
         evt = threading.Event()
-        gate = TransitGate(func=[self.blocking_task(evt, "done")], limit=2)
+        gate = BypassConductor(func=[self.blocking_task(evt, "done")], limit=2)
         thr = [threading.Thread(target=gate.transit) for _ in range(3)]
         for t in thr: t.start()
         time.sleep(0.1)
@@ -248,13 +248,13 @@ class TestTransitGate1(_Base):
         order: list[str] = []
         def a(): order.append("a")
         def b(): order.append("b")
-        gate = TransitGate(func=[a, b], limit=1)
+        gate = BypassConductor(func=[a, b], limit=1)
         gate.transit(); self.assertEqual(order, ["a", "b"])
         self.assertEqual(len(gate.outcomes()), 2)
 
     def test_increase_limit_runtime(self):
         evt = threading.Event()
-        gate = TransitGate(func=[self.blocking_task(evt, "x")], limit=1)
+        gate = BypassConductor(func=[self.blocking_task(evt, "x")], limit=1)
 
         t1 = threading.Thread(target=gate.transit)
         t1.start()
@@ -276,7 +276,7 @@ class TestTransitGate1(_Base):
 
     def test_decrease_limit_blocks_new(self):
         evt = threading.Event()
-        gate = TransitGate(func=[self.blocking_task(evt, "x")], limit=3)
+        gate = BypassConductor(func=[self.blocking_task(evt, "x")], limit=3)
 
         t1 = threading.Thread(target=gate.transit)
         t2 = threading.Thread(target=gate.transit)
@@ -303,7 +303,7 @@ class TestTransitGate1(_Base):
         def greet(name: str):
             return self.record(f"Hi {name}!")
 
-        gate = TransitGate(func=greet, limit=1, name="Mark")
+        gate = BypassConductor(func=greet, limit=1, name="Mark")
         gate.transit()
 
         self.assertEqual(self.call_count, 1)
@@ -313,7 +313,7 @@ class TestTransitGate1(_Base):
         def add(a, b):
             return self.record(a + b)
 
-        gate = TransitGate(func=add, limit=1, a=10, b=20)
+        gate = BypassConductor(func=add, limit=1, a=10, b=20)
         gate.transit()
 
         self.assertEqual(self.call_count, 1)
@@ -321,16 +321,16 @@ class TestTransitGate1(_Base):
 
 
     def test_lambda_with_bound_params(self):
-        gate = TransitGate(func=lambda: self.record(7 * 3), limit=1)
+        gate = BypassConductor(func=lambda: self.record(7 * 3), limit=1)
         gate.transit()
         self.assertEqual(gate.outcomes()[0].result(), 21)
 
 # --------------------------------------------------------------------------
 # 2. STRESS + ADVANCED
 # --------------------------------------------------------------------------
-class StressTransitGate2(_Base):
+class StressBypassConductor2(_Base):
     def _run_many(self, limit: int, n_threads: int):
-        gate = TransitGate(func=[lambda: self.record(1)], limit=limit)
+        gate = BypassConductor(func=[lambda: self.record(1)], limit=limit)
         threads = [threading.Thread(target=gate.transit) for _ in range(n_threads)]
         random.shuffle(threads)
         for t in threads: t.start()
@@ -354,7 +354,7 @@ if _HYP:
         def test_call_count_equals_limit(self, limit: int, ratio: int):
             """For N threads >= limit, exactly `limit` tasks run."""
             n_threads = limit * ratio
-            gate = TransitGate(func=[lambda: self.record(1)], limit=limit)
+            gate = BypassConductor(func=[lambda: self.record(1)], limit=limit)
             thr = [threading.Thread(target=gate.transit) for _ in range(n_threads)]
             for t in thr: t.start()
             for t in thr: t.join()

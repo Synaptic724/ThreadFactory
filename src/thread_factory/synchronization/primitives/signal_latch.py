@@ -1,7 +1,7 @@
 import threading
 import ulid
 from typing import Callable, Optional, Any, Dict
-from thread_factory.synchronization.primitives.signal_condition import SignalCondition
+from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 class SignalLatch(IDisposable):
@@ -20,7 +20,7 @@ class SignalLatch(IDisposable):
     def __init__(
         self,
         signal_callback: Optional[Callable[[str], None]] = None,
-        cond: Optional[SignalCondition] = None,
+        cond: Optional[TransitCondition] = None,
         controller: Optional['Controller'] = None,
     ):
         """
@@ -30,7 +30,7 @@ class SignalLatch(IDisposable):
         """
         super().__init__()
         self._id: str = str(ulid.ULID())
-        self._cond: SignalCondition = cond or SignalCondition()
+        self._cond: TransitCondition = cond or TransitCondition()
         self._open: bool = False
         self._signal_callback = signal_callback
         self._lock = threading.RLock()

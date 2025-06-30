@@ -4,7 +4,7 @@ from ulid import ULID
 
 from thread_factory import ConcurrentSet
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
-from thread_factory.dynamic_thread_pool.help_request import HelpRequest
+from thread_factory.agent_thread_pool.help_request import HelpRequest
 
 
 class TestValueWork(unittest.TestCase):
@@ -71,7 +71,7 @@ class TestValueWork(unittest.TestCase):
     def test_bind_value_work_sets_thread_context(self):
         """Test that bind_value_work sets _value_work on the current thread."""
         thread = threading.current_thread()
-        thread._worker_type = "dynamic"
+        thread._worker_type = "agentic"
         thread._factory_id = ULID()
 
         self.value_work.bind_value_work()
@@ -81,7 +81,7 @@ class TestValueWork(unittest.TestCase):
     def test_bind_value_work_invokes_callable(self):
         """Test that bind_value_work invokes the callable and sets 'called'."""
         thread = threading.current_thread()
-        thread._worker_type = "dynamic"
+        thread._worker_type = "agentic"
         thread._factory_id = ULID()
 
         result = {}

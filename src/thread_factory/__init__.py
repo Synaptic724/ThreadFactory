@@ -44,8 +44,8 @@ from thread_factory.utils import Empty, Stopwatch, AutoResetTimer
 from thread_factory.synchronization.primitives import (
     Dynaphore,
     SmartCondition,
-    SwitchLock,
-    SignalCondition,
+    FlowRegulator,
+    TransitCondition,
 )
 # ---- Runtime Primitives ----
 from thread_factory.synchronization.primitives import __all__ as primatives_all

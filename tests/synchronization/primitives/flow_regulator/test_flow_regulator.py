@@ -1,13 +1,13 @@
 """
-Full test-suite for SwitchLock – now using DynamicWorker via a small
+Full test-suite for FlowRegulator – now using DynamicWorker via a small
 compatibility wrapper so none of the original test logic had to change.
 """
 
 import threading
 import time
 import unittest
-from thread_factory.synchronization.primitives.switchlock import SwitchLock
-from thread_factory.dynamic_thread_pool.dynamic_worker import DynamicWorker
+from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
+from thread_factory.agent_thread_pool.agent import DynamicWorker
 
 
 # --------------------------------------------------------------------------- #
@@ -36,7 +36,7 @@ class Worker(DynamicWorker):
 # --------------------------------------------------------------------------- #
 #  Helper utilities                                                           #
 # --------------------------------------------------------------------------- #
-def wait_for_waiters(lock: SwitchLock, expected: int, timeout: float = 2.0):
+def wait_for_waiters(lock: FlowRegulator, expected: int, timeout: float = 2.0):
     start = time.time()
     while time.time() - start < timeout:
         if len(lock.get_all_waiting_factory_ids()) >= expected:
@@ -54,17 +54,17 @@ def _set_thread_factory_id(fid: str):       # kept for completeness
 # --------------------------------------------------------------------------- #
 #  Test-suite                                                                 #
 # --------------------------------------------------------------------------- #
-class TestSwitchLock(unittest.TestCase):
+class TestFlowRegulator(unittest.TestCase):
 
     # ------------------------------------------------------------------- #
     #  Basic behaviour                                                    #
     # ------------------------------------------------------------------- #
     def test_init_negative_value_raises(self):
         with self.assertRaises(ValueError):
-            SwitchLock(value=-1)
+            FlowRegulator(value=-1)
 
     def test_init_zero_acquire_block(self):
-        lock = SwitchLock(value=0)
+        lock = FlowRegulator(value=0)
         ev   = threading.Event()
 
         def attempt():
@@ -82,7 +82,7 @@ class TestSwitchLock(unittest.TestCase):
     #  Permit manipulation                                                #
     # ------------------------------------------------------------------- #
     def test_permit_increase_unblocks_thread(self):
-        lock = SwitchLock(value=0)
+        lock = FlowRegulator(value=0)
         done = threading.Event()
         out = []
 
@@ -103,7 +103,7 @@ class TestSwitchLock(unittest.TestCase):
     #  Targeted release & notify                                          #
     # ------------------------------------------------------------------- #
     def test_targeted_release_uses_factory_ids(self):
-        lock     = SwitchLock(value=0)
+        lock     = FlowRegulator(value=0)
         results  = {}
         threads  = []
 
@@ -135,7 +135,7 @@ class TestSwitchLock(unittest.TestCase):
         self.assertEqual(len(results), 4)
 
     def test_dispose_wakes_waiters(self):
-        lock  = SwitchLock(value=0)
+        lock  = FlowRegulator(value=0)
         done  = [threading.Event(), threading.Event()]
 
         def waiter(idx):
@@ -159,7 +159,7 @@ class TestSwitchLock(unittest.TestCase):
     #  Waiting list                                                       #
     # ------------------------------------------------------------------- #
     def test_get_all_waiting_factory_ids(self):
-        lock = SwitchLock(value=0)
+        lock = FlowRegulator(value=0)
 
         def blocking():
             lock.acquire()
@@ -183,7 +183,7 @@ class TestSwitchLock(unittest.TestCase):
     #  Release N unblocks N                                               #
     # ------------------------------------------------------------------- #
     def test_release_n_unblocks_n_threads(self):
-        lock      = SwitchLock(value=0)
+        lock      = FlowRegulator(value=0)
         released  = []
         events    = [threading.Event() for _ in range(5)]
 
@@ -214,7 +214,7 @@ class TestSwitchLock(unittest.TestCase):
     #  Targeted release by ULID                                           #
     # ------------------------------------------------------------------- #
     def test_targeted_release_by_ulid(self):
-        lock   = SwitchLock(value=0)
+        lock   = FlowRegulator(value=0)
         got    = []
         events = [threading.Event() for _ in range(4)]
 
@@ -247,7 +247,7 @@ class TestSwitchLock(unittest.TestCase):
             self.assertFalse(t.is_alive())
 
     def test_release_excessive_does_not_corrupt_state(self):
-        lock = SwitchLock(value=1)
+        lock = FlowRegulator(value=1)
         results = []
 
         def work():
@@ -264,7 +264,7 @@ class TestSwitchLock(unittest.TestCase):
         self.assertEqual(lock._value, 2)  # May want to enforce upper cap later
 
     def test_acquire_from_non_dynamic_worker_raises(self):
-        lock = SwitchLock(value=1)
+        lock = FlowRegulator(value=1)
 
         def try_acquire():
             with self.assertRaises(RuntimeError):
@@ -276,7 +276,7 @@ class TestSwitchLock(unittest.TestCase):
         self.assertFalse(t.is_alive())
 
     def test_permit_exhaustion_recovery(self):
-        lock = SwitchLock(value=1)
+        lock = FlowRegulator(value=1)
         count = 0
         barrier = threading.Barrier(2)
 
@@ -298,7 +298,7 @@ class TestSwitchLock(unittest.TestCase):
         self.assertEqual(count, 100)
 
     def test_notify_with_awaited_caller_executes_in_target_thread(self):
-        lock = SwitchLock(value=0)
+        lock = FlowRegulator(value=0)
         owner = []
 
         def cb():
@@ -317,7 +317,7 @@ class TestSwitchLock(unittest.TestCase):
         self.assertIn("AwaitedCallerTest", owner)
 
     def test_callback_exception_is_handled(self):
-        lock = SwitchLock(value=0)
+        lock = FlowRegulator(value=0)
 
         def bad_cb():
             raise RuntimeError("Boom")
@@ -336,7 +336,7 @@ class TestSwitchLock(unittest.TestCase):
         self.assertFalse(t.is_alive())
 
     def test_dispose_during_acquire_returns_false(self):
-        lock = SwitchLock(value=0)
+        lock = FlowRegulator(value=0)
 
         result = []
 
@@ -355,7 +355,7 @@ class TestSwitchLock(unittest.TestCase):
     #  Notify all                                                         #
     # ------------------------------------------------------------------- #
     def test_notify_all_threads(self):
-        lock   = SwitchLock(value=0)
+        lock   = FlowRegulator(value=0)
         events = []
 
         def waiter(evt):
@@ -388,7 +388,7 @@ class TestSwitchLock(unittest.TestCase):
         ops_per_thr = 50
         total_ops   = num_threads * ops_per_thr
 
-        lock     = SwitchLock(value=num_threads // 2)
+        lock     = FlowRegulator(value=num_threads // 2)
         counter  = 0
         c_lock   = threading.Lock()
         events   = [threading.Event() for _ in range(num_threads)]
@@ -428,7 +428,7 @@ class TestSwitchLock(unittest.TestCase):
 # --------------------------------------------------------------------------- #
 #  Bias-threshold behaviour                                                   #
 # --------------------------------------------------------------------------- #
-class TestSwitchLockBias(unittest.TestCase):
+class TestFlowRegulatorBias(unittest.TestCase):
     """
     Verifies that permits are buffered when bias is ON and that the buffer
     is flushed exactly once the waiter count reaches the threshold.
@@ -436,7 +436,7 @@ class TestSwitchLockBias(unittest.TestCase):
 
     def test_bias_holds_until_threshold_exceeded(self):
         bias = 3
-        lock = SwitchLock(value=0, bias_threshold=bias)
+        lock = FlowRegulator(value=0, bias_threshold=bias)
 
         events = [threading.Event() for _ in range(bias)]  # 3 workers
         threads = []
@@ -468,7 +468,7 @@ class TestSwitchLockBias(unittest.TestCase):
         for t in threads: t.join()
 
     def test_bias_lowering_triggers_flush(self):
-        lock = SwitchLock(value=0, bias_threshold=10)
+        lock = FlowRegulator(value=0, bias_threshold=10)
         evs = [threading.Event() for _ in range(5)]
 
         for ev in evs:
@@ -482,7 +482,7 @@ class TestSwitchLockBias(unittest.TestCase):
 
 
     def test_fourth_waiter_triggers_flush(self):
-        lock = SwitchLock(value=0, bias_threshold=3)
+        lock = FlowRegulator(value=0, bias_threshold=3)
 
         # start three waiters – bias not exceeded
         for _ in range(3):
@@ -498,7 +498,7 @@ class TestSwitchLockBias(unittest.TestCase):
         self.assertEqual(lock._pending_permits, 0, "Buffer must be empty")
 
     def test_bias_off_behaves_like_normal_semaphore(self):
-        lock  = SwitchLock(value=0, bias_threshold=None)  # bias disabled
+        lock  = FlowRegulator(value=0, bias_threshold=None)  # bias disabled
         evt   = threading.Event()
 
         def waiter():
@@ -524,7 +524,7 @@ class TestSwitchLockBias(unittest.TestCase):
         lock.notify(..., awaited_caller=False, callback=cb)
         → cb must run in the notifying thread *before* the waiter resumes.
         """
-        lock = SwitchLock(value=0)
+        lock = FlowRegulator(value=0)
         events = []
         trail = []  # execution log (order matters)
         tlock = threading.Lock()
@@ -564,7 +564,7 @@ class TestSwitchLockBias(unittest.TestCase):
         lock.notify(..., awaited_caller=True, callback=cb)
         → cb must run inside the awakened worker thread.
         """
-        lock = SwitchLock(value=0)
+        lock = FlowRegulator(value=0)
         owner = []
 
         def inline_cb():
@@ -589,7 +589,7 @@ class TestSwitchLockBias(unittest.TestCase):
         lock.notify_all(..., awaited_caller=True) with a default callback.
         Every woken worker must execute the callback exactly once.
         """
-        lock = SwitchLock(value=0)
+        lock = FlowRegulator(value=0)
         num_w = 3
         fired_by = []
         fire_lock = threading.Lock()

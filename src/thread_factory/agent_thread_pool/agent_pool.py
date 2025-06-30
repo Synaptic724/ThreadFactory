@@ -2,22 +2,22 @@ from typing import Callable
 import threading
 from ulid import ULID
 from thread_factory.concurrency import ConcurrentSet, ConcurrentQueue, ConcurrentList, ConcurrentDict
-from thread_factory.dynamic_thread_pool import DynamicWorker
-from thread_factory.synchronization.primitives.switchlock import SwitchLock
+from thread_factory.agent_thread_pool import DynamicWorker
+from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.runtime.orchestrator.monitoring.records.records import Records
 
 
-class _DynamicPoolContainer(IDisposable):
+class _AgentPoolContainer(IDisposable):
     """
-    _DynamicPoolContainer
+    _AgentPoolContainer
     ---------------------
     Internal coordination structure for managing a set of AgenticWorker threads.
 
     It ensures:
     - Thread registration (with optional record tracking)
     - Thread unregistration upon disposal
-    - Smart signaling and wake-up via SwitchLock
+    - Smart signaling and wake-up via FlowRegulator
     - Optional callback-based notifications
     - Controlled shutdown with unregister state cleanup
 
@@ -35,7 +35,7 @@ class _DynamicPoolContainer(IDisposable):
         """
         super().__init__()
         self._lock = threading.RLock()  # Internal lock for safe concurrent modifications
-        self._switch_lock = SwitchLock(0)  # Smart semaphore-like switch used for synchronization
+        self._flow_regulator = FlowRegulator(0)  # Smart semaphore-like switch used for synchronization
         self._active = False  # Flag to indicate whether the container is active
         self._ignore_tracking = ignore_tracking  # Whether to store tracking Records or not
 
@@ -236,13 +236,13 @@ class _DynamicPoolContainer(IDisposable):
         self._switch_lock.bypass_bias_and_notify(n=worker_count, awaited_caller=True, callback=work_request)
 
 
-class DynamicPool(IDisposable):
+class AgentPool(IDisposable):
     """
-    DynamicPool
+    AgentPool
     -----------
     A cooperative thread assistance system based on agentic execution principles.
 
-    Unlike traditional thread pools that offload tasks into queues, DynamicPool enables
+    Unlike traditional thread pools that offload tasks into queues, AgentPool enables
     the calling thread to immediately begin executing work while optionally requesting
     help from agentic workers via `HelpRequest` contracts.
 
@@ -271,11 +271,11 @@ class DynamicPool(IDisposable):
     🧵 Philosophy:
     --------------
     Threads are not subordinates—they are peers in a dynamic execution model.
-    DynamicPool empowers them to negotiate, respond, and collaborate under load.
+    AgentPool empowers them to negotiate, respond, and collaborate under load.
 
     🧩 Integration Note:
     --------------------
-    DynamicPool is a foundational component of the larger `MainPool` architecture,
+    AgentPool is a foundational component of the larger `MainPool` architecture,
     but it can also be used independently for standalone agentic threading needs.
     """
     def __init__(self, max_workers: int, min_workers: int = 1):

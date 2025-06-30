@@ -6,9 +6,11 @@ from thread_factory import ConcurrentSet
 from thread_factory.utils import IDisposable
 from thread_factory.synchronization.primitives.smart_condition import SmartCondition
 
-class SwitchLock(IDisposable):
+#FlowRegulator class
+
+class FlowRegulator(IDisposable):
     """
-    SwitchLock
+    FlowRegulator
     ----------
     A dynamic, "smart" semaphore implementation that provides granular control
     over permits and thread notifications. It extends standard semaphore
@@ -25,7 +27,7 @@ class SwitchLock(IDisposable):
 
     Thread Behavior
     ---------------
-    Threads do **not** need to declare themselves explicitly to use SwitchLock.
+    Threads do **not** need to declare themselves explicitly to use FlowRegulator.
 
     • All threads are automatically assigned a `factory_id` (ULID) by the internal SmartCondition.
     • This allows for targeted notifications, callback binding, and fine-grained control.
@@ -46,11 +48,11 @@ class SwitchLock(IDisposable):
     Based on 1000 iterations of `acquire()` with one permit available:
 
         threading.Lock        │  0.07 μs
-        SwitchLock (this)     │  4.40 μs
+        FlowRegulator (this)     │  4.40 μs
         Thread Spawn (bare)   │ 195.8 μs
 
     ⚠ Note:
-        While ~63× slower than a raw lock, `SwitchLock` provides intelligent
+        While ~63× slower than a raw lock, `FlowRegulator` provides intelligent
         scheduling, permit biasing, and cross-thread callback coordination—
         ideal for controlled concurrency and thread orchestration.
 
@@ -61,7 +63,7 @@ class SwitchLock(IDisposable):
     ]
     def __init__(self, value: int = 1, bias_threshold: Optional[int] = None):
         """
-        Initializes a new SwitchLock instance.
+        Initializes a new FlowRegulator instance.
 
         Args:
             value (int): The initial number of available permits. Must be a non-negative integer.
@@ -71,7 +73,7 @@ class SwitchLock(IDisposable):
         """
         super().__init__()  # Initialize the IDisposable base class
         if value < 0:
-            raise ValueError("SwitchLock initial value must be >= 0")
+            raise ValueError("FlowRegulator initial value must be >= 0")
 
         self._id = str(ulid.ULID())
         self._cond: SmartCondition = SmartCondition()
@@ -82,7 +84,7 @@ class SwitchLock(IDisposable):
 
     def dispose(self):
         """
-        Disposes of the SwitchLock, releasing all its resources and
+        Disposes of the FlowRegulator, releasing all its resources and
         waking up any threads currently waiting to acquire a permit.
         After disposal, the lock should no longer be used. This method is idempotent.
         """
@@ -299,7 +301,7 @@ class SwitchLock(IDisposable):
         The call honours return_home_on_block and per-thread worker-type checks.
         """
         if self._disposed:
-            raise RuntimeError("SwitchLock has been disposed and cannot be acquired.")
+            raise RuntimeError("FlowRegulator has been disposed and cannot be acquired.")
 
         if not blocking and timeout is not None:
             raise ValueError("Cannot give a timeout with blocking=False")
@@ -345,7 +347,7 @@ class SwitchLock(IDisposable):
                 if not self._cond.wait(timeout=remaining):
                     return False  # woke by timeout, not by notify
 
-    __enter__ = acquire  # Allows using the SwitchLock as a context manager (e.g., `with lock:`)
+    __enter__ = acquire  # Allows using the FlowRegulator as a context manager (e.g., `with lock:`)
 
     def release(self,
                 n: int = 1,
