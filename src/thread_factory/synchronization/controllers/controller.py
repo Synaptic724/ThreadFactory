@@ -418,7 +418,12 @@ class Controller(IDisposable):
         # Update internal active waits tracking based on specific event types
         if event_type == "WAIT_STARTING":
             self._active_waits[object_id] = "WAITING"
-        elif event_type in ["OPENED_BY_CONTROLLER", "DISPOSED_BY_CONTROLLER", "RESET_BY_CONTROLLER"]:
+        elif event_type in [
+            "OPENED_BY_CONTROLLER",
+            "DISPOSED_BY_CONTROLLER",
+            "RESET_BY_CONTROLLER",
+            "SEMAPHORE_RELEASED"  # Added to handle ThresholdSemaphore release events
+        ]:
             # These events indicate a terminal state or completion, so remove from active waits
             if object_id in self._active_waits:
                 self._active_waits.pop(object_id)
