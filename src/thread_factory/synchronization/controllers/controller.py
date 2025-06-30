@@ -31,6 +31,16 @@ class Controller(IDisposable):
 
     The Controller is designed to be thread-safe, utilizing `threading.RLock` for global
     synchronization and `ConcurrentDict` for thread-safe access to its internal data structures.
+
+
+    ***This object is currently integrated with:
+    - `SignalLatch`: For managing waiting states and signaling between threads.
+    - `SignalBarrier`: For synchronizing groups of threads at specific points in execution.
+    - `ClockBarrier`: For time-based synchronization of threads.
+    - `TransitBarrier`: Executes all threads in a group once into a callable after a threshold is reached.
+
+    These components allow the Controller to manage complex thread interactions.
+    There will be more integration with other synchronization primitives in the future.***
     """
 
     def __init__(self, logger: Optional[logging.Logger] = None):
