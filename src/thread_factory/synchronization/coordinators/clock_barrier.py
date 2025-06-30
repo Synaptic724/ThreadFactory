@@ -1,50 +1,33 @@
 import threading
 import time
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, Any
 import ulid
 from thread_factory.utils import IDisposable
+
+
+# Assuming Controller is available for type hinting
+# from thread_factory.synchronization.controllers.controller import Controller
 
 class ClockBarrier(IDisposable):
     """
     ClockBarrier
     ------------
-    A reusable synchronization barrier with a *global timeout*.
-
-    This barrier starts a wall-clock countdown when the first thread arrives.
-    If exactly `parties` threads reach the barrier before the timeout,
-    all threads are released and the barrier resets for the next generation.
-
-    If the timeout expires before all parties arrive:
-    - The barrier is marked as broken.
-    - All waiting threads (and any future ones) raise BrokenBarrierError.
-    - An optional `on_broken` callback is triggered once.
-
-    Parameters:
-    -----------
-    threshold : int
-        The number of threads required for the barrier to pass.
-    timeout : float
-        Maximum allowed time (in seconds) between the first and last thread.
-    on_broken : Callable[[], None], optional
-        Optional callback executed once if the barrier breaks.
-
-    Notes:
-    ------
-    - Call `reset()` to reuse the barrier after a timeout.
-    - Automatically resets after a successful pass.
-    - Thread-safe via a single internal lock.
-    - Calling `dispose()` will break the barrier and wake all waiters.
+    A reusable synchronization barrier with a *global timeout* that can be
+    observed and controlled by a Controller.
     """
     __slots__ = IDisposable.__slots__ + [
         "_threshold", "_timeout", "_on_broken",
         "_lock", "_cond",
-        "_count", "_start_time", "_broken", "_generation", "_id"
+        "_count", "_start_time", "_broken", "_generation", "_id",
+        "_controller"  # Added for controller integration
     ]
+
     def __init__(
-        self,
-        threshold: int,
-        timeout: float = 0.01,
-        on_broken: Optional[Callable[[], None]] = None,
+            self,
+            threshold: int,
+            timeout: float = 0.01,
+            on_broken: Optional[Callable[[], None]] = None,
+            controller: Optional['Controller'] = None,
     ):
         super().__init__()
 
@@ -66,25 +49,46 @@ class ClockBarrier(IDisposable):
         self._broken = False
         self._generation = 0
 
+        # --- Controller Integration ---
+        self._controller = controller
+        if self._controller:
+            try:
+                self._controller.register(self)
+            except Exception:
+                # Allow standalone use if registration fails
+                pass
+
+    # --- Controller Contract ---
+    @property
+    def id(self) -> str:
+        """The unique identifier for this component."""
+        return self._id
+
+    def _get_object_details(self) -> Dict[str, Any]:
+        """Provides commands and metadata for the Controller."""
+        return {
+            'name': 'clock_barrier',
+            'commands': {
+                'reset': self.reset,
+                'is_broken': self.is_broken,
+                'get_waiting_count': self.get_waiting_count,
+            }
+        }
+
+    # --- Existing Methods (with modifications for notifications) ---
+
     def is_broken(self) -> bool:
-        """
-        Returns True if the barrier is currently broken.
-        """
+        """Returns True if the barrier is currently broken."""
         with self._lock:
             return self._broken
 
     def get_waiting_count(self) -> int:
-        """
-        Returns the number of threads currently blocked at the barrier.
-        """
+        """Returns the number of threads currently blocked at the barrier."""
         with self._lock:
             return self._count
 
     def reset(self) -> None:
-        """
-        Resets the barrier state to allow reuse after a break.
-        Safe to call even if the barrier isn't broken.
-        """
+        """Resets the barrier state to allow reuse after a break."""
         with self._cond:
             self._broken = False
             self._count = 0
@@ -95,30 +99,29 @@ class ClockBarrier(IDisposable):
     def wait(self) -> bool:
         """
         Waits until enough threads arrive at the barrier or timeout is reached.
-
-        Returns:
-            True if the barrier passed successfully.
-
-        Raises:
-            BrokenBarrierError if the timeout expires or the barrier is already broken.
         """
         with self._cond:
+            if self._disposed:
+                raise threading.BrokenBarrierError("ClockBarrier is disposed")
             if self._broken:
-                raise threading.BrokenBarrierError("ClockBarrier timeout")
+                raise threading.BrokenBarrierError("ClockBarrier is broken")
 
             my_generation = self._generation
             self._count += 1
 
             if self._count == 1:
-                # First thread starts the timer
                 self._start_time = time.monotonic()
 
             if self._count == self._threshold:
-                # All required threads have arrived
-                self._advance_generation()
+                self._advance_generation()  # This will notify and reset
                 return True
 
             while True:
+                # This check prevents a race condition if start_time is not yet set
+                if self._start_time is None:
+                    self._cond.wait(timeout=self._timeout)
+                    continue
+
                 remaining = self._timeout - (time.monotonic() - self._start_time)
                 if remaining <= 0:
                     self._break_barrier_locked()
@@ -126,29 +129,32 @@ class ClockBarrier(IDisposable):
 
                 self._cond.wait(timeout=remaining)
 
-                # Determine whether we were released due to success or failure
                 if self._generation != my_generation:
                     if self._broken:
-                        raise threading.BrokenBarrierError("ClockBarrier timeout")
+                        raise threading.BrokenBarrierError("ClockBarrier is broken")
                     return True
 
     def _advance_generation(self) -> None:
-        """
-        Resets state and releases all waiters after a successful pass.
-        """
+        """Resets state, notifies controller, and releases all waiters."""
+        # Notify Controller of success
+        if self._controller:
+            self._controller.notify(self.id, "BARRIER_PASSED")
+
         self._cond.notify_all()
         self._count = 0
         self._start_time = None
         self._generation += 1
 
     def _break_barrier_locked(self) -> None:
-        """
-        Marks the barrier as broken and notifies all waiters.
-        This method must be called with the condition lock held.
-        """
+        """Marks barrier as broken, notifies controller, and wakes waiters."""
         if self._broken:
             return
         self._broken = True
+
+        # Notify Controller of failure
+        if self._controller:
+            self._controller.notify(self.id, "BARRIER_BROKEN")
+
         self._cond.notify_all()
         if self._on_broken:
             try:
@@ -157,12 +163,10 @@ class ClockBarrier(IDisposable):
                 pass
 
     def dispose(self) -> None:
-        """
-        Breaks the barrier and wakes all waiters.
-        Safe to call multiple times.
-        """
+        """Breaks the barrier and wakes all waiters."""
         if self._disposed:
             return
         self._disposed = True
+        self._controller = None  # Clear controller reference
         with self._cond:
             self._break_barrier_locked()

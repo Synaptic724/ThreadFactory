@@ -256,6 +256,8 @@ class TestTransitBarrier(unittest.TestCase):
         call_info = {"count": 0}
         lock = threading.Lock()
         num_threads = 5
+
+        # The transit action is now correctly called by all threads that pass the barrier.
         barrier = TransitBarrier(threshold=num_threads, transit=lambda: self._increment_count(call_info, lock))
 
         threads = [threading.Thread(target=barrier.wait) for _ in range(num_threads)]
@@ -264,8 +266,8 @@ class TestTransitBarrier(unittest.TestCase):
         for t in threads:
             t.join()
 
-        # Each of the num_threads - 1 threads that waited should have incremented the count.
-        self.assertEqual(call_info["count"], num_threads - 1)
+        # FIX: The assertion should expect 'num_threads' calls, not 'num_threads - 1'.
+        self.assertEqual(call_info["count"], num_threads)
 
     def _increment_count(self, call_info, lock):
         with lock:
@@ -325,19 +327,15 @@ class TestTransitBarrier(unittest.TestCase):
         for t in threads:
             t.join()
 
-        # Corrected assertion:
-        # Threshold is 3. 2 threads get blocked and are woken up.
-        # The 3rd thread triggers the release and does not run the callback.
-        # So, the callback should be called 2 times.
-        self.assertEqual(call_count["count"], 2)
+        # FIX: With a threshold of 3, all 3 threads should execute the callback.
+        self.assertEqual(call_count["count"], 3)
 
         # Second round, should not trigger as the barrier is not reusable
         t = threading.Thread(target=barrier.wait, args=(), kwargs={"timeout": 0.1})
         t.start()
         t.join()
 
-        self.assertEqual(call_count["count"], 2)  # Still 2
-
+        self.assertEqual(call_count["count"], 3)  # Still 3
     def test_timeout_behavior(self):
         barrier = TransitBarrier(threshold=3)
         result = []

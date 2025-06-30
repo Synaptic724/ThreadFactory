@@ -122,6 +122,8 @@ class TransitBarrier(IDisposable):
                 else:
                     self._condition.notify_all()
 
+    # In your TransitBarrier class
+
     def wait(self, timeout: Optional[float] = None) -> bool:
         """
         Waits at the barrier. In manual mode, it notifies the controller
@@ -144,15 +146,28 @@ class TransitBarrier(IDisposable):
                     if self._controller:
                         self._controller.notify(self.id, "THRESHOLD_MET")
                 else:
+                    # This is the auto-release path
                     if not self._released:
                         self._released = True
+                        final_action = None
                         if not self._transit_fired:
                             self._transit_fired = True
-                            self._condition.notify_all(self._transit)
-                        else:
-                            self._condition.notify_all()
+                            final_action = self._transit
+
+                        # Notify all other waiting threads
+                        self._condition.notify_all(final_action)
+
+                        # FIX: The triggering thread must also execute the action
+                        if final_action:
+                            try:
+                                final_action()
+                            except Exception:
+                                # Suppress exceptions in callbacks to not crash the barrier
+                                pass
+
                     return True
 
+            # All other threads wait here
             released = self._condition.wait(timeout=timeout)
 
             if self._disposed:
