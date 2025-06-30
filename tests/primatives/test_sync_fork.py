@@ -2,7 +2,6 @@ import unittest
 import threading
 import time
 from typing import List, Tuple, Callable
-from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from thread_factory.primitives.sync_fork import SyncFork
 
