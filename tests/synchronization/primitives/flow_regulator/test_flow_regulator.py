@@ -7,13 +7,13 @@ import threading
 import time
 import unittest
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
-from thread_factory.agent_thread_pool.agent import DynamicWorker
+from thread_factory.agent_thread_pool.agent import Agent
 
 
 # --------------------------------------------------------------------------- #
 #  Tiny compatibility layer                                                   #
 # --------------------------------------------------------------------------- #
-class Worker(DynamicWorker):
+class Worker(Agent):
     """
     A one-shot façade around DynamicWorker so the legacy tests that expect a
     simple `Worker(target=…, args=…, kwargs=…)` continue to work unchanged.

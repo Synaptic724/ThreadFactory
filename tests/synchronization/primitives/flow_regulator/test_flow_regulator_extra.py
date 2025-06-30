@@ -19,13 +19,13 @@ import unittest
 from time import perf_counter
 
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
-from thread_factory.agent_thread_pool.agent import DynamicWorker
+from thread_factory.agent_thread_pool.agent import Agent
 
 
 # --------------------------------------------------------------------------- #
 #  Tiny Worker wrapper (fire-and-forget)                                      #
 # --------------------------------------------------------------------------- #
-class Worker(DynamicWorker):
+class Worker(Agent):
     def __init__(self, *, target=None, args=(), kwargs=None, name=None):
         super().__init__(name=name)
         self._target = target

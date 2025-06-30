@@ -2,10 +2,10 @@ import threading
 import time
 import unittest
 
-from thread_factory.primitives import TransitBarrier
+from thread_factory.synchronization import TransitBarrier
 
 
-class TestThresholdSemaphore(unittest.TestCase):
+class TestTransitBarrier(unittest.TestCase):
 
     def test_threads_are_released_at_threshold(self):
         result = []
