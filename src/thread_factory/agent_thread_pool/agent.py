@@ -165,18 +165,23 @@ class Agent(Worker):
         """
         super().__init__(*args, **kwargs)
 
+
+
         # --- Behavior Coordination (Private Attributes) ---
         self._save_points: dict[str, Callable[[], None]] = {}
         self._locations: dict[str, Callable[[], None]] = {}
-        self._event_loop: Optional[Callable[[], None]] = None
+        self._event_loop: Optional[Callable[[], None]] = None #Home Location
         self._value_work: HelpRequest | None = None
         self._worker_type = "agentic"
+        self._return_home = False # Returns to event loop after work completion
 
         # --- Agentic Memory (Inventory) (Private Attributes) ---
         self._inventory = threading.local()
         self._inventory.data = {}
         self._shared_inventory: dict[str, Any] = {}
         self._data_transfer: dict[str, Callable[..., Any]] = {}
+        self._lock = threading.RLock()  # Ensures thread-safe access to shared state
+
 
 
     # --- Core Work Lifecycle Handling ---
@@ -193,6 +198,43 @@ class Agent(Worker):
         """
         if self._value_work:
             self._value_work.set_state(new_state)
+
+    def should_return_home(self) -> bool:
+        """
+        Checks if the worker should return to its home behavior after completing
+        its current task.
+
+        This method allows the worker to determine if it should continue processing
+        or return to its primary execution loop.
+
+        Returns:
+            bool: `True` if the worker should return home, `False` otherwise.
+        """
+        with self._lock:
+            if self._disposed:
+                raise RuntimeError("Cannot check return home after worker is disposed.")
+            # Return the current return home flag
+            return self._return_home
+
+    def set_return_home(self, return_home: bool) -> None:
+        """
+        Sets whether the worker should return to its home behavior after completing
+        its current task.
+
+        This method allows external components to control the worker's flow,
+        determining if it should continue processing or return to its primary
+        execution loop.
+
+        Args:
+            return_home (bool): If `True`, the worker will return to its home behavior
+                                after completing its current task; otherwise, it will
+                                continue processing.
+        """
+        with self._lock:
+            if self._disposed:
+                raise RuntimeError("Cannot set return home after worker is disposed.")
+            # Set the return home flag
+            self._return_home = return_home
 
     def get_work_state(self) -> Optional[WorkStatus]:
         """

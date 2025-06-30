@@ -106,7 +106,7 @@ class Conductor(IDisposable):
 
         # Settings and validations
         self._max_threshold = max_threads
-        self._threshold = min_threads
+        self._min_threshold = min_threads
         self.reusable = reusable
         self.manual_release = manual_release
         self._timeout = timeout
@@ -127,8 +127,8 @@ class Conductor(IDisposable):
         # Initialize synchronization primitives
         self._lock = threading.RLock()
         self._clock_barrier = None
-        self._threshold_semaphore = None
-        self._dynaphore = Dynaphore(self._threshold)
+        self._signal_barrier = None
+        self._dynaphore = Dynaphore(self._min_threshold)
         self._entrance_sema = None
         self._internal_threshold_sema = None
 
@@ -137,12 +137,12 @@ class Conductor(IDisposable):
             if timeout <= 0:
                 raise ValueError("Timeout must be a positive number.")
             self._clock_barrier = ClockBarrier(
-                threshold=self._threshold,
+                threshold=self._min_threshold,
                 timeout=timeout,
                 on_broken=self.notify_all_override
             )
         else:
-            self._threshold_semaphore = ThresholdSemaphore(self._threshold, reusable=True)
+            self._signal_barrier = SignalBarrier(self._min_threshold, reusable=True)
 
 
     def create_outcomes(self) -> None:
@@ -181,8 +181,8 @@ class Conductor(IDisposable):
         self._broken = False
         if self._timeout is not None:
             self._clock_barrier.reset()
-        elif self._threshold_semaphore is not None:
-            self._threshold_semaphore.reset()
+        elif self._signal_barrier is not None:
+            self._signal_barrier.reset()
 
     @property
     def results(self) -> List[Any]:
@@ -312,8 +312,8 @@ class Conductor(IDisposable):
         """
         if not self.tasks:
             raise ValueError("No tasks provided to execute.")
-        self.entrance_sema = ThresholdSemaphore(self._threshold, reusable=False)
-        self.internal_threshold_sema = ThresholdSemaphore(self._threshold, reusable=True)
+        self.entrance_sema = SignalBarrier(self._min_threshold, reusable=False)
+        self.internal_threshold_sema = SignalBarrier(self._min_threshold, reusable=True)
         self._create_field = True
 
     def wait(self) -> bool:
@@ -338,7 +338,7 @@ class Conductor(IDisposable):
             if self._timeout:
                 was_released = self._clock_barrier_wait()
             else:
-                was_released = self._threshold_semaphore.wait()
+                was_released = self._signal_barrier.wait()
 
             # Block further entry until operation finishes
             self._dynaphore.wait_for_permit()
