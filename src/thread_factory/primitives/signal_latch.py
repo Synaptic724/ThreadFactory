@@ -1,180 +1,120 @@
 import threading
 import ulid
-from typing import Callable, Optional
+from typing import Callable, Optional, Any, Dict
 from thread_factory.primitives.signal_condition import SignalCondition
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 
 class SignalLatch(IDisposable):
     """
-    SignalLatch
-    -----------
-    A blocking latch that *signals* an external observer **before** each thread
-    actually blocks. Internally, it leverages `SignalCondition` for its
-    wait/notify mechanisms but offers a simplified API:
-
-    -   ``wait()``: Fires configured callbacks/notifications, then blocks the calling thread.
-    -   ``open()``: Releases all currently waiting threads and keeps the latch
-        permanently open.
-    -   ``reset()``: Closes the latch, causing subsequent ``wait()`` calls to block.
-    -   ``is_open()``: Checks if the latch is currently open.
-
-    Parameters
-    ----------
-    signal_callback : Callable[[str, bool], None], optional
-        A generic function invoked as ``signal_callback(self.id, self.signal_value)``
-        right before a thread is suspended in ``wait()``. This is a general-purpose
-        notification mechanism. Defaults to ``None``.
-    signal_value : bool
-        The boolean value forwarded with every invocation of ``signal_callback``
-        and exposed via the ``signal_value`` property for direct controller inspection.
-        Defaults to ``True``.
-    cond : SignalCondition, optional
-        An existing ``SignalCondition`` instance to use internally. If ``None``,
-        a new one will be created.
-    controller : object, optional
-        An optional controller object that will be directly notified by the latch.
-        If the controller has a ``register_latch(latch: 'SignalLatch')`` method,
-        it will be called during initialization, allowing the controller to store
-        references to the latch's control methods (e.g., open, reset).
-        The controller should also have a ``notify_controller(latch: 'SignalLatch')``
-        method, which will be called just before a thread blocks in `wait()`.
+    A blocking latch that can signal an external observer before blocking.
+    It is designed to be managed by an optional, generic Controller.
     """
-
-    __slots__ = [
-        "_id",
-        "_cond",
-        "_open",
-        "_signal_callback",
-        "_signal_value",
-        "_lock",
-        "_disposed",
-        "_controller",
-    ]
-
     def __init__(
-            self,
-            signal_callback: Optional[Callable[[str, bool], None]] = None,
-            signal_value: bool = True,
-            cond: Optional[SignalCondition] = None,
-            controller: Optional[object] = None,
+        self,
+        signal_callback: Optional[Callable[[str], None]] = None,
+        cond: Optional[SignalCondition] = None,
+        controller: Optional['Controller'] = None,
     ):
+        """
+        Initializes the SignalLatch.
+
+        Args:
+            signal_callback: A function to call with the latch's ID just
+                             before a thread blocks. Defaults to None.
+            cond: An optional, existing SignalCondition to use internally.
+            controller: An optional Controller instance to register with. If provided,
+                        you should also pass a controller method (like
+                        controller.on_wait_starting) as the signal_callback.
+        """
         super().__init__()
         self._id: str = str(ulid.ULID())
         self._cond: SignalCondition = cond or SignalCondition()
         self._open: bool = False
         self._signal_callback = signal_callback
-        self._signal_value = signal_value
         self._lock = threading.RLock()
-        self._disposed = False
         self._controller = controller
 
-        # Register this latch instance with the controller, if provided.
+        # Automatically register with the controller upon creation.
         if self._controller:
             try:
-                # The controller is expected to have a method to register the latch.
-                # This is a cleaner Inversion of Control pattern.
                 self._controller.register(self)
-            except AttributeError:
-                # Silently fail if the controller does not support registration.
-                # A warning could be logged here for debugging.
-                # print(f"Warning: Controller {self._controller} does not have 'register_latch(latch)' method.")
-                pass
             except Exception as e:
-                # Log any other exceptions during registration.
-                # print(f"Error registering latch with controller {self._id}: {e}")
                 pass
+
 
     @property
     def id(self) -> str:
-        """
-        Returns the unique ULID identifier for this latch.
-        """
+        """Returns the unique ULID identifier for this latch."""
         return self._id
 
-    @property
-    def signal_value(self) -> bool:
+    def _get_object_details(self) -> Dict[str, Any]:
         """
-        Returns the boolean value that is passed with the signal callback.
+        Returns the metadata and commands for this latch, fulfilling the
+        controller's integration contract.
         """
-        return self._signal_value
+        return {
+            'name': 'latch',
+            'commands': {
+                'open': self.open,
+                'reset': self.reset,
+                'is_open': self.is_open,
+                'dispose': self.dispose,
+            }
+        }
 
-    def wait(self, timeout: float | None = None) -> bool:
-        """
-        Fires the generic ``signal_callback`` (if provided) and notifies the
-        direct ``controller`` (if provided), then blocks until this latch is opened.
+    # --- Core Latch Functionality ---
 
-        Returns `True` if the latch was opened, `False` if the wait timed out.
+    def wait(self, timeout: Optional[float] = None) -> bool:
+        """
+        Blocks until this latch is opened. Fires a signal_callback with the
+        latch's ID if provided, just before blocking.
+
+        Returns:
+            True if the latch was opened, False if the wait timed out.
         """
         if self._disposed:
-            raise RuntimeError("SignalLatch has been disposed")
+            raise RuntimeError(f"SignalLatch '{self.id}' has been disposed.")
 
-        # Before waiting, check if the latch is already open.
-        # This check is crucial and must be done before signaling.
+        # First, check if the latch is already open to avoid unnecessary signaling.
         with self._cond:
             if self._open:
                 return True
 
-        # If not open, proceed with signaling.
-        # Path 1: Invoke the generic signal callback.
+        # If we are about to block, fire the callback.
         if self._signal_callback:
             try:
-                self._signal_callback(self._id, self._signal_value)
+                # The callback signature is now simpler.
+                self._signal_callback(self._id)
             except Exception:
-                # Log or handle exceptions from user code silently.
+                # Swallow exceptions from user callbacks to prevent crashing.
                 pass
 
-        # Path 2: Invoke the direct controller's specific method.
-        if self._controller:
-            try:
-                # Pass the latch instance itself to the controller for state inspection.
-                self._controller.notify_controller(self)
-            except AttributeError:
-                # Silently fail if the controller doesn't have the method.
-                pass
-            except Exception:
-                # Log or handle exceptions from user code silently.
-                pass
-
-        # Acquire the internal condition lock and proceed to block.
+        # Now, enter the wait state.
         with self._cond:
-            # Re-check the _open flag in case it was changed between the first
-            # check and acquiring the lock. This is a critical double-check.
-            if self._open:
-                return True
+            # Re-check in case the latch was opened between the first check and now.
+            # This handles a classic race condition.
             return self._cond.wait_for(lambda: self._open, timeout=timeout)
 
     def open(self):
-        """
-        Opens the latch and permanently releases all waiting threads.
-        This method is idempotent.
-        """
+        """Opens the latch and releases all waiting threads. This is idempotent."""
         if self._disposed:
             return
         with self._cond:
-            if self._open:
-                return
-            self._open = True
-            self._cond.notify_all()
+            if not self._open:
+                self._open = True
+                self._cond.notify_all()
 
     def reset(self):
-        """
-        Resets the latch to the *closed* state, allowing it to be reused.
-        """
+        """Resets the latch to the closed state, allowing it to be reused."""
         if self._disposed:
-            raise RuntimeError("Cannot reset a disposed SignalLatch")
+            raise RuntimeError(f"Cannot reset a disposed SignalLatch ('{self.id}').")
         with self._cond:
             self._open = False
 
     def is_open(self) -> bool:
-        """
-        Checks if the latch is currently in the open state.
-        """
-        # No lock needed for a simple boolean read if atomicity is guaranteed.
-        # However, using the lock ensures the most up-to-date state is read
-        # relative to other operations.
-        with self._cond:
-            return self._open
+        """Checks if the latch is currently in the open state."""
+        return self._open
 
     def dispose(self):
         """
@@ -183,22 +123,15 @@ class SignalLatch(IDisposable):
         """
         if self._disposed:
             return
-
-        with self._lock:  # Outer lock for the dispose process
+        with self._lock:
             if self._disposed:
                 return
             self._disposed = True
 
         with self._cond:
-            # Mark as open to ensure all waiters pass immediately.
             self._open = True
             self._cond.notify_all()
 
-        # Dispose the internal SignalCondition, cleaning up its resources.
-        if hasattr(self._cond, 'dispose'):
-            self._cond.dispose()
-
-        # Clear references to aid garbage collection and prevent accidental use.
+        self._cond.dispose()
         self._signal_callback = None
-        self._signal_value = None
         self._controller = None
