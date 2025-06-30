@@ -9,12 +9,12 @@ from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
 from thread_factory.synchronization.execution.transit_gate import TransitGate
 
 # Orchestrators
-from thread_factory.synchronization.orchestrators.conductor import Conductor
-from thread_factory.synchronization.orchestrators.multi_conductor import MultiConductor
-from thread_factory.synchronization.orchestrators.clock_barrier import ClockBarrier
-from thread_factory.synchronization.orchestrators.action_barrier import ActionBarrier
-from thread_factory.synchronization.orchestrators.scout import Scout
-from thread_factory.synchronization.orchestrators.signal_barrier import SignalBarrier
+from thread_factory.synchronization.coordinators.conductor import Conductor
+from thread_factory.synchronization.coordinators.multi_conductor import MultiConductor
+from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
+from thread_factory.synchronization.coordinators.action_barrier import ActionBarrier
+from thread_factory.synchronization.coordinators.scout import Scout
+from thread_factory.synchronization.coordinators.signal_barrier import SignalBarrier
 
 # Synchronization primitives
 from thread_factory.synchronization.primitives.dynaphore import Dynaphore

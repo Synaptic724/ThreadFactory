@@ -1,7 +1,7 @@
 import unittest
 import threading
 import time
-from thread_factory.synchronization.orchestrators.signal_barrier import SignalBarrier, Group
+from thread_factory.synchronization.coordinators.signal_barrier import SignalBarrier, Group
 
 
 class TestSignalBarrier(unittest.TestCase):

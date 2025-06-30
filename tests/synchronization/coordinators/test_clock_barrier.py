@@ -1,5 +1,5 @@
 import threading, time, unittest
-from thread_factory.synchronization.orchestrators.clock_barrier import ClockBarrier
+from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
 
 
 BROKEN = threading.BrokenBarrierError   # shorthand

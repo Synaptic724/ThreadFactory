@@ -6,7 +6,7 @@ compatibility wrapper so none of the original test logic had to change.
 import threading
 import time
 import unittest
-from thread_factory.synchronization.primitives.switchlock
+from thread_factory.synchronization.primitives.switchlock import SwitchLock
 from thread_factory.dynamic_thread_pool.dynamic_worker import DynamicWorker
 
 

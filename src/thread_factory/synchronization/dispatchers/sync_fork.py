@@ -3,7 +3,7 @@ import threading
 from typing import Callable, List, Optional, Tuple
 import inspect
 import ulid
-from thread_factory.synchronization.orchestrators.scout import Scout
+from thread_factory.synchronization.coordinators.scout import Scout
 from thread_factory.utils import IDisposable
 
 

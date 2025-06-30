@@ -2,7 +2,7 @@ import unittest
 import threading
 import time
 from typing import List
-from thread_factory.synchronization.orchestrators.conductor import Conductor
+from thread_factory.synchronization.coordinators.conductor import Conductor
 
 class TestConductor(unittest.TestCase):
     # ==================================================================

@@ -2,7 +2,7 @@ import unittest
 import threading
 import time
 
-from thread_factory.synchronization.orchestrators.multi_conductor import MultiConductor
+from thread_factory.synchronization.coordinators.multi_conductor import MultiConductor
 from thread_factory.utils import Group
 
 
