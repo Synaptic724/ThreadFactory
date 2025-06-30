@@ -31,6 +31,18 @@ class AutoResetTimer(IDisposable):
         self._lock = threading.RLock()
         self._running = False
 
+    def dispose(self):
+        """
+        Dispose of the timer and stop any scheduled execution.
+        This should be called to clean up the timer when no longer needed.
+        """
+        if self._disposed:
+            return
+        with self._lock:
+            self._disposed = True
+            self.stop()
+            self._timer = None
+
     def _run(self):
         """
         Internal runner that wraps the user callback.
@@ -91,14 +103,3 @@ class AutoResetTimer(IDisposable):
         """
         return self._running
 
-    def dispose(self):
-        """
-        Dispose of the timer and stop any scheduled execution.
-        This should be called to clean up the timer when no longer needed.
-        """
-        if self._disposed:
-            return
-        with self._lock:
-            self._disposed = True
-            self.stop()
-            self._timer = None
