@@ -180,33 +180,28 @@ class Fork:
         return None
 
     def _select_fork_unit_step(self) -> Optional['ForkUnit']:
-        """
-        Selects an available ForkUnit using a rotating step index.
-
-        Starts at the current `self._selector_step_counter` and steps through
-        the list by `self._selector_step`, with wraparound. Distributes fork
-        access more evenly under heavy concurrency.
-
-        Returns:
-            ForkUnit if available, otherwise None (if all units are exhausted).
-        """
-
         if self._forks_closed and not self._reusable:
             return None
 
         length = len(self._list_of_forks)
-
+        # We need the selector lock to increment the counter, not to check units.
         with self._selector_lock:
             start_index = self._selector_step_counter % length
+            # The loop for checking is outside the global lock
 
-            for i in range(length):
-                idx = (start_index + i * self._selector_step) % length
-                unit = self._list_of_forks[idx]
-                with unit.lock:
-                    if not unit.gate or unit.gate_uses < unit.usage_cap:
+        for i in range(length):
+            idx = (start_index + i * self._selector_step) % length
+            unit = self._list_of_forks[idx]
+
+            # Acquire the unit lock to check its state.
+            with unit.lock:
+                if not unit.gate and unit.gate_uses < unit.usage_cap:
+                    # Acquire the selector lock only when we find a unit to return.
+                    with self._selector_lock:
                         self._selector_step_counter = idx + 1
                         return unit
 
+        # If the loop finishes, all forks are exhausted.
         self._forks_closed = True
         return None
 

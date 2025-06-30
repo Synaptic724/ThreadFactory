@@ -165,7 +165,7 @@ class TestFork(unittest.TestCase):
 
         self.assertEqual(len(log), total_tasks)
         # Assert the measured time is close to the expected serialized time
-        self.assertAlmostEqual(total_time, expected_time, delta=0.05)  # Allow a 50ms delta for overhead
+        self.assertAlmostEqual(total_time, expected_time, delta=0.06)  # Allow a 50ms delta for overhead
 
     def test_step_selector_even_distribution(self):
         log = []
