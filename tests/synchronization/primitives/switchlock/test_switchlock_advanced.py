@@ -15,7 +15,7 @@ import time
 import unittest
 from contextlib import ExitStack
 
-from thread_factory.primitives import SwitchLock
+from thread_factory.synchronization.primitives.switchlock
 from thread_factory.dynamic_thread_pool.dynamic_worker import DynamicWorker
 
 

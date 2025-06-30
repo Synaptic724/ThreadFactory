@@ -16,7 +16,6 @@ from typing import (
     TypeVar,
 )
 from array import array
-
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.utils import Empty, IDisposable
 

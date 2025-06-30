@@ -2,9 +2,9 @@ import ulid
 from thread_factory.utils import IDisposable
 import inspect
 import threading
-from thread_factory.primitives import Dynaphore
+from thread_factory.synchronization.primitives import Dynaphore
 from typing import Optional, Callable, List, Union, Any
-from thread_factory.primitives import ClockBarrier
+from thread_factory.synchronization.orchestrators.clock_barrier import ClockBarrier
 from thread_factory.synchronization.primitives.threshold_semaphore import ThresholdSemaphore
 
 

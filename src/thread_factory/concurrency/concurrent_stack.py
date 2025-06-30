@@ -13,7 +13,6 @@ from typing import (
     Optional,
     TypeVar,
 )
-
 from thread_factory.concurrency import ConcurrentList
 from thread_factory.utils import Empty, IDisposable
 

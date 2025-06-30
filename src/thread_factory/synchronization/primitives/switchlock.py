@@ -4,7 +4,7 @@ from typing import Optional, Union, Iterable, Any, Callable
 import ulid
 from thread_factory import ConcurrentSet
 from thread_factory.utils import IDisposable
-from thread_factory.primitives import SmartCondition
+from thread_factory.synchronization.primitives.smart_condition import SmartCondition
 
 class SwitchLock(IDisposable):
     """

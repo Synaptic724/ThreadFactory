@@ -41,14 +41,14 @@ from thread_factory.concurrency import __all__ as concurrency_all
 # ---- Utilities ----
 from thread_factory.utils import Empty, Stopwatch, AutoResetTimer
 
-from thread_factory.primitives import (
+from thread_factory.synchronization.primitives import (
     Dynaphore,
     SmartCondition,
     SwitchLock,
     SignalCondition,
 )
 # ---- Runtime Primitives ----
-from thread_factory.primitives import __all__ as primatives_all
+from thread_factory.synchronization.primitives import __all__ as primatives_all
 
 # ---- Operations ----
 from thread_factory.runtime.factory.operations import (

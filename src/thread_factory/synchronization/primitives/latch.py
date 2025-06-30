@@ -22,7 +22,7 @@ class Latch(IDisposable):
     >>> threading.Thread(target=task).start()
     >>> latch.open()
     """
-    __slots__ = IDisposable.__slots__ + ["open", "condition", "_id"]
+    __slots__ = IDisposable.__slots__ + ["_open", "_condition", "_id"]
     def __init__(self):
         super().__init__()
 

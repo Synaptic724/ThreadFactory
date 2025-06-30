@@ -2,7 +2,7 @@ import threading
 from typing import Optional, Callable
 import ulid
 from thread_factory.utils import IDisposable
-from thread_factory.primitives import SignalCondition
+from thread_factory.synchronization.primitives.signal_condition import SignalCondition
 
 class ActionBarrier(IDisposable):
     """

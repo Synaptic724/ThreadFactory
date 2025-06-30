@@ -18,7 +18,7 @@ import time
 import unittest
 from time import perf_counter
 
-from thread_factory.primitives import SwitchLock
+from thread_factory.synchronization.primitives.switchlock import SwitchLock
 from thread_factory.dynamic_thread_pool.dynamic_worker import DynamicWorker
 
 
