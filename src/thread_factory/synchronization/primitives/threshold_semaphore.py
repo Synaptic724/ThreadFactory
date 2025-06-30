@@ -12,21 +12,73 @@ class ThresholdSemaphore(IDisposable):
     """
     ThresholdSemaphore
     ------------------
-    A reusable barrier-like semaphore that unblocks all waiting threads once
-    a predefined threshold is reached.
+    A reusable, synchronization primitive that acts like a *count-to-N barrier*.
+    Once a predefined number of threads (the `threshold`) have called `wait()`, all
+    waiting threads are released simultaneously. This release can occur automatically
+    or be manually triggered, depending on the configuration.
 
-    This class can be used standalone or optionally integrated with a Controller
-    for centralized management and observation.
+    💡 Core Features:
+    -----------------
+    • **Count-based Trigger**: Threads block until the `threshold` number of waiters is reached.
+    • **Optional Reusability**: Can be configured to reset after releasing all threads.
+    • **Manual Release Option**: Allows controller or external caller to trigger release manually.
+    • **Controller Integration**: Emits lifecycle events and supports remote invocation.
+    • **Timeout-aware**: Threads can specify a timeout for `wait()`.
 
-    Parameters:
-        threshold (int): Number of threads required to trigger release.
-        callback (Optional[Callable[[], None]]): Hook for standalone use when threshold is reached.
-        reusable (bool): If True, resets after triggering (default: False).
-        manual_release (bool): If True, waits after threshold until release() is called.
-        controller (Optional[Controller]): An optional Controller instance to register with.
-        signal_callback (Optional[Callable[[str], None]]): A function to call with the
-            semaphore's ID just before a thread blocks. Typically, this is the
-            controller's `on_wait_starting` method.
+    🔁 Reusable Behavior:
+    ---------------------
+    If `reusable=True`, once all waiting threads pass the barrier, the internal count is
+    reset automatically and the semaphore becomes ready for reuse. The last thread to pass
+    is responsible for resetting the internal state.
+
+    🔐 Manual Release:
+    ------------------
+    If `manual_release=True`, the barrier is *not* released automatically when the threshold is met.
+    Instead, a manual call to `release()` is required to proceed.
+
+    🔧 Controller Integration:
+    --------------------------
+    When integrated with a Controller instance:
+    • Self-registers on creation.
+    • Emits the following events:
+        - "THRESHOLD_MET": When the threshold is first reached.
+        - "SEMAPHORE_RELEASED": When threads are actually unblocked.
+    • Supports command-based control via:
+        - `release()`, `reset()`, `set_threshold()`, `is_spent()`, `notify_all_override()`, `dispose()`
+    • Provides a `signal_callback` hook (e.g., `controller.on_wait_starting`) to signal blocking activity.
+
+    ⚙ Parameters:
+    -------------
+    threshold (int):
+        Number of threads required to reach the release point.
+    callback (Optional[Callable[[], None]]):
+        A function invoked once when the threshold is reached (before releasing threads).
+    reusable (bool):
+        If True, the semaphore resets itself after each full release cycle. Default is False.
+    manual_release (bool):
+        If True, prevents automatic release and requires an explicit call to `release()`.
+    controller (Optional[Controller]):
+        A `Controller` instance used for central management and event emission.
+    signal_callback (Optional[Callable[[str], None]]):
+        A hook called just before a thread blocks in `wait()`. Typically used to notify a controller.
+
+    🚨 Exceptions:
+    --------------
+    Raises ValueError if `threshold <= 0`.
+
+    🧪 Typical Use Case:
+    --------------------
+        # With 5 threads
+        semaphore = ThresholdSemaphore(threshold=5, reusable=True)
+
+        def worker():
+            print("Thread waiting")
+            semaphore.wait()
+            print("Thread released")
+
+        # Start 5 threads to trigger threshold
+        for _ in range(5):
+            threading.Thread(target=worker).start()
     """
     __slots__ = IDisposable.__slots__ + [
         "_threshold", "_callback", "_reusable", "_manual_release",
@@ -73,12 +125,28 @@ class ThresholdSemaphore(IDisposable):
 
     @property
     def id(self) -> str:
-        """Returns the unique ULID identifier for this semaphore."""
+        """
+        Returns the unique ULID identifier for this semaphore.
+
+        This ID is used for identification during controller integration,
+        event tracking, and external control through the command interface.
+
+        Returns:
+            str: A globally unique ULID string.
+        """
         return self._id
 
     def _get_object_details(self) -> Dict[str, Any]:
         """
-        Returns metadata and commands for controller integration.
+        Provides controller-compatible metadata and command bindings.
+
+        This allows the `Controller` to register the object, invoke its
+        commands remotely, and subscribe to events.
+
+        Returns:
+            Dict[str, Any]: A dictionary with keys:
+                - 'name': A string descriptor of the object ("threshold_semaphore").
+                - 'commands': A dictionary mapping command names to bound methods.
         """
         return {
             'name': 'threshold_semaphore',
@@ -95,6 +163,15 @@ class ThresholdSemaphore(IDisposable):
     # --- Core Methods (with integration) ---
 
     def dispose(self):
+        """
+        Releases all resources and unblocks waiting threads.
+
+        This method marks the semaphore as disposed and removes references
+        to callbacks and controllers. All currently waiting threads are notified
+        and allowed to exit.
+
+        This method is idempotent and safe to call multiple times.
+        """
         with self._lock:
             if self._disposed:
                 return
@@ -108,11 +185,29 @@ class ThresholdSemaphore(IDisposable):
             self._condition.notify_all()
 
     def is_spent(self) -> bool:
-        """Returns True if the semaphore has been used and is not reusable."""
+        """
+        Indicates whether the semaphore has already been released
+        and is no longer usable (unless reusable=True).
+
+        Returns:
+            bool: True if the threshold was reached and the semaphore
+                  has been released in a non-reusable configuration.
+        """
         return self._released and not self._reusable
 
     def notify_all_override(self) -> None:
-        """Forcibly releases all waiting threads."""
+        """
+        Forcibly releases all threads currently waiting on the semaphore.
+
+        This bypasses the threshold logic. It's typically used by the
+        controller or external system to override the normal wait logic.
+
+        Emits:
+            Controller event: "SEMAPHORE_RELEASED"
+
+        Notes:
+            If reusable=True, resets the counter after releasing.
+        """
         with self._condition:
             if self._disposed or self._released:
                 return
@@ -127,7 +222,18 @@ class ThresholdSemaphore(IDisposable):
             self._condition.notify_all()
 
     def release(self) -> None:
-        """Manually releases threads when in manual_release mode."""
+        """
+        Manually releases the semaphore when `manual_release=True`.
+
+        This should be called *after* the threshold has been met.
+
+        Emits:
+            Controller event: "SEMAPHORE_RELEASED"
+
+        Notes:
+            Has no effect unless `manual_release=True` and the internal
+            count has reached the configured threshold.
+        """
         with self._condition:
             if self._disposed or self._released:
                 return
@@ -140,7 +246,19 @@ class ThresholdSemaphore(IDisposable):
                 self._condition.notify_all()
 
     def set_threshold(self, new_threshold: int):
-        """Dynamically changes the required threshold."""
+        """
+        Dynamically updates the required thread count to trigger release.
+
+        Args:
+            new_threshold (int): The new threshold value (> 0).
+
+        Raises:
+            ValueError: If `new_threshold <= 0`.
+
+        Behavior:
+            - If the new threshold is already met and not in manual mode,
+              the semaphore will auto-release immediately.
+        """
         if new_threshold <= 0:
             raise ValueError("Threshold must be greater than 0")
 
@@ -155,7 +273,13 @@ class ThresholdSemaphore(IDisposable):
                 self._condition.notify_all()
 
     def reset(self):
-        """Resets the semaphore for a new cycle."""
+        """
+        Manually resets the semaphore for reuse.
+
+        This resets the internal counter and clears the released flag,
+        regardless of current state. Should only be used when the semaphore
+        is not in use or all waiters have already exited.
+        """
         with self._condition:
             self._count = 0
             self._released = False
@@ -163,7 +287,34 @@ class ThresholdSemaphore(IDisposable):
     # In the ThresholdSemaphore class...
 
     def wait(self, timeout: Optional[float] = None) -> bool:
-        """Waits until the threshold is reached and released."""
+        """
+        Blocks the calling thread until the threshold is met and release is triggered.
+
+        Args:
+            timeout (Optional[float]): Optional timeout in seconds. If specified,
+                the thread will unblock after the timeout even if the semaphore
+                hasn't been released.
+
+        Returns:
+            bool: True if the semaphore was released and the thread passed through.
+                  False if the wait timed out or the semaphore was disposed before release.
+
+        Behavior:
+            - Increments the internal count on entry.
+            - If the threshold is reached:
+                • Invokes `callback` (if provided).
+                • Emits "THRESHOLD_MET" event to the controller.
+                • Either auto-releases or waits for `release()`, depending on configuration.
+            - If `signal_callback` is defined and the thread will block, it is invoked.
+            - If reusable=True, the last thread to exit resets the state for the next cycle.
+
+        Notes:
+            - If the semaphore has already been released and is not reusable, the call returns immediately.
+            - If disposed, the thread unblocks with a return value of False.
+
+        Exceptions:
+            - All internal exceptions in callbacks or controller logic are caught and logged silently.
+        """
         if self.is_spent():
             return False  # Corrected from our last session
 

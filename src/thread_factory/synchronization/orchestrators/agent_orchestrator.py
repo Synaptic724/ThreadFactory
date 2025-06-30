@@ -1,12 +1,13 @@
 from typing import Callable, Optional
 import threading
 from typing import Callable, Optional, List
+from thread_factory.synchronization import ThresholdSemaphore
 from thread_factory.utils import IDisposable
 
 
-class DynamicCoordinator(IDisposable):
+class AgentOrchestrator(IDisposable):
     """
-    DynamicCoordinator
+    AgentOrchestrator
     ------------------
     A coordination primitive for dynamic thread groups.
 
@@ -31,7 +32,7 @@ class DynamicCoordinator(IDisposable):
         def group_task():
             print(f"Thread running in group: {threading.current_thread().name}")
 
-        coordinator = DynamicCoordinator(group_size=3, fn=group_task, strict=True)
+        coordinator = AgentOrchestrator(group_size=3, fn=group_task, strict=True)
 
         # Assume you have a pool, you'd do something like:
         for _ in range(2):
