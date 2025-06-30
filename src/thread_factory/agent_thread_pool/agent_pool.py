@@ -2,7 +2,7 @@ from typing import Callable
 import threading
 from ulid import ULID
 from thread_factory.concurrency import ConcurrentSet, ConcurrentQueue, ConcurrentList, ConcurrentDict
-from thread_factory.agent_thread_pool import DynamicWorker
+from thread_factory.agent_thread_pool import Agent
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.runtime.orchestrator.monitoring.records.records import Records
@@ -129,7 +129,7 @@ class _AgentPoolContainer(IDisposable):
         Ensures the calling thread is a valid AgenticWorker.
         """
         current_thread = threading.current_thread()
-        if not isinstance(current_thread, DynamicWorker):
+        if not isinstance(current_thread, Agent):
             raise TypeError("Current thread must be an instance of AgenticWorker")
 
     def _register_thread(self):
@@ -294,7 +294,7 @@ class AgentPool(IDisposable):
         Creates workers and starts them.
         """
         for worker_id in range(len(self.worker_pool), len(self.worker_pool) + num_workers):
-            worker = DynamicWorker()
+            worker = Agent()
             self.worker_pool.append(worker)
             worker.start()
 

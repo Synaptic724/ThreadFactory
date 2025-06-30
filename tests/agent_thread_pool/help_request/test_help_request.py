@@ -110,7 +110,7 @@ class TestValueWork(unittest.TestCase):
 
         # Simulate first thread
         thread1 = threading.current_thread()
-        thread1._worker_type = "dynamic"
+        thread1._worker_type = "agentic"
         thread1._factory_id = ULID()
         help_request.bind_value_work()
 
@@ -119,7 +119,7 @@ class TestValueWork(unittest.TestCase):
 
         # Simulate second thread
         class DummyThread:
-            _worker_type = "dynamic"
+            _worker_type = "agentic"
             _factory_id = ULID()
 
         original_thread = threading.current_thread

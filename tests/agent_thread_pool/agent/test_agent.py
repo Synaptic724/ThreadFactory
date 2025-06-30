@@ -2,10 +2,7 @@ import unittest
 from unittest.mock import Mock, patch
 import threading
 import time
-import inspect # Required for testing async functions
-
-# Assuming these imports are correct based on the provided code structure
-from thread_factory.runtime import Worker, WorkerState
+from thread_factory.runtime import WorkerState
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 from thread_factory.agent_thread_pool.help_request import HelpRequest
 from thread_factory.agent_thread_pool.agent import Agent
