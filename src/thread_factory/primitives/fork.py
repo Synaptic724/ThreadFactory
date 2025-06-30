@@ -43,7 +43,7 @@ class Fork:
     - Tracks usage count per unit.
     - Once all units are exhausted, marks the fork as closed.
 
-    If `reusable=True` is set, the fork can be reset via `reset()`.
+    This fork can always be reset via `reset()` to be reused.
 
     ------
     Example Use
@@ -53,7 +53,8 @@ class Fork:
     >>> fork = Fork(2, [(3, worker_a), (2, worker_b)])
 
     Calling `fork.use_fork()` 5 times will dispatch the workers according to
-    their caps (3 and 2 uses). Further calls raise `RuntimeError` unless reusable.
+    their caps (3 and 2 uses). Further calls raise `RuntimeError`.
+    Call `fork.reset()` to use it again.
 
     ------
     Parameters
@@ -66,8 +67,13 @@ class Fork:
             - `usage_cap`: Max number of thread executions for this callable.
             - A synchronous function to execute.
 
-    reusable : bool (default False)
-        If True, the fork can be reset and reused after exhaustion.
+    rotate_selectors : bool (default False)
+        If True, uses a time-based selection strategy (`_select_fork_unit`).
+        If False, uses a step-based selection strategy (`_select_fork_unit_step`).
+
+    selector_step : int (default 1)
+        Only applicable if `rotate_selectors` is False. Defines the step size
+        for the `_select_fork_unit_step` method.
 
     ------
     Methods
@@ -76,13 +82,13 @@ class Fork:
         Attempts to execute one of the available callables.
 
     reset():
-        Resets internal counters and gates for reuse (if allowed).
+        Resets internal counters and gates for reuse.
     """
 
-    # Removed _usage_cap from __slots__ as it is no longer a class-level attribute.
-    __slots__ = ["_list_of_forks", "_reusable", "_forks_closed", "_rotate_selectors", "_selector_step", "_selector_step_counter", "_selector_lock"]
+    # Removed _reusable from __slots__
+    __slots__ = ["_list_of_forks", "_forks_closed", "_rotate_selectors", "_selector_step", "_selector_step_counter", "_selector_lock"]
 
-    def __init__(self, number_of_forks: int, callables: List[Tuple[int, Callable]], reusable: bool = False,
+    def __init__(self, number_of_forks: int, callables: List[Tuple[int, Callable]],
                  rotate_selectors: bool = False, selector_step: int = 1):
         if number_of_forks != len(callables):
             raise ValueError("The number of forks must match the number of callables.")
@@ -113,7 +119,7 @@ class Fork:
         self._list_of_forks: List[ForkUnit] = [
             ForkUnit(fork_callable=call, usage_cap=cap) for cap, call in callables
         ]
-        self._reusable = reusable
+        # _reusable removed
         self._forks_closed = False
         self._rotate_selectors = rotate_selectors
         self._selector_step = selector_step
@@ -124,10 +130,11 @@ class Fork:
         """
         Resets the state of all ForkUnits, allowing the fork to be reused.
 
-        If `reusable=True`, this method can be called after exhaustion to reset:
+        This method can be called after exhaustion to reset:
         - All gates (marking them as open again).
         - All usage counters.
         - The selector step counter.
+        - The fork's overall closed status.
 
         Raises:
             Nothing. Safe to call even if the fork hasn't been used.
@@ -154,34 +161,35 @@ class Fork:
             ForkUnit if available, otherwise None (if all units are exhausted).
         """
 
-        if self._forks_closed and not self._reusable:
-            return None
+        # No check for self._forks_closed here, as it's handled by the caller
+        # if this method returns None.
 
         flip = time.monotonic_ns() & 1
         mid = len(self._list_of_forks) // 2
-        scan_range = range(0, mid) if flip == 0 else range(mid, len(self._list_of_forks))
+        scan_range_1 = range(0, mid) if flip == 0 else range(mid, len(self._list_of_forks))
+        scan_range_2 = range(mid, len(self._list_of_forks)) if flip == 0 else range(0, mid)
 
-        for idx in scan_range:
+
+        for idx in scan_range_1:
             unit = self._list_of_forks[idx]
             with unit.lock:
-                if not unit.gate or unit.gate_uses < unit.usage_cap:
+                if not unit.gate and unit.gate_uses < unit.usage_cap:
                     return unit
 
         # If nothing found in primary range, try the backup range
-        backup_range = range(mid, len(self._list_of_forks)) if flip == 0 else range(0, mid)
-        for idx in backup_range:
+        for idx in scan_range_2:
             unit = self._list_of_forks[idx]
             with unit.lock:
-                if not unit.gate or unit.gate_uses < unit.usage_cap:
+                if not unit.gate and unit.gate_uses < unit.usage_cap:
                     return unit
 
-        # All forks are exhausted
-        self._forks_closed = True
+        # All forks are exhausted after attempting both ranges
+        self._forks_closed = True # Mark as closed for future quick rejection
         return None
 
     def _select_fork_unit_step(self) -> Optional['ForkUnit']:
-        if self._forks_closed and not self._reusable:
-            return None
+        # No check for self._forks_closed here, as it's handled by the caller
+        # if this method returns None.
 
         length = len(self._list_of_forks)
         # We need the selector lock to increment the counter, not to check units.
@@ -198,11 +206,12 @@ class Fork:
                 if not unit.gate and unit.gate_uses < unit.usage_cap:
                     # Acquire the selector lock only when we find a unit to return.
                     with self._selector_lock:
-                        self._selector_step_counter = idx + 1
+                        # Increment selector_step_counter for the *next* selection
+                        self._selector_step_counter = (idx + 1) % length # Ensure it wraps around
                         return unit
 
         # If the loop finishes, all forks are exhausted.
-        self._forks_closed = True
+        self._forks_closed = True # Mark as closed for future quick rejection
         return None
 
     def use_fork(self) -> None:
@@ -215,28 +224,31 @@ class Fork:
         - Maintains full parallelism **across units** because each has its own lock.
 
         Raises:
-            RuntimeError: If no units are available and the fork is not reusable.
+            RuntimeError: If no units are available.
         """
 
-        if self._forks_closed and not self._reusable:
-            raise RuntimeError("Forks are closed and not reusable. Cannot use fork.")
+        # Removed the initial check based on _forks_closed and _reusable.
+        # The primary check for exhaustion happens after attempting to select a unit.
 
         while True:                     # ⟳ Retry until we truly reserve a slot
             unit = (self._select_fork_unit() if self._rotate_selectors
                     else self._select_fork_unit_step())
 
             if unit is None:
+                # This path is taken if _select_fork_unit(step) exhausted all units
+                # and marked self._forks_closed = True.
                 raise RuntimeError("No available forks to use, all forks are at capacity.")
 
             # 🛡️ Atomic reservation & execution
             with unit.lock:
                 if unit.gate_uses >= unit.usage_cap:
-                    # Lost the race—try another unit
+                    # Lost the race—another thread just claimed this unit.
+                    # Continue the while loop to try finding another unit.
                     continue
 
                 unit.gate_uses += 1
                 if unit.gate_uses >= unit.usage_cap:
-                    unit.gate = True
+                    unit.gate = True # Mark this specific unit as exhausted
 
                 # Execute while still holding the unit’s lock to serialize
                 # threads *on this unit* (needed for the single-fork test).

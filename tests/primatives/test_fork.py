@@ -247,8 +247,7 @@ class TestFork(unittest.TestCase):
             callables=[
                 (2, dummy_func_factory("A", log)),
                 (2, dummy_func_factory("B", log))
-            ],
-            reusable=True
+            ]
         )
 
         for _ in range(4):
@@ -343,8 +342,7 @@ class TestFork(unittest.TestCase):
         # Create a non-reusable fork with specific caps
         fork = Fork(
             number_of_forks=2,
-            callables=[(2, lambda: None), (3, lambda: None)],
-            reusable=False
+            callables=[(2, lambda: None), (3, lambda: None)]
         )
 
         # Use all forks
@@ -369,8 +367,7 @@ class TestFork(unittest.TestCase):
             callables=[
                 (3, dummy_func_factory("A", log)),
                 (3, dummy_func_factory("B", log))
-            ],
-            reusable=True
+            ]
         )
 
         # Use the fork a few times, but not to exhaustion
@@ -440,8 +437,7 @@ class TestFork(unittest.TestCase):
                 (3, dummy_func_factory("A", log)),
                 (3, dummy_func_factory("B", log)),
                 (3, dummy_func_factory("C", log))
-            ],
-            reusable=True
+            ]
         )
 
         # Use the fork a few times
