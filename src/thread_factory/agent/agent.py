@@ -175,6 +175,7 @@ class Agent(Worker):
         self._value_work: HelpRequest | None = None
         self._worker_type = "agentic"
         self._return_home = False # Returns to event loop after work completion
+        self._pool_agent = True # Indicates this worker is part of a dynamic thread pool
 
         # --- Agentic Memory (Inventory) (Private Attributes) ---
         self._inventory = threading.local()

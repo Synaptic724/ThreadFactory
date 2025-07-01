@@ -1,7 +1,7 @@
 import threading
 from typing import Optional, List
-from thread_factory.agent.activity.activity_controller import ActivityController
 from thread_factory.agent.activator import AgentActivator
+from thread_factory.concurrency import ConcurrentDict, ConcurrentList, ConcurrentSet
 
 
 class CommandCenter:
@@ -119,30 +119,3 @@ class CommandCenter:
 
         AgentActivator(thread, factory_id)
         return True  # The transformation was successful.
-
-    def create_controller(self, **kwargs) -> ActivityController:
-        """
-        Creates a new, standard OperationalController that can be canceled.
-        """
-        return ActivityController(**kwargs)
-
-    def get_uncancelable_controller(self) -> ActivityController:
-        """
-        Returns a shared, singleton controller that cannot be canceled.
-        """
-        return ActivityController.get_uncancelable()
-
-    def create_linked_controller(
-            self, *activities: 'Activity', **kwargs
-    ) -> ActivityController:
-        """
-        Creates a new controller that is linked to other activities.
-        """
-        new_controller = self.create_controller(**kwargs)
-        cancel_action = new_controller.cancel
-        for act in activities:
-            if act.is_cancellation_requested:
-                new_controller.cancel()
-                break
-            act.register_cancellation_callback(cancel_action)
-        return new_controller
