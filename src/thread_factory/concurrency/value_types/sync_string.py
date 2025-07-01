@@ -825,6 +825,22 @@ class SyncString:
         with self._lock:
             return getattr(self._value, name)
 
+    def __imul__(self, n):
+        """
+        Perform in-place multiplication (*=).
+
+        This operation is atomic. It acquires the lock, repeats the string
+        n times, and updates the internal value in a single operation.
+
+        Args:
+            n (int): The number of times to repeat the string.
+
+        Returns:
+            SyncString: self, after modification.
+        """
+        with self._lock:
+            self._value *= n
+            return self
 
     @classmethod
     def __class_getitem__(cls, item):

@@ -191,12 +191,31 @@ class TestSyncString(unittest.TestCase):
 
         self.assertIn(s.get(), [f"val_{i}" for i in range(5)])
 
+    def test_concurrent_imul_simulation(self):
+        s = SyncString("a")
+
+        def multiplier():
+            nonlocal s
+            s *= 2
+
+        # Start with "a", run multiplier twice.
+        # If not atomic, one thread might read "a", the other "a", and both set to "aa".
+        # If atomic, one thread sets to "aa", the other reads "aa" and sets to "aaaa".
+        threads = [threading.Thread(target=multiplier) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(s.get(), "aaaa")
+
     def test_concurrent_append_simulation(self):
         s = SyncString("")
+
         def appender(ch):
+            nonlocal s  # Tell the function to use the 's' from the outer scope
             for _ in range(100):
-                current = s.get()
-                s.set(current + ch)
+                s += ch  # Use the atomic in-place add operator
 
         threads = [threading.Thread(target=appender, args=(chr(65 + i),)) for i in range(5)]
 
@@ -205,6 +224,7 @@ class TestSyncString(unittest.TestCase):
         for t in threads:
             t.join()
 
+        # This will now pass every time
         self.assertEqual(len(s.get()), 500)
 
     def test_getitem_slice(self):
