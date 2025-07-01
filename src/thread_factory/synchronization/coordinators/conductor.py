@@ -3,10 +3,11 @@ from thread_factory.utils import IDisposable
 import inspect
 import threading
 from thread_factory.synchronization.primitives import Dynaphore
-from typing import Optional, Callable, List, Union, Any
+from typing import Optional, Callable, List, Union, Any, Dict
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.outcome import Outcome
 
 
@@ -54,21 +55,21 @@ class Conductor(IDisposable):
         print(f"Conductor results: {conductor.results}")
     """
     __slots__ = IDisposable.__slots__ + [
-        "_min_threshold", "_max_threshold", "tasks", "reusable", "manual_release", "_timeout", "_raise_on_timeout",
-        "_id", "outcomes", "_released", "_broken", "_create_field", "_outcome_set",
-        "_index", "_index_updater", "_new_index", "_lock", "_clock_barrier", "_signal_barrier", "_dynaphore",
+        "_threshold", "tasks", "reusable", "manual_release", "_timeout", "_raise_on_timeout",
+        "_id", "outcomes", "_released", "_broken", "_create_field", "_multiple_outcomes_per_task",
+        "_lock", "_clock_barrier", "_signal_barrier", "_dynaphore",
         "_entrance_sema", "_internal_threshold_sema", "_flow_regulator"
     ]
 
     def __init__(
             self,
-            min_threads: int,
-            max_threads: Optional[int] = None,
+            threshold: int,
             tasks: Optional[Union[Callable, List[Callable]]] = None,
             reusable: bool = False,
             manual_release: bool = False,
             timeout: Optional[float] = None,
-            raise_on_timeout: bool = False
+            raise_on_timeout: bool = False,
+            multiple_outcomes_per_task: bool = False # New flag
     ):
         """Initializes the Conductor.
 
@@ -86,10 +87,14 @@ class Conductor(IDisposable):
                 arrives, the conductor will break and release all threads.
             raise_on_timeout (bool): If True, raises a `TimeoutError` when the
                 global timeout is exceeded instead of returning False.
+            multiple_outcomes_per_task (bool): If True, each task index can store
+                multiple Outcome objects (e.g., if multiple threads attempt the same task).
+                If False, only the first Outcome set for a given index is stored. Defaults to False.
         """
         super().__init__()
-        if min_threads <= 0:
+        if threshold <= 0:
             raise ValueError("Threshold must be a positive integer.")
+        self._threshold = threshold
         self.tasks: List[Callable] = []
 
         if tasks:
@@ -104,56 +109,43 @@ class Conductor(IDisposable):
                 self.tasks.append(task)
 
         # Settings and validations
-        self._max_threshold = max_threads
-        self._min_threshold = min_threads
         self.reusable = reusable
         self.manual_release = manual_release
         self._timeout = timeout
         self._raise_on_timeout = raise_on_timeout
+        self._multiple_outcomes_per_task = multiple_outcomes_per_task # Store the new flag
 
         # Outputs
         self._id = str(ulid.ULID())
-        self.outcomes: List[Outcome] | None = None
-        self.create_outcomes()  # Initialize outcomes for tasks
+        # Use ConcurrentDict for thread-safe dictionary operations
+        self.outcomes: ConcurrentDict[int, Union[Outcome, List[Outcome]]] = ConcurrentDict()
 
         # Initialize internal state
         self._released = False
         self._broken = False
         self._create_field = False
-        self._outcome_set = False
-        self._index = 0
 
         # Initialize synchronization primitives
         self._lock = threading.RLock()
         self._clock_barrier = None
         self._signal_barrier = None
-        self._dynaphore = Dynaphore(self._min_threshold)
+        self._dynaphore = Dynaphore(self._threshold)
         self._entrance_sema = None
         self._internal_threshold_sema = None
         self._flow_regulator = FlowRegulator(0)
-        self._index_updater = False
 
 
         if timeout is not None:
             if timeout <= 0:
                 raise ValueError("Timeout must be a positive number.")
             self._clock_barrier = ClockBarrier(
-                threshold=self._min_threshold,
+                threshold=self._threshold,
                 timeout=timeout,
                 on_broken=self.notify_all_override
             )
         else:
-            self._signal_barrier = SignalBarrier(self._min_threshold, reusable=True)
+            self._signal_barrier = SignalBarrier(self._threshold, reusable=True)
 
-
-    def create_outcomes(self) -> None:
-        """Creates Outcome objects for each task.
-
-        This method is called internally to ensure that outcomes are created
-        when the conductor is initialized or reset.
-        """
-        from thread_factory.utils import Outcome
-        self.outcomes = [Outcome() for _ in self.tasks]
 
     def dispose(self):
         """Safely terminates the conductor, releasing all waiting threads.
@@ -165,8 +157,13 @@ class Conductor(IDisposable):
         if self._disposed: return
         with self._lock:
             self._disposed = True
-            for obj in self.outcomes:
-                obj.dispose()
+            if self.outcomes:
+                for key, value in self.outcomes.items():
+                    if self._multiple_outcomes_per_task:
+                        for obj in value: # value is List[Outcome]
+                            obj.dispose()
+                    else: # value is single Outcome
+                        value.dispose()
             self.outcomes.clear()
             self._broken = True
             self._released = True
@@ -177,9 +174,15 @@ class Conductor(IDisposable):
         This method is called internally by the `reusable` mode logic and should
         generally not be called publicly. It clears all previous outcomes.
         """
-        for o in self.outcomes:
-            o.dispose()
-        self.create_outcomes()
+        if self.outcomes:
+            for key, value in self.outcomes.items():
+                if self._multiple_outcomes_per_task:
+                    for obj in value: # value is List[Outcome]
+                        obj.dispose()
+                else: # value is single Outcome
+                    value.dispose()
+        self.outcomes.clear()
+
         self._released = False
         self._broken = False
         if self._timeout is not None:
@@ -191,13 +194,33 @@ class Conductor(IDisposable):
     def results(self) -> List[Any]:
         """A convenience property to get a list of successful task results."""
         if self._disposed: return []
-        return [o.result() for o in self.outcomes if o.done and o.exception() is None]
+        successful = []
+        for key, value in self.outcomes.items():
+            outcomes_to_check = value if self._multiple_outcomes_per_task else [value]
+            for o in outcomes_to_check:
+                if o.done and o.exception() is None:
+                    try:
+                        successful.append(o.result())
+                    except Exception:
+                        pass
+        return successful
 
     @property
     def exceptions(self) -> List[Exception]:
         """A convenience property to get a list of captured task exceptions."""
         if self._disposed: return []
-        return [o.exception() for o in self.outcomes if o.done and o.exception() is not None]
+        errors = []
+        for key, value in self.outcomes.items():
+            outcomes_to_check = value if self._multiple_outcomes_per_task else [value]
+            for o in outcomes_to_check:
+                if o.done:
+                    exc = o.exception()
+                    if exc is not None and not (isinstance(exc, RuntimeError) and str(exc) == "Outcome was disposed."):
+                        try:
+                            errors.append(exc)
+                        except Exception:
+                            pass
+        return errors
 
     def is_spent(self) -> bool:
         """Checks if the conductor has completed its run and is not reusable.
@@ -257,37 +280,14 @@ class Conductor(IDisposable):
             else:
                 return True
 
-    def _execute_operation(self, task: Callable) -> None:
+    def _execute_operation(self, task: Callable, index: int) -> None:
         """
         Executes a single operation/task associated with the conductor.
         """
         try:
-            self._set_result(task())
+            self._set_result(task(), index)
         except Exception as e:
-            self._set_exception(e)
-        self._reset_update_flags()
-
-    def _get_new_index(self, index:int) -> None:
-        """
-        Returns the current index of the task being executed.
-        This is used to track which task is currently being processed.
-        """
-        with self._lock:
-            if self._index_updater:
-                return
-            self._index_updater = True
-            self._index = index
-
-    def _reset_update_flags(self):
-        """
-        Resets the flags used for updating the index and outcome state.
-        This is called after the tasks have been executed.
-        """
-        with self._lock:
-            if not self._outcome_set:
-                return
-            self._index_updater = False
-            self._outcome_set = False
+            self._set_exception(e, index)
 
     def _execute_operations(self):
         """
@@ -298,40 +298,54 @@ class Conductor(IDisposable):
                 if not self._create_field:
                     self._create_execute_operations_field()
 
-            self._entrance_sema.wait()
         for index, task in enumerate(self.tasks):
-            self._get_new_index(index)
-            self._execute_operation(task)
-            self._internal_threshold_sema.wait()
+            self._execute_operation(task, index)
+            #self._internal_threshold_sema.wait() # Still commented out, which is fine for single thread.
 
         if not self.manual_release:
             self._released = True
 
-    def _set_result(self, result: Any):
+    def _set_result(self, result: Any, index: int):
         """
         Sets the result of the callable execution.
         This method is called internally after the callable completes.
+        It creates the Outcome object(s) for the given index.
         """
-        if self._outcome_set:
-            return
-        with self._lock:
-            if self._outcome_set:
-                return
-            self._outcome_set = True
-            self.outcomes[self._index].set_result(result)
+        if self._multiple_outcomes_per_task:
+            # Create a new Outcome and append to list
+            new_outcome = Outcome()
+            new_outcome.set_result(result)
+            # Use ConcurrentDict's thread-safe update for list
+            with self.outcomes._lock: # Access ConcurrentDict's internal lock for list modification
+                if index not in self.outcomes:
+                    self.outcomes[index] = []
+                self.outcomes[index].append(new_outcome)
+        else:
+            # Use setdefault for idempotent creation of a single Outcome
+            # ConcurrentDict's setdefault is thread-safe for the dict operation itself
+            outcome_obj = self.outcomes.setdefault(index, Outcome())
+            outcome_obj.set_result(result)
 
-    def _set_exception(self, e: Exception):
+
+    def _set_exception(self, e: Exception, index: int):
         """
         Sets the exception of the callable execution.
         This method is called internally if the callable raises an exception.
+        It creates the Outcome object(s) for the given index.
         """
-        if self._outcome_set:
-            return
-        with self._lock:
-            if self._outcome_set:
-                return
-            self._outcome_set = True
-            self.outcomes[self._index].set_exception(e)
+        if self._multiple_outcomes_per_task:
+            # Create a new Outcome and append to list
+            new_outcome = Outcome()
+            new_outcome.set_exception(e)
+            with self.outcomes._lock: # Access ConcurrentDict's internal lock for list modification
+                if index not in self.outcomes:
+                    self.outcomes[index] = []
+                self.outcomes[index].append(new_outcome)
+        else:
+            # Use setdefault for idempotent creation of a single Outcome
+            outcome_obj = self.outcomes.setdefault(index, Outcome())
+            outcome_obj.set_exception(e)
+
 
     def _create_execute_operations_field(self):
         """Creates a field for executing operations.
@@ -341,8 +355,7 @@ class Conductor(IDisposable):
         """
         if not self.tasks:
             raise ValueError("No tasks provided to execute.")
-        self.entrance_sema = SignalBarrier(self._min_threshold, reusable=False)
-        self.internal_threshold_sema = SignalBarrier(self._min_threshold, reusable=True)
+        self.internal_threshold_sema = SignalBarrier(self._threshold, reusable=True)
         self._create_field = True
 
     def wait(self) -> bool:

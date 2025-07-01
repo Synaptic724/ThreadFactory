@@ -44,7 +44,7 @@ class TestConductor(unittest.TestCase):
     # Core success
     # ----------------------------------------------------------
     def test_threshold_release_and_single_result(self):
-        c = Conductor(min_threads=2, tasks=lambda: "done")
+        c = Conductor(threshold=2, tasks=lambda: "done")
         _spawn(2, c.wait)
         time.sleep(0.05)
         self.assertEqual(_collect_results(c.outcomes), ["done"])
@@ -53,7 +53,7 @@ class TestConductor(unittest.TestCase):
     def test_exception_capture(self):
         class Boom(Exception):
             pass
-        c = Conductor(min_threads=1, tasks=lambda: (_ for _ in ()).throw(Boom("x")))
+        c = Conductor(threshold=1, tasks=lambda: (_ for _ in ()).throw(Boom("x")))
         c.wait()
         excs = _collect_excs(c.outcomes)
         self.assertEqual(len(excs), 1)
@@ -67,7 +67,7 @@ class TestConductor(unittest.TestCase):
         def bad():
             raise ZeroDivisionError()
 
-        c = Conductor(min_threads=1, tasks=[ok1, bad, ok2])
+        c = Conductor(threshold=1, tasks=[ok1, bad, ok2])
         c.wait()
         self.assertCountEqual(_collect_results(c.outcomes), ["one", "two"])
         self.assertEqual(sum(isinstance(e, ZeroDivisionError) for e in _collect_excs(c.outcomes)), 1)
@@ -77,7 +77,7 @@ class TestConductor(unittest.TestCase):
     # ----------------------------------------------------------
     def test_reusable_cycles_increment_counter(self):
         hits = {"n": 0}
-        c = Conductor(min_threads=2, tasks=lambda: hits.__setitem__("n", hits["n"] + 1), reusable=True)
+        c = Conductor(threshold=2, tasks=lambda: hits.__setitem__("n", hits["n"] + 1), reusable=True)
 
         for _ in range(2):
             _spawn(2, c.wait)
@@ -85,10 +85,10 @@ class TestConductor(unittest.TestCase):
         self.assertEqual(hits["n"], 2)
 
     def test_is_spent(self):
-        one = Conductor(min_threads=1)
+        one = Conductor(threshold=1)
         self.assertFalse(one.is_spent())
         one.wait(); self.assertTrue(one.is_spent())
-        loop = Conductor(min_threads=1, reusable=True)
+        loop = Conductor(threshold=1, reusable=True)
         loop.wait(); self.assertFalse(loop.is_spent())
 
     # ----------------------------------------------------------
@@ -96,7 +96,7 @@ class TestConductor(unittest.TestCase):
     # ----------------------------------------------------------
     @unittest.expectedFailure  # known bug
     def test_manual_release_blocks_until_called(self):
-        c = Conductor(min_threads=2, tasks=lambda: None, manual_release=True)
+        c = Conductor(threshold=2, tasks=lambda: None, manual_release=True)
         flag = threading.Event()
         _spawn(2, lambda: (c.wait(), flag.set()))
         time.sleep(0.1)
@@ -104,7 +104,7 @@ class TestConductor(unittest.TestCase):
         c.release(); self.assertTrue(flag.wait(1))
 
     def test_dispose_unblocks_waiter(self):
-        c = Conductor(min_threads=2)
+        c = Conductor(threshold=2)
         result = []
         t = threading.Thread(target=lambda: result.append(c.wait()), daemon=True)
         t.start(); time.sleep(0.05)
@@ -115,12 +115,12 @@ class TestConductor(unittest.TestCase):
     # Misc edge cases
     # ----------------------------------------------------------
     def test_wait_on_spent_returns_immediately(self):
-        c = Conductor(min_threads=1)
+        c = Conductor(threshold=1)
         self.assertTrue(c.wait())
         self.assertTrue(c.wait())
 
     def test_no_tasks_means_no_outcomes(self):
-        c = Conductor(min_threads=1)
+        c = Conductor(threshold=1)
         c.wait()
         self.assertEqual(c.outcomes, [])
 
