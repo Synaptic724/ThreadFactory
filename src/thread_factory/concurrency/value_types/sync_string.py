@@ -5,23 +5,58 @@ class SyncString:
     """
     SyncString(initial='') -> SyncString
 
-    A thread-safe mutable wrapper around Python's built-in immutable str.
+    A thread-safe mutable wrapper around Python's built-in immutable `str`.
 
-    Provides synchronized access to common string methods and operators using internal locking.
+    🔐 Core Purpose
+    ---------------
+    Provides synchronized access to common string operations and behaviors using internal locking.
     Useful for concurrent environments where safe string manipulation is required.
+
+    🔧 Features
+    -----------
+    - Thread-safe string access and mutation.
+    - Supports method forwarding for many built-in string methods.
+    - Can be safely used in multithreaded programs.
+    - Offers optional **init-safe** protection for concurrent construction.
+
+    🧷 Central Lock Initialization
+    -----------------------------
+    SyncString supports an `init_safe=True` option (default) that uses a class-level
+    `_central_lock` during instantiation to ensure **race-free creation** when multiple
+    threads construct instances at the same time.
+
+    ⚠️ Note:
+    - Setting `init_safe=False` skips the global lock and initializes directly.
+    - This is faster but not safe if many threads create instances concurrently.
+
+    ✅ Recommended Usage:
+        shared = SyncString("init")
+        shared.get()            # Read thread-safely
+        shared.set("new val")   # Write thread-safely
+        shared.append("...")    # Custom string manipulation methods
     """
 
-    def __init__(self, initial: str = ""):
+    _central_lock = threading.Lock()  # Class-level lock for safe instantiation
+    __slots__ = ("_value", "_lock")
+
+    def __init__(self, initial: str = "", init_safe: bool = True):
         """
         Initialize a new thread-safe string wrapper.
 
         Args:
             initial (str): The initial string value. Defaults to an empty string.
+            init_safe (bool): If True (default), uses a central lock to ensure thread-safe
+                              creation across threads. If False, skips central protection.
 
-        This constructor sets up an internal lock for all string operations.
+        The instance will use an internal lock for all future operations.
         """
-        self._value = str(initial)
-        self._lock = threading.RLock()
+        if init_safe:
+            with SyncString._central_lock:
+                self._value = str(initial)
+                self._lock = threading.RLock()
+        else:
+            self._value = str(initial)
+            self._lock = threading.RLock()
 
     def _perform_binary_op(self, other, operation):
         """

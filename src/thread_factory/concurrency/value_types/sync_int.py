@@ -1,5 +1,7 @@
 import threading
 
+import threading
+
 class SyncInt:
     """
     SyncInt
@@ -20,6 +22,15 @@ class SyncInt:
     - Type conversion (`int()`, `float()`, `str()`)
     - Manual and atomic value access via `.get()` and `.set()`
     - Safe thread-aware binary operations with locking on both operands
+    - Optional **init-safe mode** using a centralized lock
+
+    🧷 Central Lock Initialization
+    -----------------------------
+    The `SyncInt` class offers an optional `init_safe` parameter for thread-safe construction.
+
+    - If `init_safe=True` (default), a global lock (`_central_lock`) ensures
+      multiple threads can initialize `SyncInt` instances safely without race conditions.
+    - This is **strongly recommended** when creating many SyncInt instances concurrently.
 
     ⚡ Power Operation Support
     --------------------------
@@ -58,19 +69,28 @@ class SyncInt:
         result = SyncInt(4) ** SyncInt(3) % 5     # Works if base is SyncInt
         result = 3 ** SyncInt(3)                  # Works (calls __rpow__)
         pow(3, SyncInt(3), 5)                     # ❌ Will raise TypeError
-
     """
 
+    _central_lock = threading.Lock()  # Used for init safety
     __slots__ = ("_value", "_lock")
-    def __init__(self, initial: int = 0):
+
+    def __init__(self, initial: int = 0, init_safe: bool = True):
         """
         Initialize the SyncInt with an initial integer value.
 
         Parameters:
             initial (int): The integer value to store.
+            init_safe (bool): If True (default), use a central lock to guarantee
+                              thread-safe initialization. If False, skip central lock
+                              and initialize independently (not recommended for concurrent use).
         """
-        self._value = int(initial)
-        self._lock = threading.RLock()
+        if init_safe:
+            with SyncInt._central_lock:
+                self._value = int(initial)
+                self._lock = threading.RLock()
+        else:
+            self._value = int(initial)
+            self._lock = threading.RLock()
 
     def get(self) -> int:
         """
@@ -1112,6 +1132,38 @@ class SyncInt:
             with self._lock:
                 self._value >>= other
         return self
+
+    def __getnewargs_ex__(self):
+        """
+        Used by pickle to get arguments for reconstructing the object,
+        including keyword arguments.
+
+        Returns:
+            tuple: A tuple containing (args, kwargs) for __new__.
+        """
+        with self._lock:
+            return (self._value,), {}
+
+    def __str__(self):
+        """
+        Return the informal string representation of the object.
+
+        Returns:
+            str: String representation of the integer.
+        """
+        with self._lock:
+            return str(self._value)
+
+    def __itruediv__(self, other):
+        """
+        Raises TypeError because in-place true division would convert the
+        internal value to a float, which is not supported by SyncInt.
+        """
+        raise TypeError(
+            "In-place true division is not supported for SyncInt as it would "
+            "change the underlying type to float. Use regular division "
+            "and assign to a new variable, or use in-place floor division (//=)."
+        )
 
     def __iand__(self, other):
         """

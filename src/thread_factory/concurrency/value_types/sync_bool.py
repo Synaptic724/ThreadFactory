@@ -1,6 +1,8 @@
 import copy
 import threading
 
+import threading
+
 class SyncBool:
     """
     SyncBool
@@ -12,19 +14,37 @@ class SyncBool:
 
     SyncBool does not inherit from bool or int to avoid unintentional coercion,
     but behaves identically for boolean logic and thread-safe use cases.
+
+    🧷 Central Lock Initialization
+    -----------------------------
+    SyncBool supports an `init_safe=True` flag to coordinate instance creation across threads.
+
+    - When `init_safe=True`, a class-level `_central_lock` is acquired to guard initialization.
+    - When `init_safe=False`, initialization skips the central lock for faster (but unsafe) creation.
+
+    This ensures safe construction in concurrent environments while offering opt-out flexibility.
     """
 
+    _central_lock = threading.Lock()
     __slots__ = ("_value", "_lock")
 
-    def __init__(self, initial: bool = False):
+    def __init__(self, initial: bool = False, init_safe: bool = True):
         """
         Initialize the SyncBool with a boolean value.
 
         Parameters:
             initial (bool): The initial boolean state. Defaults to False.
+            init_safe (bool): Whether to use the class-level lock during initialization
+                              for safe concurrent construction. Defaults to True.
         """
-        self._value = bool(initial)
-        self._lock = threading.RLock()
+        if init_safe:
+            with SyncBool._central_lock:
+                self._value = bool(initial)
+                self._lock = threading.RLock()
+        else:
+            self._value = bool(initial)
+            self._lock = threading.RLock()
+
 
     def get(self) -> bool:
         """
