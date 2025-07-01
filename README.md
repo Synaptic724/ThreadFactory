@@ -33,7 +33,7 @@ Here's how ThreadFactory elevates your concurrency game:
 * 🔬 **First-Principles Primitives: Building Blocks for Robust Systems**
     Dive deeper with powerful, low-level synchronization constructs like `Dynaphore` (dynamic semaphores), `SmartCondition` (intelligent condition variables), and `SignalLatch` (one-shot signal mechanisms). Engineer sophisticated thread interactions with precision.
 
-* orchestrators **& Barriers: Harmonize Complex Workflows**
+* 🧩 **Orchestrators & Barriers: Harmonize Complex Workflows**
     Coordinate your threads with elegance. Leverage `TransitBarrier` for phased execution, `SignalBarrier` for event-driven synchronization, and `Conductor` for orchestrating intricate task flows. Ensure your threads march in perfect unison.
 
 * ⚡ **Dispatchers & Gates: Fine-Grained Thread Control**

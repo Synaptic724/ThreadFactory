@@ -107,12 +107,15 @@ Central registry for lifecycle-managed objects. Supports:
 
 It forms the backbone for global coordination, status tracking, and command dispatch.
 
----
+[//]: # (---)
 
-## 🧱 Work Abstractions – `thread_factory.core.work`
+[//]: # ()
+[//]: # (## 🧱 Work Abstractions – `thread_factory.core.work`)
 
-### 🪄 `ValueWork`
-Inverted `Future` managed by threads themselves. Tracks status (`pending`, `running`, `completed`, `cancelled`, `failed`) and timestamps. Can be used with dynamic workers for agentic execution and result orchestration.
+[//]: # ()
+[//]: # (### 🪄 `Help_request`)
+
+[//]: # (Inverted `Future` managed by threads themselves. Tracks status &#40;`pending`, `running`, `completed`, `cancelled`, `failed`&#41; and timestamps. Can be used with dynamic workers for agentic execution and result orchestration.)
 
 ---
 
