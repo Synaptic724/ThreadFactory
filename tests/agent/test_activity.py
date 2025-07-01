@@ -45,6 +45,10 @@ class TestActivity(unittest.TestCase):
         self.assertIsNone(self.activity._metadata)
         self.assertIsNone(self.activity._actions)
 
+    def test_activity_knows_its_controller(self):
+        from thread_factory.agent.activity_controller import ActivityController
+        controller = ActivityController(task="foo", use_default_profiles=False)
+        self.assertIs(controller.activity._controller, controller)
     def test_double_dispose_is_idempotent(self):
         self.activity.dispose()
         try:
