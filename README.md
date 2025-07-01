@@ -79,6 +79,7 @@ If you really love my work please connect with me on [LinkedIn](https://www.link
 ThreadFactory's **Sync Types** are thread-safe wrappers for Python’s core data types. They're built for deterministic, low-contention, concurrent access across threads, making them perfect for shared state in threaded environments, worker pools, and agent execution contexts.
 
 * `SyncInt`: An atomic integer wrapper with full arithmetic and bitwise operation support.
+* `SyncFloat`: A thread-safe float that supports all arithmetic operations, ensuring precision in concurrent calculations.
 * `SyncBool`: A thread-safe boolean that handles all logical operations safely.
 * `SyncString`: A thread-safe mutable wrapper around Python’s `str`, offering comprehensive dunder method and string method coverage.
 

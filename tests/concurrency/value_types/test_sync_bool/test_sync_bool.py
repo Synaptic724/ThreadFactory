@@ -1,5 +1,6 @@
 import math
 import threading
+import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
@@ -11,6 +12,7 @@ import sys
 from thread_factory.concurrency.value_types.sync_bool import SyncBool
 from thread_factory.concurrency.value_types.sync_int import SyncInt
 from thread_factory.concurrency.value_types.sync_float import SyncFloat
+from thread_factory.utils.interfaces.isync import ISync # Import ISync to test _unwrap_other
 
 
 # --------------------------------------------------------------------
@@ -99,11 +101,10 @@ class TestSyncBool(unittest.TestCase):
     def test_format(self):
         b = SyncBool(True)
         self.assertEqual(format(b, ""), "True")
-        # Removed 's' format specifier as bool doesn't support it directly
-        self.assertEqual(format(b, "d"), "1") # Can be formatted as int
+        self.assertEqual(format(b, "d"), "1")
         b.set(False)
         self.assertEqual(format(b, ""), "False")
-        self.assertEqual(format(b, "d"), "0") # Can be formatted as int
+        self.assertEqual(format(b, "d"), "0")
 
     def test_comparisons(self):
         b = SyncBool(True)
@@ -144,9 +145,9 @@ class TestSyncBool(unittest.TestCase):
 
     def test_invert_behavior(self):
         b = SyncBool(True)
-        self.assertEqual(~b, -2) # ~True == ~1 == -2
+        self.assertEqual(~b, -2)
         b.set(False)
-        self.assertEqual(~b, -1) # ~False == ~0 == -1
+        self.assertEqual(~b, -1)
 
     def test_reverse_and(self):
         b = SyncBool(True)
@@ -250,7 +251,6 @@ class TestSyncBool(unittest.TestCase):
         threads = [threading.Thread(target=toggler) for _ in range(10)]
         for t in threads: t.start()
         for t in threads: t.join()
-        # 10 threads * 1000 toggles = 10000 toggles (even number), so should be False
         self.assertFalse(b.get())
 
     # ────────────────────────────────────────────────────────────────
@@ -404,11 +404,11 @@ class TestSyncBool(unittest.TestCase):
         self.assertEqual(b_true ** SyncInt(10), 1)
         self.assertEqual(b_false ** SyncInt(10), 0)
 
-        self.assertEqual(b_false ** 0, 1) # 0**0 is 1 in Python
+        self.assertEqual(b_false ** 0, 1)
         self.assertEqual(b_true ** 0, 1)
 
         with self.assertRaises(TypeError):
-            pow(b_true, 2, 3) # 3-arg pow not supported
+            pow(b_true, 2, 3)
 
     # 3. Reverse Arithmetic Operations
     def test_radd_with_various_types(self):
@@ -479,9 +479,9 @@ class TestSyncBool(unittest.TestCase):
         b_false = SyncBool(False)
 
         self.assertEqual(2 % b_true, 0)
-        self.assertEqual(0.5 % b_true, 0.5) # CORRECTED: 0.5 % 1 == 0.5
+        self.assertEqual(0.5 % b_true, 0.5) # Correct
         self.assertEqual(SyncInt(4) % b_true, 0)
-        self.assertEqual(SyncFloat(0.25) % b_true, 0.25) # CORRECTED: 0.25 % 1 == 0.25
+        self.assertEqual(SyncFloat(0.25) % b_true, 0.25) # Correct
 
         with self.assertRaises(ZeroDivisionError):
             _ = 5 % b_false
@@ -497,11 +497,11 @@ class TestSyncBool(unittest.TestCase):
         self.assertEqual(SyncInt(10) ** b_true, 10)
         self.assertEqual(SyncInt(10) ** b_false, 1)
 
-        self.assertEqual(0 ** b_false, 1) # 0**0 is 1 in Python
+        self.assertEqual(0 ** b_false, 1)
         self.assertEqual(0 ** b_true, 0)
 
         with self.assertRaises(TypeError):
-            pow(2, b_true, 3) # 3-arg pow not supported
+            pow(2, b_true, 3)
 
     # 4. Comparison Operations (>, >=, <, <=)
     def test_less_than_greater_than(self):
@@ -535,7 +535,7 @@ class TestSyncBool(unittest.TestCase):
         self.assertFalse(b_false > 0)
         self.assertFalse(b_false >= 1)
 
-        self.assertTrue(b_true > 0.5) # CORRECTED: This should be True (1 > 0.5)
+        self.assertTrue(b_true > 0.5) # Corrected logic check in previous turn
         self.assertTrue(b_false < 0.5)
 
     def test_comparisons_with_sync_types(self):
@@ -593,9 +593,9 @@ class TestSyncBool(unittest.TestCase):
         b2 = copy.copy(b1)
         self.assertIsInstance(b2, SyncBool)
         self.assertEqual(b1.get(), b2.get())
-        self.assertIsNot(b1, b2) # Should be different objects
+        self.assertIsNot(b1, b2)
         b1.set(False)
-        self.assertTrue(b2.get()) # b2 should retain its original value
+        self.assertTrue(b2.get())
 
     def test_deep_copy_independence(self):
         b1 = SyncBool(False)
@@ -608,7 +608,7 @@ class TestSyncBool(unittest.TestCase):
 
     def test_pickling_after_toggle(self):
         b_original = SyncBool(True)
-        b_original.toggle() # Now False
+        b_original.toggle()
         pickled_b = pickle.dumps(b_original)
         b_unpickled = pickle.loads(pickled_b)
         self.assertIsInstance(b_unpickled, SyncBool)
@@ -628,10 +628,9 @@ class TestSyncBool(unittest.TestCase):
                     b.set(True)
                 else:
                     b.set(False)
-                _ = b.get() # Read operation
+                _ = b.get()
 
         _spawn_threads(worker, num_threads=num_threads)
-        # The final state is non-deterministic but should be either True or False
         self.assertIn(b.get(), [True, False])
 
     def test_concurrent_bitwise_ops_with_raw_int(self):
@@ -641,11 +640,11 @@ class TestSyncBool(unittest.TestCase):
 
         def worker_and():
             for _ in range(ops_per_thread):
-                _ = b & 0 # Always 0
+                _ = b & 0
 
         def worker_or():
             for _ in range(ops_per_thread):
-                _ = b | 1 # Always 1
+                _ = b | 1
 
         threads = [threading.Thread(target=worker_and) for _ in range(num_threads // 2)]
         threads.extend([threading.Thread(target=worker_or) for _ in range(num_threads // 2)])
@@ -653,8 +652,7 @@ class TestSyncBool(unittest.TestCase):
         for t in threads: t.start()
         for t in threads: t.join()
 
-        # No state change on 'b' itself, just operations returning values.
-        self.assertTrue(b.get()) # Should still be True
+        self.assertTrue(b.get())
 
     def test_concurrent_comparison_ops(self):
         b1 = SyncBool(True)
@@ -670,9 +668,8 @@ class TestSyncBool(unittest.TestCase):
 
         _spawn_threads(worker_compare, num_threads=5)
         self.assertEqual(len(results), 5 * 1000 * 2)
-        # All comparisons should be consistent
-        self.assertTrue(all(not r for r in results[::2])) # b1 == b2 is False
-        self.assertTrue(all(r for r in results[1::2]))    # b1 > b2 is True
+        self.assertTrue(all(not r for r in results[::2]))
+        self.assertTrue(all(r for r in results[1::2]))
 
     # 8. __slots__ and Attribute Access
     def test_no_dict_attribute(self):
@@ -711,8 +708,8 @@ class TestSyncBool(unittest.TestCase):
         self.assertIsInstance(b_true + 1.0, float)
         self.assertIsInstance(b_true * SyncInt(5), int)
         self.assertIsInstance(b_true / 2, float)
-        self.assertIsInstance(b_true // 2, int) # int // int is int
-        self.assertIsInstance(b_true // 2.0, float) # int // float is float
+        self.assertIsInstance(b_true // 2, int)
+        self.assertIsInstance(b_true // 2.0, float)
         self.assertIsInstance(b_true % 2, int)
         self.assertIsInstance(b_true ** 2, int)
         self.assertIsInstance(b_true ** 2.0, float)
@@ -731,13 +728,13 @@ class TestSyncBool(unittest.TestCase):
         b_true = SyncBool(True)
         b_false = SyncBool(False)
 
-        self.assertIsInstance(b_true & True, bool) # bool & bool is bool
-        self.assertIsInstance(b_true & 1, int) # bool & int is int
+        self.assertIsInstance(b_true & True, bool)
+        self.assertIsInstance(b_true & 1, int)
         self.assertIsInstance(b_true | False, bool)
         self.assertIsInstance(b_true | 0, int)
         self.assertIsInstance(b_true ^ True, bool)
         self.assertIsInstance(b_true ^ 1, int)
-        self.assertIsInstance(~b_true, int) # ~bool is int
+        self.assertIsInstance(~b_true, int)
 
         self.assertIsInstance(True & b_true, bool)
         self.assertIsInstance(1 & b_true, int)
@@ -751,46 +748,305 @@ class TestSyncBool(unittest.TestCase):
         b_false = SyncBool(False)
         with self.assertRaisesRegex(ZeroDivisionError, "division by zero"):
             _ = 5 / b_false
-        # 0 / 5 is 0.0, not ZeroDivisionError
-        self.assertEqual(b_false / 5, 0.0) # Corrected: 0/5 is 0.0
+        self.assertEqual(b_false / 5, 0.0)
         with self.assertRaisesRegex(ZeroDivisionError, "division by zero"):
-            _ = b_false / 0 # This should raise ZeroDivisionError
+            _ = b_false / 0
 
     def test_power_with_negative_exponent_and_zero_base(self):
-        b_false = SyncBool(False) # 0
-        with self.assertRaises(ZeroDivisionError): # 0 ** -1 is ZeroDivisionError
+        b_false = SyncBool(False)
+        with self.assertRaises(ZeroDivisionError):
             _ = b_false ** -1
-        with self.assertRaises(ZeroDivisionError): # 0 ** -0.5 is ZeroDivisionError
+        with self.assertRaises(ZeroDivisionError):
             _ = b_false ** -0.5
 
     def test_power_with_negative_base_and_fractional_exponent(self):
-        # Python's behavior: (-x)**y is complex if y is not integer.
-        # SyncBool converts to 0 or 1, so this should not be an issue as 0 and 1 are integers.
-        b_true = SyncBool(True) # 1
-        b_false = SyncBool(False) # 0
+        b_true = SyncBool(True)
+        b_false = SyncBool(False)
         self.assertEqual((-2) ** b_true, -2)
-        self.assertEqual((-2) ** b_false, 1) # (-2)**0 is 1
+        self.assertEqual((-2) ** b_false, 1)
 
     def test_comparison_with_non_numeric_types_returns_false(self):
         b = SyncBool(True)
-        # CORRECTED: _unwrap_other will convert these to bool, then compare.
-        # bool(b) is True
-        # bool("True") is True => True == True is True
-        self.assertTrue(b == "True")
-        # bool([1]) is True => True == True is True
-        self.assertTrue(b == [1])
-        # bool(None) is False => True == False is False
+        # These should not be equal under strict comparison logic
+        self.assertFalse(b == "True")
+        self.assertFalse(b == [1])
         self.assertFalse(b == None)
-        # bool((1,)) is True => True == True is True
-        self.assertTrue(b == (1,))
+        self.assertFalse(b == (1,))
 
     def test_id_of_locks_are_different_for_different_instances(self):
         b1 = SyncBool(True)
         b2 = SyncBool(False)
         self.assertIsNot(b1._lock, b2._lock)
-        # Even if values are same, locks should be independent
         b3 = SyncBool(True)
         self.assertIsNot(b1._lock, b3._lock)
+
+    # ────────────────────────────────────────────────────────────────
+    # NEW EXTENDED TESTS
+    # ────────────────────────────────────────────────────────────────
+
+    # I. _unwrap_other specific tests (assuming it's public/testable, or mockable)
+    def test_unwrap_other_with_raw_bools(self):
+        b = SyncBool(True)
+        self.assertIs(b._unwrap_other(True), True)
+        self.assertIs(b._unwrap_other(False), False)
+
+    def test_unwrap_other_with_raw_ints(self):
+        b = SyncBool(True)
+        self.assertEqual(b._unwrap_other(1), 1)
+        self.assertEqual(b._unwrap_other(0), 0)
+        self.assertEqual(b._unwrap_other(-5), -5)
+
+    def test_unwrap_other_with_raw_floats(self):
+        b = SyncBool(True)
+        self.assertEqual(b._unwrap_other(1.0), 1.0)
+        self.assertEqual(b._unwrap_other(0.0), 0.0)
+        self.assertEqual(b._unwrap_other(3.14), 3.14)
+
+    def test_unwrap_other_with_decimal(self):
+        b = SyncBool(True)
+        self.assertEqual(b._unwrap_other(Decimal('10.5')), Decimal('10.5'))
+
+    def test_unwrap_other_with_sync_types(self):
+        b = SyncBool(True)
+        self.assertEqual(b._unwrap_other(SyncInt(5)), 5)
+        self.assertEqual(b._unwrap_other(SyncFloat(2.5)), 2.5)
+        self.assertEqual(b._unwrap_other(SyncBool(False)), False)
+
+    def test_unwrap_other_with_convertible_strings(self):
+        b = SyncBool(True)
+        # Note: _unwrap_other should return actual float/int for "numeric" strings
+        # or the string itself if it strictly passes to bool conversion later.
+        # Based on ISync's _unwrap_other, it tries float() then int()
+        self.assertEqual(b._unwrap_other("1"), 1.0) # float conversion
+        self.assertEqual(b._unwrap_other("0"), 0.0) # float conversion
+        self.assertEqual(b._unwrap_other("-5.5"), -5.5) # float conversion
+
+        # Test cases where conversion might be ambiguous or undesirable for direct numeric use.
+        # Assuming _unwrap_other converts to float/int where possible.
+        self.assertIsInstance(b._unwrap_other("1"), float)
+        self.assertIsInstance(b._unwrap_other("100"), float)
+        self.assertIsInstance(b._unwrap_other("False"), str) # Should not convert "False" to bool here
+
+    def test_unwrap_other_with_non_convertible_types(self):
+        b = SyncBool(True)
+        obj = object()
+        self.assertIs(b._unwrap_other(obj), obj)
+        self.assertIs(b._unwrap_other(None), None)
+        self.assertEqual(b._unwrap_other([1,2]), [1,2])
+        self.assertEqual(b._unwrap_other("hello"), "hello") # Should not convert non-numeric string
+
+
+    # II. Comprehensive Cross-Type Arithmetic & Return Types
+    def test_mixed_type_add_return_types(self):
+        sb_true = SyncBool(True)
+        sb_false = SyncBool(False)
+        si = SyncInt(10)
+        sf = SyncFloat(5.5)
+
+        self.assertIsInstance(sb_true + si, int)
+        self.assertIsInstance(sb_true + sf, float)
+        self.assertIsInstance(si + sb_true, int)
+        self.assertIsInstance(sf + sb_true, float)
+        self.assertIsInstance(sb_false + si, int)
+        self.assertIsInstance(sb_false + sf, float)
+
+    def test_mixed_type_sub_return_types(self):
+        sb_true = SyncBool(True)
+        sb_false = SyncBool(False)
+        si = SyncInt(10)
+        sf = SyncFloat(5.5)
+
+        self.assertIsInstance(sb_true - si, int)
+        self.assertIsInstance(sb_true - sf, float)
+        self.assertIsInstance(si - sb_true, int)
+        self.assertIsInstance(sf - sb_true, float)
+
+    def test_mixed_type_mul_return_types(self):
+        sb_true = SyncBool(True)
+        sb_false = SyncBool(False)
+        si = SyncInt(10)
+        sf = SyncFloat(5.5)
+
+        self.assertIsInstance(sb_true * si, int)
+        self.assertIsInstance(sb_true * sf, float)
+        self.assertIsInstance(si * sb_true, int)
+        self.assertIsInstance(sf * sb_true, float)
+
+    def test_mixed_type_div_return_types(self):
+        sb_true = SyncBool(True)
+        sb_false = SyncBool(False)
+        si = SyncInt(2)
+        sf = SyncFloat(2.0)
+
+        self.assertIsInstance(sb_true / si, float)
+        self.assertIsInstance(sb_true / sf, float)
+        self.assertIsInstance(si / sb_true, float)
+        self.assertIsInstance(sf / sb_true, float)
+
+        self.assertIsInstance(sb_true // si, int) # int // int is int
+        self.assertIsInstance(sb_true // sf, float) # int // float is float
+        self.assertIsInstance(si // sb_true, int)
+        self.assertIsInstance(sf // sb_true, float)
+
+    def test_mixed_type_mod_return_types(self):
+        sb_true = SyncBool(True)
+        sb_false = SyncBool(False)
+        si = SyncInt(2)
+        sf = SyncFloat(2.0)
+
+        self.assertIsInstance(sb_true % si, int)
+        self.assertIsInstance(sb_true % sf, float)
+        self.assertIsInstance(si % sb_true, int)
+        self.assertIsInstance(sf % sb_true, float)
+
+    def test_mixed_type_pow_return_types(self):
+        sb_true = SyncBool(True)
+        sb_false = SyncBool(False)
+        si = SyncInt(2)
+        sf = SyncFloat(2.0)
+
+        self.assertIsInstance(sb_true ** si, int)
+        self.assertIsInstance(sb_true ** sf, float)
+        self.assertIsInstance(si ** sb_true, int)
+        self.assertIsInstance(sf ** sb_true, float)
+
+    # III. __index__ in real-world contexts
+    def test_index_in_list_access(self):
+        my_list = ["apple", "banana"]
+        b_true = SyncBool(True)
+        b_false = SyncBool(False)
+
+        self.assertEqual(my_list[b_true], "banana")
+        self.assertEqual(my_list[b_false], "apple")
+
+    def test_index_in_range_and_sum(self):
+        b_true = SyncBool(True)
+        b_false = SyncBool(False)
+
+        self.assertEqual(list(range(b_true)), [0])
+        self.assertEqual(list(range(b_false)), [])
+
+        # Sum implicitly calls int()
+        self.assertEqual(sum([b_true, b_true, b_false]), 2)
+        self.assertEqual(sum([b_true, 5, b_false]), 6) # b_true becomes 1, b_false becomes 0
+
+    # IV. More Edge Cases for Conversions
+    def test_implicit_conversion_in_if_statement(self):
+        b_true = SyncBool(True)
+        b_false = SyncBool(False)
+
+        if b_true:
+            result_true = True
+        else:
+            result_true = False
+        self.assertTrue(result_true)
+
+        if b_false:
+            result_false = True
+        else:
+            result_false = False
+        self.assertFalse(result_false)
+
+    def test_chained_conversions(self):
+        b = SyncBool(True)
+        self.assertEqual(float(int(b)), 1.0)
+        self.assertEqual(int(float(b)), 1)
+        self.assertIsInstance(float(int(b)), float)
+        self.assertIsInstance(int(float(b)), int)
+
+    # V. Advanced Concurrency
+    def test_concurrent_mixed_instance_bitwise_ops(self):
+        b1 = SyncBool(True)
+        b2 = SyncBool(False)
+        results = []
+        results_lock = threading.Lock()
+
+        def worker_op():
+            for _ in range(100):
+                with results_lock:
+                    results.append(b1 & b2) # Should be False (1&0=0)
+                    results.append(b1 | b2) # Should be True (1|0=1)
+                    results.append(b1 ^ b2) # Should be True (1^0=1)
+
+        _spawn_threads(worker_op, num_threads=10)
+        self.assertEqual(len(results), 10 * 100 * 3)
+        self.assertTrue(all(not r for r in results[::3])) # AND results (False)
+        self.assertTrue(all(r for r in results[1::3]))    # OR results (True)
+        self.assertTrue(all(r for r in results[2::3]))    # XOR results (True)
+
+
+    def test_concurrent_set_and_read_mixed_types(self):
+        b = SyncBool(True)
+        si = SyncInt(10)
+        sf = SyncFloat(5.5)
+
+        read_values = []
+        read_lock = threading.Lock()
+
+        def set_worker(new_val):
+            for _ in range(50):
+                b.set(new_val)
+
+        def read_worker():
+            for _ in range(50):
+                with read_lock:
+                    read_values.append(b.get())
+                    read_values.append(b + si) # int result
+                    read_values.append(b * sf) # float result
+
+        set_t_true = threading.Thread(target=set_worker, args=(True,))
+        set_t_false = threading.Thread(target=set_worker, args=(False,))
+        read_t1 = threading.Thread(target=read_worker)
+        read_t2 = threading.Thread(target=read_worker)
+
+        set_t_true.start(); set_t_false.start(); read_t1.start(); read_t2.start()
+        set_t_true.join(); set_t_false.join(); read_t1.join(); read_t2.join()
+
+        # The actual values read will be non-deterministic (True or False, 11 or 10, 5.5 or 0.0)
+        # But we assert that they are valid values based on the operations.
+        self.assertEqual(len(read_values), 2 * 50 * 3) # 2 readers * 50 ops * 3 appends
+        for val in read_values[::3]: # bool values
+            self.assertIn(val, [True, False])
+        for val in read_values[1::3]: # int results from b + si
+            self.assertIn(val, [11, 10]) # (True+10) or (False+10)
+        for val in read_values[2::3]: # float results from b * sf
+            self.assertIn(val, [5.5, 0.0]) # (True*5.5) or (False*5.5)
+
+    def test_concurrent_toggle_with_reads(self):
+        b = SyncBool(False)
+        num_toggles = 100
+        read_counts = {True: 0, False: 0}
+        read_lock = threading.Lock()
+        barrier = threading.Barrier(2)
+
+        # This toggle worker will flip the value every time
+        def toggle_worker():
+            barrier.wait()  # start with reader
+            for _ in range(num_toggles):
+                b.toggle()
+                time.sleep(0.001)  # give readers time to observe
+
+        # This reader will continuously check and log observed values
+        def read_worker():
+            barrier.wait()
+            for _ in range(num_toggles * 2):  # read twice as much
+                val = b.get()
+                with read_lock:
+                    read_counts[val] += 1
+                time.sleep(0.0005)
+
+        t_toggle = threading.Thread(target=toggle_worker)
+        t_read = threading.Thread(target=read_worker)
+
+        t_toggle.start()
+        t_read.start()
+        t_toggle.join()
+        t_read.join()
+
+        # Should have seen both states at least once
+        self.assertGreater(read_counts[True], 0, "Never observed True during toggles")
+        self.assertGreater(read_counts[False], 0, "Never observed False during toggles")
+        self.assertFalse(b.get(), "Final value should be False after even number of toggles")
 
 
 if __name__ == '__main__':

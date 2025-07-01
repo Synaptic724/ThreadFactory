@@ -51,24 +51,28 @@ class SyncBool(ISync):
     def _coerce(cls, val):  # bool cast (Python truthiness)
         return bool(val)
 
-    # Override ISync._unwrap_other to retain numeric types (int / float / Decimal)
+    # Revised to satisfy the new test-cases
     def _unwrap_other(self, other):
         """
-        Convert *other* to a type appropriate for arithmetic / bitwise ops.
+        Convert *other* into a value usable for arithmetic / bitwise ops.
 
-        • Sync*  → unwrap then decide
-        • int / float / Decimal  → keep as-is (preserves numeric semantics)
-        • everything else        → bool() cast
+        • Sync*               → underlying scalar
+        • int / float / Decimal (non-bool) → return as-is
+        • numeric strings     → float(value)
+        • everything else     → returned unchanged (no implicit ``bool()``)
         """
-        if ISync._is_sync(other):
-            raw = other.get()
-        else:
-            raw = other
+        raw = other.get() if ISync._is_sync(other) else other
 
-        # Preserve numeric values exactly (except plain bool)
         if isinstance(raw, (int, float, Decimal)) and type(raw) is not bool:
             return raw
-        return bool(raw)
+
+        if isinstance(raw, str):
+            try:
+                return float(raw)                       # “1” → 1.0, “-5.5” → -5.5
+            except ValueError:
+                return raw                              # non-numeric str
+
+        return raw                                      # objects / None / lists …
 
     def get(self) -> bool:
         """
@@ -133,15 +137,15 @@ class SyncBool(ISync):
         with self._lock:
             return float(self._value)
 
+    # In SyncBool class
     def __index__(self):
         """
         Return the integer index equivalent of the boolean.
-
         Returns:
             int: 0 or 1.
         """
         with self._lock:
-            return self._value
+            return int(self._value)  # Explicitly cast to int
 
     def __bool__(self):
         """
@@ -267,7 +271,6 @@ class SyncBool(ISync):
         # The order of operands in the lambda is reversed to match the operation.
         return self._perform_binary_op(other, lambda v_self, v_other: v_other & v_self)
 
-    import copy
 
     def __copy__(self):
         """
@@ -582,3 +585,30 @@ class SyncBool(ISync):
             raise TypeError("pow() 3-arg form not supported for SyncBool")
         with self._lock:
             return int(self._value) ** other
+
+    # ──────────────────────────────────────────────────────────────
+    #  In-place bitwise operators  (self  OP=  other)
+    # ──────────────────────────────────────────────────────────────
+    def __iand__(self, other):
+        """
+        In-place bitwise **AND** (``x &= y``).
+
+        Keeps the object a *SyncBool* instead of falling back to ``int``.
+        """
+        # __and__ may return int when `other` is int → cast to bool
+        self.set(bool(self.__and__(other)))
+        return self
+
+    def __ior__(self, other):
+        """
+        In-place bitwise **OR** (``x |= y``).
+        """
+        self.set(bool(self.__or__(other)))
+        return self
+
+    def __ixor__(self, other):
+        """
+        In-place bitwise **XOR** (``x ^= y``).
+        """
+        self.set(bool(self.__xor__(other)))
+        return self
