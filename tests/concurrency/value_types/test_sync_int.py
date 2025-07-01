@@ -1027,7 +1027,27 @@ class TestSyncInt(unittest.TestCase):
         except Exception as e:
             results.append(f"Error: {e}")
 
+    def test_itruediv_raises_type_error(self):
+        """
+        Verify that in-place true division raises a TypeError as expected.
+        """
+        s_int = SyncInt(10)
+        with self.assertRaises(TypeError):
+            s_int /= 2
 
+    def test_str_representation(self):
+        """
+        Test the __str__ method for correct string conversion.
+        """
+        s_int = SyncInt(-987)
+        self.assertEqual(str(s_int), "-987")
+
+    def test_getnewargs_ex_structure(self):
+        """
+        Check that __getnewargs_ex__ returns the correct tuple structure for pickling.
+        """
+        s_int = SyncInt(42)
+        self.assertEqual(s_int.__getnewargs_ex__(), ((42,), {}))
     def _one_writer_worker(s_int):
         for i in range(10):
             s_int.set(i)
