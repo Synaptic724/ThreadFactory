@@ -22,6 +22,7 @@ Thread-safe wrappers for Python’s core data types. Built for deterministic, lo
 - `SyncInt`: Atomic integer wrapper with arithmetic and bitwise support.
 - `SyncBool`: Thread-safe boolean with full logical operation support.
 - `SyncString`: Thread-safe mutable wrapper around Python’s `str`, with full dunder and method coverage.
+- `SyncFloat`: Atomic float wrapper with arithmetic and bitwise support.
 
 These types are ideal for shared state in threaded environments, worker pools, and agent execution contexts.
 

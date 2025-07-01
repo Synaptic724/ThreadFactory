@@ -78,6 +78,20 @@ class SyncBool(ISync):
         with self._lock:
             self._value = not self._value
 
+    # helper: integer view of the current value (saves one lock nest)
+    def _as_int(self) -> int:
+        """
+        Internal helper: Return the integer form of the current boolean.
+
+        This is a lightweight version of `int(self.get())` without locking.
+        Assumes the caller already holds `_lock`, or is inside a safe context.
+
+        Returns:
+            int: 1 if True, 0 if False
+        """
+        return 1 if self._value else 0
+
+
     def __int__(self):
         """
         Return the integer representation of the boolean.
