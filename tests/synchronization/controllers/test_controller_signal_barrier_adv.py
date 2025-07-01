@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import MagicMock, call
 
 # Import the real objects to be tested
-from thread_factory.synchronization.controllers.signal_controller import Controller
+from thread_factory.synchronization.controllers.signal_controller import SignalController
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
 
 

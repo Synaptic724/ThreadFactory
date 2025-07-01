@@ -5,7 +5,7 @@ import time
 import unittest
 from typing import List
 from unittest.mock import MagicMock, call  # Import 'call' for a more robust check
-from thread_factory.synchronization.controllers.signal_controller import Controller
+from thread_factory.synchronization.controllers.signal_controller import SignalController
 from thread_factory.synchronization.primitives.signal_latch import SignalLatch
 from thread_factory.concurrency import ConcurrentDict
 
@@ -29,7 +29,7 @@ class TestControllerWithLatch(unittest.TestCase):
     def setUp(self):
         self.mock_logger = MagicMock(spec=logging.Logger)
         # Apply your corrected Controller class from the previous step
-        self.controller = Controller(logger=self.mock_logger)
+        self.controller = SignalController(logger=self.mock_logger)
         self.temp_controller = None
 
     def tearDown(self):
@@ -51,7 +51,7 @@ class TestControllerWithLatch(unittest.TestCase):
         self.assertIs(self.controller._logger, self.mock_logger)
 
         # Create controller with default logger
-        self.temp_controller = Controller()
+        self.temp_controller = SignalController()
         self.assertIsInstance(self.temp_controller._logger, logging.Logger)
         self.assertNotEqual(self.temp_controller._logger, self.mock_logger)
         self.assertTrue(self.temp_controller._logger.handlers)

@@ -4,7 +4,7 @@ import threading
 import time
 
 # Assuming classes are in this structure
-from thread_factory.synchronization.controllers.signal_controller import Controller
+from thread_factory.synchronization.controllers.signal_controller import SignalController
 from thread_factory.synchronization.coordinators.transit_barrier import TransitBarrier
 
 
@@ -17,7 +17,7 @@ class TestControllerWithTransitBarrier(unittest.TestCase):
     def setUp(self):
         """Set up a new controller with a mock logger for each test."""
         self.mock_logger = MagicMock()
-        self.controller = Controller(logger=self.mock_logger)
+        self.controller = SignalController(logger=self.mock_logger)
 
     def tearDown(self):
         """Ensure the controller is disposed of after each test."""

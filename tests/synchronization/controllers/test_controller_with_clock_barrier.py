@@ -21,7 +21,7 @@ import unittest
 import ulid
 
 # --- SUT imports ----------------------------------------------------------
-from thread_factory.synchronization.controllers import Controller  # fix path if different
+from thread_factory.synchronization.controllers import SignalController  # fix path if different
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier   # fix path if different
 # -------------------------------------------------------------------------
 
@@ -47,12 +47,12 @@ class ControllerClockBarrierTests(unittest.TestCase):
     # ------------------------------------------------------------------ #
     # Utility helpers
     # ------------------------------------------------------------------ #
-    def _make_controller(self) -> Controller:
+    def _make_controller(self) -> SignalController:
         """
         Returns a fresh Controller with DEBUG logging disabled
         to keep test output clean.
         """
-        ctrl = Controller()
+        ctrl = SignalController()
         ctrl._logger.disabled = True
         return ctrl
 
@@ -188,7 +188,7 @@ class ControllerClockBarrierExtraTests(unittest.TestCase):
 
     # ---------- utilities -------------------------------------------------- #
     def _ctrl(self):
-        c = Controller()
+        c = SignalController()
         c._logger.disabled = True
         return c
 
