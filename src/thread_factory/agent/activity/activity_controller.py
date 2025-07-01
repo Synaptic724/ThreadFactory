@@ -1,7 +1,7 @@
 import ulid
 from typing import Callable, Dict, Any, Optional
 from thread_factory import ConcurrentDict
-from thread_factory.agent.activity import Activity
+from thread_factory.agent.activity.activity import Activity
 from thread_factory.agent.activity.activity_builder import ActivityBuilder
 from thread_factory.utils import IDisposable
 
