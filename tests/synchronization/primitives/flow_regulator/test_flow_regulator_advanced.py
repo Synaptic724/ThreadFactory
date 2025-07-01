@@ -16,7 +16,7 @@ import unittest
 from contextlib import ExitStack
 
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
-from thread_factory.agent_thread_pool.agent import Agent
+from thread_factory.agent.agent import Agent
 
 
 # --------------------------------------------------------------------------- #

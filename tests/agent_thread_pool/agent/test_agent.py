@@ -3,10 +3,9 @@ from unittest.mock import Mock, patch
 import threading
 import time
 from thread_factory.runtime import WorkerState
-from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
+from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus
 from thread_factory.agent_thread_pool.help_request import HelpRequest
-from thread_factory.agent_thread_pool.agent import Agent
-from thread_factory.utils.general_helpers.coroutine_helpers import CoroutineHelpers # Import the helper
+from thread_factory.agent.agent import Agent
 
 
 # Define a simple async function for testing coroutine checks

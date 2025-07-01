@@ -105,7 +105,7 @@ class SignalBarrier(IDisposable):
         self._reusable = reusable
         self._manual_release = manual_release
 
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._condition = threading.Condition(self._lock)
         self._count = 0
         self._released = False

@@ -2,7 +2,7 @@ from typing import Callable
 import threading
 from ulid import ULID
 from thread_factory.concurrency import ConcurrentSet, ConcurrentQueue, ConcurrentList, ConcurrentDict
-from thread_factory.agent_thread_pool import Agent
+from thread_factory.agent import Agent
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.runtime.orchestrator.monitoring.records.records import Records

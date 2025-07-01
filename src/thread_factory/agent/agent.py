@@ -3,6 +3,7 @@ from thread_factory.runtime import Worker, WorkerState
 from thread_factory.agent_thread_pool.help_request import HelpRequest
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 from thread_factory.utils.general_helpers.coroutine_helpers import CoroutineHelpers
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 import threading
 
 class Agent(Worker):
@@ -168,8 +169,8 @@ class Agent(Worker):
 
 
         # --- Behavior Coordination (Private Attributes) ---
-        self._save_points: dict[str, Callable[[], None]] = {}
-        self._locations: dict[str, Callable[[], None]] = {}
+        self._save_points: ConcurrentDict[str, Callable[[], None]] = ConcurrentDict()
+        self._locations: ConcurrentDict[str, Callable[[], None]] = ConcurrentDict()
         self._event_loop: Optional[Callable[[], None]] = None #Home Location
         self._value_work: HelpRequest | None = None
         self._worker_type = "agentic"
@@ -177,12 +178,10 @@ class Agent(Worker):
 
         # --- Agentic Memory (Inventory) (Private Attributes) ---
         self._inventory = threading.local()
-        self._inventory.data = {}
-        self._shared_inventory: dict[str, Any] = {}
-        self._data_transfer: dict[str, Callable[..., Any]] = {}
+        self._inventory.data = ConcurrentDict()
+        self._shared_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
+        self._data_transfer: ConcurrentDict[str, Callable[..., Any]] = ConcurrentDict()
         self._lock = threading.RLock()  # Ensures thread-safe access to shared state
-
-
 
     # --- Core Work Lifecycle Handling ---
     def set_work_state(self, new_state: WorkStatus) -> None:
@@ -394,7 +393,7 @@ class Agent(Worker):
             raise TypeError(f"Cannot register coroutine function '{name}' as a save point. Agent runs synchronously.")
         self._save_points[name] = fn
 
-    def get_save_points_dict(self) -> dict[str, Callable[[], None]]:
+    def get_save_points_dict(self) -> ConcurrentDict[str, Callable[[], None]]:
         """
         Retrieves a copy of the dictionary of registered save points.
 
@@ -431,7 +430,7 @@ class Agent(Worker):
             raise TypeError(f"Cannot register coroutine function '{name}' as a location. Agent runs synchronously.")
         self._locations[name] = fn
 
-    def get_locations_dict(self) -> dict[str, Callable[[], None]]:
+    def get_locations_dict(self) -> ConcurrentDict[str, Callable[[], None]]:
         """
         Retrieves a copy of the dictionary of registered locations.
 
@@ -562,7 +561,7 @@ class Agent(Worker):
         """
         return self._shared_inventory.get(key, default)
 
-    def get_shared_inventory(self) -> dict[str, Any]:
+    def get_shared_inventory(self) -> ConcurrentDict[str, Any]:
         """
         Retrieves the entire shared inventory dictionary.
 
@@ -594,7 +593,7 @@ class Agent(Worker):
             raise TypeError(f"Cannot register coroutine function '{name}' for data transfer. Agent runs synchronously.")
         self._data_transfer[name] = fn
 
-    def get_data_transfer_dict(self) -> dict[str, Callable[..., Any]]:
+    def get_data_transfer_dict(self) -> ConcurrentDict[str, Callable[..., Any]]:
         """
         Retrieves a copy of the dictionary of registered data transfer functions.
 
