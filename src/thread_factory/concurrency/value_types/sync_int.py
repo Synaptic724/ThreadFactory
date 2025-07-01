@@ -4,13 +4,63 @@ class SyncInt:
     """
     SyncInt
     -------
-    A thread-safe integer wrapper that mimics Python's built-in `int` type.
+    A thread-safe integer wrapper that mimics Python's built-in `int` type,
+    designed for safe concurrent access in multithreaded environments.
 
-    Provides synchronized access to integer operations and behaviors including
-    arithmetic, bitwise operations, conversion methods, and binary interface methods.
+    🔐 Core Purpose
+    --------------
+    SyncInt provides synchronized access to integer operations, ensuring that
+    multiple threads can safely read and modify the value without race conditions.
 
-    This class is ideal for concurrent applications where integers are shared across threads.
+    🔧 Features
+    ----------
+    - Full support for arithmetic operations (`+`, `-`, `*`, `//`, `%`, `**`, etc.)
+    - Comparison operators (`==`, `<`, `>`, etc.)
+    - Bitwise operations (`&`, `|`, `^`, `<<`, `>>`)
+    - Type conversion (`int()`, `float()`, `str()`)
+    - Manual and atomic value access via `.get()` and `.set()`
+    - Safe thread-aware binary operations with locking on both operands
+
+    ⚡ Power Operation Support
+    --------------------------
+    SyncInt includes custom implementations for `__pow__` and `__rpow__`:
+
+    • `__pow__`: Handles `SyncInt ** x` — supports optional `modulo` as a third argument.
+    • `__rpow__`: Handles `x ** SyncInt` when `x` cannot handle the pow itself.
+
+    ⚠️ Important Limitation (Python dispatch rule)
+    ----------------------------------------------
+    The built-in `pow()` function in Python always dispatches based on the **left-most operand**.
+    This means:
+
+        ✅ pow(SyncInt, ..., ...) ➜ will invoke SyncInt.__pow__
+        ✅ 3 ** SyncInt ➜ will invoke SyncInt.__rpow__ (if `int.__pow__` fails)
+        ❌ pow(3, SyncInt, 5) ➜ SyncInt methods are NOT called (fails with TypeError)
+
+    To work around these dispatch limitations for ternary power (`pow(a, b, c)`), use:
+
+        SyncInt.safe_pow(a, b, c)
+
+    This static utility:
+    - Unwraps all `SyncInt` arguments
+    - Acquires all relevant locks (if needed)
+    - Performs the operation correctly, regardless of argument order
+
+    🧠 Deadlock Prevention
+    ----------------------
+    For binary and ternary operations involving multiple `SyncInt` instances,
+    locks are always acquired in order of object ID to avoid deadlocks.
+
+    This makes operations like `SyncInt(3) ** SyncInt(4) % SyncInt(5)` safe across threads.
+
+    ✅ Recommended Usage:
+        result = SyncInt.safe_pow(a, b, c)        # Always works
+        result = SyncInt(4) ** SyncInt(3) % 5     # Works if base is SyncInt
+        result = 3 ** SyncInt(3)                  # Works (calls __rpow__)
+        pow(3, SyncInt(3), 5)                     # ❌ Will raise TypeError
+
     """
+
     __slots__ = ("_value", "_lock")
     def __init__(self, initial: int = 0):
         """
@@ -133,6 +183,53 @@ class SyncInt:
         with self._lock:
             return abs(self._value)
 
+    # ADD THIS NEW HELPER METHOD:
+    def _unwrap_other(self, other):
+        """Helper to unwrap SyncInt objects to their underlying int value."""
+        if isinstance(other, SyncInt):
+            return other.get()
+        return other
+
+    def _perform_binary_op(self, other, operation, r_operation=False):
+        """
+        Perform a binary operation with another value in a thread-safe manner.
+
+        If `other` is a SyncInt, it acquires both locks in a deterministic
+        order to prevent deadlocks. Otherwise, it acquires only this object's lock.
+        It then unwraps the values and applies the given operation.
+
+        Parameters:
+            other: Another value to operate with.
+            operation: A function that accepts two unwrapped integer values (self_val, other_val).
+            r_operation (bool): True if this is a reverse operation (other op self).
+
+        Returns:
+            The result of the operation.
+        """
+        if isinstance(other, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            # For reverse operations, 'self' is the second operand.
+            if r_operation:
+                first, second = (other, self) if id(other) < id(self) else (self, other)
+            else:
+                first, second = (self, other) if id(self) < id(other) else (other, self)
+
+            with first._lock:
+                with second._lock:
+                    # Perform the operation using the underlying integer values
+                    # based on whether it's a forward or reverse operation.
+                    if r_operation:
+                        return operation(other._value, self._value)
+                    return operation(self._value, other._value)
+        else:
+            # For other types, only lock self.
+            with self._lock:
+                # The operation is performed on the original `self` and `other` values.
+                if r_operation:
+                    return operation(other, self._value)
+                return operation(self._value, other)
+
+
     def __add__(self, other):
         """
         Return self + other.
@@ -143,8 +240,7 @@ class SyncInt:
         Returns:
             int: Sum of self and other.
         """
-        with self._lock:
-            return self._value + other
+        return self._perform_binary_op(other, lambda a, b: a + b)
 
     def __and__(self, other):
         """
@@ -156,8 +252,7 @@ class SyncInt:
         Returns:
             int: Result of AND operation.
         """
-        with self._lock:
-            return self._value & other
+        return self._perform_binary_op(other, lambda a, b: a & b)
 
     def __bool__(self):
         """
@@ -189,8 +284,7 @@ class SyncInt:
         Returns:
             tuple: (self // other, self % other)
         """
-        with self._lock:
-            return divmod(self._value, other)
+        return self._perform_binary_op(other, divmod)
 
     def __eq__(self, other):
         """
@@ -202,8 +296,11 @@ class SyncInt:
         Returns:
             bool: True if equal.
         """
+        # Equality doesn't strictly need the _perform_binary_op with lock ordering
+        # as it's a non-modifying read and doesn't risk deadlock on its own.
+        # However, for consistency with unwrapping other SyncInts:
         with self._lock:
-            return self._value == other
+            return self._value == self._unwrap_other(other)
 
     def __float__(self):
         """
@@ -225,8 +322,7 @@ class SyncInt:
         Returns:
             int: Floor division result.
         """
-        with self._lock:
-            return self._value // other
+        return self._perform_binary_op(other, lambda a, b: a // b)
 
     def __floor__(self):
         """
@@ -262,7 +358,7 @@ class SyncInt:
             bool: True if greater than or equal.
         """
         with self._lock:
-            return self._value >= other
+            return self._value >= self._unwrap_other(other)
 
     def __gt__(self, other):
         """
@@ -275,7 +371,7 @@ class SyncInt:
             bool: True if greater.
         """
         with self._lock:
-            return self._value > other
+            return self._value > self._unwrap_other(other)
 
     def __hash__(self):
         """
@@ -318,7 +414,7 @@ class SyncInt:
             bool: True if less than or equal.
         """
         with self._lock:
-            return self._value <= other
+            return self._value <= self._unwrap_other(other)
 
     def __lshift__(self, other):
         """
@@ -330,8 +426,7 @@ class SyncInt:
         Returns:
             int: Shifted value.
         """
-        with self._lock:
-            return self._value << other
+        return self._perform_binary_op(other, lambda a, b: a << b)
 
     def __lt__(self, other):
         """
@@ -344,7 +439,7 @@ class SyncInt:
             bool: True if less.
         """
         with self._lock:
-            return self._value < other
+            return self._value < self._unwrap_other(other)
 
     def __mod__(self, other):
         """
@@ -356,8 +451,7 @@ class SyncInt:
         Returns:
             int: Result of modulus.
         """
-        with self._lock:
-            return self._value % other
+        return self._perform_binary_op(other, lambda a, b: a % b)
 
     def __mul__(self, other):
         """
@@ -369,8 +463,7 @@ class SyncInt:
         Returns:
             int: Product of self and other.
         """
-        with self._lock:
-            return self._value * other
+        return self._perform_binary_op(other, lambda a, b: a * b)
 
     def __neg__(self):
         """
@@ -392,33 +485,22 @@ class SyncInt:
         with self._lock:
             return +self._value
 
-    # Add this helper method back
-    # ADD THIS NEW HELPER METHOD:
-    def _unwrap_other(self, other):
-        if isinstance(other, SyncInt):
-            return other.get()
-        return other
-
     def __pow__(self, other, modulo=None):
-        with self._lock:
-            # Ensure 'other' (exponent) is unwrapped if it's a SyncInt
-            other_val = self._unwrap_other(other)
+        """
+        Performs thread-safe exponentiation: `self ** other % modulo`.
+        Delegates to `SyncInt.safe_pow` for comprehensive handling.
+        """
+        # Call safe_pow, passing self as the base
+        return SyncInt.safe_pow(self, other, modulo)
 
-            if modulo is not None:
-                # Ensure 'modulo' is unwrapped if it's a SyncInt
-                mod_val = self._unwrap_other(modulo)
-                return pow(self._value, other_val, mod_val)
-            return pow(self._value, other_val)
 
     def __rpow__(self, other, modulo=None):
-        with self._lock:
-            # Ensure 'other' (base) is unwrapped if it's a SyncInt
-            base_val = self._unwrap_other(other)
-            mod_val = self._unwrap_other(modulo) if modulo is not None else None
-
-            if mod_val is not None:
-                return pow(base_val, self._value, mod_val)
-            return pow(base_val, self._value)
+        """
+        Performs thread-safe reverse exponentiation: `other ** self % modulo`.
+        Delegates to `SyncInt.safe_pow` for comprehensive handling.
+        """
+        # Call safe_pow, passing self as the exponent
+        return SyncInt.safe_pow(other, self, modulo)
 
     def __radd__(self, other):
         """
@@ -430,8 +512,7 @@ class SyncInt:
         Returns:
             int: Sum.
         """
-        with self._lock:
-            return other + self._value
+        return self._perform_binary_op(other, lambda a, b: a + b, r_operation=True)
 
     def __rand__(self, other):
         """
@@ -443,8 +524,7 @@ class SyncInt:
         Returns:
             int: Result.
         """
-        with self._lock:
-            return other & self._value
+        return self._perform_binary_op(other, lambda a, b: a & b, r_operation=True)
 
     def __rdivmod__(self, other):
         """
@@ -456,8 +536,7 @@ class SyncInt:
         Returns:
             Tuple[int, int]: Quotient and remainder.
         """
-        with self._lock:
-            return divmod(other, self._value)
+        return self._perform_binary_op(other, divmod, r_operation=True)
 
     def __rfloordiv__(self, other):
         """
@@ -469,8 +548,7 @@ class SyncInt:
         Returns:
             int: Floor division result.
         """
-        with self._lock:
-            return other // self._value
+        return self._perform_binary_op(other, lambda a, b: a // b, r_operation=True)
 
     def __rlshift__(self, other):
         """
@@ -482,8 +560,7 @@ class SyncInt:
         Returns:
             int: Result of left shift.
         """
-        with self._lock:
-            return other << self._value
+        return self._perform_binary_op(other, lambda a, b: a << b, r_operation=True)
 
     def __rmod__(self, other):
         """
@@ -495,8 +572,7 @@ class SyncInt:
         Returns:
             int: Remainder.
         """
-        with self._lock:
-            return other % self._value
+        return self._perform_binary_op(other, lambda a, b: a % b, r_operation=True)
 
     def __rmul__(self, other):
         """
@@ -508,8 +584,7 @@ class SyncInt:
         Returns:
             int: Product.
         """
-        with self._lock:
-            return other * self._value
+        return self._perform_binary_op(other, lambda a, b: a * b, r_operation=True)
 
     def __ror__(self, other):
         """
@@ -521,8 +596,7 @@ class SyncInt:
         Returns:
             int: Result of bitwise OR.
         """
-        with self._lock:
-            return other | self._value
+        return self._perform_binary_op(other, lambda a, b: a | b, r_operation=True)
 
     def __round__(self, ndigits=None):
         """
@@ -547,8 +621,7 @@ class SyncInt:
         Returns:
             int: Right-shifted value.
         """
-        with self._lock:
-            return other >> self._value
+        return self._perform_binary_op(other, lambda a, b: a >> b, r_operation=True)
 
     def __rshift__(self, other):
         """
@@ -560,8 +633,7 @@ class SyncInt:
         Returns:
             int: Shifted value.
         """
-        with self._lock:
-            return self._value >> other
+        return self._perform_binary_op(other, lambda a, b: a >> b)
 
     def __rsub__(self, other):
         """
@@ -573,8 +645,7 @@ class SyncInt:
         Returns:
             int: Difference.
         """
-        with self._lock:
-            return other - self._value
+        return self._perform_binary_op(other, lambda a, b: a - b, r_operation=True)
 
     def __rtruediv__(self, other):
         """
@@ -586,8 +657,7 @@ class SyncInt:
         Returns:
             float: Quotient.
         """
-        with self._lock:
-            return other / self._value
+        return self._perform_binary_op(other, lambda a, b: a / b, r_operation=True)
 
     def __rxor__(self, other):
         """
@@ -599,8 +669,7 @@ class SyncInt:
         Returns:
             int: Bitwise XOR.
         """
-        with self._lock:
-            return other ^ self._value
+        return self._perform_binary_op(other, lambda a, b: a ^ b, r_operation=True)
 
     def __sizeof__(self):
         """
@@ -621,8 +690,7 @@ class SyncInt:
         Returns:
             int: Difference.
         """
-        with self._lock:
-            return self._value - other
+        return self._perform_binary_op(other, lambda a, b: a - b)
 
     def __truediv__(self, other):
         """
@@ -634,8 +702,7 @@ class SyncInt:
         Returns:
             float: Quotient.
         """
-        with self._lock:
-            return self._value / other
+        return self._perform_binary_op(other, lambda a, b: a / b)
 
     def __trunc__(self):
         """
@@ -657,8 +724,7 @@ class SyncInt:
         Returns:
             int: Bitwise XOR.
         """
-        with self._lock:
-            return self._value ^ other
+        return self._perform_binary_op(other, lambda a, b: a ^ b)
 
     @property
     def numerator(self):
@@ -768,7 +834,9 @@ class SyncInt:
             bool: True if not equal, False otherwise.
         """
         with self._lock:
-            return self._value != other
+            return self._value != self._unwrap_other(other)
+
+
 
     def __or__(self, other):
         """
@@ -780,8 +848,7 @@ class SyncInt:
         Returns:
             int: Result of bitwise OR.
         """
-        with self._lock:
-            return self._value | other
+        return self._perform_binary_op(other, lambda a, b: a | b)
 
     def __repr__(self):
         """
@@ -792,3 +859,319 @@ class SyncInt:
         """
         with self._lock:
             return repr(self._value)
+
+    @staticmethod
+    def safe_pow(base, exp, mod=None):
+        """
+        Thread-safe pow() that locks all SyncInt operands (if any) using consistent locking order.
+
+        Args:
+            base (int or SyncInt): Base value.
+            exp (int or SyncInt): Exponent.
+            mod (int or SyncInt, optional): Modulo.
+
+        Returns:
+            int: Result of pow(base, exp, mod) or pow(base, exp)
+        """
+
+        def unwrap(x):
+            return x.get() if isinstance(x, SyncInt) else x
+
+        # Gather all SyncInt args to lock
+        syncs = [x for x in (base, exp, mod) if isinstance(x, SyncInt)]
+        if not syncs:
+            # No locking needed
+            return pow(base, exp, mod) if mod is not None else pow(base, exp)
+
+        # Sort all SyncInt objects by id for deadlock-free acquisition
+        sorted_syncs = sorted(syncs, key=id)
+        try:
+            for s in sorted_syncs:
+                s._lock.acquire()
+
+            # After locking, unwrap and compute
+            base_val = unwrap(base)
+            exp_val = unwrap(exp)
+            mod_val = unwrap(mod) if mod is not None else None
+            return pow(base_val, exp_val, mod_val) if mod_val is not None else pow(base_val, exp_val)
+
+        finally:
+            for s in reversed(sorted_syncs):
+                s._lock.release()
+
+
+
+    def increment(self, value=1):
+        """
+        Atomically increment the internal value by the specified amount.
+
+        Parameters:
+            value (int or SyncInt): The amount to add.
+
+        Returns:
+            int: The updated value after increment.
+        """
+        if isinstance(value, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, value) if id(self) < id(value) else (value, self)
+            with first._lock:
+                with second._lock:
+                    self._value += value._value
+                    return self._value
+        else:
+            with self._lock:
+                self._value += value
+                return self._value
+
+    def decrement(self, value=1):
+        """
+        Atomically decrement the internal value by the specified amount.
+
+        Parameters:
+            value (int or SyncInt): The amount to subtract.
+
+        Returns:
+            int: The updated value after decrement.
+        """
+        if isinstance(value, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, value) if id(self) < id(value) else (value, self)
+            with first._lock:
+                with second._lock:
+                    self._value -= value._value
+                    return self._value
+        else:
+            with self._lock:
+                self._value -= value
+                return self._value
+
+    def __iadd__(self, other):
+        """
+        In-place addition: self += other
+
+        Parameters:
+            other (int or SyncInt): Value to add.
+
+        Returns:
+            SyncInt: Modified instance.
+        """
+        if isinstance(other, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock:
+                with second._lock:
+                    self._value += other._value
+        else:
+            with self._lock:
+                self._value += other
+        return self
+
+    def __isub__(self, other):
+        """
+        In-place subtraction: self -= other
+
+        Parameters:
+            other (int or SyncInt): Value to subtract.
+
+        Returns:
+            SyncInt: Modified instance.
+        """
+        if isinstance(other, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock:
+                with second._lock:
+                    self._value -= other._value
+        else:
+            with self._lock:
+                self._value -= other
+        return self
+
+    def __imul__(self, other):
+        """
+        In-place multiplication: self *= other
+
+        Parameters:
+            other (int or SyncInt): Value to multiply.
+
+        Returns:
+            SyncInt: Modified instance.
+        """
+        if isinstance(other, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock:
+                with second._lock:
+                    self._value *= other._value
+        else:
+            with self._lock:
+                self._value *= other
+        return self
+
+    def __ifloordiv__(self, other):
+        """
+        In-place floor division: self //= other
+
+        Parameters:
+            other (int or SyncInt): Divisor.
+
+        Returns:
+            SyncInt: Modified instance.
+        """
+        if isinstance(other, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock:
+                with second._lock:
+                    self._value //= other._value
+        else:
+            with self._lock:
+                self._value //= other
+        return self
+
+    def __imod__(self, other):
+        """
+        In-place modulo: self %= other
+
+        Parameters:
+            other (int or SyncInt): Modulo divisor.
+
+        Returns:
+            SyncInt: Modified instance.
+        """
+        if isinstance(other, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock:
+                with second._lock:
+                    self._value %= other._value
+        else:
+            with self._lock:
+                self._value %= other
+        return self
+
+    def __ipow__(self, other):
+        """
+        In-place power: self **= other
+
+        Parameters:
+            other (int or SyncInt): Exponent.
+
+        Returns:
+            SyncInt: Modified instance.
+        """
+        if isinstance(other, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock:
+                with second._lock:
+                    self._value **= other._value
+        else:
+            with self._lock:
+                self._value **= other
+        return self
+
+    def __ilshift__(self, other):
+        """
+        In-place left shift: self <<= other
+
+        Parameters:
+            other (int or SyncInt): Shift amount.
+
+        Returns:
+            SyncInt: Modified instance.
+        """
+        if isinstance(other, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock:
+                with second._lock:
+                    self._value <<= other._value
+        else:
+            with self._lock:
+                self._value <<= other
+        return self
+
+    def __irshift__(self, other):
+        """
+        In-place right shift: self >>= other
+
+        Parameters:
+            other (int or SyncInt): Shift amount.
+
+        Returns:
+            SyncInt: Modified instance.
+        """
+        if isinstance(other, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock:
+                with second._lock:
+                    self._value >>= other._value
+        else:
+            with self._lock:
+                self._value >>= other
+        return self
+
+    def __iand__(self, other):
+        """
+        In-place bitwise AND: self &= other
+
+        Parameters:
+            other (int or SyncInt): Operand.
+
+        Returns:
+            SyncInt: Modified instance.
+        """
+        if isinstance(other, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock:
+                with second._lock:
+                    self._value &= other._value
+        else:
+            with self._lock:
+                self._value &= other
+        return self
+
+    def __ior__(self, other):
+        """
+        In-place bitwise OR: self |= other
+
+        Parameters:
+            other (int or SyncInt): Operand.
+
+        Returns:
+            SyncInt: Modified instance.
+        """
+        if isinstance(other, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock:
+                with second._lock:
+                    self._value |= other._value
+        else:
+            with self._lock:
+                self._value |= other
+        return self
+
+    def __ixor__(self, other):
+        """
+        In-place bitwise XOR: self ^= other
+
+        Parameters:
+            other (int or SyncInt): Operand.
+
+        Returns:
+            SyncInt: Modified instance.
+        """
+        if isinstance(other, SyncInt):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock:
+                with second._lock:
+                    self._value ^= other._value
+        else:
+            with self._lock:
+                self._value ^= other
+        return self
