@@ -1,8 +1,7 @@
+from thread_factory.utils.interfaces.isync import ISync
 import threading
 
-import threading
-
-class SyncInt:
+class SyncInt(ISync):
     """
     SyncInt
     -------
@@ -72,7 +71,7 @@ class SyncInt:
     """
 
     _central_lock = threading.Lock()  # Used for init safety
-    __slots__ = ("_value", "_lock")
+    __slots__ = ["_value", "_lock"]
 
     def __init__(self, initial: int = 0, init_safe: bool = True):
         """
@@ -91,6 +90,10 @@ class SyncInt:
         else:
             self._value = int(initial)
             self._lock = threading.RLock()
+
+    @classmethod
+    def _coerce(cls, val):  # int-specific cast
+        return int(val)
 
     def get(self) -> int:
         """

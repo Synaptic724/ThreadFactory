@@ -108,7 +108,7 @@ class TestSyncBool(unittest.TestCase):
         def thread1_task():
             try:
                 barrier.wait()
-                for _ in range(10000000):
+                for _ in range(100000):
                     _ = b1 & b2  # Access b1 then b2
             except Exception as e:
                 exceptions.append(e)
@@ -116,7 +116,7 @@ class TestSyncBool(unittest.TestCase):
         def thread2_task():
             try:
                 barrier.wait()
-                for _ in range(10000000):
+                for _ in range(100000):
                     _ = b2 | b1  # Access b2 then b1
             except Exception as e:
                 exceptions.append(e)

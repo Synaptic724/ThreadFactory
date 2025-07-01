@@ -1,7 +1,8 @@
 import copy
 import threading
+from thread_factory.utils.interfaces.isync import ISync
 
-class SyncBool:
+class SyncBool(ISync):
     """
     SyncBool
     --------
@@ -24,7 +25,7 @@ class SyncBool:
     """
 
     _central_lock = threading.Lock()
-    __slots__ = ("_value", "_lock")
+    __slots__ = ["_value", "_lock"]
 
     def __init__(self, initial: bool = False, init_safe: bool = True):
         """
@@ -42,6 +43,10 @@ class SyncBool:
         else:
             self._value = bool(initial)
             self._lock = threading.RLock()
+
+    @classmethod
+    def _coerce(cls, val):  # bool cast (Python truthiness)
+        return bool(val)
 
     def get(self) -> bool:
         """

@@ -1,7 +1,8 @@
 import threading
 import copy
+from thread_factory.utils.interfaces.isync import ISync
 
-class SyncString:
+class SyncString(ISync):
     """
     SyncString(initial='') -> SyncString
 
@@ -37,7 +38,7 @@ class SyncString:
     """
 
     _central_lock = threading.Lock()  # Class-level lock for safe instantiation
-    __slots__ = ("_value", "_lock")
+    __slots__ = ["_value", "_lock"]
 
     def __init__(self, initial: str = "", init_safe: bool = True):
         """
@@ -84,6 +85,10 @@ class SyncString:
             # For other types, only lock self and coerce the other value to a string.
             with self._lock:
                 return operation(self._value, str(other))
+
+    @classmethod
+    def _coerce(cls, val):  # always cast to str
+        return str(val)
 
 
     def get(self) -> str:
