@@ -207,6 +207,127 @@ class TestSyncString(unittest.TestCase):
 
         self.assertEqual(len(s.get()), 500)
 
+    def test_getitem_slice(self):
+        s = SyncString("abcdefgh")
+        self.assertEqual(s[2:5], "cde")
+
+    def test_all_comparisons_with_syncstring(self):
+        s1 = SyncString("cat")
+        s2 = SyncString("dog")
+        s3 = SyncString("cat")
+
+        self.assertTrue(s1 == s3)
+        self.assertTrue(s1 != s2)
+        self.assertTrue(s1 < s2)
+        self.assertTrue(s1 <= s3)
+        self.assertTrue(s2 > s1)
+        self.assertTrue(s3 >= s1)
+
+    def test_reverse_mod_operator(self):
+        s = SyncString("World")
+        self.assertEqual("Hello, %s" % s, "Hello, World")
+
+    def test_deadlock_prevention_on_binary_op(self):
+        """
+        Simulates a classic deadlock scenario to test the lock-ordering mechanism.
+        Two threads attempt to operate on two SyncString instances in reverse order.
+        """
+        s1 = SyncString("one")
+        s2 = SyncString("two")
+
+        # A barrier to synchronize the start of the threads
+        # to increase the chance of a race condition.
+        barrier = threading.Barrier(2)
+
+        exceptions = []
+
+        def thread1_task():
+            try:
+                barrier.wait()
+                for _ in range(1000):
+                    # Perform an operation that locks s1, then s2
+                    _ = s1 + s2
+            except Exception as e:
+                exceptions.append(e)
+
+        def thread2_task():
+            try:
+                barrier.wait()
+                for _ in range(1000):
+                    # Perform an operation that locks s2, then s1
+                    _ = s2 == s1
+            except Exception as e:
+                exceptions.append(e)
+
+        t1 = threading.Thread(target=thread1_task)
+        t2 = threading.Thread(target=thread2_task)
+
+        t1.start()
+        t2.start()
+
+        t1.join(timeout=2)
+        t2.join(timeout=2)
+
+        self.assertFalse(t1.is_alive(), "Thread 1 deadlocked or timed out")
+        self.assertFalse(t2.is_alive(), "Thread 2 deadlocked or timed out")
+        self.assertEqual(exceptions, [], "Threads raised exceptions")
+    def test_join_unicode_separator(self):
+        s = SyncString("🚀")
+        self.assertEqual(s.join(["A", "B", "C"]), "A🚀B🚀C")
+
+    def test_iter_safe_copy(self):
+        s = SyncString("test")
+        it = iter(s)
+        s.set("changed")
+        self.assertEqual(list(it), list("test"))
+
+    def test_maketrans_usage(self):
+        s = SyncString("abc")
+        trans = str.maketrans("abc", "123")
+        self.assertEqual(s.translate(trans), "123")
+
+    def test_getattr_method_forwarding(self):
+        s = SyncString("HELLO")
+        self.assertTrue(callable(s.lower))
+        self.assertEqual(s.lower(), "hello")
+
+    def test_bytes_conversion(self):
+        s = SyncString("abc")
+        self.assertEqual(bytes(s), b"abc")
+
+    def test_reversed_iteration(self):
+        s = SyncString("hello")
+        self.assertEqual(list(reversed(s)), list("olleh"))
+
+    def test_sizeof_method(self):
+        s = SyncString("hello world")
+        self.assertIsInstance(s.__sizeof__(), int)
+
+    def test_format_specifier(self):
+        s = SyncString("Result: {:.2f}")
+        self.assertEqual(format(s, ""), "Result: {:.2f}")
+        self.assertEqual(s.get().format(3.14159), "Result: 3.14")
+
+    def test_mod_operator(self):
+        s = SyncString("Count: %d")
+        self.assertEqual(s % 7, "Count: 7")
+
+    def test_reduce_pickle_roundtrip(self):
+        import pickle
+        s = SyncString("pickle_test")
+        result = pickle.loads(pickle.dumps(s))
+        self.assertEqual(result.get(), "pickle_test")
+
+    def test_class_getitem_noop(self):
+        self.assertEqual(SyncString[str], SyncString)
+
+    def test_dir_contains_builtin_methods(self):
+        s = SyncString("test")
+        methods = dir(s)
+        self.assertIn("upper", methods)
+        self.assertIn("lower", methods)
+        self.assertIn("format", methods)
+
     def test_copy_and_isolation(self):
         s1 = SyncString("original")
         s2 = copy.copy(s1)

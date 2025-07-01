@@ -20,60 +20,35 @@ class SyncString:
 
         This constructor sets up an internal lock for all string operations.
         """
-        self._value = initial
+        self._value = str(initial)
         self._lock = threading.RLock()
 
-    def __bytes__(self):
+    def _perform_binary_op(self, other, operation):
         """
-        Converts the string to a bytes object using UTF-8 encoding.
+        Perform a binary operation with another value in a thread-safe manner.
+
+        If `other` is a SyncString, it acquires both locks in a deterministic
+        order to prevent deadlocks. Otherwise, it acquires only this object's lock.
+        It then unwraps the values and applies the given operation.
+
+        Parameters:
+            other: Another value to operate with.
+            operation: A function that accepts two unwrapped string values (self_val, other_val).
 
         Returns:
-            bytes: The UTF-8 encoded representation of the current value.
+            The result of the operation.
         """
-        with self._lock:
-            return bytes(self._value, 'utf-8')
-
-    def __reversed__(self):
-        """
-        Returns a reverse iterator over the characters in the string.
-
-        Returns:
-            iterator: An iterator yielding characters in reverse order.
-        """
-        with self._lock:
-            return reversed(self._value)
-
-    def __sizeof__(self):
-        """
-        Returns the size of the underlying string object in memory.
-
-        Returns:
-            int: The memory size in bytes.
-        """
-        with self._lock:
-            return self._value.__sizeof__()
-
-    def __getattr__(self, name):
-        """
-        Fallback to underlying string methods not explicitly implemented.
-
-        If a method or attribute is not found on SyncString, this method is called
-        and will attempt to retrieve it from the internal string value.
-
-        Args:
-            name (str): The name of the method or attribute to retrieve.
-
-        Returns:
-            Any: The resolved method or attribute bound to the internal value.
-        """
-        with self._lock:
-            attr = getattr(self._value, name)
-            if callable(attr):
-                def thread_safe_method(*args, **kwargs):
-                    with self._lock:
-                        return attr(*args, **kwargs)
-                return thread_safe_method
-            return attr
+        if isinstance(other, SyncString):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock:
+                with second._lock:
+                    # The operation is performed on the original `self` and `other` values.
+                    return operation(self._value, other._value)
+        else:
+            # For other types, only lock self and coerce the other value to a string.
+            with self._lock:
+                return operation(self._value, str(other))
 
 
     def get(self) -> str:
@@ -100,7 +75,7 @@ class SyncString:
         It allows atomic replacement of the internal string in concurrent settings.
         """
         with self._lock:
-            self._value = new_value
+            self._value = str(new_value)
 
     def capitalize(self, *args, **kwargs):
         """
@@ -354,8 +329,8 @@ class SyncString:
 
         Can be used as: str.maketrans(x[, y[, z]])
         """
-        with self._lock:
-            return self._value.maketrans(*args, **kwargs)
+        # maketrans is a static method on str, so we don't need a lock or self._value
+        return str.maketrans(*args, **kwargs)
 
     def partition(self, *args, **kwargs):
         """
@@ -571,8 +546,7 @@ class SyncString:
         Supports comparison to strings and other compatible types.
         Thread-safe.
         """
-        with self._lock:
-            return self._value == other
+        return self._perform_binary_op(other, lambda v_self, v_other: v_self == v_other)
 
     def __ne__(self, other):
         """
@@ -580,8 +554,7 @@ class SyncString:
 
         Thread-safe.
         """
-        with self._lock:
-            return self._value != other
+        return self._perform_binary_op(other, lambda v_self, v_other: v_self != v_other)
 
     def __lt__(self, other):
         """
@@ -589,8 +562,7 @@ class SyncString:
 
         Comparison is lexicographic. Thread-safe.
         """
-        with self._lock:
-            return self._value < other
+        return self._perform_binary_op(other, lambda v_self, v_other: v_self < v_other)
 
     def __le__(self, other):
         """
@@ -598,8 +570,7 @@ class SyncString:
 
         Thread-safe.
         """
-        with self._lock:
-            return self._value <= other
+        return self._perform_binary_op(other, lambda v_self, v_other: v_self <= v_other)
 
     def __gt__(self, other):
         """
@@ -607,8 +578,7 @@ class SyncString:
 
         Thread-safe.
         """
-        with self._lock:
-            return self._value > other
+        return self._perform_binary_op(other, lambda v_self, v_other: v_self > v_other)
 
     def __ge__(self, other):
         """
@@ -616,8 +586,7 @@ class SyncString:
 
         Thread-safe.
         """
-        with self._lock:
-            return self._value >= other
+        return self._perform_binary_op(other, lambda v_self, v_other: v_self >= v_other)
 
     def __add__(self, other):
         """
@@ -626,8 +595,7 @@ class SyncString:
         Returns a new string without modifying the internal value.
         Thread-safe.
         """
-        with self._lock:
-            return self._value + other
+        return self._perform_binary_op(other, lambda v_self, v_other: v_self + v_other)
 
     def __radd__(self, other):
         """
@@ -635,8 +603,24 @@ class SyncString:
 
         Returns a new string. Thread-safe.
         """
+        return self._perform_binary_op(other, lambda v_self, v_other: v_other + v_self)
+
+    def __iadd__(self, other):
+        """
+        Perform in-place concatenation (+=).
+
+        This operation is atomic. It acquires the lock, appends the other
+        string, and updates the internal value in a single operation.
+
+        Args:
+            other (str): The string to append.
+
+        Returns:
+            SyncString: self, after modification.
+        """
         with self._lock:
-            return other + self._value
+            self._value += str(other)
+            return self
 
     def __mul__(self, n):
         """
@@ -783,6 +767,65 @@ class SyncString:
         with self._lock:
             return dir(self._value)
 
+    def __bytes__(self):
+        """
+        Converts the string to a bytes object using UTF-8 encoding.
+
+        Returns:
+            bytes: The UTF-8 encoded representation of the current value.
+        """
+        with self._lock:
+            return bytes(self._value, 'utf-8')
+
+    def __reversed__(self):
+        """
+        Returns a reverse iterator over the characters in the string.
+
+        Returns:
+            iterator: An iterator yielding characters in reverse order.
+        """
+        with self._lock:
+            return reversed(self._value)
+
+    def __sizeof__(self):
+        """
+        Returns the size of the underlying string object in memory.
+
+        Returns:
+            int: The memory size in bytes.
+        """
+        with self._lock:
+            return self._value.__sizeof__()
+
+    def __getattr__(self, name):
+        """
+        Fallback to underlying string methods not explicitly implemented.
+
+        If a method or attribute is not found on SyncString, this method is called
+        and will attempt to retrieve it from the internal string value.
+
+        Args:
+            name (str): The name of the method or attribute to retrieve.
+
+        Returns:
+            Any: The resolved method or attribute bound to the internal value.
+        """
+        # No lock here, as the returned method will handle its own locking.
+        attr = getattr(self._value, name)
+        if callable(attr):
+            def thread_safe_method(*args, **kwargs):
+                with self._lock:
+                    # Re-fetch the value inside the lock to ensure it's current
+                    current_value = self._value
+                    # Get the method from the current value
+                    method = getattr(current_value, name)
+                    return method(*args, **kwargs)
+            return thread_safe_method
+        # For non-callable attributes, we should still lock to be safe.
+        with self._lock:
+            return getattr(self._value, name)
+
+
     @classmethod
     def __class_getitem__(cls, item):
         """
@@ -791,3 +834,32 @@ class SyncString:
         Example: `ConcurrentString[str]`
         """
         return cls
+
+    @staticmethod
+    def __new__(cls, *args, **kwargs):
+        """
+        Create and return a new instance of SyncString.
+
+        This override exists to satisfy type-checkers and frameworks
+        that expect a defined __new__ method.
+
+        Returns:
+            SyncString: A new instance.
+        """
+        return object.__new__(cls)
+
+    def __rmod__(self, other):
+        """
+        Return value % self.
+
+        Performs reverse string formatting where the left-hand operand
+        formats the right-hand SyncString, like: "Hello, %s" % SyncString("World")
+
+        Parameters:
+            other (Any): The value that performs formatting on this SyncString.
+
+        Returns:
+            str: The formatted string.
+        """
+        with self._lock:
+            return other % self._value

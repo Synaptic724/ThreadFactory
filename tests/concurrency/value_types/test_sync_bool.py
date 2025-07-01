@@ -1,3 +1,4 @@
+import threading
 import unittest
 from threading import Thread
 from time import sleep
@@ -75,6 +76,63 @@ class TestSyncBool(unittest.TestCase):
         self.assertFalse(True ^ b)
         self.assertTrue(False ^ b)
 
+    def test_syncbool_to_syncbool_comparison(self):
+        b1 = SyncBool(True)
+        b2 = SyncBool(True)
+        b3 = SyncBool(False)
+        self.assertTrue(b1 == b2)
+        self.assertFalse(b1 == b3)
+        self.assertTrue(b1 != b3)
+
+    def test_syncbool_to_syncbool_bitwise_ops(self):
+        b_true = SyncBool(True)
+        b_false = SyncBool(False)
+        self.assertFalse(b_false & b_true)
+        self.assertTrue(b_false | b_true)
+        self.assertTrue(b_true ^ b_false)
+
+    def test_deadlock_prevention_on_binary_op(self):
+        """
+        Simulates a classic deadlock scenario to test the lock-ordering mechanism.
+        Two threads attempt to operate on two SyncBool instances in reverse order.
+        """
+        b1 = SyncBool(True)
+        b2 = SyncBool(False)
+
+        # A barrier to synchronize the start of the threads
+        # to increase the chance of a race condition.
+        barrier = threading.Barrier(2)
+
+        exceptions = []
+
+        def thread1_task():
+            try:
+                barrier.wait()
+                for _ in range(10000000):
+                    _ = b1 & b2  # Access b1 then b2
+            except Exception as e:
+                exceptions.append(e)
+
+        def thread2_task():
+            try:
+                barrier.wait()
+                for _ in range(10000000):
+                    _ = b2 | b1  # Access b2 then b1
+            except Exception as e:
+                exceptions.append(e)
+
+        t1 = Thread(target=thread1_task)
+        t2 = Thread(target=thread2_task)
+
+        t1.start()
+        t2.start()
+
+        t1.join(timeout=30)
+        t2.join(timeout=30)
+
+        self.assertFalse(t1.is_alive(), "Thread 1 deadlocked or timed out")
+        self.assertFalse(t2.is_alive(), "Thread 2 deadlocked or timed out")
+        self.assertEqual(exceptions, [], "Threads raised exceptions")
     def test_comparisons(self):
         b = SyncBool(True)
         self.assertTrue(b == True)

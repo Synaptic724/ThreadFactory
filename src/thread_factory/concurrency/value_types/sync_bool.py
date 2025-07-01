@@ -54,6 +54,33 @@ class SyncBool:
         with self._lock:
             self._value = not self._value
 
+    def _perform_binary_op(self, other, operation):
+        """
+        Perform a binary operation with another value in a thread-safe manner.
+
+        If `other` is a SyncBool, it acquires both locks in a deterministic
+        order to prevent deadlocks. Otherwise, it acquires only this object's lock.
+        It then unwraps the values and applies the given operation.
+
+        Parameters:
+            other: Another value to operate with.
+            operation: A function that accepts two unwrapped boolean values (self_val, other_val).
+
+        Returns:
+            The result of the operation.
+        """
+        if isinstance(other, SyncBool):
+            # Lock in a deterministic order (by object id) to prevent deadlocks.
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock:
+                with second._lock:
+                    # The operation is performed on the original `self` and `other` values.
+                    return operation(self._value, other._value)
+        else:
+            # For other types, only lock self and coerce the other value to a bool.
+            with self._lock:
+                return operation(self._value, bool(other))
+
     def __int__(self):
         """
         Return the integer representation of the boolean.
@@ -134,8 +161,7 @@ class SyncBool:
         Returns:
             bool: True if equal, False otherwise.
         """
-        with self._lock:
-            return self._value == bool(other)
+        return self._perform_binary_op(other, lambda v_self, v_other: v_self == v_other)
 
     def __ne__(self, other):
         """
@@ -147,8 +173,8 @@ class SyncBool:
         Returns:
             bool: True if not equal, False otherwise.
         """
-        with self._lock:
-            return self._value != bool(other)
+        return self._perform_binary_op(other, lambda v_self, v_other: v_self != v_other)
+
 
     def __and__(self, other):
         """
@@ -160,8 +186,7 @@ class SyncBool:
         Returns:
             bool: The result of self & other.
         """
-        with self._lock:
-            return self._value & bool(other)
+        return self._perform_binary_op(other, lambda v_self, v_other: v_self & v_other)
 
     def __or__(self, other):
         """
@@ -173,8 +198,7 @@ class SyncBool:
         Returns:
             bool: The result of self | other.
         """
-        with self._lock:
-            return self._value | bool(other)
+        return self._perform_binary_op(other, lambda v_self, v_other: v_self | v_other)
 
     def __xor__(self, other):
         """
@@ -186,8 +210,7 @@ class SyncBool:
         Returns:
             bool: The result of self ^ other.
         """
-        with self._lock:
-            return self._value ^ bool(other)
+        return self._perform_binary_op(other, lambda v_self, v_other: v_self ^ v_other)
 
     def __invert__(self):
         """
@@ -209,8 +232,8 @@ class SyncBool:
         Returns:
             bool: The result of other & self.
         """
-        with self._lock:
-            return bool(other) & self._value
+        # The order of operands in the lambda is reversed to match the operation.
+        return self._perform_binary_op(other, lambda v_self, v_other: v_other & v_self)
 
     def __ror__(self, other):
         """
@@ -222,8 +245,8 @@ class SyncBool:
         Returns:
             bool: The result of other | self.
         """
-        with self._lock:
-            return bool(other) | self._value
+        # The order of operands in the lambda is reversed to match the operation.
+        return self._perform_binary_op(other, lambda v_self, v_other: v_other | v_self)
 
     def __rxor__(self, other):
         """
@@ -235,5 +258,21 @@ class SyncBool:
         Returns:
             bool: The result of other ^ self.
         """
-        with self._lock:
-            return bool(other) ^ self._value
+        # The order of operands in the lambda is reversed to match the operation.
+        return self._perform_binary_op(other, lambda v_self, v_other: v_other ^ v_self)
+
+    @staticmethod
+    def __new__(cls, *args, **kwargs):
+        """
+        Create and return a new SyncBool instance.
+
+        This method ensures consistent object creation behavior
+        even if inherited or used via subclassing mechanisms.
+
+        Parameters:
+            cls (Type): The class being instantiated.
+
+        Returns:
+            SyncBool: A new instance of SyncBool.
+        """
+        return super(SyncBool, cls).__new__(cls)
