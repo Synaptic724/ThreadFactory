@@ -4,7 +4,7 @@ from thread_factory.agent.activity.activity_controller import ActivityController
 from thread_factory.agent.activator import AgentActivator
 
 
-class AgentToolkit:
+class CommandCenter:
     """
     A central factory for creating and binding agentic behaviors to standard Python threads.
 
@@ -41,7 +41,7 @@ class AgentToolkit:
             raise RuntimeError("The main thread cannot be transformed into an agent.")
 
         # Call the helper as a static method on the class.
-        return AgentToolkit._transform_logic(thread, factory_id)
+        return CommandCenter._transform_logic(thread, factory_id)
 
     def transform_thread(
         self,
@@ -72,7 +72,7 @@ class AgentToolkit:
             raise RuntimeError("The main thread cannot be transformed into an agent.")
 
         # Call the helper as a static method on the class.
-        return AgentToolkit._transform_logic(thread, factory_id)
+        return CommandCenter._transform_logic(thread, factory_id)
 
     def activate_agents(
         self,

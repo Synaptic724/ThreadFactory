@@ -207,11 +207,15 @@ class TestSignalBarrier(unittest.TestCase):
     def test_manual_release_with_reusable_true(self):
         barrier = SignalBarrier(threshold=2, reusable=True, manual_release=True)
         results = []
+        sync_barrier = threading.Barrier(2)  # Ensures threads hit the barrier together
+        lock = threading.Lock()
 
         def worker(i):
             for _ in range(2):
+                sync_barrier.wait()       # make sure both arrive before SignalBarrier
                 barrier.wait()
-                results.append(i)
+                with lock:
+                    results.append(i)
 
         t1 = threading.Thread(target=worker, args=(1,))
         t2 = threading.Thread(target=worker, args=(2,))
@@ -228,6 +232,7 @@ class TestSignalBarrier(unittest.TestCase):
         t2.join()
 
         self.assertEqual(len(results), 4)
+
 
     def test_release_does_nothing_if_threshold_not_met(self):
         barrier = SignalBarrier(threshold=3, manual_release=True)
