@@ -1,3 +1,7 @@
+from __future__ import annotations    # MUST be first
+
+from numbers import Real
+
 from thread_factory.utils.interfaces.isync import ISync
 import threading
 
@@ -90,6 +94,30 @@ class SyncInt(ISync):
         else:
             self._value = int(initial)
             self._lock = threading.RLock()
+
+    def _unwrap_other(self, other):
+        """
+        SyncInt-specific coercion.
+
+        Accepts
+        -------
+        • another ISync value   → other.get()       (keeps float precision)
+        • any numbers.Real      → other            (int, float, bool, Decimal …)
+
+        Raises
+        ------
+        TypeError  – for non-numeric types.
+        """
+        if ISync._is_sync(other):
+            val = other.get()
+            if isinstance(val, Real):
+                return val
+            raise TypeError(f"Incompatible Sync type {type(other).__name__}")
+
+        if isinstance(other, Real):
+            return other
+
+        raise TypeError(f"Incompatible type '{type(other).__name__}' for SyncInt")
 
     @classmethod
     def _coerce(cls, val):  # int-specific cast
@@ -205,52 +233,6 @@ class SyncInt(ISync):
         """
         with self._lock:
             return abs(self._value)
-
-    # ADD THIS NEW HELPER METHOD:
-    def _unwrap_other(self, other):
-        """Helper to unwrap SyncInt objects to their underlying int value."""
-        if isinstance(other, SyncInt):
-            return other.get()
-        return other
-
-    def _perform_binary_op(self, other, operation, r_operation=False):
-        """
-        Perform a binary operation with another value in a thread-safe manner.
-
-        If `other` is a SyncInt, it acquires both locks in a deterministic
-        order to prevent deadlocks. Otherwise, it acquires only this object's lock.
-        It then unwraps the values and applies the given operation.
-
-        Parameters:
-            other: Another value to operate with.
-            operation: A function that accepts two unwrapped integer values (self_val, other_val).
-            r_operation (bool): True if this is a reverse operation (other op self).
-
-        Returns:
-            The result of the operation.
-        """
-        if isinstance(other, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            # For reverse operations, 'self' is the second operand.
-            if r_operation:
-                first, second = (other, self) if id(other) < id(self) else (self, other)
-            else:
-                first, second = (self, other) if id(self) < id(other) else (other, self)
-
-            with first._lock:
-                with second._lock:
-                    # Perform the operation using the underlying integer values
-                    # based on whether it's a forward or reverse operation.
-                    if r_operation:
-                        return operation(other._value, self._value)
-                    return operation(self._value, other._value)
-        else:
-            # For other types, only lock self.
-            with self._lock:
-                # The operation is performed on the original `self` and `other` values.
-                if r_operation:
-                    return operation(other, self._value)
-                return operation(self._value, other)
 
 
     def __add__(self, other):
@@ -923,7 +905,9 @@ class SyncInt(ISync):
                 s._lock.release()
 
 
-
+    # ------------------------------------------------------------------ #
+    # Atomic helpers
+    # ------------------------------------------------------------------ #
     def increment(self, value=1):
         """
         Atomically increment the internal value by the specified amount.
@@ -934,16 +918,14 @@ class SyncInt(ISync):
         Returns:
             int: The updated value after increment.
         """
-        if isinstance(value, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
+        if ISync._is_sync(value):
             first, second = (self, value) if id(self) < id(value) else (value, self)
-            with first._lock:
-                with second._lock:
-                    self._value += value._value
-                    return self._value
+            with first._lock, second._lock:
+                self._value += int(value.get())
+                return self._value
         else:
             with self._lock:
-                self._value += value
+                self._value += int(value)
                 return self._value
 
     def decrement(self, value=1):
@@ -956,18 +938,47 @@ class SyncInt(ISync):
         Returns:
             int: The updated value after decrement.
         """
-        if isinstance(value, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
+        if ISync._is_sync(value):
             first, second = (self, value) if id(self) < id(value) else (value, self)
-            with first._lock:
-                with second._lock:
-                    self._value -= value._value
-                    return self._value
+            with first._lock, second._lock:
+                self._value -= int(value.get())
+                return self._value
         else:
             with self._lock:
-                self._value -= value
+                self._value -= int(value)
                 return self._value
 
+    # ------------------------------------------------------------------ #
+    # Internal shared helper for every in-place operator
+    # ------------------------------------------------------------------ #
+    def _apply_ip_op(self, other, op):
+        """
+        Internal helper to apply an in-place operation *op* thread-safely.
+
+        Parameters
+        ----------
+        other : int | ISync
+            Right-hand operand.
+        op    : Callable[[int, int], int]
+            Function that combines two ints and returns the new value.
+
+        Returns
+        -------
+        SyncInt
+            Returns self after mutation.
+        """
+        if ISync._is_sync(other):
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+            with first._lock, second._lock:
+                self._value = op(self._value, int(other.get()))
+        else:
+            with self._lock:
+                self._value = op(self._value, int(other))
+        return self
+
+    # ------------------------------------------------------------------ #
+    # In-place arithmetic / bitwise operators (docstrings preserved)
+    # ------------------------------------------------------------------ #
     def __iadd__(self, other):
         """
         In-place addition: self += other
@@ -978,16 +989,7 @@ class SyncInt(ISync):
         Returns:
             SyncInt: Modified instance.
         """
-        if isinstance(other, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    self._value += other._value
-        else:
-            with self._lock:
-                self._value += other
-        return self
+        return self._apply_ip_op(other, lambda a, b: a + b)
 
     def __isub__(self, other):
         """
@@ -999,16 +1001,7 @@ class SyncInt(ISync):
         Returns:
             SyncInt: Modified instance.
         """
-        if isinstance(other, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    self._value -= other._value
-        else:
-            with self._lock:
-                self._value -= other
-        return self
+        return self._apply_ip_op(other, lambda a, b: a - b)
 
     def __imul__(self, other):
         """
@@ -1020,16 +1013,7 @@ class SyncInt(ISync):
         Returns:
             SyncInt: Modified instance.
         """
-        if isinstance(other, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    self._value *= other._value
-        else:
-            with self._lock:
-                self._value *= other
-        return self
+        return self._apply_ip_op(other, lambda a, b: a * b)
 
     def __ifloordiv__(self, other):
         """
@@ -1041,16 +1025,7 @@ class SyncInt(ISync):
         Returns:
             SyncInt: Modified instance.
         """
-        if isinstance(other, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    self._value //= other._value
-        else:
-            with self._lock:
-                self._value //= other
-        return self
+        return self._apply_ip_op(other, lambda a, b: a // b)
 
     def __imod__(self, other):
         """
@@ -1062,16 +1037,7 @@ class SyncInt(ISync):
         Returns:
             SyncInt: Modified instance.
         """
-        if isinstance(other, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    self._value %= other._value
-        else:
-            with self._lock:
-                self._value %= other
-        return self
+        return self._apply_ip_op(other, lambda a, b: a % b)
 
     def __ipow__(self, other):
         """
@@ -1083,16 +1049,7 @@ class SyncInt(ISync):
         Returns:
             SyncInt: Modified instance.
         """
-        if isinstance(other, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    self._value **= other._value
-        else:
-            with self._lock:
-                self._value **= other
-        return self
+        return self._apply_ip_op(other, lambda a, b: a ** b)
 
     def __ilshift__(self, other):
         """
@@ -1104,16 +1061,7 @@ class SyncInt(ISync):
         Returns:
             SyncInt: Modified instance.
         """
-        if isinstance(other, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    self._value <<= other._value
-        else:
-            with self._lock:
-                self._value <<= other
-        return self
+        return self._apply_ip_op(other, lambda a, b: a << b)
 
     def __irshift__(self, other):
         """
@@ -1125,48 +1073,7 @@ class SyncInt(ISync):
         Returns:
             SyncInt: Modified instance.
         """
-        if isinstance(other, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    self._value >>= other._value
-        else:
-            with self._lock:
-                self._value >>= other
-        return self
-
-    def __getnewargs_ex__(self):
-        """
-        Used by pickle to get arguments for reconstructing the object,
-        including keyword arguments.
-
-        Returns:
-            tuple: A tuple containing (args, kwargs) for __new__.
-        """
-        with self._lock:
-            return (self._value,), {}
-
-    def __str__(self):
-        """
-        Return the informal string representation of the object.
-
-        Returns:
-            str: String representation of the integer.
-        """
-        with self._lock:
-            return str(self._value)
-
-    def __itruediv__(self, other):
-        """
-        Raises TypeError because in-place true division would convert the
-        internal value to a float, which is not supported by SyncInt.
-        """
-        raise TypeError(
-            "In-place true division is not supported for SyncInt as it would "
-            "change the underlying type to float. Use regular division "
-            "and assign to a new variable, or use in-place floor division (//=)."
-        )
+        return self._apply_ip_op(other, lambda a, b: a >> b)
 
     def __iand__(self, other):
         """
@@ -1178,16 +1085,7 @@ class SyncInt(ISync):
         Returns:
             SyncInt: Modified instance.
         """
-        if isinstance(other, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    self._value &= other._value
-        else:
-            with self._lock:
-                self._value &= other
-        return self
+        return self._apply_ip_op(other, lambda a, b: a & b)
 
     def __ior__(self, other):
         """
@@ -1199,16 +1097,7 @@ class SyncInt(ISync):
         Returns:
             SyncInt: Modified instance.
         """
-        if isinstance(other, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    self._value |= other._value
-        else:
-            with self._lock:
-                self._value |= other
-        return self
+        return self._apply_ip_op(other, lambda a, b: a | b)
 
     def __ixor__(self, other):
         """
@@ -1220,13 +1109,33 @@ class SyncInt(ISync):
         Returns:
             SyncInt: Modified instance.
         """
-        if isinstance(other, SyncInt):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    self._value ^= other._value
-        else:
-            with self._lock:
-                self._value ^= other
-        return self
+        return self._apply_ip_op(other, lambda a, b: a ^ b)
+
+    # ------------------------------------------------------------------ #
+    # Pickle helper (unchanged)
+    # ------------------------------------------------------------------ #
+    def __getnewargs_ex__(self):
+        """
+        Used by pickle to get arguments for reconstructing the object,
+        including keyword arguments.
+
+        Returns:
+            tuple: A tuple containing (args, kwargs) for __new__.
+        """
+        with self._lock:
+            return (self._value,), {}
+
+
+    # ------------------------------------------------------------------ #
+    # Disallow in-place true division (unchanged)
+    # ------------------------------------------------------------------ #
+    def __itruediv__(self, other):
+        """
+        Raises TypeError because in-place true division would convert the
+        internal value to a float, which is not supported by SyncInt.
+        """
+        raise TypeError(
+            "In-place true division is not supported for SyncInt as it would "
+            "change the underlying type to float. Use regular division "
+            "and assign to a new variable, or use in-place floor division (//=)."
+        )

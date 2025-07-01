@@ -1,3 +1,4 @@
+from __future__ import annotations    # MUST be first
 import copy
 import threading
 from thread_factory.utils.interfaces.isync import ISync
@@ -76,33 +77,6 @@ class SyncBool(ISync):
         """
         with self._lock:
             self._value = not self._value
-
-    def _perform_binary_op(self, other, operation):
-        """
-        Perform a binary operation with another value in a thread-safe manner.
-
-        If `other` is a SyncBool, it acquires both locks in a deterministic
-        order to prevent deadlocks. Otherwise, it acquires only this object's lock.
-        It then unwraps the values and applies the given operation.
-
-        Parameters:
-            other: Another value to operate with.
-            operation: A function that accepts two unwrapped boolean values (self_val, other_val).
-
-        Returns:
-            The result of the operation.
-        """
-        if isinstance(other, SyncBool):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    # The operation is performed on the original `self` and `other` values.
-                    return operation(self._value, other._value)
-        else:
-            # For other types, only lock self and coerce the other value to a bool.
-            with self._lock:
-                return operation(self._value, bool(other))
 
     def __int__(self):
         """

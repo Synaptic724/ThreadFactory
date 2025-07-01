@@ -1048,6 +1048,8 @@ class TestSyncInt(unittest.TestCase):
         """
         s_int = SyncInt(42)
         self.assertEqual(s_int.__getnewargs_ex__(), ((42,), {}))
+
+
     def _one_writer_worker(s_int):
         for i in range(10):
             s_int.set(i)

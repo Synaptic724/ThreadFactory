@@ -1,3 +1,4 @@
+from __future__ import annotations    # MUST be first
 import threading
 import copy
 from thread_factory.utils.interfaces.isync import ISync
@@ -59,32 +60,6 @@ class SyncString(ISync):
             self._value = str(initial)
             self._lock = threading.RLock()
 
-    def _perform_binary_op(self, other, operation):
-        """
-        Perform a binary operation with another value in a thread-safe manner.
-
-        If `other` is a SyncString, it acquires both locks in a deterministic
-        order to prevent deadlocks. Otherwise, it acquires only this object's lock.
-        It then unwraps the values and applies the given operation.
-
-        Parameters:
-            other: Another value to operate with.
-            operation: A function that accepts two unwrapped string values (self_val, other_val).
-
-        Returns:
-            The result of the operation.
-        """
-        if isinstance(other, SyncString):
-            # Lock in a deterministic order (by object id) to prevent deadlocks.
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    # The operation is performed on the original `self` and `other` values.
-                    return operation(self._value, other._value)
-        else:
-            # For other types, only lock self and coerce the other value to a string.
-            with self._lock:
-                return operation(self._value, str(other))
 
     @classmethod
     def _coerce(cls, val):  # always cast to str

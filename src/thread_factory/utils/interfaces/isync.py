@@ -63,3 +63,26 @@ class ISync:
             other_val = self._unwrap_other(other)
             with self._lock:
                 return op(other_val, self._value) if r_operation else op(self._value, other_val)
+
+
+    # ------------------------------------------------------------------ #
+    #  Pickle support – exclude the RLock and rebuild it on load
+    # ------------------------------------------------------------------ #
+    def __getstate__(self):
+        """
+        Return the instance state for pickling.
+
+        We only pickle the numeric value.  The lock is **not** pickled and
+        will be recreated in ``__setstate__``.
+        """
+        return {"_value": self.get()}        # plain float, fully picklable
+
+    def __setstate__(self, state):
+        """
+        Re-initialise the object after unpickling.
+
+        A fresh ``threading.RLock`` is created each time, ensuring the
+        unpickled object is safe to share between threads.
+        """
+        self._value = float(state["_value"])
+        self._lock  = threading.RLock()

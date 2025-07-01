@@ -1,3 +1,4 @@
+from __future__ import annotations    # MUST be first
 import threading
 import math
 from copy import deepcopy
@@ -84,54 +85,6 @@ class SyncFloat(ISync):
     @classmethod
     def _coerce(cls, val):  # float-specific cast
         return float(val)
-
-    def _unwrap_other(self, other):
-        """
-        Helper to unwrap supported sync types (SyncFloat, SyncInt, etc.) or
-        raw numeric/str values to a float.
-
-        Falls back to returning the argument unchanged if coercion fails.
-        """
-        # Same-type unwrap
-        if isinstance(other, SyncFloat):
-            return other.get()
-
-        # Cross-type unwrap (e.g., SyncInt / SyncBool) if a `get()` exists
-        if hasattr(other, "get") and callable(getattr(other, "get", None)):
-            try:
-                return float(other.get())
-            except Exception:
-                pass
-
-        # Primitive numeric / string
-        try:
-            return float(other)
-        except Exception:
-            return other  # Let caller raise if it can't handle
-
-
-    def _perform_binary_op(self, other, operation, r_operation=False):
-        """
-        Thread-safe binary operation helper.
-
-        * Locks both operands deterministically if `other` is a SyncFloat.
-        * Locks only `self` otherwise.
-        * Supports reverse operations via `r_operation`.
-        """
-        if isinstance(other, SyncFloat):
-            # Acquire locks in object-id order to prevent deadlocks
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-            with first._lock:
-                with second._lock:
-                    if r_operation:
-                        return operation(other._value, self._value)
-                    return operation(self._value, other._value)
-        else:
-            other_val = self._unwrap_other(other)
-            with self._lock:
-                if r_operation:
-                    return operation(other_val, self._value)
-                return operation(self._value, other_val)
 
     # ──────────────────────────────────────────────────────────────────
     # Public API
@@ -890,48 +843,49 @@ class SyncFloat(ISync):
     # Atomic convenience helpers
     # ------------------------------------------------------------------ #
 
-    def increment(self, value: Real | "SyncFloat" | "SyncInt" = 1.0):
+    def increment(self, value: Real | ISync = 1.0):
         """
-        increment(value=1.0)
-        --------------------
-        Atomically add *value* to the internal float.
+        Atomically increment the internal value by the specified amount.
 
-        Parameters:
-            value (Real | SyncFloat | SyncInt): Amount to add.
+        Parameters
+        ----------
+        value : Real | ISync
+            Amount to add.  Any ISync value is converted via float(other.get()).
 
-        Returns:
-            float: The updated value after increment.
+        Returns
+        -------
+        float
+            The updated value.
         """
-        # SyncFloat / SyncInt → lock ordering
-        if isinstance(value, (SyncFloat, "SyncInt")):               # type: ignore[name-defined]
+        if ISync._is_sync(value):
             first, second = (self, value) if id(self) < id(value) else (value, self)
-            with first._lock:
-                with second._lock:
-                    self._value += float(getattr(value, "_value", value.get()))
-                    return self._value
+            with first._lock, second._lock:
+                self._value += float(value.get())
+                return self._value
         else:
             with self._lock:
                 self._value += float(value)
                 return self._value
 
-    def decrement(self, value: Real | "SyncFloat" | "SyncInt" = 1.0):
+    def decrement(self, value: Real | ISync = 1.0):
         """
-        decrement(value=1.0)
-        --------------------
-        Atomically subtract *value* from the internal float.
+        Atomically decrement the internal value by the specified amount.
 
-        Parameters:
-            value (Real | SyncFloat | SyncInt): Amount to subtract.
+        Parameters
+        ----------
+        value : Real | ISync
+            Amount to subtract.
 
-        Returns:
-            float: The updated value after decrement.
+        Returns
+        -------
+        float
+            The updated value.
         """
-        if isinstance(value, (SyncFloat, "SyncInt")):               # type: ignore[name-defined]
+        if ISync._is_sync(value):
             first, second = (self, value) if id(self) < id(value) else (value, self)
-            with first._lock:
-                with second._lock:
-                    self._value -= float(getattr(value, "_value", value.get()))
-                    return self._value
+            with first._lock, second._lock:
+                self._value -= float(value.get())
+                return self._value
         else:
             with self._lock:
                 self._value -= float(value)
