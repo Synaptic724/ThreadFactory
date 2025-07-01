@@ -1,7 +1,7 @@
 import threading
 from typing import Optional, List, Callable, Any
 from thread_factory.agent.activator import AgentActivator
-from thread_factory.concurrency import ConcurrentDict
+from thread_factory.concurrency import ConcurrentDict, ConcurrentList
 from thread_factory.agent_thread_pool import HelpRequest  # Assuming HelpRequest for placeholder
 
 
@@ -51,7 +51,7 @@ class CommandCenter:
 
         return _execute_and_dispose
 
-    def create_active_controllable_agents(
+    def create_agents(
             self,
             count: int,
             target: Callable[[], Any],
@@ -72,6 +72,7 @@ class CommandCenter:
             List[threading.Thread]: A list of the newly created (but not started)
                                     threads, now dressed as agents.
         """
+        new_threads: List[threading.Thread] = []
         for i in range(count):
             # 1. Create a wrapper to run the user's code and then auto-dispose.
             wrapped_target = self._create_agent_wrapper(target)
@@ -89,6 +90,7 @@ class CommandCenter:
             # 4. Store the newly activated agent thread in our tracking dictionary.
             #    The thread object now has the .factory_id attribute patched onto it.
             self._active_agents[thread.factory_id] = thread
+            new_threads.append(thread)
 
         return new_threads
 
