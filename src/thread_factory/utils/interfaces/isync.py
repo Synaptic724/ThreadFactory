@@ -65,6 +65,10 @@ class ISync:
             with self._lock:
                 return op(other_val, self._value) if r_operation else op(self._value, other_val)
 
+    @staticmethod
+    def _acquire_two(a: "ISync", b: "ISync"):
+        """Return the two locks in a deterministic order (smallest id first)."""
+        return ((a, b) if id(a) <= id(b) else (b, a))
 
     # ------------------------------------------------------------------ #
     #  Pickle support – exclude the RLock and rebuild it on load

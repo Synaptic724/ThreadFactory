@@ -1,7 +1,6 @@
 from __future__ import annotations    # MUST be first
-
 from numbers import Real
-
+from thread_factory.concurrency.value_types.sync_string import SyncString
 from thread_factory.utils.interfaces.isync import ISync
 import threading
 
@@ -97,27 +96,27 @@ class SyncInt(ISync):
 
     def _unwrap_other(self, other):
         """
-        SyncInt-specific coercion.
+        SyncString-compatible unwrapping.
 
         Accepts
         -------
-        • another ISync value   → other.get()       (keeps float precision)
-        • any numbers.Real      → other            (int, float, bool, Decimal …)
+        • SyncString         → other.get()
+        • str                → other (already valid)
 
-        Raises
-        ------
-        TypeError  – for non-numeric types.
+        Returns
+        -------
+        A str if valid. Any other type is returned as-is,
+        and should raise a TypeError during comparison if unsupported.
+
+        This ensures Python's default str behavior is preserved.
         """
-        if ISync._is_sync(other):
-            val = other.get()
-            if isinstance(val, Real):
-                return val
-            raise TypeError(f"Incompatible Sync type {type(other).__name__}")
+        if isinstance(other, SyncString):
+            return other.get()
 
-        if isinstance(other, Real):
+        if isinstance(other, str):
             return other
 
-        raise TypeError(f"Incompatible type '{type(other).__name__}' for SyncInt")
+        return other  # Let Python raise TypeError naturally if needed
 
     @classmethod
     def _coerce(cls, val):  # int-specific cast

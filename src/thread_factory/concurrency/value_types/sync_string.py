@@ -60,6 +60,30 @@ class SyncString(ISync):
             self._value = str(initial)
             self._lock = threading.RLock()
 
+    def _unwrap_other(self, other):
+        if isinstance(other, SyncString):
+            return other.get()
+        if isinstance(other, str):
+            return other
+        return other  # no coercion
+
+    def _perform_binary_op(self, other, op):
+        """
+        Thread-safe binary operation that avoids deadlocks
+        by enforcing consistent lock acquisition order.
+        """
+        if isinstance(other, SyncString):
+            # Acquire locks in deterministic order
+            first, second = (self, other) if id(self) < id(other) else (other, self)
+
+            with first._lock:
+                with second._lock:
+                    return op(self._value, other._value)
+
+        # For non-SyncString values, just lock self
+        with self._lock:
+            b = self._unwrap_other(other)
+            return op(self._value, b)
 
     @classmethod
     def _coerce(cls, val):  # always cast to str

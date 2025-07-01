@@ -2,7 +2,6 @@ from __future__ import annotations    # MUST be first
 import copy
 import threading
 from decimal import Decimal
-
 from thread_factory.utils.interfaces.isync import ISync
 
 class SyncBool(ISync):
