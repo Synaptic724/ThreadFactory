@@ -1,3 +1,4 @@
+import copy
 import threading
 
 class SyncBool:
@@ -234,6 +235,103 @@ class SyncBool:
         """
         # The order of operands in the lambda is reversed to match the operation.
         return self._perform_binary_op(other, lambda v_self, v_other: v_other & v_self)
+
+    import copy
+
+    def __copy__(self):
+        """
+        Create a shallow copy of the SyncBool.
+
+        Returns:
+            SyncBool: A new instance with the same boolean value.
+        """
+        with self._lock:
+            return SyncBool(self._value)
+
+    def __deepcopy__(self, memo):
+        """
+        Create a deep copy of the SyncBool.
+
+        Parameters:
+            memo (dict): The memoization dictionary for deep copies.
+
+        Returns:
+            SyncBool: A deep-copied instance with the same boolean value.
+        """
+        with self._lock:
+            copied_value = copy.deepcopy(self._value, memo)
+            return SyncBool(copied_value)
+
+    def __format__(self, format_spec):
+        """
+        Format the boolean value using a format specifier.
+
+        Parameters:
+            format_spec (str): The format string.
+
+        Returns:
+            str: Formatted representation of the internal boolean.
+        """
+        with self._lock:
+            return format(self._value, format_spec)
+
+    def __reduce__(self):
+        """
+        Return a tuple for pickle support.
+
+        Returns:
+            tuple: (constructor, args)
+        """
+        with self._lock:
+            return (self.__class__, (self._value,))
+
+    def __lt__(self, other):
+        """
+        Less than comparison.
+
+        Parameters:
+            other (Any): The value to compare against.
+
+        Returns:
+            bool: True if self < other.
+        """
+        return self._perform_binary_op(other, lambda a, b: a < b)
+
+    def __le__(self, other):
+        """
+        Less than or equal comparison.
+
+        Parameters:
+            other (Any): The value to compare against.
+
+        Returns:
+            bool: True if self <= other.
+        """
+        return self._perform_binary_op(other, lambda a, b: a <= b)
+
+    def __gt__(self, other):
+        """
+        Greater than comparison.
+
+        Parameters:
+            other (Any): The value to compare against.
+
+        Returns:
+            bool: True if self > other.
+        """
+        return self._perform_binary_op(other, lambda a, b: a > b)
+
+    def __ge__(self, other):
+        """
+        Greater than or equal comparison.
+
+        Parameters:
+            other (Any): The value to compare against.
+
+        Returns:
+            bool: True if self >= other.
+        """
+        return self._perform_binary_op(other, lambda a, b: a >= b)
 
     def __ror__(self, other):
         """

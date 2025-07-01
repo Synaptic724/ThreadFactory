@@ -858,6 +858,378 @@ class TestSyncInt(unittest.TestCase):
         s_int |= 5  # 0101
         self.assertEqual(s_int.get(), 13)  # 1101
 
+    def test_iadd_with_negative_syncint(self):
+        s1 = SyncInt(10)
+        s2 = SyncInt(-20)
+        s1 += s2
+        self.assertEqual(s1.get(), -10)
+
+    def test_imul_by_zero(self):
+        s_int = SyncInt(100)
+        s_int *= 0
+        self.assertEqual(s_int.get(), 0)
+
+    def test_imul_with_negative(self):
+        s_int = SyncInt(-10)
+        s_int *= 5
+        self.assertEqual(s_int.get(), -50)
+
+    def test_ifloordiv_by_negative(self):
+        s_int = SyncInt(20)
+        s_int //= -3
+        self.assertEqual(s_int.get(), -7)
+
+    def test_ifloordiv_resulting_in_zero(self):
+        s_int = SyncInt(5)
+        s_int //= 10
+        self.assertEqual(s_int.get(), 0)
+
+    def test_imod_with_negative_divisor(self):
+        s_int = SyncInt(10)
+        s_int %= -3
+        self.assertEqual(s_int.get(), -2)
+
+    def test_ipow_with_zero_exponent(self):
+        s_int = SyncInt(123)
+        s_int **= 0
+        self.assertEqual(s_int.get(), 1)
+
+    def test_ipow_with_one_as_base(self):
+        s_int = SyncInt(1)
+        s_int **= 100
+        self.assertEqual(s_int.get(), 1)
+
+    def test_ipow_with_negative_base_odd_exponent(self):
+        s_int = SyncInt(-2)
+        s_int **= 3
+        self.assertEqual(s_int.get(), -8)
+
+    def test_ilshift_by_zero(self):
+        s_int = SyncInt(10)
+        s_int <<= 0
+        self.assertEqual(s_int.get(), 10)
+
+    def test_irshift_to_zero(self):
+        s_int = SyncInt(1)
+        s_int >>= 1
+        self.assertEqual(s_int.get(), 0)
+
+    def test_iand_with_zero(self):
+        s_int = SyncInt(0b1111)
+        s_int &= 0
+        self.assertEqual(s_int.get(), 0)
+
+    def test_ior_with_self(self):
+        s_int = SyncInt(42)
+        original_id = id(s_int)
+        s_int |= s_int
+        self.assertEqual(s_int.get(), 42)
+        self.assertIs(s_int, s_int)
+
+    def test_ixor_with_self_is_zero(self):
+        s_int = SyncInt(123)
+        s_int ^= s_int
+        self.assertEqual(s_int.get(), 0)
+
+    def test_iadd_returns_self(self):
+        s_int = SyncInt(10)
+        result = s_int.__iadd__(5)
+        self.assertIs(s_int, result)
+
+    def test_divmod_with_negative_divisor(self):
+        s_int = SyncInt(10)
+        self.assertEqual(divmod(s_int, -3), (-4, -2))
+
+    def test_rdivmod_with_negative_dividend(self):
+        s_int = SyncInt(3)
+        self.assertEqual(divmod(-10, s_int), (-4, 2))
+
+    def test_and_with_negative_numbers(self):
+        # -5 = ...1011, -3 = ...1101.  (-5 & -3) = -7 (...1001) is wrong.
+        # two's complement: -5 is ...11111011, -3 is ...11111101. & is ...11111001 which is -7
+        s_int = SyncInt(-5)
+        self.assertEqual(s_int & -3, -7)
+
+    def test_rshift_on_negative_number(self):
+        s_int = SyncInt(-16)
+        self.assertEqual(s_int >> 2, -4)
+
+    def test_comparison_with_non_numeric_type(self):
+        s_int = SyncInt(10)
+        with self.assertRaises(TypeError):
+            s_int > "10"
+        with self.assertRaises(TypeError):
+            s_int < [10]
+
+    def test_safe_pow_with_negative_exponent(self):
+        with self.assertRaises(ValueError):
+            SyncInt.safe_pow(10, -2, 5)
+
+    def test_safe_pow_with_zero_modulus(self):
+        with self.assertRaises(ValueError):
+            SyncInt.safe_pow(10, 2, 0)
+
+    def test_direct_ternary_pow_with_int_base_fails(self):
+        s_exp = SyncInt(3)
+        s_mod = SyncInt(5)
+        with self.assertRaises(TypeError):
+            pow(10, s_exp, s_mod)
+
+    def test_bool_on_negative_number(self):
+        s_int = SyncInt(-1)
+        self.assertTrue(bool(s_int))
+
+    def test_index_with_out_of_bounds(self):
+        s_int = SyncInt(5)
+        data = [1, 2, 3]
+        with self.assertRaises(IndexError):
+            data[s_int]
+
+    def test_format_with_padding_and_sign(self):
+        s_int = SyncInt(-42)
+        self.assertEqual(f"{s_int:>+10}", "       -42")
+
+    def test_to_bytes_with_insufficient_length(self):
+        s_int = SyncInt(1000)  # needs 2 bytes
+        with self.assertRaises(OverflowError):
+            s_int.to_bytes(1, 'big')
+
+    def test_from_bytes_with_empty_bytes(self):
+        self.assertEqual(SyncInt.from_bytes(b'', 'big'), 0)
+
+    def test_hashing_in_dictionary(self):
+        s_int1 = SyncInt(10)
+        s_int2 = SyncInt(10)
+        s_int3 = SyncInt(20)
+        d = {s_int1: "value1"}
+        self.assertIn(s_int2, d)
+        self.assertNotIn(s_int3, d)
+        self.assertEqual(d[s_int2], "value1")
+
+    def test_slots_prevent_new_attributes(self):
+        s_int = SyncInt(10)
+        with self.assertRaises(AttributeError):
+            s_int.new_attr = "test"
+
+    def test_rlock_reentrancy(self):
+        s_int = SyncInt(10)
+        with s_int._lock:
+            s_int.set(20)
+            with s_int._lock:
+                s_int.set(30)
+                self.assertEqual(s_int.get(), 30)
+        self.assertEqual(s_int.get(), 30)
+
+    def _deadlock_worker(s1, s2, results):
+        try:
+            s1 += s2
+            results.append("Success")
+        except Exception as e:
+            results.append(f"Error: {e}")
+
+
+    def _one_writer_worker(s_int):
+        for i in range(10):
+            s_int.set(i)
+            time.sleep(0.01)
+
+
+
+    def test_init_from_unsupported_type(self):
+        with self.assertRaises(TypeError):
+            SyncInt([1, 2])
+
+    def test_set_from_unsupported_type(self):
+        s_int = SyncInt(0)
+        with self.assertRaises(TypeError):
+            s_int.set({"a": 1})
+
+    def test_bit_count_zero(self):
+        self.assertEqual(SyncInt(0).bit_count(), 0)
+
+    def test_conjugate_zero(self):
+        self.assertEqual(SyncInt(0).conjugate(), 0)
+
+    def test_to_bytes_signed_positive(self):
+        self.assertEqual(SyncInt(127).to_bytes(1, 'big', signed=True), b'\x7f')
+
+    def test_from_bytes_signed_negative(self):
+        self.assertEqual(SyncInt.from_bytes(b'\x80', 'big', signed=True), -128)
+
+    def test_add_syncint_to_negative(self):
+        s1 = SyncInt(-50)
+        s2 = SyncInt(20)
+        self.assertEqual(s1 + s2, -30)
+
+    def test_radd_syncint_to_negative(self):
+        s1 = SyncInt(-50)
+        self.assertEqual(20 + s1, -30)
+
+    def test_and_with_mask(self):
+        s1 = SyncInt(0b110101)
+        self.assertEqual(s1 & 0b001100, 0b000100)
+
+    def test_rand_with_mask(self):
+        s1 = SyncInt(0b110101)
+        self.assertEqual(0b001100 & s1, 0b000100)
+
+    def test_or_with_mask(self):
+        s1 = SyncInt(0b110101)
+        self.assertEqual(s1 | 0b001100, 0b111101)
+
+    def test_xor_with_mask(self):
+        s1 = SyncInt(0b110101)
+        self.assertEqual(s1 ^ 0b001100, 0b111001)
+
+    def test_divmod_by_larger_number(self):
+        s1 = SyncInt(10)
+        self.assertEqual(divmod(s1, 20), (0, 10))
+
+    def test_float_conversion_negative(self):
+        self.assertAlmostEqual(float(SyncInt(-50)), -50.0)
+
+    def test_floordiv_by_negative(self):
+        s1 = SyncInt(10)
+        self.assertEqual(s1 // -4, -3)
+
+    def test_rfloordiv_by_negative(self):
+        s1 = SyncInt(10)
+        self.assertEqual(-40 // s1, -4)
+
+    def test_format_as_octal(self):
+        s1 = SyncInt(63)
+        self.assertEqual(format(s1, 'o'), '77')
+
+    def test_ge_with_syncint_false(self):
+        s1 = SyncInt(9)
+        s2 = SyncInt(10)
+        self.assertFalse(s1 >= s2)
+
+    def test_gt_with_syncint_equal(self):
+        s1 = SyncInt(10)
+        s2 = SyncInt(10)
+        self.assertFalse(s1 > s2)
+
+    def test_hash_of_negative_one(self):
+        self.assertEqual(hash(SyncInt(-1)), hash(-1))
+
+    def test_index_in_string(self):
+        s_idx = SyncInt(4)
+        self.assertEqual("hello world"[s_idx], 'o')
+
+    def test_invert_zero(self):
+        self.assertEqual(~SyncInt(0), -1)
+
+    def test_le_with_syncint_false(self):
+        s1 = SyncInt(11)
+        s2 = SyncInt(10)
+        self.assertFalse(s1 <= s2)
+
+    def test_lt_with_syncint_equal(self):
+        s1 = SyncInt(10)
+        s2 = SyncInt(10)
+        self.assertFalse(s1 < s2)
+
+    def test_mod_by_larger_number(self):
+        s1 = SyncInt(10)
+        self.assertEqual(s1 % 20, 10)
+
+    def test_rmod_by_larger_number(self):
+        s1 = SyncInt(20)
+        self.assertEqual(10 % s1, 10)
+
+    def test_mul_by_negative(self):
+        s1 = SyncInt(10)
+        self.assertEqual(s1 * -5, -50)
+
+    def test_rmul_by_negative(self):
+        s1 = SyncInt(10)
+        self.assertEqual(-5 * s1, -50)
+
+    def test_neg_zero(self):
+        self.assertEqual(-SyncInt(0), 0)
+
+    def test_pos_zero(self):
+        self.assertEqual(+SyncInt(0), 0)
+
+    def test_safe_pow_all_ints_no_mod(self):
+        self.assertEqual(SyncInt.safe_pow(4, 3, None), 64)
+
+    def test_rpow_int_syncint_with_mod_fails(self):
+        with self.assertRaises(TypeError):
+            pow(2, SyncInt(3), 5)  # Calls int.__pow__ which doesn't know what to do
+
+    def test_sub_from_zero(self):
+        s1 = SyncInt(25)
+        self.assertEqual(0 - s1, -25)
+
+    def test_truediv_by_negative(self):
+        s1 = SyncInt(10)
+        self.assertAlmostEqual(s1 / -4, -2.5)
+
+    def test_rtruediv_by_negative(self):
+        s1 = SyncInt(10)
+        self.assertAlmostEqual(-50 / s1, -5.0)
+
+    def test_numerator_on_zero(self):
+        self.assertEqual(SyncInt(0).numerator, 0)
+
+    def test_denominator_on_zero(self):
+        self.assertEqual(SyncInt(0).denominator, 1)
+
+    def test_real_on_zero(self):
+        self.assertEqual(SyncInt(0).real, 0)
+
+    def test_imag_on_zero(self):
+        self.assertEqual(SyncInt(0).imag, 0)
+
+    def test_getnewargs_zero(self):
+        self.assertEqual(SyncInt(0).__getnewargs__(), (0,))
+
+    def test_ne_syncint_true(self):
+        s1 = SyncInt(10)
+        s2 = SyncInt(11)
+        self.assertTrue(s1 != s2)
+
+    def test_ne_syncint_false(self):
+        s1 = SyncInt(10)
+        s2 = SyncInt(10)
+        self.assertFalse(s1 != s2)
+
+    def test_or_with_zero(self):
+        s1 = SyncInt(42)
+        self.assertEqual(s1 | 0, 42)
+
+    def test_ror_with_zero(self):
+        s1 = SyncInt(42)
+        self.assertEqual(0 | s1, 42)
+
+    def test_repr_zero(self):
+        self.assertEqual(repr(SyncInt(0)), '0')
+
+
+    def _concurrent_ipow_worker(s_int, results):
+        try:
+            s_int **= 2
+            results.append(s_int.get())
+        except Exception as e:
+            results.append(e)
+
+
+    def test_sequential_mixed_inplace_ops(self):
+        s = SyncInt(10)
+        s += 5  # 15
+        s *= 2  # 30
+        s //= 4  # 7
+        s %= 3  # 1
+        s **= 100  # 1
+        s <<= 3  # 8
+        s >>= 1  # 4
+        s &= 6  # 4 (100 & 110 -> 100)
+        s |= 1  # 5 (100 | 001 -> 101)
+        s ^= 5  # 0 (101 ^ 101 -> 000)
+        self.assertEqual(s.get(), 0)
+
     def test_ixor_with_syncint(self):
         s_int1 = SyncInt(15)  # 1111
         s_int2 = SyncInt(7)  # 0111
