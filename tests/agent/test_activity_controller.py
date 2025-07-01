@@ -3,68 +3,82 @@ from thread_factory.agent.activity_controller import ActivityController
 from thread_factory import ConcurrentDict
 
 
-class TestAgentController(unittest.TestCase):
+class TestActivityController(unittest.TestCase):
 
     def setUp(self):
-        self.controller = ActivityController(job_name="unit_test", priority=1)
+        self.controller = ActivityController(job="unit_test", priority=1)
 
     def tearDown(self):
-        self.controller.dispose()
+        if self.controller and not self.controller._disposed:
+            self.controller.dispose()
 
-    def test_ulid_exists(self):
+    def test_ulid_is_generated(self):
         self.assertTrue(hasattr(self.controller, "_ulid"))
         self.assertIsInstance(self.controller._ulid, str)
         self.assertGreater(len(self.controller._ulid), 0)
 
-    def test_metadata_copy(self):
+    def test_metadata_fields_set_correctly(self):
         meta = self.controller.metadata
-        self.assertEqual(meta["job_name"], "unit_test")
-        self.assertEqual(meta["priority"], 1)
+        self.assertEqual(meta["job"], "unit_test")
+        self.assertEqual(meta["user_metadata"]["priority"], 1)
 
-        meta["job_name"] = "modified"
-        self.assertNotEqual(self.controller.metadata["job_name"], "modified")
+        meta["user_metadata"]["priority"] = 999
+        self.assertNotEqual(self.controller.user_metadata["priority"], 1)
 
-    def test_bind_and_activity_propagation(self):
+    def test_task_job_group_setters_work(self):
+        self.controller.task = "download"
+        self.controller.job = "B123"
+        self.controller.group = "group_alpha"
+        self.assertEqual(self.controller.task, "download")
+        self.assertEqual(self.controller.job, "B123")
+        self.assertEqual(self.controller.group, "group_alpha")
+
+    def test_bind_propagates_to_activity_token(self):
         self.controller.bind("cancel_requested", True)
-        self.controller.bind("compute", lambda: 123)
+        self.controller.bind("compute_value", lambda: 99)
+        token = self.controller.activity
+        self.assertIn("cancel_requested", token)
+        self.assertTrue(token["cancel_requested"])
+        self.assertEqual(token["compute_value"](), 99)
 
-        act = self.controller.activity
-        self.assertTrue("cancel_requested" in act)
-        self.assertEqual(act["cancel_requested"], True)
-        self.assertEqual(act["compute"](), 123)
+    def test_register_and_run_callback_executes(self):
+        calls = []
 
-    def test_register_and_run_callback_success(self):
-        called = []
+        def on_trigger():
+            calls.append("ran")
 
-        def my_callback():
-            called.append("ok")
-
-        self.controller.register_callback("on_shutdown", my_callback)
-        result = self.controller.run_callback("on_shutdown")
-
+        self.controller.register_callback("my_cb", on_trigger)
+        result = self.controller.run_callback("my_cb")
         self.assertTrue(result)
-        self.assertIn("ok", called)
+        self.assertIn("ran", calls)
 
-    def test_run_callback_not_found(self):
-        self.assertFalse(self.controller.run_callback("does_not_exist"))
+    def test_run_callback_returns_false_if_missing(self):
+        result = self.controller.run_callback("not_there")
+        self.assertFalse(result)
 
-    def test_run_callback_raises(self):
-        def bad_callback():
+    def test_run_callback_returns_false_on_exception(self):
+        def broken():
             raise RuntimeError("fail")
 
-        self.controller.register_callback("fail", bad_callback)
-        self.assertFalse(self.controller.run_callback("fail"))  # should not raise
+        self.controller.register_callback("boom", broken)
+        result = self.controller.run_callback("boom")
+        self.assertFalse(result)
 
-    def test_dispose_clears_everything(self):
-        self.controller.bind("cancel_requested", True)
-        self.controller.register_callback("on_shutdown", lambda: None)
+    def test_user_metadata_access(self):
+        c = ActivityController(task="extract", user_label="custom")
+        self.assertEqual(c.user_metadata["user_label"], "custom")
+        c.dispose()
 
+    def test_dispose_clears_internal_references(self):
+        self.controller.bind("flag", True)
+        self.controller.register_callback("noop", lambda: None)
         self.controller.dispose()
         self.assertTrue(self.controller._disposed)
         self.assertIsNone(self.controller._metadata)
         self.assertIsNone(self.controller._actions)
         self.assertIsNone(self.controller._callbacks)
         self.assertIsNone(self.controller._activity)
+
 
 if __name__ == "__main__":
     unittest.main()
