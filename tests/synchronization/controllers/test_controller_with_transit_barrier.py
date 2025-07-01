@@ -4,7 +4,7 @@ import threading
 import time
 
 # Assuming classes are in this structure
-from thread_factory.synchronization.controllers.controller import Controller
+from thread_factory.synchronization.controllers.signal_controller import Controller
 from thread_factory.synchronization.coordinators.transit_barrier import TransitBarrier
 
 

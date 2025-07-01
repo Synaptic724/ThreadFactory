@@ -1,5 +1,5 @@
-from thread_factory.synchronization.controllers.controller import Controller
+from thread_factory.synchronization.controllers.signal_controller import SignalController
 
 __all__ = [
-    "Controller",
+    "SignalController",
     ]

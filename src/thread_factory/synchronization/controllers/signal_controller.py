@@ -5,9 +5,9 @@ from thread_factory.concurrency import ConcurrentDict
 from thread_factory.utils import IDisposable
 
 
-class Controller(IDisposable):
+class SignalController(IDisposable):
     """
-    Controller: A management system for registering, invoking, and controlling objects
+    SignalController: A management system for registering, invoking, and controlling objects
     that expose commands through a standardized interface.
 
     Objects managed by this controller must adhere to a specific contract:
@@ -18,7 +18,7 @@ class Controller(IDisposable):
         - 'commands' (Dict[str, Callable]): A dictionary where keys are command names (str)
           and values are the corresponding callable methods or functions exposed by the object.
 
-    This Controller provides the following functionalities:
+    This SignalController provides the following functionalities:
     - **Centralized Invocation and Broadcast**: Allows invoking specific commands on individual
       registered objects or broadcasting a command to multiple objects.
     - **Subscription-based Event Notification**: Enables external components to subscribe to
@@ -29,7 +29,7 @@ class Controller(IDisposable):
       execute before and after command invocations, useful for diagnostics, logging, or
       implementing cross-cutting concerns.
 
-    The Controller is designed to be thread-safe, utilizing `threading.RLock` for global
+    The SignalController is designed to be thread-safe, utilizing `threading.RLock` for global
     synchronization and `ConcurrentDict` for thread-safe access to its internal data structures.
 
 
@@ -39,13 +39,13 @@ class Controller(IDisposable):
     - `ClockBarrier`: For time-based synchronization of threads.
     - `TransitBarrier`: Executes all threads in a group once into a callable after a threshold is reached.
 
-    These components allow the Controller to manage complex thread interactions.
+    These components allow the SignalController to manage complex thread interactions.
     There will be more integration with other synchronization primitives in the future.***
     """
 
     def __init__(self, logger: Optional[logging.Logger] = None):
         """
-        Initialize the Controller.
+        Initialize the SignalController.
 
         Args:
             logger (Optional[logging.Logger]): An optional custom logger instance.
@@ -230,7 +230,7 @@ class Controller(IDisposable):
         """
         # Check if already disposed to prevent redundant operations
         if self._disposed:
-            self._logger.debug("Controller already disposed. Skipping dispose operation.")
+            self._logger.debug("SignalController already disposed. Skipping dispose operation.")
             return
 
         with self._outer_lock:
@@ -238,7 +238,7 @@ class Controller(IDisposable):
             if self._disposed:
                 return
 
-            self._logger.info("Controller disposing...")
+            self._logger.info("SignalController disposing...")
             self._logger.debug(f"Attempting to dispose {len(self._registry)} registered objects manually.")
 
             # Iterate over a copy of items to avoid issues if registry is modified during iteration
@@ -270,11 +270,11 @@ class Controller(IDisposable):
 
             # Mark the controller as disposed
             self._disposed = True
-            self._logger.info("Controller disposed.")
+            self._logger.info("SignalController disposed.")
 
     def register(self, registrant: Any):
         """
-        Register a new controllable object with the Controller.
+        Register a new controllable object with the SignalController.
 
         The object must adhere to the contract:
         - It must have an `id` attribute (string) which serves as its unique identifier.
@@ -316,7 +316,7 @@ class Controller(IDisposable):
 
     def unregister(self, object_id: str, dispose_object: bool = True):
         """
-        Unregister a previously registered object from the Controller.
+        Unregister a previously registered object from the SignalController.
 
         This method removes the object's entry from the registry, clears any associated
         active waits or subscriptions, and optionally calls the object's `dispose()` method.
@@ -416,14 +416,14 @@ class Controller(IDisposable):
         """
         # Early exit if the controller is disposed or the object is not registered
         if self._disposed:
-            self._logger.debug(f"Controller disposed. Ignoring notification for {object_id}, event {event_type}")
+            self._logger.debug(f"SignalController disposed. Ignoring notification for {object_id}, event {event_type}")
             return
         if not self._registry or object_id not in self._registry:
             self._logger.warning(f"Notification received for unregistered object {object_id}, event {event_type}. "
                                  f"This event will not be dispatched to subscribers.")
             return
 
-        self._logger.info(f"Controller Event: ID='{object_id}', Event='{event_type}'")
+        self._logger.info(f"SignalController Event: ID='{object_id}', Event='{event_type}'")
 
         # Update internal active waits tracking based on specific event types
         if event_type == "WAIT_STARTING":

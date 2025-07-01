@@ -1,170 +1,102 @@
-import threading
 import ulid
-from typing import Callable, Optional
-# Assuming these imports from your project structure
-from thread_factory import ConcurrentDict, ConcurrentList
+from typing import Callable, Dict, Any
+from thread_factory import ConcurrentDict
 from thread_factory.agent.activity import Activity
-from thread_factory.utils.exceptions.operation_canceled_error import OperationCanceledError
+from thread_factory.utils import IDisposable
 
 
-class ActivityController:
+class ActivityController(IDisposable):
     """
-    Acts as a central command and control unit for an agent's operation or job.
+    Signal and behavior controller for a single agent or operation.
 
-    This class is designed to be open-ended. While it has a fully implemented
-    cooperative cancellation system, it serves as the authoritative source for
-    'Activity' tokens. These tokens are the primary vehicle for sending any
-    type of command or signal to a working agent, not just cancellation.
-
-    It manages the lifecycle of an operation (e.g., signaling it to stop) and
-    holds metadata about the job itself.
+    This controller owns a single `Activity` token, which reflects dynamic
+    behaviors, flags, and metadata updates in real time. External systems
+    may bind actions or register callbacks for coordination.
     """
-    # A singleton instance for a controller that can never be canceled.
-    # This is useful for non-cancelable operations that still require an Activity token.
-    _none_controller: Optional['ActivityController'] = None
-    _none_lock = threading.RLock()
 
-    def __init__(self, is_cancelable: bool = True, **kwargs):
+    def __init__(self, **kwargs: Any):
         """
-        Initializes a new OperationalController for a specific job or operation.
+        Initializes a new controller with its own activity and metadata.
 
         Args:
-            is_cancelable (bool): If False, this controller and its activities
-                                  can never enter a canceled state.
-            **kwargs: Arbitrary keyword arguments that will be stored as
-                      metadata for the operation (e.g., job_name, priority).
+            **kwargs: Arbitrary metadata to associate with the operation,
+                      such as job_name, priority, labels, etc.
         """
-        # --- State Properties ---
-        self._is_cancellation_requested = False
-        self._can_be_canceled = is_cancelable
-        self._ulid = str(ulid.ULID())  # A unique ID for this specific operation control instance.
+        super().__init__()
+        self._ulid = str(ulid.ULID())
+        self._metadata = ConcurrentDict(kwargs)
+        self._actions = ConcurrentDict[str, Any]()         # renamed from _activities
+        self._callbacks = ConcurrentDict[str, Callable[[], None]]()
+        self._activity = Activity(self._metadata)          # single persistent token
 
-        # --- Thread-Safe Collections ---
-        self._lock = threading.RLock()  # Ensures thread-safe access to controller state.
-        self._callbacks: ConcurrentList[Callable[[], None]] = ConcurrentList()  # Callbacks to fire on cancellation.
-        self._metadata = ConcurrentDict(kwargs)  # Thread-safe dictionary for metadata.
+    def dispose(self) -> None:
+        """
+        Clears all internal state and severs activity bindings.
+        This controller should not be reused after disposal.
+        """
+        if self._disposed:
+            return
+        self._callbacks.dispose()
+        self._callbacks = None
+        self._actions.dispose()
+        self._actions = None
+        self._metadata.dispose()
+        self._metadata = None
+        self._activity = None
+        self._disposed = True
+
 
     @property
     def activity(self) -> Activity:
         """
-        Issues a new Activity token linked to this controller.
-
-        This token is the object you pass to an agent. The agent uses it to
-        check for cancellation requests or to pull other dynamic commands
-        that have been added to the Activity.
+        Returns the persistent `Activity` token owned by this controller.
 
         Returns:
-            Activity: A new token instance representing the ongoing operation.
+            Activity: A shared token reflecting current actions and metadata.
         """
-        return Activity(self, self.metadata)
+        return self._activity
 
     @property
-    def is_cancellation_requested(self) -> bool:
-        """
-        Checks if the cancellation signal has been sent for this operation.
+    def metadata(self) -> ConcurrentDict[str, Any]:
+        """Returns a copy of the metadata dictionary."""
+        return self._metadata.copy()
 
-        Returns:
-            bool: True if cancel() has been called, otherwise False.
+    def bind(self, name: str, value: Any) -> None:
         """
-        with self._lock:
-            return self._is_cancellation_requested
-
-    @property
-    def can_be_canceled(self) -> bool:
-        """
-        Gets a value indicating if this operation supports cancellation at all.
-
-        Returns:
-            bool: True if the controller was initialized to be cancelable.
-        """
-        return self._can_be_canceled
-
-    def cancel(self, throw_on_first_exception: bool = False):
-        """
-        Broadcasts a cancellation request to all linked Activity tokens and
-        executes any registered cancellation callbacks.
-
-        This method is idempotent; calling it multiple times has no further effect.
-        This is the primary mechanism for telling an agent to stop its current job.
+        Binds or updates an action into the activity's live action map.
 
         Args:
-            throw_on_first_exception (bool): If True, an exception raised by a
-                                             callback will halt execution and be
-                                             re-thrown. If False, all callbacks
-                                             will be attempted regardless of errors.
+            name (str): The action identifier.
+            value (Any): Callable, static value, or flag.
         """
-        if not self._can_be_canceled:
-            return  # Cannot cancel an uncancelable controller
+        self._actions[name] = value
+        self._activity.add_activity(name, value)
 
-        with self._lock:
-            # If already canceled, do nothing.
-            if self._is_cancellation_requested:
-                return
-
-            # Set the state to canceled.
-            self._is_cancellation_requested = True
-
-            # Execute all registered callbacks.
-            for callback in self._callbacks:
-                try:
-                    callback()
-                except Exception as e:
-                    if throw_on_first_exception:
-                        raise OperationCanceledError(f"Callback failed during cancellation: {e}") from e
-                    # Otherwise, swallow the exception and continue.
-                    # In a real application, you would log this error.
-                    pass
-
-            # Clear callbacks after execution as they are one-shot.
-            self._callbacks.clear()
-
-    def register_callback(self, callback: Callable[[], None]) -> None:
+    def register_callback(self, name: str, callback: Callable[[], None]) -> None:
         """
-        Registers a callback delegate that will be invoked when this operation
-        is canceled.
-
-        If the operation has already been canceled, the callback is executed immediately.
+        Registers a named callback for external triggering.
 
         Args:
-            callback (Callable[[], None]): The function to execute on cancellation.
+            name (str): Callback identifier (e.g., "on_shutdown").
+            callback (Callable): The function to call.
         """
-        with self._lock:
-            if self.is_cancellation_requested:
-                # If cancellation has already happened, run the callback now.
-                try:
-                    callback()
-                except Exception:
-                    # Swallow exception, but log in a real-world scenario.
-                    pass
-            else:
-                # Otherwise, add it to the list to be called later.
-                self._callbacks.append(callback)
+        self._callbacks[name] = callback
 
-    def dispose(self):
+    def run_callback(self, name: str) -> bool:
         """
-        Releases all resources used by the controller, primarily clearing any
-        pending callbacks to prevent memory leaks.
-        """
-        with self._lock:
-            self._callbacks.clear()
+        Runs a registered callback by name, if present.
 
-    @staticmethod
-    def get_uncancelable() -> 'OperationalController':
-        """
-        Returns a shared, uncancelable OperationalController singleton.
-
-        This is useful for operations that must not be canceled but need to
-        be passed to functions that require an Activity token, ensuring
-        polymorphic compatibility.
+        Args:
+            name (str): Name of the callback.
 
         Returns:
-            OperationalController: The singleton instance that will never enter a
-                                   canceled state.
+            bool: True if callback executed, False otherwise.
         """
-        with ActivityController._none_lock:
-            if ActivityController._none_controller is None:
-                # Create the singleton instance with the `is_cancelable` flag set to False.
-                ActivityController._none_controller = ActivityController(
-                    is_cancelable=False, source="uncancelable_singleton"
-                )
-            return ActivityController._none_controller
+        callback = self._callbacks.get(name)
+        if callback:
+            try:
+                callback()
+                return True
+            except Exception:
+                pass  # Real-world use would log this
+        return False

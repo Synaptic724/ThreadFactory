@@ -5,7 +5,7 @@ import time
 import unittest
 from typing import List
 from unittest.mock import MagicMock, call  # Import 'call' for a more robust check
-from thread_factory.synchronization.controllers.controller import Controller
+from thread_factory.synchronization.controllers.signal_controller import Controller
 from thread_factory.synchronization.primitives.signal_latch import SignalLatch
 from thread_factory.concurrency import ConcurrentDict
 

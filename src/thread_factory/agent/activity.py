@@ -1,9 +1,13 @@
 import threading
+from copy import deepcopy
+
 import ulid
 from typing import Callable, Optional, Any, Dict, Union
 from thread_factory import ConcurrentDict
+from thread_factory.utils import IDisposable
 
-class Activity:
+
+class Activity(IDisposable):
     """
     A dynamic operation token that carries all signals, flags, and behavior
     injected by a controller. Cancellation is treated like any other named activity.
@@ -14,17 +18,28 @@ class Activity:
     an ActivityController.
     """
 
-    def __init__(self, metadata: Dict[str, Any]):
+    def __init__(self, metadata: ConcurrentDict[str, Any]):
         """
         Initializes a new Activity token.
 
         Args:
             metadata (Dict[str, Any]): Metadata to associate with this activity.
         """
+        super().__init__()
         self._ulid = str(ulid.ULID())
         self._metadata = ConcurrentDict(metadata)
-        self._activities: ConcurrentDict[str, Any] = ConcurrentDict()
+        self._actions: ConcurrentDict[str, Any] = ConcurrentDict()
         self._lock = threading.RLock()
+
+    def dispose(self) -> None:
+        """Disposes of the activity token, releasing all resources."""
+        if self._disposed:
+            return
+        self._disposed = True
+        self._actions.dispose()
+        self._actions = None
+        self._metadata.dispose()
+        self._metadata = None
 
     @property
     def ulid(self) -> str:
@@ -33,8 +48,12 @@ class Activity:
 
     @property
     def metadata(self) -> ConcurrentDict[str, Any]:
-        """Gets the metadata associated with this activity."""
+        """Returns a shallow copy of the metadata."""
         return self._metadata.copy()
+
+    def deep_metadata(self) -> ConcurrentDict[str, Any]:
+        """Returns a deep copy of the metadata."""
+        return deepcopy(self._metadata)
 
     def add_activity(self, name: str, action: Union[Callable[..., Any], bool, Any]) -> None:
         """
@@ -44,8 +63,7 @@ class Activity:
             name (str): The identifier for this behavior or flag.
             action (Callable | bool | Any): The associated logic or value.
         """
-        with self._lock:
-            self._activities[name] = action
+        self._actions[name] = action
 
     def get_activity(self, name: str) -> Optional[Union[Callable[..., Any], bool, Any]]:
         """
@@ -57,8 +75,7 @@ class Activity:
         Returns:
             Callable | bool | Any | None: The bound behavior or data.
         """
-        with self._lock:
-            return self._activities.get(name)
+        return self._actions.get(name)
 
     def __getitem__(self, key: str) -> Any:
         """Shortcut to access activity bindings like a dictionary."""
@@ -66,4 +83,4 @@ class Activity:
 
     def __contains__(self, key: str) -> bool:
         """Checks whether a named activity exists."""
-        return key in self._activities
+        return key in self._actions

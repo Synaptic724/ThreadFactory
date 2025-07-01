@@ -1,7 +1,7 @@
 import threading
 import ulid
 from typing import Callable, Optional, Any, List, Dict
-from thread_factory.agent.activity_controller import AgentController
+from thread_factory.agent.activity_controller import ActivityController
 from thread_factory.agent.activator import AgentActivator
 
 
@@ -121,21 +121,21 @@ class AgentToolkit:
         AgentActivator(thread, factory_id)
         return True  # The transformation was successful.
 
-    def create_controller(self, **kwargs) -> AgentController:
+    def create_controller(self, **kwargs) -> ActivityController:
         """
         Creates a new, standard OperationalController that can be canceled.
         """
-        return AgentController(**kwargs)
+        return ActivityController(**kwargs)
 
-    def get_uncancelable_controller(self) -> AgentController:
+    def get_uncancelable_controller(self) -> ActivityController:
         """
         Returns a shared, singleton controller that cannot be canceled.
         """
-        return AgentController.get_uncancelable()
+        return ActivityController.get_uncancelable()
 
     def create_linked_controller(
             self, *activities: 'Activity', **kwargs
-    ) -> AgentController:
+    ) -> ActivityController:
         """
         Creates a new controller that is linked to other activities.
         """
