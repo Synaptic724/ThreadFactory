@@ -15,7 +15,34 @@
 <!--[![Coverage Status](https://coveralls.io/repos/github/Synaptic724/threadfactory/badge.svg?branch=main)](https://coveralls.io/github/Synaptic724/threadfactory?branch=main) -->
 <!--[![CodeFactor](https://www.codefactor.io/repository/github/synaptic724/threadfactory/badge)](https://www.codefactor.io/repository/github/synaptic724/threadfactory) -->
 
-High-performance **thread-safe** (No-GIL–friendly) data structures and parallel operations for Python 3.13+.
+High-performance **No-GIL-friendly** data-structures & concurrency primitives for Python 3.13+.  
+Built to *scale up, fan out,* and leave the old GIL-bound world in the dust. 🚀
+
+## ✨ Why ThreadFactory? Unlocking Peak Concurrency Performance
+
+Tired of battling race conditions and deadlocks in your multithreaded Python applications? ThreadFactory provides a meticulously crafted suite of tools designed for **uncompromising thread safety and blazing-fast performance**.
+
+Here's how ThreadFactory elevates your concurrency game:
+
+* 🔒 **Sync Types: Atomic & Immutable-like Control**
+    Experience effortless thread-safe manipulation of fundamental data types. Our `SyncInt`, `SyncBool`, `SyncString`, and more, act as atomic wrappers, guaranteeing data integrity without complex locking rituals.
+
+* 🤝 **Concurrent Collections: High-Performance Shared Data Structures**
+    Transform your shared data management. Access and modify dictionaries, lists, sets, queues, stacks, and buffers with confidence, knowing they are built for high-load, concurrent environments. **🔥 Say goodbye to data corruption!**
+
+* 🔬 **First-Principles Primitives: Building Blocks for Robust Systems**
+    Dive deeper with powerful, low-level synchronization constructs like `Dynaphore` (dynamic semaphores), `SmartCondition` (intelligent condition variables), and `SignalLatch` (one-shot signal mechanisms). Engineer sophisticated thread interactions with precision.
+
+* orchestrators **& Barriers: Harmonize Complex Workflows**
+    Coordinate your threads with elegance. Leverage `TransitBarrier` for phased execution, `SignalBarrier` for event-driven synchronization, and `Conductor` for orchestrating intricate task flows. Ensure your threads march in perfect unison.
+
+* ⚡ **Dispatchers & Gates: Fine-Grained Thread Control**
+    Control thread execution with surgical precision. Utilize `Fork` for parallel execution, `SyncFork` for synchronized branching, and `TransitGate` for managing access to critical sections.
+
+* 🚀 **Benchmarks that Prove the Speed: 2×–5× Faster Under Load!**
+    Don't just take our word for it. ThreadFactory isn't just safer; it's *faster*. Our rigorous benchmarks consistently demonstrate **2x to 5x speed improvements** over standard library alternatives under heavy concurrent loads. All battle-tested with **10 Million to 20 Million operation** stress runs and ***zero* deadlocks**.
+
+**ThreadFactory: Build Confidently. Run Faster.**
 
 > **NOTE**  
 > ThreadFactory is designed and tested against Python 3.13+ in **No-GIL** mode.  
@@ -47,17 +74,29 @@ If you really love my work please connect with me on [LinkedIn](https://www.link
 
 ## 🚀 Features
 
-## Concurrent Data Structures
+## 🔒 Sync Types – `thread_factory.concurrency.value_types`
 
-### `ConcurrentDict`  
-- A thread-safe dictionary.  
-- Supports typical dict operations (`update`, `popitem`, etc.).  
-- Provides `map`, `filter`, and `reduce` for safe, bulk operations.  
+ThreadFactory's **Sync Types** are thread-safe wrappers for Python’s core data types. They're built for deterministic, low-contention, concurrent access across threads, making them perfect for shared state in threaded environments, worker pools, and agent execution contexts.
+
+* `SyncInt`: An atomic integer wrapper with full arithmetic and bitwise operation support.
+* `SyncBool`: A thread-safe boolean that handles all logical operations safely.
+* `SyncString`: A thread-safe mutable wrapper around Python’s `str`, offering comprehensive dunder method and string method coverage.
+
+---
+
+## 📦 Concurrent Data Structures - `thread_factory.concurrency`
+
+ThreadFactory provides a robust suite of **Concurrent Data Structures**, designed for high-performance shared data management in multi-threaded applications.
+
+### `ConcurrentDict`
+- A thread-safe dictionary.
+- Supports typical dict operations (`update`, `popitem`, etc.).
+- Provides `map`, `filter`, and `reduce` for safe, bulk operations.
 - **Freeze support**: When frozen, the dictionary becomes read-only. Lock acquisition is skipped during reads, dramatically improving performance in high-read workloads.
 
-### `ConcurrentList`  
-- A thread-safe list supporting concurrent access and modification.  
-- Slice assignment, in-place operators (`+=`, `*=`), and advanced operations (`map`, `filter`, `reduce`).  
+### `ConcurrentList`
+- A thread-safe list supporting concurrent access and modification.
+- Slice assignment, in-place operators (`+=`, `*=`), and advanced operations (`map`, `filter`, `reduce`).
 - **Freeze support**: Prevents structural modifications while enabling safe, lock-free reads (e.g., `__getitem__`, iteration, and slicing). Ideal for caching and broadcast scenarios.
 
 ### `ConcurrentSet`
@@ -67,27 +106,27 @@ If you really love my work please connect with me on [LinkedIn](https://www.link
 - **Freeze support**: Once frozen, the set cannot be modified — but read operations become lock-free and extremely efficient.
 - Ideal for workloads where the set is mutated during setup but then used repeatedly in a read-only context (e.g., filters, routing tables, permissions).
 
-### `ConcurrentQueue`  
-- A thread-safe FIFO queue built atop `collections.deque`.  
+### `ConcurrentQueue`
+- A thread-safe FIFO queue built atop `collections.deque`.
 - Tested and outperforms deque alone by up to 64% in our benchmark.
-- Supports `enqueue`, `dequeue`, `peek`, `map`, `filter`, and `reduce`.  
+- Supports `enqueue`, `dequeue`, `peek`, `map`, `filter`, and `reduce`.
 - Raises `Empty` when `dequeue` or `peek` is called on an empty queue.
 - Outperforms multiprocessing queues by over 400% in some cases — clone and run unit tests to see.
 
-### `ConcurrentStack`  
-- A thread-safe LIFO stack.  
-- Supports `push`, `pop`, `peek` operations.  
-- Ideal for last-in, first-out (LIFO) workloads.  
+### `ConcurrentStack`
+- A thread-safe LIFO stack.
+- Supports `push`, `pop`, `peek` operations.
+- Ideal for last-in, first-out (LIFO) workloads.
 - Built on `deque` for fast appends and pops.
 - Similar performance to ConcurrentQueue.
 
-### `ConcurrentBuffer`  
-- A **high-performance**, thread-safe buffer using **sharded deques** for low-contention access.  
-- Designed to handle massive producer/consumer loads with better throughput than standard queues.  
-- Supports `enqueue`, `dequeue`, `peek`, `clear`, and bulk operations (`map`, `filter`, `reduce`).  
-- **Timestamp-based ordering** ensures approximate FIFO behavior across shards.  
+### `ConcurrentBuffer`
+- A **high-performance**, thread-safe buffer using **sharded deques** for low-contention access.
+- Designed to handle massive producer/consumer loads with better throughput than standard queues.
+- Supports `enqueue`, `dequeue`, `peek`, `clear`, and bulk operations (`map`, `filter`, `reduce`).
+- **Timestamp-based ordering** ensures approximate FIFO behavior across shards.
 - Outperforms `ConcurrentQueue` by up to **60%** in mid-range concurrency in even thread Producer/Consumer configuration with 10 shards.
-- Automatically balances items across shards; ideal for parallel pipelines and low-latency workloads.  
+- Automatically balances items across shards; ideal for parallel pipelines and low-latency workloads.
 - Best used with `shard_count ≈ thread_count / 2` for optimal performance, but keep shards at or below 10.
 
 ### `ConcurrentCollection`
@@ -99,117 +138,86 @@ If you really love my work please connect with me on [LinkedIn](https://www.link
     - **ConcurrentBuffer**: 102,494 ops/sec
     - Better scaling under thread contention.
 
-### `ConcurrentBag`  
-- A thread-safe “multiset” collection that allows duplicates.  
-- Methods like `add`, `remove`, `discard`, etc.  
+### `ConcurrentBag`
+- A thread-safe “multiset” collection that allows duplicates.
+- Methods like `add`, `remove`, `discard`, etc.
 - Ideal for collections where duplicate elements matter.
 
 ---
 
+## 🛠 Primitives & Coordination Mechanisms
 
-## Parallel Utilities
+ThreadFactory goes beyond collections, offering finely engineered synchronization primitives and specialized tools for orchestration, diagnostics, and thread-safe control.
 
-ThreadFactory provides a collection of parallel programming utilities inspired by .NET's Task Parallel Library (TPL). 
+### 🧠 Core Primitives – `thread_factory.synchronization.primitives`
 
-### `parallel_for`
+* 🎛 `Dynaphore`: A **dynamically resizable permit gate** for adaptive resource control and elastic thread pools.
+* 🔁 `FlowRegulator`: A **smart semaphore** with factory ID targeting, callback routing, and bias buffering for dynamic wakeups in agentic worker systems.
+* 🧠 `SmartCondition`: A **next-generation `Condition` replacement** enabling **targeted wakeups**, ULID tracking, and direct callback delivery to waiting threads.
+* 🔔 `TransitCondition`: A **minimalist wait/notify condition** where callbacks execute within the waiting thread, ensuring lightweight and FIFO-safe signaling.
+* 🛑 `SignalLatch`: A **latch with observer signaling support**, capable of notifying a controller before blocking. It natively connects to a `SignalController` for streamlined lifecycle management.
+* 🔒 `Latch`: A classic **reusable latch** that, once opened, permanently releases all waiting threads until explicitly reset.
 
-- Executes a traditional `for` loop in parallel across multiple threads.
-- Accepts `start`, `stop`, and a `body` function to apply to each index.
-- Supports:
-    - Automatic chunking to balance load.
-    - Optional `local_init` / `local_finalize` for per-thread local state.
-    - Optional `stop_on_exception` to abort on the first error.
+### ⚡ Coordinators & Barriers – `thread_factory.synchronization.orchestrators`
 
-### `parallel_foreach`
+* 🎯 `TransitBarrier`: A **reusable barrier** for sophisticated threshold coordination, with the option to execute a callable once all threads arrive.
+* 🚦 `SignalBarrier`: A **reusable, signal-based barrier** that supports thresholds, timeouts, and failure states, natively connecting to a `SignalController` for integrated lifecycle management.
+* ⏰ `ClockBarrier`: A **barrier with a global timeout** that breaks and raises an exception if all threads don't arrive within the specified duration. It natively connects to a `SignalController`.
+* 🚦 `Conductor`: A **reusable group synchronizer** that executes tasks after a threshold is met, supporting timeouts and failure states. This object also natively connects to a `SignalController`.
+* 🧠 `MultiConductor`: Manages **multiple `Group` objects** with per-group thresholds, executing per-group tasks and performing global releases. It natively connects to a `SignalController` for comprehensive coordination.
+* 🔍 `Scout`: A **predicate-based monitor** where a single thread blocks while evaluating a custom predicate, complete with timeout, success, and failure callbacks.
 
-- Executes an `action` function on each item of an iterable in parallel.
-- Supports:
-    - Both pre-known-length and streaming iterables.
-    - Optional `chunk_size` to tune batch sizes.
-    - Optional `stop_on_exception` to halt execution when an exception occurs.
-    - Efficient when processing large datasets or streaming data without loading everything into memory.
+### 🚉 Execution Gates – `thread_factory.synchronization.execution`
 
-### `parallel_invoke`
+* 🔀 `TransitGate`: Allows up to `N` threads to **execute a pre-bound callable pipeline**, capturing results via `Outcome`. It collapses once the execution cap is reached, making it ideal for controlled bootstraps or one-time initializers.
 
-- Executes multiple independent functions concurrently.
-- Accepts an arbitrary number of functions as arguments.
-- Returns a list of futures representing the execution of each function.
-- Optionally waits for all functions to finish (or fail).
-- Simplifies running unrelated tasks in parallel with easy error propagation.
+### 🎛 Dispatchers – `thread_factory.synchronization.dispatchers`
 
-### `parallel_map`
+* 🔧 `Fork`: A **thread dispatcher** that assigns callables based on usage caps, ensuring each executes a fixed number of times for simple routing.
+* 🔄 `SyncFork`: A **dispatcher that coordinates `N` threads** into callable groups, where all callables execute simultaneously once slots are filled. It supports timeouts and reuse.
+* 🔄 `SyncSignalFork`: Similar to `SyncFork`, but with the added ability to **execute a callable as a signal**. This object natively connects to a `SignalController` for enhanced integration.
 
-- Parallel equivalent of Python’s built-in `map()`.
-- Applies a `transform` function to each item in an iterable concurrently.
-- Maintains the order of results.
-- Automatically splits the work into chunks for efficient multi-threaded execution.
-- Returns a fully materialized list of results.
+### 🎮 Central Controllers – `thread_factory.synchronization.controller`
 
-### Notes
+* ### `SignalController`
+    The **central registry and backbone** for lifecycle-managed objects within ThreadFactory. It offers robust support for:
+    * **`register()` / `unregister()`**: Dynamically add or remove managed objects.
+    * **`invoke()` with pre/post hooks**: Trigger operations across registered components with custom logic before and after.
+    * **Event notification (`notify`)**: Broadcast events to all interested managed objects.
+    * **Full-thread-safe `dispose()`**: Recursively and safely tears down all managed objects, ensuring proper resource release and preventing leaks in complex systems.
+    The `SignalController` forms the foundation for global coordination, status tracking, and command dispatch, providing a powerful hub for your concurrency architecture.
+---
 
-- All utilities automatically default to `max_workers = os.cpu_count()` if unspecified.
-- `chunk_size` can be manually tuned or defaults to roughly `4 × #workers` for balanced performance.
-- Exceptions raised inside tasks are properly propagated to the caller.
+## ⚡ Parallel Utilities - `thread_factory.concurrency`
+
+ThreadFactory provides a powerful collection of **parallel programming utilities** inspired by .NET's Task Parallel Library (TPL), simplifying common concurrent patterns.
+
+* ### `parallel_for`
+    Executes a traditional `for` loop in parallel across multiple threads. It supports automatic chunking, optional `local_init`/`local_finalize` for per-thread state, and `stop_on_exception` for early abortion on error.
+
+* ### `parallel_foreach`
+    Executes an `action` function on each item of an iterable in parallel. It handles both pre-known-length and streaming iterables, with optional `chunk_size` tuning and `stop_on_exception` to halt on errors. Ideal for efficient processing of large or streaming datasets.
+
+* ### `parallel_invoke`
+    Executes multiple independent functions concurrently. It accepts an arbitrary number of functions, returning a list of futures representing their execution, with an option to wait for all to finish. This simplifies running unrelated tasks in parallel with easy error propagation.
+
+* ### `parallel_map`
+    The **parallel equivalent of Python’s built-in `map()`**. It applies a `transform` function to each item in an iterable concurrently, maintaining result order. Work is automatically split into chunks for efficient multi-threaded execution, returning a fully materialized list of results.
+
+### Notes for Parallel Utilities
+
+* All utilities automatically default to `max_workers = os.cpu_count()` if unspecified.
+* `chunk_size` can be manually tuned or defaults to roughly `4 × #workers` for balanced performance.
+* Exceptions raised inside tasks are properly propagated to the caller.
 
 ---
 
-## 🔧 Primitives & Utilities
+## ⏱️ Timing Utilities – `thread_factory.utils.timing`
 
-ThreadFactory isn’t just about queues — it includes finely engineered synchronization primitives and timers for orchestration, diagnostics, and thread-safe control.
+ThreadFactory includes precise **Timing Utilities** for orchestration, diagnostics, and monitoring your concurrent applications.
 
-### 🔑 `SmartCondition`
-- A next-generation `Condition` replacement with **targeted wakeups**.
-- Threads can wait using a `factory_id`, enabling selective `notify(factory_id=...)` or full `notify_all()`.
-- Supports:
-  - `wait()`, `wait_for(predicate)`
-  - ID-targeted `notify()` and `notify_all()`
-  - Waiter inspection via `find_waiter_count()`, `has_waiters()`, etc.
-- ✅ Powers `SwitchLock`, `DynamicWorker`, and advanced coordination routines.
-- Designed for systems requiring precise, minimal, and observable thread signaling.
-
-### ⚖️ `SwitchLock`
-- A **dynamic, ID-aware semaphore** built atop `SmartCondition`.
-- Features:
-  - **Runtime tuning**: Increase or decrease permits dynamically.
-  - **Thread routing**: Use factory IDs to trap or release specific threads.
-  - **Fairness model**: Permit distribution maintains predictable access and wake order.
-- Core mechanism behind agentic thread workflows and distributed locking schemes.
-
-### 🧮 `Dynaphore`
-- A **dynamic semaphore** for thread coordination.
-- Unlike `SwitchLock`, `Dynaphore` is designed for **numeric weight-based access**, not ID routing.
-- Features:
-  - Scales up/down the number of available permits at runtime.
-  - Blocks threads when permits are exhausted.
-  - Wakes them as permits become available.
-- Ideal for resource pools, task throttling, or thread admission control.
-- Lighter than `SwitchLock` when ID targeting isn’t required.
-
-### 🧵 `SignalCondition`
-- A **minimalist condition primitive** for classic wait/notify behavior.
-- Designed for speed, simplicity, and self-managed wait logic.
-- Unlike `SmartCondition`, callbacks run **in the waiting thread**, making it ideal for simple producer/consumer pipelines.
-- Use in event loops, polling mechanics, or timeouts where lock contention is minimal.
-
-#### ⏱ `AutoResetTimer`
-- A self-resetting timer that automatically expires and restarts.
-- Ideal for:
-  - Retry loops
-  - Cooldown mechanisms
-  - Debounce filters
-  - State polling under time constraints
-
-#### ⌛ `Stopwatch`
-- A high-resolution, nanosecond-accurate stopwatch.
-- Built with `time.perf_counter_ns()` for ultra-low overhead.
-- API:
-  - `start()`, `stop()`, `reset()`, `elapsed()`
-- Use to measure:
-  - Critical path latency
-  - Thread execution time
-  - Performance bottlenecks
-
----
+* ⏲️ `AutoResetTimer`: A **self-resetting timer** that automatically expires and restarts, ideal for retry loops, cooldown mechanisms, debounce filters, and heartbeat monitoring.
+* 🕰️ `Stopwatch`: A **high-resolution, nanosecond-accurate profiler** built with `time.perf_counter_ns()` for ultra-low overhead. Use it to precisely measure critical path latency, thread execution time, and pinpoint performance bottlenecks.
 
 ### ⚡ Performance Note
 

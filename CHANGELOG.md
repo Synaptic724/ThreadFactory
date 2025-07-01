@@ -8,11 +8,22 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.3.0] - 2025-06-30
+# 🧵 ThreadFactory v1.3.3 – Massive Concurrency Upgrade
 
-# 🚀 ThreadFactory Changelog – Massive Concurrency Upgrade
+ThreadFactory now introduces a modular concurrency stack built from first principles.  
+This release splits the system into high-performance primitives, orchestrators, dispatchers, sync types, and agentic thread tools.
 
-ThreadFactory now introduces a modular concurrency stack built from first principles. This version splits the system into high-performance primitives, orchestrators, dispatchers, and dynamic thread management tools.
+---
+
+## 🔒 Sync Types – `concurrency.value_types`
+
+Thread-safe wrappers for Python’s core data types. Built for deterministic, low-contention, concurrent access across threads.
+
+- `SyncInt`: Atomic integer wrapper with arithmetic and bitwise support.
+- `SyncBool`: Thread-safe boolean with full logical operation support.
+- `SyncString`: Thread-safe mutable wrapper around Python’s `str`, with full dunder and method coverage.
+
+These types are ideal for shared state in threaded environments, worker pools, and agent execution contexts.
 
 ---
 
@@ -32,6 +43,7 @@ Minimalist wait/notify condition. Callback always executes inside the waiting th
 
 ### 🛑 `SignalLatch`
 Latch with observer signaling support. Can notify a controller before blocking. Uses `SignalCondition` internally.
+This object can natively connect to a `SignalController` for lifecycle management.
 
 ### 🔒 `Latch`
 Classic reusable latch. Once opened, all threads are released permanently until reset.
@@ -43,14 +55,21 @@ Classic reusable latch. Once opened, all threads are released permanently until 
 ### 🎯 `TransitBarrier`
 Reusable barrier with threshold coordination and optional callable execution once threshold is met.
 
+### 🚦 `SignalBarrier`
+Reusable barrier with signal-based coordination. Supports threshold, timeout, and failure states.
+This object can natively connect to a `SignalController` for lifecycle management.
+
 ### ⏰ `ClockBarrier`
 Barrier with global timeout. If not all threads arrive before timeout, the barrier breaks and raises.
+This object can natively connect to a `SignalController` for lifecycle management.
 
 ### 🚦 `Conductor`
 Reusable group synchronizer. Executes tasks after a threshold is met. Supports timeout and failure states.
+This object can natively connect to a `SignalController` for lifecycle management.
 
 ### 🧠 `MultiConductor`
 Manages multiple `Group` objects with per-group thresholds. Executes per-group tasks and performs global release.
+This object can natively connect to a `SignalController` for lifecycle management.
 
 ### 🔍 `Scout`
 Predicate-based monitor. One thread blocks while evaluating a predicate with timeout and success/failure callbacks.
@@ -72,11 +91,14 @@ Thread dispatcher that assigns callables based on usage caps. Ensures each calla
 ### 🔄 `SyncFork`
 Dispatcher that coordinates N threads into callable groups. All callables execute simultaneously once all slots are filled. Supports timeouts and reuse.
 
+### 🔄 `SyncSignalFork`
+Dispatcher that coordinates N threads into callable groups just like the SyncFork. It can also execute a callable as a signal.
+This object can natively connect to a `SignalController` for lifecycle management.
 ---
 
 ## 🧠 New Controllers – `synchronization.controller`
 
-### 🎮 `Controller`
+### 🎮 `SignalController`
 Central registry for lifecycle-managed objects. Supports:
 - `register()` / `unregister()`
 - `invoke()` with pre/post hooks
@@ -101,16 +123,6 @@ Timer that auto-resets after use. Useful for cyclic backoff, loop pacing, and he
 
 ### 🕰️ `Stopwatch`
 Simple nanosecond-precision profiler. Used for queue stats, lock contention tracking, and execution spans.
-
----
-
-## 🧵 Dynamic Execution Engine – `thread_factory.dynamic`
-
-### 🔄 `DynamicWorker`
-Prototype worker with the following features:
-- Executes `ValueWork` atomically
-- Integrates with `SmartCondition` and `SwitchLock` for coordination
-- Supports behavior injection, lifecycle checkpoints, and agent-style wake/sleep loops
 
 ---
 
