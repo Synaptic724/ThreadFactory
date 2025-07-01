@@ -7,7 +7,7 @@ from thread_factory.agent.activity import Activity
 from thread_factory.utils.exceptions.operation_canceled_error import OperationCanceledError
 
 
-class AgentController:
+class ActivityController:
     """
     Acts as a central command and control unit for an agent's operation or job.
 
@@ -21,7 +21,7 @@ class AgentController:
     """
     # A singleton instance for a controller that can never be canceled.
     # This is useful for non-cancelable operations that still require an Activity token.
-    _none_controller: Optional['OperationalController'] = None
+    _none_controller: Optional['ActivityController'] = None
     _none_lock = threading.RLock()
 
     def __init__(self, is_cancelable: bool = True, **kwargs):
@@ -161,10 +161,10 @@ class AgentController:
             OperationalController: The singleton instance that will never enter a
                                    canceled state.
         """
-        with OperationalController._none_lock:
-            if OperationalController._none_controller is None:
+        with ActivityController._none_lock:
+            if ActivityController._none_controller is None:
                 # Create the singleton instance with the `is_cancelable` flag set to False.
-                OperationalController._none_controller = OperationalController(
+                ActivityController._none_controller = ActivityController(
                     is_cancelable=False, source="uncancelable_singleton"
                 )
-            return OperationalController._none_controller
+            return ActivityController._none_controller

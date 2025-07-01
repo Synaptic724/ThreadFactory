@@ -2,6 +2,8 @@ import unittest
 from unittest.mock import Mock, patch
 import threading
 import time
+
+from thread_factory import ConcurrentDict
 from thread_factory.runtime import WorkerState
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus
 from thread_factory.agent_thread_pool.help_request import HelpRequest
@@ -60,7 +62,7 @@ class TestAgent(unittest.TestCase):
         """Test retrieving the save points dictionary."""
         self.worker.register_save_point("test_point", sync_test_func)
         points = self.worker.get_save_points_dict()
-        self.assertIsInstance(points, dict)
+        self.assertIsInstance(points, ConcurrentDict)
         self.assertIn("test_point", points)
         self.assertIsNot(points, self.worker._save_points) # Ensure it's a copy
 
@@ -88,7 +90,7 @@ class TestAgent(unittest.TestCase):
         """Test retrieving the locations dictionary."""
         self.worker.register_location("test_location", sync_test_func)
         locations = self.worker.get_locations_dict()
-        self.assertIsInstance(locations, dict)
+        self.assertIsInstance(locations, ConcurrentDict)
         self.assertIn("test_location", locations)
         self.assertIsNot(locations, self.worker._locations) # Ensure it's a copy
 
@@ -375,7 +377,7 @@ class TestAgent(unittest.TestCase):
         self.worker.set_shared_inventory_item("item1", 1)
         self.worker.set_shared_inventory_item("item2", "value2")
         shared_inv = self.worker.get_shared_inventory()
-        self.assertIsInstance(shared_inv, dict)
+        self.assertIsInstance(shared_inv, ConcurrentDict)
         self.assertEqual(shared_inv, {"item1": 1, "item2": "value2"})
         self.assertIs(shared_inv, self.worker._shared_inventory) # Ensure it's the direct reference
 
@@ -397,7 +399,7 @@ class TestAgent(unittest.TestCase):
         """Test retrieving the data transfer functions dictionary."""
         self.worker.register_data_transfer("test_transfer", sync_test_func)
         transfers = self.worker.get_data_transfer_dict()
-        self.assertIsInstance(transfers, dict)
+        self.assertIsInstance(transfers, ConcurrentDict)
         self.assertIn("test_transfer", transfers)
         self.assertIsNot(transfers, self.worker._data_transfer) # Ensure it's a copy
 

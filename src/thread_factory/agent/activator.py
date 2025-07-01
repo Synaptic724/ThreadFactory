@@ -1,7 +1,7 @@
 import threading
 import ulid
 from typing import Callable, Optional, Any
-from thread_factory import ConcurrentDict
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.general_helpers.coroutine_helpers import CoroutineHelpers
 
 class AgentActivator:
@@ -37,6 +37,8 @@ class AgentActivator:
         self._inventory = threading.local()
         self._inventory.data = ConcurrentDict()
         self._shared_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
+
+        # --- Data Transfer, Save Points, and Locations ---
         self._data_transfer: ConcurrentDict[str, Callable[..., Any]] = ConcurrentDict()
         self._save_points: ConcurrentDict[str, Callable[[], None]] = ConcurrentDict()
         self._locations: ConcurrentDict[str, Callable[[], None]] = ConcurrentDict()
