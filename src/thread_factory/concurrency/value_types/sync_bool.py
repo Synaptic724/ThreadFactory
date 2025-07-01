@@ -1,8 +1,6 @@
 import copy
 import threading
 
-import threading
-
 class SyncBool:
     """
     SyncBool
@@ -44,7 +42,6 @@ class SyncBool:
         else:
             self._value = bool(initial)
             self._lock = threading.RLock()
-
 
     def get(self) -> bool:
         """

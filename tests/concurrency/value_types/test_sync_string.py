@@ -209,6 +209,56 @@ class TestSyncString(unittest.TestCase):
 
         self.assertEqual(s.get(), "aaaa")
 
+    def test_concurrent_contains_checks(self):
+        s = SyncString("initial")
+
+        def writer():
+            for i in range(100):
+                s.set(f"val_{i}")
+
+        def checker():
+            for _ in range(100):
+                _ = "val_" in s
+
+        threads = [threading.Thread(target=writer)] + [threading.Thread(target=checker) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertTrue(s.get().startswith("val_"))
+
+    def test_bytes_interaction(self):
+        s = SyncString("data")
+        self.assertEqual(bytes(s), b"data")
+        s.set("binary\x00data")
+        self.assertEqual(bytes(s), b"binary\x00data")
+
+    def test_large_string_handling(self):
+        large_str = "a" * (10 ** 6)
+        s = SyncString(large_str)
+        self.assertEqual(len(s), 10 ** 6)
+        s.set(s.get() + "b")
+        self.assertEqual(len(s), (10 ** 6) + 1)
+        self.assertTrue(s.endswith("b"))
+
+    def test_concurrent_iadd(self):
+        s = SyncString("start")
+
+        def append_x():
+            nonlocal s
+            for _ in range(100):
+                s += "x"
+
+        threads = [threading.Thread(target=append_x) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        expected_length = len("start") + (10 * 100)
+        self.assertEqual(len(s), expected_length)
+
     def test_concurrent_append_simulation(self):
         s = SyncString("")
 
@@ -226,6 +276,36 @@ class TestSyncString(unittest.TestCase):
 
         # This will now pass every time
         self.assertEqual(len(s.get()), 500)
+
+    def test_concurrent_instantiation_init_safe(self):
+        instances = []
+
+        def create():
+            instances.append(SyncString("test", init_safe=True))
+
+        threads = [threading.Thread(target=create) for _ in range(100)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(len(instances), 100)
+        self.assertTrue(all(s.get() == "test" for s in instances))
+
+    def test_concurrent_instantiation_init_not_safe(self):
+        instances = []
+
+        def create():
+            instances.append(SyncString("test", init_safe=False))
+
+        threads = [threading.Thread(target=create) for _ in range(100)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(len(instances), 100)
+        self.assertTrue(all(s.get() == "test" for s in instances))
 
     def test_getitem_slice(self):
         s = SyncString("abcdefgh")
