@@ -1,6 +1,8 @@
 from __future__ import annotations    # MUST be first
 import copy
 import threading
+from decimal import Decimal
+
 from thread_factory.utils.interfaces.isync import ISync
 
 class SyncBool(ISync):
@@ -48,6 +50,25 @@ class SyncBool(ISync):
     @classmethod
     def _coerce(cls, val):  # bool cast (Python truthiness)
         return bool(val)
+
+    # Override ISync._unwrap_other to retain numeric types (int / float / Decimal)
+    def _unwrap_other(self, other):
+        """
+        Convert *other* to a type appropriate for arithmetic / bitwise ops.
+
+        • Sync*  → unwrap then decide
+        • int / float / Decimal  → keep as-is (preserves numeric semantics)
+        • everything else        → bool() cast
+        """
+        if ISync._is_sync(other):
+            raw = other.get()
+        else:
+            raw = other
+
+        # Preserve numeric values exactly (except plain bool)
+        if isinstance(raw, (int, float, Decimal)) and type(raw) is not bool:
+            return raw
+        return bool(raw)
 
     def get(self) -> bool:
         """
