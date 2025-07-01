@@ -6,6 +6,8 @@ from thread_factory.synchronization.primitives import Dynaphore
 from typing import Optional, Callable, List, Union, Any
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
+from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
+from thread_factory.utils.coordination.outcome import Outcome
 
 
 class Conductor(IDisposable):
@@ -52,13 +54,10 @@ class Conductor(IDisposable):
         print(f"Conductor results: {conductor.results}")
     """
     __slots__ = IDisposable.__slots__ + [
-        "threshold", "tasks", "reusable", "manual_release",
-        "_timeout", "_raise_on_timeout", "outcomes",
-        "_lock", "_released", "_broken", "_clock_barrier",
-        "_threshold_semaphore", "_dynaphore", "_loop_reset_event"''
-        "_max_threshold", "_minimum_threads", "_create_field"
-        "_internal_threshold_sema", "_entrance_sema", "_outcome_set"
-        "_index", "_id"
+        "_min_threshold", "_max_threshold", "tasks", "reusable", "manual_release", "_timeout", "_raise_on_timeout",
+        "_id", "outcomes", "_released", "_broken", "_create_field", "_outcome_set",
+        "_index", "_index_updater", "_new_index", "_lock", "_clock_barrier", "_signal_barrier", "_dynaphore",
+        "_entrance_sema", "_internal_threshold_sema", "_flow_regulator"
     ]
 
     def __init__(
@@ -114,7 +113,7 @@ class Conductor(IDisposable):
 
         # Outputs
         self._id = str(ulid.ULID())
-        self.outcomes = None
+        self.outcomes: List[Outcome] | None = None
         self.create_outcomes()  # Initialize outcomes for tasks
 
         # Initialize internal state
@@ -131,6 +130,8 @@ class Conductor(IDisposable):
         self._dynaphore = Dynaphore(self._min_threshold)
         self._entrance_sema = None
         self._internal_threshold_sema = None
+        self._flow_regulator = FlowRegulator(0)
+        self._index_updater = False
 
 
         if timeout is not None:
@@ -164,7 +165,8 @@ class Conductor(IDisposable):
         if self._disposed: return
         with self._lock:
             self._disposed = True
-            for outcome in self.outcomes: outcome.dispose()
+            for obj in self.outcomes:
+                obj.dispose()
             self.outcomes.clear()
             self._broken = True
             self._released = True
@@ -175,7 +177,8 @@ class Conductor(IDisposable):
         This method is called internally by the `reusable` mode logic and should
         generally not be called publicly. It clears all previous outcomes.
         """
-        for o in self.outcomes: o.dispose()
+        for o in self.outcomes:
+            o.dispose()
         self.create_outcomes()
         self._released = False
         self._broken = False
@@ -254,6 +257,38 @@ class Conductor(IDisposable):
             else:
                 return True
 
+    def _execute_operation(self, task: Callable) -> None:
+        """
+        Executes a single operation/task associated with the conductor.
+        """
+        try:
+            self._set_result(task())
+        except Exception as e:
+            self._set_exception(e)
+        self._reset_update_flags()
+
+    def _get_new_index(self, index:int) -> None:
+        """
+        Returns the current index of the task being executed.
+        This is used to track which task is currently being processed.
+        """
+        with self._lock:
+            if self._index_updater:
+                return
+            self._index_updater = True
+            self._index = index
+
+    def _reset_update_flags(self):
+        """
+        Resets the flags used for updating the index and outcome state.
+        This is called after the tasks have been executed.
+        """
+        with self._lock:
+            if not self._outcome_set:
+                return
+            self._index_updater = False
+            self._outcome_set = False
+
     def _execute_operations(self):
         """
         Executes the tasks associated with the conductor once the threshold is met.
@@ -263,14 +298,10 @@ class Conductor(IDisposable):
                 if not self._create_field:
                     self._create_execute_operations_field()
 
-        for index, task in enumerate(self.tasks):
-            with self._lock:
-                self._index = index
             self._entrance_sema.wait()
-            try:
-                self._set_result(task())
-            except Exception as e:
-                self._set_exception(e)
+        for index, task in enumerate(self.tasks):
+            self._get_new_index(index)
+            self._execute_operation(task)
             self._internal_threshold_sema.wait()
 
         if not self.manual_release:
@@ -287,8 +318,7 @@ class Conductor(IDisposable):
             if self._outcome_set:
                 return
             self._outcome_set = True
-            outcome.set_result(result)
-            self._outcomes.append(outcome)
+            self.outcomes[self._index].set_result(result)
 
     def _set_exception(self, e: Exception):
         """
@@ -301,8 +331,7 @@ class Conductor(IDisposable):
             if self._outcome_set:
                 return
             self._outcome_set = True
-            outcome.set_exception(e)
-            self._outcomes.append(outcome)
+            self.outcomes[self._index].set_exception(e)
 
     def _create_execute_operations_field(self):
         """Creates a field for executing operations.
@@ -332,27 +361,28 @@ class Conductor(IDisposable):
         # If already released and not reusable, it acts like an open latch.
         if self._released and not self.reusable:
             return True
-
+        print("Step 1: Waiting for threshold...")
         try:
             # Wait for threshold based on config
             if self._timeout:
                 was_released = self._clock_barrier_wait()
             else:
                 was_released = self._signal_barrier.wait()
-
+            print("Step 2: Waiting for tasks to execute...")
             # Block further entry until operation finishes
             self._dynaphore.wait_for_permit()
-
+            print("Step 3: Executing operations...")
             try:
                 # 🔧 Inject your actual execution logic here
                 self._execute_operations()
             finally:
+                print("Step 4: Closing conductor...")
                 self._dynaphore.release()
         except Exception as e:
             was_released = False
             if self._raise_on_timeout:
                 raise TimeoutError(f"Conductor wait timed out after {self._timeout}s.") from e
-
+        print("Ending 1")
         # If timeout or error occurred, break the barrier
         if not was_released and not self._disposed:
             with self._lock:
@@ -364,5 +394,7 @@ class Conductor(IDisposable):
         if self.reusable and was_released:
             with self._lock:
                 self.reset()
+        # Return whether the conductor was successfully released
+        print("Ending 2")
 
         return was_released and not self._disposed and not self._broken

@@ -53,7 +53,7 @@ class Outcome(IDisposable):
             if self.disposed:
                 raise RuntimeError("Cannot set result on a disposed Outcome.")
             if self._is_done:
-                raise RuntimeError("Outcome has already been set.")
+                return
             self._result = result
             self._is_done = True
             self._condition.notify_all()
@@ -69,7 +69,7 @@ class Outcome(IDisposable):
             if self.disposed:
                 raise RuntimeError("Cannot set exception on a disposed Outcome.")
             if self._is_done:
-                raise RuntimeError("Outcome has already been set.")
+                return
             self._exception = exception
             self._is_done = True
             self._condition.notify_all()
