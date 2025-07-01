@@ -1,6 +1,5 @@
 import unittest
-from thread_factory.agent.activity_controller import ActivityController
-from thread_factory import ConcurrentDict
+from thread_factory.agent.activity.activity_controller import ActivityController
 
 
 class TestActivityController(unittest.TestCase):

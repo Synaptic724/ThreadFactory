@@ -1,7 +1,6 @@
 import threading
-import ulid
-from typing import Callable, Optional, Any, List, Dict
-from thread_factory.agent.activity_controller import ActivityController
+from typing import Optional, List
+from thread_factory.agent.activity.activity_controller import ActivityController
 from thread_factory.agent.activator import AgentActivator
 
 
