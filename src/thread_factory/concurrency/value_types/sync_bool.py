@@ -370,3 +370,180 @@ class SyncBool(ISync):
             SyncBool: A new instance of SyncBool.
         """
         return super(SyncBool, cls).__new__(cls)
+
+    # ──────────────────────────────────────────────────────────────
+    #  Reverse-operand numeric operators  (other  OP  self)
+    # ──────────────────────────────────────────────────────────────
+
+    def __radd__(self, other):
+        """
+        Reversed addition (``other + self``).
+
+        Treats the boolean as its integer value (0 or 1).
+        """
+        with self._lock:
+            return other + int(self._value)
+
+    def __rsub__(self, other):
+        """
+        Reversed subtraction (``other - self``).
+        """
+        with self._lock:
+            return other - int(self._value)
+
+    def __rmul__(self, other):
+        """
+        Reversed multiplication (``other * self``).
+        """
+        with self._lock:
+            return other * int(self._value)
+
+    def __rtruediv__(self, other):
+        """
+        Reversed true-division (``other / self``).
+
+        Raises ``ZeroDivisionError`` when ``self`` is ``False``.
+        """
+        with self._lock:
+            denom = int(self._value)
+            if denom == 0:
+                raise ZeroDivisionError("division by zero")
+            return other / denom
+
+    def __rfloordiv__(self, other):
+        """
+        Reversed floor-division (``other // self``).
+
+        Raises ``ZeroDivisionError`` when ``self`` is ``False``.
+        """
+        with self._lock:
+            denom = int(self._value)
+            if denom == 0:
+                raise ZeroDivisionError("division by zero")
+            return other // denom
+
+    def __rmod__(self, other):
+        """
+        Reversed modulo (``other % self``).
+
+        Raises ``ZeroDivisionError`` when ``self`` is ``False``.
+        """
+        with self._lock:
+            denom = int(self._value)
+            if denom == 0:
+                raise ZeroDivisionError("modulo by zero")
+            return other % denom
+
+    def __rpow__(self, other, mod=None):
+        """
+        Reversed exponentiation (``other ** self``).
+
+        The 3-argument ``pow(x, y, z)`` form is **not supported**.
+        """
+        if mod is not None:
+            raise TypeError("pow() 3-arg form not supported for SyncBool")
+        with self._lock:
+            return other ** int(self._value)
+
+    # ──────────────────────────────────────────────────────────────
+    #  Forward numeric operators   (self  OP  other)
+    #  These allow SyncBool to behave like a numeric value (0 or 1)
+    #  when used in arithmetic expressions.
+    # ──────────────────────────────────────────────────────────────
+
+    def __add__(self, other):
+        """
+        Add SyncBool to another value.
+
+        Parameters:
+            other (Any): Value to add.
+
+        Returns:
+            Result of `int(self) + other`. Allows expressions like `SyncBool(True) + 5`.
+        """
+        with self._lock:
+            return int(self._value) + other
+
+    def __sub__(self, other):
+        """
+        Subtract another value from SyncBool.
+
+        Parameters:
+            other (Any): Value to subtract.
+
+        Returns:
+            Result of `int(self) - other`.
+        """
+        with self._lock:
+            return int(self._value) - other
+
+    def __mul__(self, other):
+        """
+        Multiply SyncBool with another value.
+
+        Parameters:
+            other (Any): Value to multiply.
+
+        Returns:
+            Result of `int(self) * other`. Enables use in expressions like `SyncBool(True) * 10`.
+        """
+        with self._lock:
+            return int(self._value) * other
+
+    def __truediv__(self, other):
+        """
+        Divide SyncBool by another value (true division).
+
+        Parameters:
+            other (Any): Divisor.
+
+        Returns:
+            Result of `int(self) / other`. May raise ZeroDivisionError if `other == 0`.
+        """
+        with self._lock:
+            return int(self._value) / other
+
+    def __floordiv__(self, other):
+        """
+        Perform floor division.
+
+        Parameters:
+            other (Any): Divisor.
+
+        Returns:
+            Result of `int(self) // other`. Truncates toward negative infinity.
+        """
+        with self._lock:
+            return int(self._value) // other
+
+    def __mod__(self, other):
+        """
+        Compute modulo of SyncBool by another value.
+
+        Parameters:
+            other (Any): Divisor.
+
+        Returns:
+            Result of `int(self) % other`.
+        """
+        with self._lock:
+            return int(self._value) % other
+
+    def __pow__(self, other, mod=None):
+        """
+        Raise SyncBool to the power of `other`.
+
+        Parameters:
+            other (Any): The exponent.
+            mod (Optional[Any]): A third argument is not supported.
+
+        Returns:
+            Result of `int(self) ** other`.
+
+        Raises:
+            TypeError: If 3-argument form of pow() is used.
+        """
+        if mod is not None:
+            raise TypeError("pow() 3-arg form not supported for SyncBool")
+        with self._lock:
+            return int(self._value) ** other
