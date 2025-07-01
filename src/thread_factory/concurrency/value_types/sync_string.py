@@ -23,6 +23,59 @@ class SyncString:
         self._value = initial
         self._lock = threading.RLock()
 
+    def __bytes__(self):
+        """
+        Converts the string to a bytes object using UTF-8 encoding.
+
+        Returns:
+            bytes: The UTF-8 encoded representation of the current value.
+        """
+        with self._lock:
+            return bytes(self._value, 'utf-8')
+
+    def __reversed__(self):
+        """
+        Returns a reverse iterator over the characters in the string.
+
+        Returns:
+            iterator: An iterator yielding characters in reverse order.
+        """
+        with self._lock:
+            return reversed(self._value)
+
+    def __sizeof__(self):
+        """
+        Returns the size of the underlying string object in memory.
+
+        Returns:
+            int: The memory size in bytes.
+        """
+        with self._lock:
+            return self._value.__sizeof__()
+
+    def __getattr__(self, name):
+        """
+        Fallback to underlying string methods not explicitly implemented.
+
+        If a method or attribute is not found on SyncString, this method is called
+        and will attempt to retrieve it from the internal string value.
+
+        Args:
+            name (str): The name of the method or attribute to retrieve.
+
+        Returns:
+            Any: The resolved method or attribute bound to the internal value.
+        """
+        with self._lock:
+            attr = getattr(self._value, name)
+            if callable(attr):
+                def thread_safe_method(*args, **kwargs):
+                    with self._lock:
+                        return attr(*args, **kwargs)
+                return thread_safe_method
+            return attr
+
+
     def get(self) -> str:
         """
         Return the current string value.
@@ -738,4 +791,3 @@ class SyncString:
         Example: `ConcurrentString[str]`
         """
         return cls
-
