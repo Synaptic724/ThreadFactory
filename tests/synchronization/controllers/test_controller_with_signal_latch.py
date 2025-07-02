@@ -180,7 +180,8 @@ class TestControllerWithLatch(unittest.TestCase):
         self.controller.invoke(latch.id, "dispose")
 
         # Check that the expected event was logged at some point
-        expected_event_call = call(f"Controller Event: ID='{latch.id}', Event='DISPOSED_BY_CONTROLLER'")
+        # Corrected the expected log message to match the implementation in SignalController
+        expected_event_call = call(f"SignalController Event: ID='{latch.id}', Event='DISPOSED_BY_CONTROLLER'")
         self.assertIn(expected_event_call, self.mock_logger.info.call_args_list)
 
         self.assertEqual(list(self.controller.get_waiting_objects()), [])

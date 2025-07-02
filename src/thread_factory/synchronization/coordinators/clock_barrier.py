@@ -243,6 +243,25 @@ class ClockBarrier(IDisposable):
             },
         }
 
+    def release(self) -> None:
+        """
+        Forcefully breaks the barrier for the current generation, releasing all
+        currently waiting threads.
+
+        Each waiting thread will raise a `threading.BrokenBarrierError`.
+        This is useful for administrative shutdown or error handling when you
+        need to unblock waiters without disposing the entire barrier.
+
+        This operation is idempotent; calling it on an already broken or
+        disposed barrier has no effect.
+        """
+        with self._cond:
+            # If the barrier is already broken or fully disposed, there's nothing to do.
+            if self._broken or self._disposed:
+                return
+
+            # Use the existing internal helper to perform the break logic.
+            self._break_barrier_locked()
     # ------------------------------------------------------------------ #
     # Introspection helpers (no side-effects)
     # ------------------------------------------------------------------ #
@@ -371,6 +390,7 @@ class ClockBarrier(IDisposable):
         self._cond.notify_all()
         self._count      = 0
         self._start_time = None
+        self._broken     = False
         self._generation += 1
 
     def _break_barrier_locked(self) -> None:
