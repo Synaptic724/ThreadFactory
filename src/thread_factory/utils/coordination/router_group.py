@@ -1,7 +1,7 @@
 from typing import Callable, Optional, List
 from thread_factory.utils.interfaces.disposable import IDisposable
 
-
+# NOT ACTIVE CLASS ATM
 class RouterGroup(IDisposable):
     """
     RouterGroup

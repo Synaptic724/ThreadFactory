@@ -1,6 +1,9 @@
 import unittest
+
+from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.utils.coordination.group import Group
 from thread_factory.utils.coordination.outcome import Outcome
+from thread_factory.utils.coordination.package import Pack
 
 
 class TestGroup(unittest.TestCase):
@@ -11,6 +14,150 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(len(g.tasks), 1)
         self.assertEqual(len(g.outcomes), 1)
         g.dispose()
+
+    def test_none_task_yields_empty_group(self):
+        g = Group(name="none-is-fine", tasks=None)
+        self.assertEqual(len(g.tasks), 0)
+        self.assertEqual(len(g.outcomes), 0)
+        g.dispose()
+
+    def test_pack_wrapped_lambda(self):
+        g = Group("wrapped", tasks=Pack(lambda: 42))
+        self.assertEqual(len(g), 1)
+        self.assertTrue(isinstance(g.tasks[0], Pack))
+        g.dispose()
+
+    def test_pack_multiple_valid_inputs(self):
+        def f(): return 1
+
+        def g(): return 2
+
+        p1 = Pack(f)
+        p2 = Pack(g)
+        group = Group(name="many", tasks=[p1, p2])
+        self.assertEqual(len(group.tasks), 2)
+        group.dispose()
+
+    def test_result_on_disposed_outcome(self):
+        g = Group("deadres", tasks=[lambda: "x"])
+        g.outcomes[0] = Outcome()
+        g.outcomes[0].set_result("y")
+        g.outcomes[0].dispose()
+        self.assertEqual(g.results, [])
+        g.dispose()
+
+    def test_invalid_item_in_iterable(self):
+        with self.assertRaises(TypeError):
+            Group("badlist", tasks=[lambda: 1, None])
+
+    def test_iter_and_len(self):
+        g = Group("check", tasks=[lambda: 1, lambda: 2])
+        self.assertEqual(len(g), 2)
+        self.assertEqual(sum(1 for _ in g), 2)
+        g.dispose()
+
+    def test_outcome_index_out_of_range(self):
+        g = Group("outofrange", tasks=[lambda: 1])
+        with self.assertRaises(KeyError):
+            _ = g.outcomes[99]
+        g.dispose()
+
+    def test_empty_group_is_safe(self):
+        g = Group("empty")
+        self.assertEqual(len(g), 0)
+        self.assertEqual(g.results, [])
+        self.assertEqual(g.exceptions, [])
+        g.dispose()
+
+    def test_dispose_on_already_disposed_outcome(self):
+        g = Group("redead", tasks=[lambda: 1])
+        g.outcomes[0].dispose()
+        g.dispose()
+
+    def test_partial_results(self):
+        g = Group("partial", tasks=[lambda: 1, lambda: 2])
+        g.outcomes[0] = Outcome()
+        g.outcomes[0].set_result(100)
+        self.assertEqual(g.results, [100])
+        g.dispose()
+
+    def test_outcome_manual_injection_with_result(self):
+        g = Group("inject", tasks=[lambda: 1])
+        o = Outcome()
+        o.set_result("ok")
+        g.outcomes[0] = o
+        self.assertEqual(g.results, ["ok"])
+        g.dispose()
+
+    def test_reset_rebuilds_dict_structure(self):
+        g = Group("rebuild", tasks=[lambda: 1, lambda: 2])
+        old_outcomes = g.outcomes
+        g.reset()
+        self.assertIsNot(g.outcomes, old_outcomes)
+        self.assertEqual(len(g.outcomes), 2)
+        g.dispose()
+
+    def test_multiple_outcomes_per_task_initializes_correctly(self):
+        g = Group("multiinit", tasks=[lambda: 1], multiple_outcomes_per_task=True)
+        self.assertTrue(isinstance(g.outcomes[0], ConcurrentList))
+        g.dispose()
+
+    def test_result_not_disposed_not_done(self):
+        g = Group("pending2", tasks=[lambda: None])
+        g.outcomes[0] = Outcome()
+        self.assertEqual(g.results, [])
+        g.dispose()
+
+    def test_strict_none_task(self):
+        with self.assertRaises(TypeError):
+            Group("strict", tasks=[None])
+
+    def test_generator_function_rejected(self):
+        def gen(): yield 1
+
+        with self.assertRaises(TypeError):
+            Group("nope", tasks=gen)
+
+    def test_non_callable_object(self):
+        with self.assertRaises(TypeError):
+            Group("badobj", tasks=[object()])
+
+    def test_callable_class_accepted(self):
+        class CallableObj:
+            def __call__(self): return "yes"
+
+        g = Group("callclass", tasks=CallableObj())
+        self.assertEqual(len(g), 1)
+        g.dispose()
+
+    def test_reset_replaces_all_outcomes(self):
+        g = Group("replace", tasks=[lambda: 1])
+        o = g.outcomes[0]
+        g.reset()
+        self.assertIsNot(g.outcomes[0], o)
+        g.dispose()
+
+    def test_results_unwrap_nested_outcomes(self):
+        g = Group("nest", tasks=[lambda: 1])
+        g.outcomes[0] = Outcome()
+        g.outcomes[0].set_result(123)
+        self.assertEqual(g.results, [123])
+        g.dispose()
+
+    def test_results_with_mixed_success_and_exceptions(self):
+        g = Group("mixedbag", tasks=[lambda: 1, lambda: 2])
+        g.outcomes[0] = Outcome()
+        g.outcomes[1] = Outcome()
+        g.outcomes[0].set_result(10)
+        g.outcomes[1].set_exception(ValueError("fail"))
+        self.assertEqual(g.results, [10])
+        g.dispose()
+
+    def test_dispose_after_reset(self):
+        g = Group("afterreset", tasks=[lambda: 1])
+        g.reset()
+        g.dispose()
+        self.assertTrue(g.disposed)
 
     def test_init_with_multiple_tasks(self):
         def t1(): pass
