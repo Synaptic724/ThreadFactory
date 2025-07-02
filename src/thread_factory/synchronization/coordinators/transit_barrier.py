@@ -5,10 +5,6 @@ from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 
 
-# Assuming your Controller class is available for type hinting
-# from thread_factory.synchronization.controllers.controller import Controller
-
-
 class TransitBarrier(IDisposable):
     """
     TransitBarrier

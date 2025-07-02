@@ -508,5 +508,3 @@ class MultiConductor(IDisposable):
             }
         }
 
-    class ExecutionStrategies:
-        pass

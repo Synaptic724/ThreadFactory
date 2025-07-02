@@ -38,6 +38,7 @@ class SignalController(IDisposable):
     - `SignalBarrier`: For synchronizing groups of threads at specific points in execution.
     - `ClockBarrier`: For time-based synchronization of threads.
     - `TransitBarrier`: Executes all threads in a group once into a callable after a threshold is reached.
+    - `SyncSignalFork`: Distributes threads into multiple groups based on a conditions.
 
     These components allow the SignalController to manage complex thread interactions.
     There will be more integration with other synchronization primitives in the future.***
