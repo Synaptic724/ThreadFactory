@@ -1,10 +1,10 @@
-# tests/test_package.py
-import inspect
 import math
-import types
-import unittest
 from functools import partial
 from thread_factory.utils.coordination.package import Package, Pack
+import unittest
+import threading
+from thread_factory.utils.coordination.package import Package
+import time
 
 
 def _square(x):          # Helper functions used in several tests
@@ -13,6 +13,93 @@ def _square(x):          # Helper functions used in several tests
 
 def _add(a, b):
     return a + b
+
+
+def delayed_add(a, b):
+    time.sleep(0.01)
+    return a + b
+
+
+def constant_value():
+    return 42
+
+
+class TestPackageThreadSafety(unittest.TestCase):
+    def test_parallel_calls_do_not_corrupt_state(self):
+        """Ensure multiple threads calling the same Package do not conflict."""
+        p = Package(delayed_add, 1, 2)
+        results = []
+
+        def worker():
+            results.append(p())
+
+        threads = [threading.Thread(target=worker) for _ in range(10)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+
+        self.assertEqual(results, [3] * 10)
+
+    def test_concurrent_binding_raises_on_frozen(self):
+        """Ensure that frozen Package cannot be mutated in any thread."""
+        p = Package(delayed_add, 2, 3)
+        p.freeze()
+
+        def attempt_bind():
+            with self.assertRaises(RuntimeError):
+                p.bind(x=99)
+
+        threads = [threading.Thread(target=attempt_bind) for _ in range(5)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+
+    def test_signature_cache_shared_safely(self):
+        """Ensure the signature property is thread-safe and consistent."""
+        p = Package(delayed_add, 5, 7)
+        signatures = []
+
+        def read_signature():
+            for _ in range(10):
+                sig = p.signature.arguments.copy()
+                signatures.append(sig)
+
+        threads = [threading.Thread(target=read_signature) for _ in range(5)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+
+        for sig in signatures:
+            self.assertEqual(sig["arg0"], 5)
+            self.assertEqual(sig["arg1"], 7)
+
+    def test_curry_creates_distinct_instances(self):
+        """Ensure curry results in new thread-safe Packages."""
+        base = Package(delayed_add, 1)
+
+        def curried_worker(results):
+            curried = base.curry(9)
+            results.append(curried())
+
+        results = []
+        threads = [threading.Thread(target=curried_worker, args=(results,)) for _ in range(5)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+
+        self.assertEqual(results, [10] * 5)
+
+    def test_hash_consistency_multithreaded(self):
+        """Ensure hash() remains consistent across threads and never throws."""
+        p = Package(constant_value)
+
+        def read_hash(hashes):
+            for _ in range(10):
+                hashes.append(hash(p))
+
+        hashes = []
+        threads = [threading.Thread(target=read_hash, args=(hashes,)) for _ in range(4)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+
+        unique_hashes = set(hashes)
+        self.assertEqual(len(unique_hashes), 1)
 
 
 class TestPackage(unittest.TestCase):
@@ -212,7 +299,7 @@ class TestPackage(unittest.TestCase):
         self.assertEqual(combo(4), (4 + 1) * 2 + (4 - 3))  # → 10 + 1 = 11
 
     def test_signature_after_curry(self):
-        p = Package(pow, 2)
+        p = Pack(pow, 2)
         q = p.curry(5)
         self.assertEqual(q.signature.arguments["arg0"], 2)  # first positional
         # pow signature is (x, y, /); inspect binds as positional "arg0", "arg1"
