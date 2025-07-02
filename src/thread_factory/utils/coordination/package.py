@@ -160,58 +160,6 @@ class Package(IDisposable):
         return task
 
     @staticmethod
-    def is_valid_callable(obj: Any) -> bool:
-        """
-        Lightweight boolean check used in discovery / plugin loading paths.
-
-        Returns:
-            True if `obj` is a sync callable (or Package); False otherwise.
-        """
-        return (
-            isinstance(obj, Package)
-            or (
-                callable(obj)
-                and not inspect.iscoroutinefunction(obj)
-                and not inspect.isgeneratorfunction(obj)
-            )
-        )
-
-    @staticmethod
-    def ensure(task: Any) -> Optional["Package"]:
-        """
-        Attempt to wrap *task* in a Package.
-
-        Returns:
-            - The Package instance if wrap succeeds (or the original Package if it already is one)
-            - None if the task is invalid.
-        """
-        if isinstance(task, Package):
-            return task
-        if Package.is_valid_callable(task):
-            try:
-                return Package(task)  # safe wrap
-            except Exception:
-                return None
-        return None
-
-
-    @staticmethod
-    def safe(task: Any) -> Union["Package", Any]:
-        """
-        Soft-wrap: if *task* is a safe callable it becomes a Package, otherwise it is
-        passed through untouched.  Great for low-assumption APIs.
-
-        Example:
-            task = Package.safe(user_obj)
-            executor.submit(task)  # works for both Pack and raw objects
-        """
-        if isinstance(task, Package):
-            return task
-        if Package.is_valid_callable(task):
-            return Package(task)  # type: ignore[arg-type]
-        return task
-
-    @staticmethod
     def from_partial(func: Callable[..., Any], *args: Any, **kwargs: Any) -> "Package":
         """
         Convenience factory for quickly creating an already-curried Package.
@@ -289,29 +237,6 @@ class Package(IDisposable):
                 raise TypeError(f"Invalid task at index {i}: {e}") from e
 
         return result
-
-
-    @staticmethod
-    def validate_callable(task: Any, index: int = -1) -> None:
-        """
-        Validates that a task is callable and not an async/coroutine/generator function.
-
-        Args:
-            task: The task to validate.
-            index: Optional index for detailed error messaging.
-
-        Raises:
-            TypeError: If task is invalid.
-        """
-        label = f" at index {index}" if index >= 0 else ""
-        if task is None:
-            raise TypeError(f"Task{label} cannot be None.")
-        if not callable(task):
-            raise TypeError(f"Expected callable{label}, got {type(task).__name__}")
-        if inspect.iscoroutinefunction(task):
-            raise TypeError(f"Coroutine function{label} is not allowed: {getattr(task, '__name__', repr(task))}")
-        if inspect.isgeneratorfunction(task):
-            raise TypeError(f"Generator function{label} is not allowed: {getattr(task, '__name__', repr(task))}")
 
     def bind(self, **new_kwargs: Any) -> Package:
         """

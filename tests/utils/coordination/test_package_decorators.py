@@ -24,19 +24,33 @@ class TestPackDecorators(unittest.TestCase):
         @good_decorator
         def greet(name): return f"hi {name}"
 
-        p = Pack(greet)
-        self.assertEqual(p("Mark"), "hi Mark")
-        self.assertIn("arg0", p.signature.arguments)
+        p = Pack(greet, "Mark")  # ← pre-bind one positional argument
+        self.assertEqual(p(), "hi Mark")  # call with no extras, still works
+        self.assertIn("arg0", p.signature.arguments)  # now arg0 exists
 
     def test_bad_decorator_still_executes(self):
+        """
+        Test that a function with a non-@wraps decorator still executes under Pack.
+        Signature will reflect the wrapper, not the original.
+        """
+
         @simple_decorator
         def shout(name): return f"yo {name}"
 
         p = Pack(shout)
         self.assertEqual(p("Zen"), "yo Zen")
-        # But signature will not be introspectable — that’s user risk
-        with self.assertRaises(ValueError):
-            _ = inspect.signature(p._func).parameters
+
+        sig = inspect.signature(p._func)
+        self.assertIsInstance(sig, inspect.Signature)
+
+        # Decorator wrapper has parameters *a, **k (as named)
+        self.assertIn("a", sig.parameters)
+        self.assertIn("k", sig.parameters)
+
+        # Ensure their kinds are VAR_POSITIONAL and VAR_KEYWORD
+        self.assertEqual(sig.parameters["a"].kind, inspect.Parameter.VAR_POSITIONAL)
+        self.assertEqual(sig.parameters["k"].kind, inspect.Parameter.VAR_KEYWORD)
+
 
     def test_double_decorated_still_works(self):
         @good_decorator

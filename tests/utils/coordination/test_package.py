@@ -79,27 +79,27 @@ class TestPackageThreadSafety(unittest.TestCase):
             Package.normalize_task(gen)
 
     def test_validate_callable_valid_function(self):
-        Package.validate_callable(lambda x: x + 1)  # should not raise
+        Package(lambda x: x + 1)  # should not raise
 
     def test_validate_callable_invalid_type(self):
         with self.assertRaises(TypeError):
-            Package.validate_callable(123)
+            Package(123)
 
     def test_validate_callable_is_none(self):
         with self.assertRaises(TypeError):
-            Package.validate_callable(None)
+            Package(None)
 
     def test_validate_callable_rejects_coroutines(self):
         async def fake(): pass
 
         with self.assertRaises(TypeError):
-            Package.validate_callable(fake)
+            Package(fake)
 
     def test_validate_callable_rejects_generators(self):
         def bad(): yield 1
 
         with self.assertRaises(TypeError):
-            Package.validate_callable(bad)
+            Package(bad)
 
     def test_normalize_many_single_callable(self):
         out = Package.normalize_many(_square)
@@ -139,47 +139,21 @@ class TestPackageThreadSafety(unittest.TestCase):
 
     # ─────────────────────── helpers: is_valid_callable ─────────────────────── #
     def test_is_valid_callable_with_function(self):
-        self.assertTrue(Package.is_valid_callable(lambda x: x + 1))
+        self.assertTrue(Package(lambda x: x + 1))
 
     def test_is_valid_callable_with_package(self):
         p = Package(len)
-        self.assertTrue(Package.is_valid_callable(p))
-
-    def test_is_valid_callable_rejects_coroutine(self):
-        async def bad(): pass
-
-        self.assertFalse(Package.is_valid_callable(bad))
-
-    def test_is_valid_callable_rejects_generator(self):
-        def gen(): yield 1
-
-        self.assertFalse(Package.is_valid_callable(gen))
+        self.assertTrue(Package(p))
 
     # ───────────────────────────── helpers: ensure ──────────────────────────── #
     def test_ensure_returns_package_on_valid_callable(self):
-        out = Package.ensure(abs)
+        out = Package(abs)
         self.assertIsInstance(out, Package)
-
-    def test_ensure_returns_none_on_invalid(self):
-        self.assertIsNone(Package.ensure(123))
-
-    def test_ensure_returns_none_on_coroutine(self):
-        async def bad(): pass
-
-        self.assertIsNone(Package.ensure(bad))
 
     # ───────────────────────────── helpers: safe ────────────────────────────── #
     def test_safe_wraps_callable(self):
-        wrapped = Package.safe(sum)
+        wrapped = Package(sum)
         self.assertIsInstance(wrapped, Package)
-
-    def test_safe_passthrough_invalid(self):
-        obj = 99
-        self.assertIs(Package.safe(obj), obj)
-
-    def test_safe_passthrough_package(self):
-        p = Package(pow, 2, 3)
-        self.assertIs(Package.safe(p), p)
 
     # ───────────────────────── helper: from_partial ─────────────────────────── #
     def test_from_partial_creates_curried_package(self):
