@@ -86,6 +86,23 @@ class SyncFloat(ISync):
     def _coerce(cls, val):  # float-specific cast
         return float(val)
 
+    def _apply_inplace_op(self, op, other):
+        """
+        Thread-safe helper for all __i*__ operators.
+
+        • If *other* is an ISync subclass, lock both operands in id() order
+        • Otherwise lock only self
+        """
+        if ISync._is_sync(other):
+            first, second = ISync._acquire_two(self, other)
+            with first._lock, second._lock:
+                rhs = float(other._value)  # safe: we hold its lock
+                self._value = op(self._value, rhs)
+        else:
+            with self._lock:
+                self._value = op(self._value, float(other))
+        return self
+
     # ──────────────────────────────────────────────────────────────────
     # Public API
     # ──────────────────────────────────────────────────────────────────
@@ -548,22 +565,6 @@ class SyncFloat(ISync):
         """
         return +self.get()
 
-
-    def _apply_inplace_op(self, func, other):
-        """
-        Internal helper to safely perform and assign in-place operations.
-
-        Parameters:
-            func (Callable): Operation to perform.
-            other: Operand.
-
-        Returns:
-            SyncFloat: Self after mutation.
-        """
-        with self._lock:
-            self._value = func(self._value, self._unwrap_other(other))
-            return self
-
     def __pow__(self, other, mod=None):
         """
         Compute self ** other (power).
@@ -838,53 +839,35 @@ class SyncFloat(ISync):
         """
         return 0.0
 
-
     # ------------------------------------------------------------------ #
     # Atomic convenience helpers
     # ------------------------------------------------------------------ #
-
     def increment(self, value: Real | ISync = 1.0):
         """
-        Atomically increment the internal value by the specified amount.
-
-        Parameters
-        ----------
-        value : Real | ISync
-            Amount to add.  Any ISync value is converted via float(other.get()).
-
-        Returns
-        -------
-        float
-            The updated value.
+        Atomically add *value* to the internal float and return the new total.
         """
         if ISync._is_sync(value):
-            first, second = (self, value) if id(self) < id(value) else (value, self)
+            # lock-ordering to avoid dead-lock
+            first, second = ISync._acquire_two(self, value)
             with first._lock, second._lock:
-                self._value += float(value.get())
+                # ✅ always use *value*’s payload, not **second**,
+                # because second could be *self* when id(self) > id(value).
+                self._value += float(value._value)
                 return self._value
-        else:
+        else:  # plain numbers
             with self._lock:
                 self._value += float(value)
                 return self._value
 
     def decrement(self, value: Real | ISync = 1.0):
         """
-        Atomically decrement the internal value by the specified amount.
-
-        Parameters
-        ----------
-        value : Real | ISync
-            Amount to subtract.
-
-        Returns
-        -------
-        float
-            The updated value.
+        Atomically subtract *value* from the internal float and return the new total.
         """
         if ISync._is_sync(value):
-            first, second = (self, value) if id(self) < id(value) else (value, self)
+            first, second = ISync._acquire_two(self, value)
             with first._lock, second._lock:
-                self._value -= float(value.get())
+                # ✅ same fix – read from *value*, not **second**
+                self._value -= float(value._value)
                 return self._value
         else:
             with self._lock:

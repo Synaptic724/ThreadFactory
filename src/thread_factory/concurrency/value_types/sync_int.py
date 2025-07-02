@@ -96,27 +96,23 @@ class SyncInt(ISync):
 
     def _unwrap_other(self, other):
         """
-        SyncString-compatible unwrapping.
+        Unwrap *other* into a plain value suitable for int-ops.
 
-        Accepts
-        -------
-        • SyncString         → other.get()
-        • str                → other (already valid)
-
-        Returns
-        -------
-        A str if valid. Any other type is returned as-is,
-        and should raise a TypeError during comparison if unsupported.
-
-        This ensures Python's default str behavior is preserved.
+        • SyncString           → other.get()            (leave as str)
+        • Any other ISync      → int(other.get())       (coerce via int())
+        • str                  → other                  (already fine)
+        • everything else      → other                  (let Python complain later)
         """
         if isinstance(other, SyncString):
             return other.get()
 
+        if ISync._is_sync(other):  # SyncInt, SyncFloat, SyncBool, …
+            return int(other.get())
+
         if isinstance(other, str):
             return other
 
-        return other  # Let Python raise TypeError naturally if needed
+        return other
 
     @classmethod
     def _coerce(cls, val):  # int-specific cast
@@ -918,7 +914,7 @@ class SyncInt(ISync):
             int: The updated value after increment.
         """
         if ISync._is_sync(value):
-            first, second = (self, value) if id(self) < id(value) else (value, self)
+            first, second = ISync._acquire_two(self, value)
             with first._lock, second._lock:
                 self._value += int(value.get())
                 return self._value
@@ -938,7 +934,7 @@ class SyncInt(ISync):
             int: The updated value after decrement.
         """
         if ISync._is_sync(value):
-            first, second = (self, value) if id(self) < id(value) else (value, self)
+            first, second = ISync._acquire_two(self, value)
             with first._lock, second._lock:
                 self._value -= int(value.get())
                 return self._value
@@ -952,24 +948,18 @@ class SyncInt(ISync):
     # ------------------------------------------------------------------ #
     def _apply_ip_op(self, other, op):
         """
-        Internal helper to apply an in-place operation *op* thread-safely.
+        Thread-safe in-place operator helper.
 
-        Parameters
-        ----------
-        other : int | ISync
-            Right-hand operand.
-        op    : Callable[[int, int], int]
-            Function that combines two ints and returns the new value.
-
-        Returns
-        -------
-        SyncInt
-            Returns self after mutation.
+        • When *other* is another ISync instance, acquire **both** locks
+          in a deterministic order with ISync._acquire_two().
+        • Avoid calling other.get() while both locks are held; we can
+          read its private _value directly because we own its lock.
         """
         if ISync._is_sync(other):
-            first, second = (self, other) if id(self) < id(other) else (other, self)
+            first, second = ISync._acquire_two(self, other)
             with first._lock, second._lock:
-                self._value = op(self._value, int(other.get()))
+                rhs = int(other._value)  # ← safe: lock held
+                self._value = op(self._value, rhs)
         else:
             with self._lock:
                 self._value = op(self._value, int(other))

@@ -5,14 +5,13 @@ import random
 import pickle
 import copy
 
-# Adapt the import path to your project structure
 from thread_factory.concurrency.value_types.sync_string import SyncString
-from thread_factory.concurrency.value_types.sync_int import SyncInt
-from thread_factory.concurrency.value_types.sync_float import SyncFloat
-from thread_factory.concurrency.value_types.sync_bool import SyncBool
+from thread_factory.concurrency.value_types.sync_int    import SyncInt
+from thread_factory.concurrency.value_types.sync_float  import SyncFloat
+from thread_factory.concurrency.value_types.sync_bool   import SyncBool
 
 
-TIMEOUT = 5  # seconds – used for join time‑outs to reveal deadlocks
+TIMEOUT = 5  # seconds – join-timeout used to reveal deadlocks
 
 
 class TestSyncIntegration(unittest.TestCase):
@@ -21,7 +20,7 @@ class TestSyncIntegration(unittest.TestCase):
     #  Helper utilities
     # ------------------------------------------------------------------
     def _spawn(self, *targets):
-        """Start all callables in individual threads and return list."""
+        """Start each callable in its own thread and return the list."""
         threads = [threading.Thread(target=fn) for fn in targets]
         for t in threads:
             t.start()
@@ -30,7 +29,8 @@ class TestSyncIntegration(unittest.TestCase):
     def _assert_threads_complete(self, threads):
         for t in threads:
             t.join(timeout=TIMEOUT)
-        self.assertTrue(all(not t.is_alive() for t in threads), "Deadlock or timeout detected")
+        self.assertTrue(all(not t.is_alive() for t in threads),
+                        "Deadlock or timeout detected")
 
     # ------------------------------------------------------------------
     #  1. Increment Int / Float coherence
@@ -38,7 +38,7 @@ class TestSyncIntegration(unittest.TestCase):
     def test_increment_int_float_coherence(self):
         i = SyncInt(0)
         f = SyncFloat(0.0)
-        barrier = threading.Barrier(6)
+        barrier = threading.Barrier(5)          # ← matches 5 worker threads
 
         def adders():
             nonlocal i, f
@@ -47,18 +47,18 @@ class TestSyncIntegration(unittest.TestCase):
                 i += 1
                 f += 1.0
 
-        threads = self._spawn(*[adders for _ in range(5)],)
+        threads = self._spawn(*[adders for _ in range(5)])
         self._assert_threads_complete(threads)
-        self.assertEqual(i.get(), 50_000)
-        self.assertAlmostEqual(f.get(), 50_000.0)
+        self.assertEqual(i.get(),        50_000)
+        self.assertAlmostEqual(f.get(),  50_000.0)
 
     # ------------------------------------------------------------------
-    # 2. String‑Int concatenation atomicity
+    # 2. String-Int concatenation atomicity
     # ------------------------------------------------------------------
     def test_string_int_concat_atomicity(self):
         s = SyncString("count:")
         i = SyncInt(0)
-        barrier = threading.Barrier(4)
+        barrier = threading.Barrier(4)          # 4 worker threads
 
         def worker():
             nonlocal s, i
@@ -77,7 +77,7 @@ class TestSyncIntegration(unittest.TestCase):
     # ------------------------------------------------------------------
     def test_bool_flip_atomicity(self):
         b = SyncBool(True)
-        barrier = threading.Barrier(3)
+        barrier = threading.Barrier(2)          # 2 worker threads
 
         def flipper():
             barrier.wait()
@@ -89,7 +89,7 @@ class TestSyncIntegration(unittest.TestCase):
         self.assertIn(b.get(), (True, False))
 
     # ------------------------------------------------------------------
-    # 4. Cross‑type addition (int into float)
+    # 4. Cross-type addition (int into float)
     # ------------------------------------------------------------------
     def test_cross_addition(self):
         f = SyncFloat(0.0)
@@ -98,12 +98,12 @@ class TestSyncIntegration(unittest.TestCase):
         self.assertEqual(f.get(), 10.0)
 
     # ------------------------------------------------------------------
-    # 5. Cross‑type comparisons stay Pythonic
+    # 5. Cross-type comparisons stay Pythonic
     # ------------------------------------------------------------------
     def test_cross_comparison(self):
         s = SyncString("123")
         i = SyncInt(123)
-        self.assertFalse(s == i)  # string vs int
+        self.assertFalse(s == i)
         with self.assertRaises(TypeError):
             _ = s < i
 
@@ -112,7 +112,7 @@ class TestSyncIntegration(unittest.TestCase):
     # ------------------------------------------------------------------
     def test_lock_ordering(self):
         s1, s2 = SyncString("a"), SyncString("b")
-        barrier = threading.Barrier(3)
+        barrier = threading.Barrier(2)          # 2 worker threads
 
         def t1():
             barrier.wait()
@@ -128,14 +128,14 @@ class TestSyncIntegration(unittest.TestCase):
         self._assert_threads_complete(threads)
 
     # ------------------------------------------------------------------
-    # 7. Massive mixed‑type race
+    # 7. Massive mixed-type race
     # ------------------------------------------------------------------
     def test_massive_mixed_race(self):
         s = SyncString("")
         i = SyncInt(0)
         f = SyncFloat(0.0)
         b = SyncBool(True)
-        barrier = threading.Barrier(6)
+        barrier = threading.Barrier(5)          # 5 worker threads
 
         def mix():
             nonlocal s, i, f, b
@@ -148,15 +148,15 @@ class TestSyncIntegration(unittest.TestCase):
 
         threads = self._spawn(mix, mix, mix, mix, mix)
         self._assert_threads_complete(threads)
-        self.assertEqual(i.get(), 5 * 2_000)
-        self.assertAlmostEqual(f.get(), 5 * 2_000 * 0.5)
+        self.assertEqual(i.get(),        5 * 2_000)
+        self.assertAlmostEqual(f.get(),  5 * 2_000 * 0.5)
 
     # ------------------------------------------------------------------
     # 8. Simultaneous set/get integrity
     # ------------------------------------------------------------------
     def test_simultaneous_set_get(self):
         s = SyncString("init")
-        barrier = threading.Barrier(4)
+        barrier = threading.Barrier(4)          # 2 writers + 2 readers
 
         def writer():
             barrier.wait()
@@ -173,7 +173,7 @@ class TestSyncIntegration(unittest.TestCase):
         self.assertIsInstance(s.get(), str)
 
     # ------------------------------------------------------------------
-    # 9. Pickle round‑trip across threads
+    # 9. Pickle round-trip across threads
     # ------------------------------------------------------------------
     def test_pickle_roundtrip(self):
         s = SyncString("pickle_me")
@@ -186,7 +186,7 @@ class TestSyncIntegration(unittest.TestCase):
     # ------------------------------------------------------------------
     def test_copy_roundtrip(self):
         s = SyncString("copy")
-        self.assertEqual(copy.copy(s).get(), "copy")
+        self.assertEqual(copy.copy(s).get(),     "copy")
         self.assertEqual(copy.deepcopy(s).get(), "copy")
 
     # ------------------------------------------------------------------
@@ -195,7 +195,7 @@ class TestSyncIntegration(unittest.TestCase):
     def test_hash_consistency(self):
         s = SyncString("hashme")
         initial_hash = hash(s)
-        s += "!"  # mutate
+        s += "!"
         self.assertNotEqual(initial_hash, hash(s))
 
     # ------------------------------------------------------------------
@@ -223,7 +223,7 @@ class TestSyncIntegration(unittest.TestCase):
     # ------------------------------------------------------------------
     def test_contains_during_modification(self):
         s = SyncString("foo_bar")
-        barrier = threading.Barrier(3)
+        barrier = threading.Barrier(2)
         flag = threading.Event()
 
         def checker():
@@ -265,10 +265,10 @@ class TestSyncIntegration(unittest.TestCase):
     def test_threaded_math_and_string(self):
         s = SyncString("A")
         i = SyncInt(1)
-        barrier = threading.Barrier(4)
+        barrier = threading.Barrier(3)          # 3 worker threads
 
         def math_text():
-            nonlocal s, i
+            nonlocal i, s
             barrier.wait()
             for _ in range(10_000):
                 i += 1
@@ -299,19 +299,18 @@ class TestSyncIntegration(unittest.TestCase):
         self.assertTrue(done.is_set())
 
     # ------------------------------------------------------------------
-    # 18. Race read‑write mix with bool gate
+    # 18. Race read-write mix with bool gate
     # ------------------------------------------------------------------
     def test_race_read_write_mix(self):
         gate = SyncBool(True)
         s = SyncString("")
-        barrier = threading.Barrier(3)
+        barrier = threading.Barrier(3)          # 2 readers + 1 writer
 
         def reader():
             barrier.wait()
             for _ in range(5_000):
                 if gate.get():
                     _ = len(s)
-
 
         def writer():
             nonlocal s
@@ -324,7 +323,7 @@ class TestSyncIntegration(unittest.TestCase):
         self._assert_threads_complete(threads)
 
     # ------------------------------------------------------------------
-    # 19. Mixed‑type equality (string vs float str rep)
+    # 19. Mixed-type equality (string vs float str rep)
     # ------------------------------------------------------------------
     def test_mixed_type_equality(self):
         f = SyncFloat(3.0)
@@ -337,7 +336,7 @@ class TestSyncIntegration(unittest.TestCase):
     def test_no_deadlock_reverse_lock(self):
         s = SyncString("txt")
         i = SyncInt(99)
-        barrier = threading.Barrier(3)
+        barrier = threading.Barrier(2)          # 2 worker threads
 
         def t1():
             barrier.wait()

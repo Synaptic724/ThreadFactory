@@ -60,6 +60,29 @@ class SyncString(ISync):
             self._value = str(initial)
             self._lock = threading.RLock()
 
+    # ──────────────────────────────────────────────────────────────
+    #  NEW: generic in-place helper (drop it near the other helpers)
+    # ──────────────────────────────────────────────────────────────
+    def _apply_ip_op(self, other, op):
+        """
+        Thread-safe in-place operator helper (+=, *=).
+
+        • If *other* is any ISync (e.g. another SyncString) acquire
+          both locks in id-order via ISync._acquire_two() to avoid
+          lock-order inversion dead-locks.
+        • With both locks held read other._value directly – **never**
+          call str(other) while the second lock is held.
+        """
+        if ISync._is_sync(other):
+            first, second = ISync._acquire_two(self, other)
+            with first._lock, second._lock:
+                rhs = str(other._value)  # other is always the RHS object
+                self._value = op(self._value, rhs)
+        else:
+            with self._lock:
+                self._value = op(self._value, str(other))
+        return self
+
     def _unwrap_other(self, other):
         if isinstance(other, SyncString):
             return other.get()
@@ -67,23 +90,23 @@ class SyncString(ISync):
             return other
         return other  # no coercion
 
-    def _perform_binary_op(self, other, op):
+    def _perform_binary_op(self, other, op, r_operation: bool = False):
         """
-        Thread-safe binary operation that avoids deadlocks
-        by enforcing consistent lock acquisition order.
+        Dead-lock-safe binary helper for strings that works with *any*
+        other operand (plain str, SyncString, or any other ISync).
         """
-        if isinstance(other, SyncString):
-            # Acquire locks in deterministic order
-            first, second = (self, other) if id(self) < id(other) else (other, self)
-
-            with first._lock:
-                with second._lock:
-                    return op(self._value, other._value)
-
-        # For non-SyncString values, just lock self
-        with self._lock:
-            b = self._unwrap_other(other)
-            return op(self._value, b)
+        if ISync._is_sync(other):
+            first, second = ISync._acquire_two(self, other)
+            with first._lock, second._lock:
+                a = self._value if not r_operation else other._value
+                b = other._value if not r_operation else self._value
+                return op(a, b)
+        else:
+            # other is a plain object → only our own lock is needed
+            with self._lock:
+                return op(self._value, self._unwrap_other(other)) \
+                    if not r_operation else \
+                    op(self._unwrap_other(other), self._value)
 
     @classmethod
     def _coerce(cls, val):  # always cast to str
@@ -657,9 +680,7 @@ class SyncString(ISync):
         Returns:
             SyncString: self, after modification.
         """
-        with self._lock:
-            self._value += str(other)
-            return self
+        return self._apply_ip_op(other, lambda a, b: a + b)
 
     def __mul__(self, n):
         """
@@ -866,19 +887,10 @@ class SyncString(ISync):
 
     def __imul__(self, n):
         """
-        Perform in-place multiplication (*=).
-
-        This operation is atomic. It acquires the lock, repeats the string
-        n times, and updates the internal value in a single operation.
-
-        Args:
-            n (int): The number of times to repeat the string.
-
-        Returns:
-            SyncString: self, after modification.
+        In-place repetition (x *= n) – atomic & dead-lock-safe.
         """
         with self._lock:
-            self._value *= n
+            self._value *= n  # real string repetition
             return self
 
     @classmethod

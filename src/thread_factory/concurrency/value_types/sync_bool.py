@@ -46,6 +46,23 @@ class SyncBool(ISync):
             self._value = bool(initial)
             self._lock = threading.RLock()
 
+    def _apply_ip_op(self, other, op):
+        """
+        Thread-safe helper for __iand__, __ior__, __ixor__.
+
+        • If *other* is any ISync, lock both operands in id() order
+        • Otherwise just lock self
+        """
+        if ISync._is_sync(other):
+            first, second = ISync._acquire_two(self, other)
+            with first._lock, second._lock:
+                rhs = bool(other._value)  # safe: we hold its lock
+                self._value = op(self._value, rhs)
+        else:
+            with self._lock:
+                self._value = op(self._value, bool(other))
+        return self
+
     @classmethod
     def _coerce(cls, val):  # bool cast (Python truthiness)
         return bool(val)
@@ -595,19 +612,16 @@ class SyncBool(ISync):
         Keeps the object a *SyncBool* instead of falling back to ``int``.
         """
         # __and__ may return int when `other` is int → cast to bool
-        self.set(bool(self.__and__(other)))
-        return self
+        return self._apply_ip_op(other, lambda a, b: a & b)
 
     def __ior__(self, other):
         """
         In-place bitwise **OR** (``x |= y``).
         """
-        self.set(bool(self.__or__(other)))
-        return self
+        return self._apply_ip_op(other, lambda a, b: a | b)
 
     def __ixor__(self, other):
         """
         In-place bitwise **XOR** (``x ^= y``).
         """
-        self.set(bool(self.__xor__(other)))
-        return self
+        return self._apply_ip_op(other, lambda a, b: a ^ b)

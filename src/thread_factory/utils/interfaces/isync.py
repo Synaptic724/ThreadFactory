@@ -43,22 +43,13 @@ class ISync:
         except Exception:
             return other                  # let caller raise if truly incompatible
 
-    def _perform_binary_op(self,
-                           other,
-                           op,
-                           r_operation: bool = False):
-        """
-        Deadlock-safe, thread-safe binary operation helper.
-
-        • If *other* is any ISync, locks BOTH instances in id() order.
-        • Otherwise, locks only `self`.
-        • `r_operation=True` → evaluate as  (other OP self)
-        """
-        if self._is_sync(other):
-            first, second = (self, other) if id(self) < id(other) else (other, self)
+    def _perform_binary_op(self, other, op, r_operation=False):
+        if ISync._is_sync(other):
+            first, second = ISync._acquire_two(self, other)
             with first._lock, second._lock:
-                a = self._value if not r_operation else self._unwrap_other(other)
-                b = self._unwrap_other(other) if not r_operation else self._value
+                # figure out which side is left/right
+                a = self._value if not r_operation else other._value
+                b = other._value if not r_operation else self._value
                 return op(a, b)
         else:
             other_val = self._unwrap_other(other)
