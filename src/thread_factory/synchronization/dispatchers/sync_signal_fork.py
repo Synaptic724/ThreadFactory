@@ -7,10 +7,6 @@ from thread_factory.synchronization.coordinators.scout import Scout
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 
-# --------------------------------------------------------------------------- #
-#                               Support Structs                               #
-# --------------------------------------------------------------------------- #
-
 @dataclasses.dataclass(slots=True)
 class ForkUnit:
     """
@@ -29,16 +25,18 @@ class ForkUnit:
     gate_uses : int
         Current number of threads that have claimed this unit.
     """
-    fork_callable: Callable
+    fork_callable: Callable | None
     usage_cap: int
     lock: threading.Lock = dataclasses.field(default_factory=threading.RLock)
     gate: bool = False
     gate_uses: int = 0
 
+    def dispose(self) -> None:
+        """
+        Marks this ForkUnit as disposed by sealing the gate and clearing callable.
+        """
+        self.fork_callable = None
 
-# --------------------------------------------------------------------------- #
-#                              SyncSignalFork                                 #
-# --------------------------------------------------------------------------- #
 
 class SyncSignalFork(IDisposable):
     """
@@ -98,9 +96,6 @@ class SyncSignalFork(IDisposable):
         "_callback", "_controller", "_signal_callback"
     ]
 
-    # ------------------------------------------------------------------ #
-    # Construction
-    # ------------------------------------------------------------------ #
     def __init__(
         self,
         number_of_forks: int,
@@ -157,16 +152,47 @@ class SyncSignalFork(IDisposable):
 
         self._detect_number_of_routes()
 
-        # ----------------- controller registration ----------------- #
         if self._controller:
             try:
                 self._controller.register(self)
             except Exception:
                 pass
 
-    # ------------------------------------------------------------------ #
-    # Controller helpers
-    # ------------------------------------------------------------------ #
+    def dispose(self) -> None:
+        """
+        Disposes the SyncSignalFork instance. Makes it permanently unusable.
+        - Releases all waiting threads.
+        - Disposes all ForkUnits (clears their callables).
+        - Signals Scout (if present) to clean up.
+        - Unregisters from controller if supported.
+
+        Idempotent: Safe to call multiple times.
+        """
+        if self._disposed:
+            return
+
+        with self._selector_lock:
+            self._disposed = True
+            self._forks_closed = True
+            self._threading_event.set()
+
+            if self._scout:
+                self._scout.dispose()
+                self._scout = None
+
+            for unit in self._list_of_forks:
+                unit.dispose()
+
+            self._list_of_forks.clear()
+
+            # Optional: unregister from controller
+            if self._controller:
+                try:
+                    self._controller.unregister(self)
+                except Exception:
+                    pass
+
+
     @property
     def id(self) -> str:  # noqa: D401
         """ULID used by the controller as a stable key."""
@@ -337,9 +363,6 @@ class SyncSignalFork(IDisposable):
         # ----------- execute callable ----------- #
         selected_unit.fork_callable()
 
-    # ------------------------------------------------------------------ #
-    # Manual controls
-    # ------------------------------------------------------------------ #
     def release(self) -> None:
         """
         Manually release the fork (only effective when *manual_release=True*).
@@ -384,18 +407,3 @@ class SyncSignalFork(IDisposable):
         self._threading_event.clear()
         if self._scout:
             self._scout.reset()
-
-    # ------------------------------------------------------------------ #
-    # Disposal
-    # ------------------------------------------------------------------ #
-    def dispose(self) -> None:
-        if self._disposed:
-            return
-        with self._selector_lock:
-            self._disposed = True
-            self._forks_closed = True
-            self._threading_event.set()
-            if self._scout:
-                self._scout.dispose()
-                self._scout = None
-            self._list_of_forks.clear()

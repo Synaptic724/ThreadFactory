@@ -8,8 +8,6 @@ from thread_factory.utils.coordination.outcome import Outcome
 from thread_factory.synchronization.primitives import Dynaphore
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
-from thread_factory.synchronization.dispatchers.fork import Fork
-from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
 
 
 class MultiConductor(IDisposable):

@@ -2,8 +2,8 @@ import threading
 from copy import deepcopy
 import ulid
 from typing import Callable, Optional, Any, Dict, Union
-from thread_factory import ConcurrentDict
-from thread_factory.utils import IDisposable
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 
 class Activity(IDisposable):

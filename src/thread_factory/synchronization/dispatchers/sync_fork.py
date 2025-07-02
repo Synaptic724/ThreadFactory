@@ -3,9 +3,8 @@ import threading
 from typing import Callable, List, Optional, Tuple
 import inspect
 import ulid
-from thread_factory.synchronization.coordinators.scout import Scout
 from thread_factory.utils.interfaces.disposable import IDisposable
-
+from thread_factory.synchronization.coordinators.scout import Scout
 
 # --------------------------------------------------------------------------- #
 #                               Support Structs                               #
@@ -26,11 +25,18 @@ class ForkUnit:
     Used internally by SyncFork to coordinate slot-based callable execution.
     """
 
-    fork_callable: Callable
+    fork_callable: Callable | None
     usage_cap: int
     lock: threading.Lock = dataclasses.field(default_factory=threading.RLock)
     gate: bool = False
     gate_uses: int = 0
+
+
+    def dispose(self) -> None:
+        """
+        Marks this ForkUnit as disposed by sealing the gate and clearing callable.
+        """
+        self.fork_callable = None
 
 
 # --------------------------------------------------------------------------- #
@@ -69,8 +75,6 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
         "_timeout_duration", "_timed_out", "_scout"  # Added timeout related slots
     ]
 
-    # ---------------------------- Construction ---------------------------- #
-
     def __init__(
             self,
             number_of_forks: int,
@@ -79,7 +83,7 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
             timeout_duration: Optional[float] = None,  # New optional timeout parameter
     ):
         super().__init__()  # Initialize IDisposable
-        # --- Validate input ------------------------------------------------ #
+        # Validate input
         if number_of_forks != len(callables):
             raise ValueError("The number of forks must match the number of callables.")
 
@@ -97,7 +101,7 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
         if timeout_duration is not None and (not isinstance(timeout_duration, (int, float)) or timeout_duration <= 0):
             raise ValueError("timeout_duration must be a positive number or None.")
 
-        # --- Init internal state ------------------------------------------ #
+        # Init internal state
         self._threading_event = threading.Event()  # Shared barrier event for all threads
         self._list_of_forks: List[ForkUnit] = [
             ForkUnit(fork_callable=fn, usage_cap=cap) for cap, fn in callables
@@ -116,7 +120,35 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
 
         self._detect_number_of_routes()
 
-    # ---------------------------- Internals for Scout Integration ------------------------------ #
+    def dispose(self) -> None:
+        """
+        Disposes the SyncFork instance. Releases all resources and makes it unusable.
+        Idempotent: safe to call multiple times.
+
+        After disposal:
+        - All future use of `use_fork()` raises RuntimeError.
+        - All `ForkUnit`s are explicitly disposed (clearing their callables).
+        - The internal threading event is triggered to release any waiting threads.
+        - If a Scout was in use, it is also disposed.
+        """
+        if self._disposed:
+            return
+
+        with self._selector_lock:
+            self._disposed = True
+            self._forks_closed = True
+            self._threading_event.set()  # Wake anything waiting
+
+            # Dispose Scout if present
+            if self._scout:
+                self._scout.dispose()
+                self._scout = None
+
+            # Dispose all ForkUnits to clear callables
+            for unit in self._list_of_forks:
+                unit.dispose()
+
+            self._list_of_forks.clear()
 
     def _scout_predicate(self) -> bool:
         """
@@ -150,7 +182,6 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
         # but could be used for logging/debugging if desired. For now, it's a no-op.
         pass
 
-    # ---------------------------- Internals ------------------------------ #
 
     def _detect_number_of_routes(self) -> None:
         """
@@ -194,7 +225,6 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
         self._forks_closed = True
         return None
 
-    # ----------------------------- API ----------------------------------- #
 
     def reset(self) -> None:
         """
@@ -232,7 +262,6 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
 
         self._detect_number_of_routes()  # Re-calculate route count, though usually static
 
-    # ----------------------------- API ----------------------------------- #
 
     def use_fork(self) -> None:
         """
@@ -240,9 +269,7 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
         slots to be filled (or timeout), then execute the assigned
         callable.
 
-        ───────────────────────────────────────────────────────────────
         Workflow
-        ───────────────────────────────────────────────────────────────
         1.  Validate object state (disposed / timed-out / closed).
         2.  Select an available **ForkUnit** and atomically claim a slot.
         3.  If this is the *first* thread of the cycle **and** a timeout
@@ -274,9 +301,6 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
         if self._forks_closed:
             raise RuntimeError("All forks are at capacity or barrier has already closed.")
 
-        # ────────────────────────────────────────────────────────────
-        # 1) Pick and claim a ForkUnit
-        # ────────────────────────────────────────────────────────────
         selected_unit: Optional[ForkUnit] = None
         while selected_unit is None:
             unit_candidate = self._select_fork_unit_step()
@@ -291,9 +315,6 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
                 if selected_unit.gate_uses >= selected_unit.usage_cap:
                     selected_unit.gate = True  # Unit exhausted
 
-        # ────────────────────────────────────────────────────────────
-        # 2) Scout ownership + global slot counter
-        # ────────────────────────────────────────────────────────────
         run_scout = False
         defer_increment = False
 
@@ -333,9 +354,6 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
                     with self._scout._condition:
                         self._scout._condition.notify_all()
 
-        # ────────────────────────────────────────────────────────────
-        # 3) Run the Scout (if this thread owns it)
-        # ────────────────────────────────────────────────────────────
         if run_scout:
             self._scout.monitor()
 
@@ -350,9 +368,6 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
                             with self._scout._condition:
                                 self._scout._condition.notify_all()
 
-        # ────────────────────────────────────────────────────────────
-        # 4) Wait for barrier completion / timeout / disposal
-        # ────────────────────────────────────────────────────────────
         self._threading_event.wait()
 
         with self._selector_lock:
@@ -361,31 +376,4 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
             if self._timed_out:
                 raise RuntimeError("SyncFork barrier timed out.")
 
-        # ────────────────────────────────────────────────────────────
-        # 5) Execute the assigned callable – let exceptions bubble!
-        # ────────────────────────────────────────────────────────────
         selected_unit.fork_callable()
-
-    def dispose(self) -> None:
-        """
-        Disposes the SyncFork instance. Releases all resources and makes it unusable.
-        Idempotent: safe to call multiple times.
-        """
-        if self._disposed:
-            return
-
-        # Keep the lock object intact so threads already inside `use_fork`
-        # can still acquire it safely on their way out.
-        with self._selector_lock:
-            self._disposed = True
-            self._forks_closed = True           # Block new entries
-            self._threading_event.set()         # Wake anything waiting
-
-            # Dispose Scout (if any) *after* waking threads
-            if self._scout:
-                self._scout.dispose()
-                self._scout = None
-
-            # Clear heavy resources — keep simple primitives alive
-            self._list_of_forks.clear()
-

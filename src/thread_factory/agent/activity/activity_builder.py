@@ -1,6 +1,6 @@
 from typing import Callable, Dict
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-from thread_factory.utils import IDisposable
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 
 class ActivityBuilder(IDisposable):

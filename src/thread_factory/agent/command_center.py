@@ -1,7 +1,8 @@
 import threading
 from typing import Optional, List, Callable, Any
 from thread_factory.agent.activator import AgentActivator
-from thread_factory.concurrency import ConcurrentDict, ConcurrentList
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.agent_thread_pool import HelpRequest  # Assuming HelpRequest for placeholder
 
 

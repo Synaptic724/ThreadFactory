@@ -4,6 +4,7 @@ import time
 from typing import Callable, List, Optional, Tuple
 import inspect
 import ulid
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 @dataclasses.dataclass(slots=True)
 class ForkUnit:
@@ -21,15 +22,21 @@ class ForkUnit:
     concurrent access and enforce execution limits per callable.
     """
 
-    fork_callable: Callable
+    fork_callable: Callable | None
     usage_cap: int
     lock: threading.Lock = dataclasses.field(default_factory=threading.RLock)
     # The 'gate' is now a consumable resource. True means it's consumed.
     gate: bool = False
     gate_uses: int = 0
 
+    def dispose(self) -> None:
+        """
+        Marks this ForkUnit as disposed by sealing the gate and clearing callable.
+        """
+        self.fork_callable = None
 
-class Fork:
+
+class Fork(IDisposable):
     """
     A concurrent fork dispatcher for routing threads across multiple callables.
 
@@ -90,6 +97,7 @@ class Fork:
 
     def __init__(self, number_of_forks: int, callables: List[Tuple[int, Callable]],
                  rotate_selectors: bool = False, selector_step: int = 1):
+        super().__init__()
         if number_of_forks != len(callables):
             raise ValueError("The number of forks must match the number of callables.")
 
@@ -127,6 +135,28 @@ class Fork:
         self._selector_step = selector_step
         self._selector_step_counter = 0
         self._selector_lock = threading.RLock()
+
+    def dispose(self) -> None:
+        """
+        Disposes the Fork instance, releasing all resources and marking
+        it as unusable. This method is idempotent and safe to call multiple times.
+
+        After disposal:
+        - All future calls to `use_fork()` will raise a RuntimeError.
+        - All internal ForkUnits are marked as disposed (callable cleared).
+        """
+        if self._disposed:
+            return
+
+        with self._selector_lock:
+            self._disposed = True
+            self._forks_closed = True  # Prevent future unit acquisition
+
+            for unit in self._list_of_forks:
+                unit.dispose()
+
+            self._list_of_forks.clear()
+
 
     def reset(self) -> None:
         """

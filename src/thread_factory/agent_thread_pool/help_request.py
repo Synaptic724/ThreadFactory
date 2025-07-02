@@ -3,7 +3,7 @@ from datetime import datetime
 from ulid import ULID
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 from typing import Callable
-from thread_factory.utils import IDisposable
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 
 class HelpRequest(IDisposable):
