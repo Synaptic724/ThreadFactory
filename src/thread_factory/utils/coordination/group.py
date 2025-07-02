@@ -4,6 +4,7 @@ import inspect
 from typing import List, Any, Callable, Optional, Union, Iterable
 import ulid
 from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utils.coordination.outcome import Outcome  # 👈 Add this for eager init
 
 class Group(IDisposable):
     """
@@ -46,9 +47,8 @@ class Group(IDisposable):
                     raise TypeError("Coroutines are not supported.")
                 self.tasks.append(task)
 
-        # Use a ConcurrentDict to store outcomes, keyed by task index.
         self.outcomes = ConcurrentDict()
-        self.reset() # Call reset to initialize outcomes correctly.
+        self.reset()
 
     def dispose(self):
         """Fully disposes the Group and all its Outcome objects."""
@@ -71,19 +71,23 @@ class Group(IDisposable):
         if self.disposed:
             return
 
-        # Dispose of old outcomes before clearing.
         if self.outcomes:
-            self.dispose()
-            self._disposed = False # Temporarily un-dispose to allow re-initialization
+            self._dispose_outcomes()
 
-        # Re-initialize outcomes based on the flag.
         if self._multiple_outcomes_per_task:
             self.outcomes = ConcurrentDict({i: ConcurrentList() for i, _ in enumerate(self.tasks)})
         else:
-            # For single outcomes, we can initialize lazily or with None.
-            # Using a dictionary mapping to None is simple and effective.
-            self.outcomes = ConcurrentDict({i: None for i, _ in enumerate(self.tasks)})
+            self.outcomes = ConcurrentDict({i: Outcome() for i, _ in enumerate(self.tasks)})  # ✅ FIXED
 
+    def _dispose_outcomes(self):
+        """Disposes only the outcomes, not the whole Group."""
+        for bucket in self.outcomes.values():
+            outcomes_to_dispose = bucket if self._multiple_outcomes_per_task else [bucket]
+            if outcomes_to_dispose:
+                for outcome in outcomes_to_dispose:
+                    if outcome:
+                        outcome.dispose()
+        self.outcomes.clear()
 
     def _iter_outcomes(self) -> Iterable['Outcome']:
         """A helper to iterate through all Outcome objects regardless of storage mode."""

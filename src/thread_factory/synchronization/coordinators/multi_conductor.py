@@ -1,14 +1,15 @@
 from __future__ import annotations
-import threading, inspect, ulid
+import threading, ulid
 from typing import Optional, Callable, List, Union, Any, Dict
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.group import Group
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.utils.coordination.outcome import Outcome
 from thread_factory.synchronization.primitives import Dynaphore
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
+from thread_factory.synchronization.dispatchers.fork import Fork
+from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
 
 
 class MultiConductor(IDisposable):
@@ -36,7 +37,6 @@ class MultiConductor(IDisposable):
         "_barrier_passed_notified", "_execution_started_notified", "_execution_completed_notified",
         "_clock_barrier", "_signal_barrier", "_internal_threshold_barrier", "outcomes", "_enabled"
     ]
-
     def __init__(
             self,
             threshold: int,
@@ -46,6 +46,8 @@ class MultiConductor(IDisposable):
             timeout: Optional[float] = None,
             raise_on_timeout: bool = False,
             multiple_outcomes_per_task: bool = False,
+            task_concurrent_execution: bool = False,
+            parallel_sync_execution: bool = False,
             callback: Optional[Callable[[], None]] = None,
             controller: Optional['SignalController'] = None
     ):
@@ -84,8 +86,10 @@ class MultiConductor(IDisposable):
         if threshold <= 0:
             raise ValueError("Threshold must be a positive integer.")
 
+        self._parallel = task_concurrent_execution
+        self._parallel_sync_execution = parallel_sync_execution
         self._threshold = threshold
-        self.groups = ConcurrentList()
+        self.groups = []
         self.reusable = reusable
         self.manual_release = manual_release
         self._timeout = timeout
@@ -99,6 +103,12 @@ class MultiConductor(IDisposable):
         self.outcomes = ConcurrentDict()
         if groups:
             for group in groups:
+                # ✅ This check ensures the Group and MultiConductor configurations match.
+                if group._multiple_outcomes_per_task != self._multiple_outcomes_per_task:
+                    raise ValueError(
+                        f"Mismatch in 'multiple_outcomes_per_task' setting between "
+                        f"MultiConductor and Group '{group.name}'."
+                    )
                 self.add_group(group)
 
         self._released = False
@@ -107,24 +117,71 @@ class MultiConductor(IDisposable):
         self._dynaphore = Dynaphore(threshold)
         self._manual_release_gate = threading.Event() if manual_release else None
         self._internal_threshold_barrier = SignalBarrier(threshold, reusable=True)
-
         self._barrier_passed_notified = False
         self._execution_started_notified = False
         self._execution_completed_notified = False
         self._callback_executed_flags = {}
+        self._clock_barrier = None
+        self._signal_barrier = None
 
         if timeout is not None:
-            if timeout <= 0: raise ValueError("Timeout must be positive.")
-            self._clock_barrier = ClockBarrier(threshold, timeout, self.notify_all_override, controller)
+            if timeout <= 0:
+                raise ValueError("Timeout must be positive.")
+            self._clock_barrier = ClockBarrier(
+                threshold, timeout, self.notify_all_override, controller
+            )
         else:
-            self._signal_barrier = SignalBarrier(threshold, reusable, controller)
-        self._main_barrier = self._clock_barrier or self._signal_barrier
+            self._signal_barrier = SignalBarrier(
+                threshold=threshold, reusable=reusable, controller=controller
+            )
 
+        self._main_barrier = self._clock_barrier or self._signal_barrier
         if self._controller:
-            try:
-                self._controller.register(self)
-            except Exception:
-                pass
+            try: self._controller.register(self)
+            except Exception: pass
+
+
+    def dispose(self):
+        """
+        Disposes of the MultiConductor and all its associated resources.
+        """
+        if self._disposed:
+            return
+
+        with self._lock:
+            if self._disposed:  # Double-check inside lock
+                return
+
+            self._disposed = True
+            self._broken = True
+            self._released = True
+
+            # --- Step 1: Immediately release all possible waiters ---
+            # This is the most critical step to prevent deadlocks during shutdown.
+            # It ensures any thread waiting on THIS object is unblocked before
+            # we proceed with any other cleanup.
+            if self._clock_barrier:
+                self._clock_barrier.dispose()
+            if self._signal_barrier:
+                self._signal_barrier.dispose()
+            if self._internal_threshold_barrier:
+                self._internal_threshold_barrier.dispose()
+            if self._dynaphore:
+                self._dynaphore.dispose()
+            if self._manual_release_gate:
+                self._manual_release_gate.set()
+
+            # --- Step 2: Perform secondary cleanup of child objects and data ---
+            # This is now safe to do because no threads are stuck waiting on us.
+            if self._controller:
+                self._controller.notify(self.id, "DISPOSED")
+                self._controller = None
+
+            for group in self.groups:
+                group.dispose()
+
+            self.groups.clear()
+            self.outcomes.clear()
 
     def add_group(self, group: Group):
         """Adds a group of tasks to the conductor.
@@ -221,6 +278,30 @@ class MultiConductor(IDisposable):
                 raise TimeoutError("MultiConductor wait timed out.") from e
             self.notify_all_override()
 
+    def _general_execution_loop(self):
+        """
+        The main execution loop that iterates through all groups and their tasks.
+        """
+        for group in self.groups:
+            for task_index, task in enumerate(group.tasks):
+
+                if self._broken or self._disposed: break
+
+                self._execute_operation(task, group, task_index)
+                self._internal_threshold_barrier.wait()
+
+                if self._callback:
+                    self._execute_callback(group, task_index)
+
+            if self._broken or self._disposed: break
+
+    def _parallel_execution_loop(self):
+        pass
+
+
+    def _parallel_sync_execution_loop(self):
+        pass
+
     def _execute_operations(self):
         """Orchestrates the entire task execution sequence across all groups.
 
@@ -235,14 +316,7 @@ class MultiConductor(IDisposable):
                     self._execution_started_notified = True
                     self._controller.notify(self.id, "EXECUTION_STARTED")
 
-            for group in self.groups:
-                for task_index, task in enumerate(group.tasks):
-                    if self._broken or self._disposed: break
-                    self._execute_operation(task, group, task_index)
-                    self._internal_threshold_barrier.wait()
-                    if self._callback:
-                        self._execute_callback(group, task_index)
-                if self._broken or self._disposed: break
+            self._execution_loop()
 
             with self._lock:
                 if self._controller and not self._execution_completed_notified and not (self._broken or self._disposed):
@@ -289,34 +363,44 @@ class MultiConductor(IDisposable):
             self._set_exception(e, group, task_index)
 
     def _set_result(self, result: Any, group: Group, task_index: int):
-        """Creates and stores a successful Outcome for a given task.
-
-        Args:
-            result (Any): The successful return value from the task.
-            group (Group): The group that owns the task.
-            task_index (int): The index of the task.
         """
-        outcome = Outcome()
-        outcome.set_result(result)
+        Stores a successful task result in the group's Outcome object(s).
+        """
         if self._multiple_outcomes_per_task:
-            group.outcomes.setdefault(task_index, ConcurrentList()).append(outcome)
+            # When multiple outcomes are allowed, we create a new Outcome
+            # for each result and append it to the list for that task.
+            new_outcome = Outcome()
+            new_outcome.set_result(result)
+            group.outcomes[task_index].append(new_outcome)
         else:
-            group.outcomes[task_index] = outcome
+            # ✅ REFINED LOGIC: Get the *existing* Outcome object from the
+            # group and set its result. This leverages the write-once
+            # safety of the Outcome object itself.
+            try:
+                # The first thread to call this will succeed.
+                group.outcomes[task_index].set_result(result)
+            except RuntimeError:
+                # Subsequent threads will fail with a RuntimeError, which is expected.
+                pass
+
 
     def _set_exception(self, e: Exception, group: Group, task_index: int):
-        """Creates and stores a failure Outcome for a given task.
-
-        Args:
-            e (Exception): The exception object caught during task execution.
-            group (Group): The group that owns the task.
-            task_index (int): The index of the task.
         """
-        outcome = Outcome()
-        outcome.set_exception(e)
+        Stores a task exception in the group's Outcome object(s).
+        """
         if self._multiple_outcomes_per_task:
-            group.outcomes.setdefault(task_index, ConcurrentList()).append(outcome)
+            # Create a new Outcome for each exception and append it.
+            new_outcome = Outcome()
+            new_outcome.set_exception(e)
+            group.outcomes[task_index].append(new_outcome)
         else:
-            group.outcomes[task_index] = outcome
+            # ✅ REFINED LOGIC: Get the *existing* Outcome object and set
+            # its exception.
+            try:
+                group.outcomes[task_index].set_exception(e)
+            except RuntimeError:
+                # This is expected if another thread already set the outcome.
+                pass
 
     def reset(self):
         """Resets the conductor and all its groups for another cycle.
@@ -347,31 +431,6 @@ class MultiConductor(IDisposable):
             self._dynaphore.set_permits(self._threshold)
             if self._controller: self._controller.notify(self.id, "RESET")
 
-    def dispose(self):
-        """Disposes of the MultiConductor and all its associated resources.
-
-        This performs a full teardown, cascading the disposal call to all
-        contained `Group` objects and releasing all internal synchronization
-        primitives, which unblocks any waiting threads. Once disposed, the
-        instance cannot be reused.
-        """
-        if self._disposed: return
-        with self._lock:
-            self._disposed = True
-            if self._controller:
-                self._controller.notify(self.id, "DISPOSED")
-                self._controller = None
-            for group in self.groups:
-                group.dispose()
-            self.groups.clear()
-            self.outcomes.clear()
-            if self._clock_barrier: self._clock_barrier.dispose()
-            if self._signal_barrier: self._signal_barrier.dispose()
-            if self._internal_threshold_barrier: self._internal_threshold_barrier.dispose()
-            if self._dynaphore: self._dynaphore.dispose()
-            if self._manual_release_gate: self._manual_release_gate.set()
-            self._released = True
-            self._broken = True
 
     def get_all_outcomes(self, as_concurrent_dict: bool = True) -> Union[Dict, ConcurrentDict]:
         """Returns all outcomes from all groups, keyed by group name.
@@ -448,3 +507,6 @@ class MultiConductor(IDisposable):
                 'notify_all_override': self.notify_all_override, 'is_spent': self.is_spent,
             }
         }
+
+    class ExecutionStrategies:
+        pass

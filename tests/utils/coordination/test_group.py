@@ -1,8 +1,4 @@
 import unittest
-import inspect
-import ulid
-from typing import Callable, List
-
 from thread_factory.utils.coordination.group import Group
 from thread_factory.utils.coordination.outcome import Outcome
 
@@ -37,10 +33,10 @@ class TestGroup(unittest.TestCase):
 
     def test_dispose_disposes_outcomes(self):
         g = Group(name="disposable", tasks=[lambda: "x"])
+        g.outcomes[0] = Outcome()  # Assign first
         g.outcomes[0].set_result("x")
         self.assertFalse(g.outcomes[0].disposed)
         g.dispose()
-        # Safe access via _iter_outcomes after dispose
         for o in g._iter_outcomes():
             self.assertTrue(o.disposed)
 
@@ -51,6 +47,7 @@ class TestGroup(unittest.TestCase):
 
     def test_reset_resets_outcomes(self):
         g = Group(name="reset", tasks=[lambda: "ok"])
+        g.outcomes[0] = Outcome()
         old = g.outcomes[0]
         old.set_result("ok")
         g.reset()
@@ -68,6 +65,8 @@ class TestGroup(unittest.TestCase):
 
     def test_results_only_returns_success(self):
         g = Group(name="results", tasks=[lambda: 1, lambda: 2])
+        g.outcomes[0] = Outcome()
+        g.outcomes[1] = Outcome()
         g.outcomes[0].set_result(1)
         g.outcomes[1].set_exception(ValueError("fail"))
         self.assertEqual(g.results, [1])
@@ -75,6 +74,8 @@ class TestGroup(unittest.TestCase):
 
     def test_exceptions_only_returns_real_errors(self):
         g = Group(name="errors", tasks=[lambda: 1, lambda: 2])
+        g.outcomes[0] = Outcome()
+        g.outcomes[1] = Outcome()
         g.outcomes[0].set_result(1)
         g.outcomes[1].set_exception(ValueError("fail"))
         self.assertEqual(len(g.exceptions), 1)
@@ -89,6 +90,7 @@ class TestGroup(unittest.TestCase):
 
     def test_results_empty_after_dispose(self):
         g = Group(name="afterlife", tasks=[lambda: "x"])
+        g.outcomes[0] = Outcome()
         g.outcomes[0].set_result("x")
         g.dispose()
         self.assertEqual(g.results, [])
@@ -114,6 +116,7 @@ class TestGroup(unittest.TestCase):
 
     def test_dispose_handles_disposed_outcome_gracefully(self):
         g = Group(name="fragile", tasks=[lambda: "res"])
+        g.outcomes[0] = Outcome()
         g.outcomes[0].dispose()
         self.assertEqual(g.results, [])
         self.assertEqual(g.exceptions, [])
