@@ -88,6 +88,11 @@ class Package(IDisposable):
         self._disposed = True
 
     @property
+    def __doc__(self):
+        """Returns the docstring of the wrapped function."""
+        return getattr(self._func, '__doc__')
+
+    @property
     def is_async(self) -> bool:
         """
         Check if the underlying function is async (coroutine). This is for info only.
@@ -97,6 +102,21 @@ class Package(IDisposable):
         """
         target = getattr(self._func, '__wrapped__', self._func)
         return inspect.iscoroutinefunction(target)
+
+    def __or__(self, other: Package) -> Package:
+        """
+        Pipe operator: output of this Package becomes input to the next.
+        """
+        if not isinstance(other, Package):
+            raise TypeError("| expects another Package")
+
+        # This correctly calls the underlying function of `other` to bypass
+        # its stored arguments, creating a true pipeline.
+        def composed_callable(*a, **kw):
+            result_of_first = self(*a, **kw)
+            return other._func(result_of_first)
+
+        return Package(composed_callable)
 
     def __call__(self, *extra_args: Any, **extra_kwargs: Any) -> Any:
         """
@@ -239,6 +259,54 @@ class Package(IDisposable):
 
         return result
 
+    # inside class Package …
+
+    # ───────────────────────────── single item ───────────────────────────── #
+    @staticmethod
+    def _pack(task: Union[Callable, Package]) -> Package:
+        """
+        Internal mirror of `Pack()`. Ensures any callable or Package becomes a Package safely.
+        Preserves identity and avoids double wrapping.
+        """
+        if isinstance(task, Package):
+            return task
+        return Pack(task)
+
+    # ──────────────────────────── many items ─────────────────────────────── #
+    @staticmethod
+    def _pack_many(
+            tasks: Union[Callable, Package, Iterable[Union[Callable, Package]]]
+    ) -> ConcurrentList[Package]:
+        """
+        Internal mirror of `Pack()` for batch input. Always returns valid Packages.
+
+        Args:
+            tasks: A single task or iterable of tasks.
+
+        Returns:
+            ConcurrentList of Package objects.
+
+        Raises:
+            TypeError: On invalid input.
+        """
+        if tasks is None:
+            raise TypeError("Tasks input cannot be None.")
+
+        if isinstance(tasks, (Callable, Package)):
+            return ConcurrentList([Package._pack(tasks)])
+
+        if not isinstance(tasks, Iterable):
+            raise TypeError(f"Expected a callable or iterable of callables, got {type(tasks).__name__}")
+
+        result = ConcurrentList()
+        for i, task in enumerate(tasks):
+            try:
+                result.append(Package._pack(task))
+            except Exception as e:
+                raise TypeError(f"Invalid task at index {i}: {e}") from e
+
+        return result
+
     def bind(self, **new_kwargs: Any) -> Package:
         """
         Mutably add or update keyword arguments.
@@ -339,19 +407,6 @@ class Package(IDisposable):
                 frozenset(self._kwargs.items()),
             ))
 
-    def __or__(self, other: Package) -> Package:
-        """
-        Pipe operator: output of this Package becomes input to the next.
-
-        Example:
-            (Pack(f) | Pack(g))(...) == g(f(...))
-
-        Returns:
-            A new composed Package.
-        """
-        if not isinstance(other, Package):
-            raise TypeError("| expects another Package")
-        return Package(lambda *a, **kw: other(self(*a, **kw)))
 
     def __add__(self, other: Package) -> Package:
         """
