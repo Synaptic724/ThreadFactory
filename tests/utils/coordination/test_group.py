@@ -1,217 +1,124 @@
 import unittest
-from thread_factory.utils import IDisposable, Outcome, Group
+import inspect
+import ulid
+from typing import Callable, List
+
+from thread_factory.utils.coordination.group import Group
+from thread_factory.utils.coordination.outcome import Outcome
 
 
 class TestGroup(unittest.TestCase):
 
-    def setUp(self):
-        # Ensure a clean state for each test
-        pass
-
-    def tearDown(self):
-        # No explicit cleanup needed for Group instances, as dispose is tested
-        pass
-
-    # --- Initialization Tests ---
-    def test_init_valid_threshold(self):
-        group = Group(threshold=1)
-        self.assertEqual(group.threshold, 1)
-        self.assertEqual(group.count, 0)
-        self.assertFalse(group.ready)
-        self.assertFalse(group.disposed)
-        self.assertFalse(group._released_once)
-        self.assertEqual(len(group.tasks), 0)
-        self.assertEqual(len(group.outcomes), 0)
-        group.dispose() # Clean up
-
-    def test_init_invalid_threshold(self):
-        with self.assertRaises(ValueError) as cm:
-            Group(threshold=0)
-        self.assertIn("Threshold must be a positive integer.", str(cm.exception))
-
-        with self.assertRaises(ValueError) as cm:
-            Group(threshold=-1)
-        self.assertIn("Threshold must be a positive integer.", str(cm.exception))
-
     def test_init_with_single_task(self):
         def my_task(): return "hello"
-        group = Group(threshold=1, tasks=my_task)
-        self.assertEqual(len(group.tasks), 1)
-        self.assertEqual(len(group.outcomes), 1)
-        self.assertIsInstance(group.outcomes[0], Outcome)
-        group.dispose()
+        g = Group(name="test", tasks=my_task)
+        self.assertEqual(len(g.tasks), 1)
+        self.assertEqual(len(g.outcomes), 1)
+        g.dispose()
 
-    def test_init_with_list_of_tasks(self):
-        def task1(): pass
-        def task2(): pass
-        group = Group(threshold=2, tasks=[task1, task2])
-        self.assertEqual(len(group.tasks), 2)
-        self.assertEqual(len(group.outcomes), 2)
-        self.assertIsInstance(group.outcomes[0], Outcome)
-        self.assertIsInstance(group.outcomes[1], Outcome)
-        group.dispose()
+    def test_init_with_multiple_tasks(self):
+        def t1(): pass
+        def t2(): pass
+        g = Group(name="batch", tasks=[t1, t2])
+        self.assertEqual(len(g.tasks), 2)
+        self.assertEqual(len(g.outcomes), 2)
+        g.dispose()
 
-    def test_init_with_invalid_tasks_type(self):
-        with self.assertRaises(TypeError) as cm:
-            Group(threshold=1, tasks="not a callable")
-        # Updated assertion message to match the Group class's actual message
-        self.assertIn("tasks must be a callable function or a list of callable functions.", str(cm.exception))
+    def test_invalid_task_type(self):
+        with self.assertRaises(TypeError):
+            Group(name="bad", tasks="not callable")
+        with self.assertRaises(TypeError):
+            Group(name="also bad", tasks=[lambda: 1, "oops"])
 
-        with self.assertRaises(TypeError) as cm:
-            Group(threshold=1, tasks=[lambda: None, "not a callable"])
-        # Updated assertion message to match the Group class's actual message
-        self.assertIn("tasks must be a callable function or a list of callable functions.", str(cm.exception))
+    def test_coroutine_task_rejected(self):
+        async def bad(): pass
+        with self.assertRaises(TypeError):
+            Group(name="bad", tasks=bad)
 
-    def test_init_with_coroutine_task(self):
-        async def async_task(): pass
-        with self.assertRaises(TypeError) as cm:
-            Group(threshold=1, tasks=async_task)
-        self.assertIn("Coroutines are not supported; only synchronous callables are allowed.", str(cm.exception))
+    def test_dispose_disposes_outcomes(self):
+        g = Group(name="disposable", tasks=[lambda: "x"])
+        g.outcomes[0].set_result("x")
+        self.assertFalse(g.outcomes[0].disposed)
+        g.dispose()
+        # Safe access via _iter_outcomes after dispose
+        for o in g._iter_outcomes():
+            self.assertTrue(o.disposed)
 
-    # --- dispose() Tests ---
-    def test_dispose_sets_disposed_flag(self):
-        group = Group(threshold=1)
-        self.assertFalse(group.disposed)
-        group.dispose()
-        self.assertTrue(group.disposed)
+    def test_dispose_idempotent(self):
+        g = Group(name="idempotent", tasks=[lambda: 1])
+        g.dispose()
+        g.dispose()  # no crash
 
-    def test_dispose_idempotency(self):
-        group = Group(threshold=1)
-        group.dispose()
-        self.assertTrue(group.disposed)
-        group.dispose() # Call again
-        self.assertTrue(group.disposed) # Should still be disposed, no error
+    def test_reset_resets_outcomes(self):
+        g = Group(name="reset", tasks=[lambda: "ok"])
+        old = g.outcomes[0]
+        old.set_result("ok")
+        g.reset()
+        new = g.outcomes[0]
+        self.assertIsNot(old, new)
+        self.assertFalse(new.done)
+        self.assertTrue(old.disposed)
+        g.dispose()
 
-    def test_dispose_calls_outcome_dispose(self):
-        mock_outcome_disposed = False
-        class MockOutcome(Outcome):
-            def dispose(self):
-                nonlocal mock_outcome_disposed
-                mock_outcome_disposed = True
-                super().dispose() # Call parent dispose to clear internal state
+    def test_reset_does_nothing_if_disposed(self):
+        g = Group(name="dead", tasks=[lambda: 1])
+        g.dispose()
+        g.reset()
+        self.assertTrue(g.disposed)
 
-        group = Group(threshold=1, tasks=[lambda: None])
-        group.outcomes[0] = MockOutcome() # Replace with mock
-        group.dispose()
-        self.assertTrue(mock_outcome_disposed)
-        # We can't safely access group.outcomes[0] after group.dispose() nullifies group.outcomes
-        # Instead, rely on mock_outcome_disposed flag set by the mock.
-        # self.assertTrue(group.outcomes[0].disposed) # REMOVED: This causes TypeError
+    def test_results_only_returns_success(self):
+        g = Group(name="results", tasks=[lambda: 1, lambda: 2])
+        g.outcomes[0].set_result(1)
+        g.outcomes[1].set_exception(ValueError("fail"))
+        self.assertEqual(g.results, [1])
+        g.dispose()
 
-    def test_dispose_clears_references(self):
-        group = Group(threshold=1, tasks=[lambda: 1])
-        group.dispose()
-        self.assertIsNone(group.tasks)
-        self.assertIsNone(group.outcomes)
-        self.assertIsNone(group.threshold)
-        self.assertIsNone(group.count)
-        self.assertIsNone(group.ready)
-        self.assertIsNone(group._released_once) # This should now be None
+    def test_exceptions_only_returns_real_errors(self):
+        g = Group(name="errors", tasks=[lambda: 1, lambda: 2])
+        g.outcomes[0].set_result(1)
+        g.outcomes[1].set_exception(ValueError("fail"))
+        self.assertEqual(len(g.exceptions), 1)
+        self.assertIsInstance(g.exceptions[0], ValueError)
+        g.dispose()
 
-    def test_properties_after_dispose(self):
-        def my_task(): return "result"
-        group = Group(threshold=1, tasks=my_task)
-        group.outcomes[0].set_result("result") # Set an outcome before dispose
-        group.dispose()
-        self.assertEqual(group.results, [])
-        self.assertEqual(group.exceptions, [])
+    def test_results_and_exceptions_empty_if_not_done(self):
+        g = Group(name="pending", tasks=[lambda: None])
+        self.assertEqual(g.results, [])
+        self.assertEqual(g.exceptions, [])
+        g.dispose()
 
-    # --- reset() Tests ---
-    def test_reset_restores_initial_state(self):
-        group = Group(threshold=1, tasks=[lambda: None])
-        group.count = 5
-        group.ready = True
-        group._released_once = True
-        group.outcomes[0].set_result("old result") # Set an old result
+    def test_results_empty_after_dispose(self):
+        g = Group(name="afterlife", tasks=[lambda: "x"])
+        g.outcomes[0].set_result("x")
+        g.dispose()
+        self.assertEqual(g.results, [])
+        self.assertEqual(g.exceptions, [])
 
-        group.reset()
-        self.assertEqual(group.count, 0)
-        self.assertFalse(group.ready)
-        self.assertFalse(group._released_once)
-        self.assertEqual(len(group.outcomes), 1)
-        self.assertFalse(group.outcomes[0].done) # New outcome should not be done
+    def test_multiple_outcomes_per_task_mode(self):
+        g = Group(name="multi", tasks=[lambda: 1], multiple_outcomes_per_task=True)
+        g.outcomes[0].append(Outcome())
+        g.outcomes[0][0].set_result(123)
+        self.assertEqual(g.results, [123])
+        g.dispose()
 
-    def test_reset_creates_new_outcome_objects(self):
-        group = Group(threshold=1, tasks=[lambda: None])
-        old_outcome = group.outcomes[0]
-        group.reset()
-        new_outcome = group.outcomes[0]
-        self.assertIsNot(old_outcome, new_outcome) # Should be a new object
-        self.assertTrue(old_outcome.disposed) # Old outcome should be disposed by reset
+    def test_iter_outcomes_covers_all_modes(self):
+        g = Group(name="iter", tasks=[lambda: 1], multiple_outcomes_per_task=True)
+        o1 = Outcome()
+        o2 = Outcome()
+        g.outcomes[0].extend([o1, o2])
+        o1.set_result("a")
+        o2.set_result("b")
+        r = g.results
+        self.assertCountEqual(r, ["a", "b"])
+        g.dispose()
 
-    def test_reset_on_disposed_group(self):
-        group = Group(threshold=1)
-        group.dispose()
-        # Reset should do nothing if disposed
-        group.reset()
-        self.assertTrue(group.disposed)
-        self.assertIsNone(group.count) # Should remain None from dispose
+    def test_dispose_handles_disposed_outcome_gracefully(self):
+        g = Group(name="fragile", tasks=[lambda: "res"])
+        g.outcomes[0].dispose()
+        self.assertEqual(g.results, [])
+        self.assertEqual(g.exceptions, [])
+        g.dispose()
 
-    # --- results property Tests ---
-    def test_results_no_tasks(self):
-        group = Group(threshold=1)
-        self.assertEqual(group.results, [])
-        group.dispose()
 
-    def test_results_all_successful(self):
-        def task1(): return "one"
-        def task2(): return 2
-        group = Group(threshold=2, tasks=[task1, task2])
-        group.outcomes[0].set_result("one")
-        group.outcomes[1].set_result(2)
-        self.assertCountEqual(group.results, ["one", 2])
-        group.dispose()
-
-    def test_results_mixed_outcomes(self):
-        def task_ok(): return "OK"
-        def task_fail(): raise ValueError("Failed")
-        group = Group(threshold=2, tasks=[task_ok, task_fail])
-        group.outcomes[0].set_result("OK")
-        group.outcomes[1].set_exception(ValueError("Failed"))
-        self.assertCountEqual(group.results, ["OK"])
-        self.assertEqual(len(group.exceptions), 1) # Check exceptions too
-        group.dispose()
-
-    def test_results_empty_if_not_done(self):
-        def task_pending(): pass
-        group = Group(threshold=1, tasks=[task_pending])
-        self.assertEqual(group.results, []) # Not done yet
-        group.dispose()
-
-    # --- exceptions property Tests ---
-    def test_exceptions_no_tasks(self):
-        group = Group(threshold=1)
-        self.assertEqual(group.exceptions, [])
-        group.dispose()
-
-    def test_exceptions_all_failed(self):
-        class CustomError(Exception): pass
-        def task1(): raise CustomError("Error1")
-        def task2(): raise RuntimeError("Error2")
-        group = Group(threshold=2, tasks=[task1, task2])
-        group.outcomes[0].set_exception(CustomError("Error1"))
-        group.outcomes[1].set_exception(RuntimeError("Error2"))
-        excs = group.exceptions
-        self.assertEqual(len(excs), 2)
-        self.assertIsInstance(excs[0], CustomError)
-        self.assertIsInstance(excs[1], RuntimeError)
-        group.dispose()
-
-    def test_exceptions_empty_if_not_done(self):
-        def task_pending(): pass
-        group = Group(threshold=1, tasks=[task_pending])
-        self.assertEqual(group.exceptions, []) # Not done yet
-        group.dispose()
-
-    def test_exceptions_disposed_outcome_in_list(self):
-        # Test case where an outcome might be disposed but still in the list
-        group = Group(threshold=1, tasks=[lambda: "result"])
-        # Manually dispose the outcome without going through group.dispose()
-        group.outcomes[0].dispose()
-        # Now, when accessing exceptions, it should handle the disposed outcome gracefully
-        # It should NOT include the RuntimeError("Outcome was disposed.")
-        self.assertEqual(group.exceptions, [])
-        self.assertEqual(group.results, []) # Should also be empty
-
-if __name__ == '__main__':
-    unittest.main(argv=['first-arg-is-ignored'], exit=False)
+if __name__ == "__main__":
+    unittest.main()

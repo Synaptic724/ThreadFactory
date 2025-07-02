@@ -4,7 +4,7 @@ from typing import Callable, List, Optional, Tuple
 import inspect
 import ulid
 from thread_factory.synchronization.coordinators.scout import Scout
-from thread_factory.utils import IDisposable
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 
 # --------------------------------------------------------------------------- #

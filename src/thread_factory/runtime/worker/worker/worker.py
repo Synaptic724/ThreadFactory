@@ -5,8 +5,10 @@ import ulid
 import ctypes
 import time
 from typing import Callable, Any, Union, Optional
-from thread_factory.concurrency import ConcurrentQueue, ConcurrentList
-from thread_factory.utils import IDisposable, Empty
+from thread_factory.concurrency.concurrent_list import ConcurrentList
+from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
+from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utils.exceptions.empty import Empty
 from thread_factory.runtime.orchestrator.monitoring.records.records import Records, Record, WorkStatus
 from thread_factory.runtime.factory.operations.work.work import Work
 

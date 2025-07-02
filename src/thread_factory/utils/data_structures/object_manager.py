@@ -1,9 +1,7 @@
 import uuid
 from typing import Optional, List
-
-from thread_factory.utils import IDisposable
-from thread_factory.utils.data_structures.tree_manager import TreeNode
-from tree_manager import TreeManager, TreeNode
+from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utils.data_structures.tree_manager import TreeNode, TreeManager
 import threading
 import abc
 

@@ -1,7 +1,12 @@
 from typing import Callable, List, Optional
 import threading
-from thread_factory.synchronization import MultiConductor, Dynaphore, SignalBarrier, Conductor
-from thread_factory.utils import IDisposable, RouterGroup, Group
+from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
+from thread_factory.synchronization.primitives.dynaphore import Dynaphore
+from thread_factory.synchronization.coordinators.multi_conductor import MultiConductor
+from thread_factory.synchronization.coordinators.conductor import Conductor
+from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utils.coordination.router_group import RouterGroup
+from thread_factory.utils.coordination.group import Group
 
 
 class Router(IDisposable):

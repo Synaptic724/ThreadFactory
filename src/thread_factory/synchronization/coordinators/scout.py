@@ -1,7 +1,7 @@
 import threading
 from typing import Callable, Optional
 import ulid
-from thread_factory.utils import IDisposable
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 
 class Scout(IDisposable):

@@ -1,8 +1,8 @@
 from typing import Callable, Optional
 import threading
 from typing import Callable, Optional, List
-from thread_factory.synchronization import ThresholdSemaphore
-from thread_factory.utils import IDisposable
+from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 
 class AgentOrchestrator(IDisposable):
@@ -52,7 +52,7 @@ class AgentOrchestrator(IDisposable):
         self.strict = strict
 
         self._lock = threading.Lock()
-        self._barrier = ThresholdSemaphore(threshold=group_size, reusable=False, callback=self._trigger_execution)
+        self._barrier = SignalBarrier(threshold=group_size, reusable=False, callback=self._trigger_execution)
         self._execution_ready = threading.Event()
         self._exceptions: List[BaseException] = []
 

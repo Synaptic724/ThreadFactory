@@ -3,9 +3,8 @@ import inspect
 import threading
 import ulid
 from typing import Callable, List, Optional, Tuple, Any, Dict
-
 from thread_factory.synchronization.coordinators.scout import Scout
-from thread_factory.utils import IDisposable
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 
 # --------------------------------------------------------------------------- #

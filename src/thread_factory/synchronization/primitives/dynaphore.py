@@ -1,6 +1,6 @@
 import threading
 import ulid
-from thread_factory.utils import IDisposable
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 class Dynaphore(threading.Semaphore, IDisposable):
     """

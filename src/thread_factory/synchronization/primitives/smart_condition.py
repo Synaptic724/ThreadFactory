@@ -3,7 +3,8 @@ import time
 import ulid
 from typing import Optional, Union, Iterable, Any, Callable
 from dataclasses import dataclass
-from thread_factory.concurrency import ConcurrentQueue, ConcurrentDict
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 

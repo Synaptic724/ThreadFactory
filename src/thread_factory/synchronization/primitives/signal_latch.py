@@ -1,7 +1,6 @@
 import threading
 import ulid
 from typing import Callable, Optional, Any, Dict
-
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 from thread_factory.utils.interfaces.disposable import IDisposable
 

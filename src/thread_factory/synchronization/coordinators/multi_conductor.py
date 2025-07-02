@@ -1,8 +1,10 @@
 from __future__ import annotations
 import threading, inspect, ulid
 from typing import Optional, Callable, List, Union, Any, Dict
-from thread_factory.utils import IDisposable, Group
-from thread_factory.concurrency import ConcurrentDict, ConcurrentList
+from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utils.coordination.group import Group
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.utils.coordination.outcome import Outcome
 from thread_factory.synchronization.primitives import Dynaphore
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier

@@ -5,7 +5,8 @@ from typing import Callable, Optional, List, Any, Union
 import ulid
 from thread_factory.synchronization.primitives.dynaphore import Dynaphore
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
-from thread_factory.utils import IDisposable, Outcome
+from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utils.coordination.outcome import Outcome
 
 
 class BypassConductor(IDisposable):

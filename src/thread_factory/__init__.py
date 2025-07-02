@@ -39,7 +39,9 @@ from thread_factory.concurrency import (
 # ---- Core Concurrency Primitives ----
 from thread_factory.concurrency import __all__ as concurrency_all
 # ---- Utilities ----
-from thread_factory.utils import Empty, Stopwatch, AutoResetTimer
+from thread_factory.utils.exceptions.empty import Empty
+from thread_factory.utils.timing_tools.auto_reset_timer import AutoResetTimer
+from thread_factory.utils.timing_tools.stopwatch import Stopwatch
 
 from thread_factory.synchronization.primitives import (
     Dynaphore,
