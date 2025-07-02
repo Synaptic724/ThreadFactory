@@ -419,7 +419,6 @@ class Conductor(IDisposable):
             task (Callable): The function to execute.
             index (int): The index of the task, used for storing the outcome.
         """
-        self._internal_threshold_barrier.wait()
         try:
             self._set_result(task(), index)
         except Exception as e:
