@@ -479,6 +479,9 @@ class TestPackage(unittest.TestCase):
     def test_bind_returns_self(self):
         p = Package(str.upper, "hi")
         self.assertIs(p.bind(), p)  # bind with no kwargs returns same obj
+################################################# TESTING PACK AND PACK MANY
+
+
 
 
 if __name__ == "__main__":

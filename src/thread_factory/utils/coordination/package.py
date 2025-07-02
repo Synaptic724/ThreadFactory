@@ -132,32 +132,6 @@ class Package(IDisposable):
                         return self._func(*all_args, **all_kwargs)
                 raise
 
-    @staticmethod
-    def normalize_task(task: Union[Callable, Package]) -> Callable:
-        """
-        Validate a callable or Package. If it's a Package, return its inner function.
-        If it's a callable, validate it. No wrapping is done here to avoid recursion.
-
-        Args:
-            task: A raw callable or Package.
-
-        Returns:
-            A validated callable (either unwrapped or raw).
-
-        Raises:
-            TypeError: If task is invalid.
-        """
-        if task is None:
-            raise TypeError("Cannot normalize None as a task.")
-        if isinstance(task, Package):
-            return task._func.__wrapped__  # allow deeper introspection for equality, etc.
-        if not callable(task):
-            raise TypeError(f"Expected callable, got {type(task).__name__}")
-        if inspect.iscoroutinefunction(task):
-            raise TypeError(f"Coroutine functions are not supported: {getattr(task, '__name__', repr(task))}")
-        if inspect.isgeneratorfunction(task):
-            raise TypeError(f"Generator functions are not supported: {getattr(task, '__name__', repr(task))}")
-        return task
 
     @staticmethod
     def from_partial(func: Callable[..., Any], *args: Any, **kwargs: Any) -> "Package":
@@ -191,6 +165,33 @@ class Package(IDisposable):
 
         return Package(_composed)
 
+
+    @staticmethod
+    def normalize_task(task: Union[Callable, Package]) -> Callable:
+        """
+        Validate a callable or Package. If it's a Package, return its inner function.
+        If it's a callable, validate it. No wrapping is done here to avoid recursion.
+
+        Args:
+            task: A raw callable or Package.
+
+        Returns:
+            A validated callable (either unwrapped or raw).
+
+        Raises:
+            TypeError: If task is invalid.
+        """
+        if task is None:
+            raise TypeError("Cannot normalize None as a task.")
+        if isinstance(task, Package):
+            return task._func.__wrapped__  # allow deeper introspection for equality, etc.
+        if not callable(task):
+            raise TypeError(f"Expected callable, got {type(task).__name__}")
+        if inspect.iscoroutinefunction(task):
+            raise TypeError(f"Coroutine functions are not supported: {getattr(task, '__name__', repr(task))}")
+        if inspect.isgeneratorfunction(task):
+            raise TypeError(f"Generator functions are not supported: {getattr(task, '__name__', repr(task))}")
+        return task
 
     @staticmethod
     def normalize_many(
