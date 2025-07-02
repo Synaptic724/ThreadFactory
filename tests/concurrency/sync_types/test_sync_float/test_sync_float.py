@@ -6,9 +6,9 @@ from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 
 # ---- import your concrete classes ----------------------------------
-from thread_factory.concurrency.value_types.sync_float import SyncFloat   # adjust the path!
-from thread_factory.concurrency.value_types.sync_int   import SyncInt
-from thread_factory.concurrency.value_types.sync_bool  import SyncBool
+from thread_factory.concurrency.sync_types.sync_float import SyncFloat   # adjust the path!
+from thread_factory.concurrency.sync_types.sync_int   import SyncInt
+from thread_factory.concurrency.sync_types.sync_bool  import SyncBool
 
 
 # --------------------------------------------------------------------

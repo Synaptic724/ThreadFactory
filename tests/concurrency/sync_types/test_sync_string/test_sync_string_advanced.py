@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 # Adjust this import path based on your project structure
 # For example, if your SyncString.py is in a 'my_lib' folder, it might be:
 # from my_lib.sync_string import SyncString
-from thread_factory.concurrency.value_types.sync_string import SyncString
+from thread_factory.concurrency.sync_types.sync_string import SyncString
 from thread_factory.utils.interfaces.isync import ISync
 
 

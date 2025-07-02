@@ -16,9 +16,9 @@ import gc, math, os, pickle, random, sys, threading, time, unittest, multiproces
 from decimal import Decimal
 from fractions import Fraction
 
-from thread_factory.concurrency.value_types.sync_bool  import SyncBool
-from thread_factory.concurrency.value_types.sync_int   import SyncInt
-from thread_factory.concurrency.value_types.sync_float import SyncFloat
+from thread_factory.concurrency.sync_types.sync_bool  import SyncBool
+from thread_factory.concurrency.sync_types.sync_int   import SyncInt
+from thread_factory.concurrency.sync_types.sync_float import SyncFloat
 
 
 # ──────────────────────────────────────────────────────────────

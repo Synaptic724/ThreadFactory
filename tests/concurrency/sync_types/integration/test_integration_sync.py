@@ -5,10 +5,10 @@ import random
 import pickle
 import copy
 
-from thread_factory.concurrency.value_types.sync_string import SyncString
-from thread_factory.concurrency.value_types.sync_int    import SyncInt
-from thread_factory.concurrency.value_types.sync_float  import SyncFloat
-from thread_factory.concurrency.value_types.sync_bool   import SyncBool
+from thread_factory.concurrency.sync_types.sync_string import SyncString
+from thread_factory.concurrency.sync_types.sync_int    import SyncInt
+from thread_factory.concurrency.sync_types.sync_float  import SyncFloat
+from thread_factory.concurrency.sync_types.sync_bool   import SyncBool
 
 
 TIMEOUT = 5  # seconds – join-timeout used to reveal deadlocks

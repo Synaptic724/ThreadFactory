@@ -1,6 +1,6 @@
 from __future__ import annotations    # MUST be first
 from numbers import Real
-from thread_factory.concurrency.value_types.sync_string import SyncString
+from thread_factory.concurrency.sync_types.sync_string import SyncString
 from thread_factory.utils.interfaces.isync import ISync
 import threading
 

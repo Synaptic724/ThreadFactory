@@ -2,7 +2,7 @@ import unittest
 import threading
 import time
 
-from thread_factory.concurrency.value_types.sync_int import SyncInt
+from thread_factory.concurrency.sync_types.sync_int import SyncInt
 
 
 # Assuming the SyncInt class provided is in a file named sync_int.py

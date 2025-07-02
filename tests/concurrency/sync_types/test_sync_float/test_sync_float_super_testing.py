@@ -8,9 +8,9 @@ import pickle
 import copy  # Import copy module for clarity
 
 # ---- import your concrete classes ----------------------------------
-from thread_factory.concurrency.value_types.sync_float import SyncFloat
-from thread_factory.concurrency.value_types.sync_int import SyncInt
-from thread_factory.concurrency.value_types.sync_bool import SyncBool
+from thread_factory.concurrency.sync_types.sync_float import SyncFloat
+from thread_factory.concurrency.sync_types.sync_int import SyncInt
+from thread_factory.concurrency.sync_types.sync_bool import SyncBool
 
 
 # --------------------------------------------------------------------

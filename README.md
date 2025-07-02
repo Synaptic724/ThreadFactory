@@ -82,6 +82,7 @@ ThreadFactory's **Sync Types** are thread-safe wrappers for Python’s core data
 * `SyncFloat`: A thread-safe float that supports all arithmetic operations, ensuring precision in concurrent calculations.
 * `SyncBool`: A thread-safe boolean that handles all logical operations safely.
 * `SyncString`: A thread-safe mutable wrapper around Python’s `str`, offering comprehensive dunder method and string method coverage.
+* `SyncRef` : A thread-safe, atomic reference to any object with conditional updates and safe data access.
 
 ---
 

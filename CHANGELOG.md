@@ -23,6 +23,7 @@ Thread-safe wrappers for Python’s core data types. Built for deterministic, lo
 - `SyncBool`: Thread-safe boolean with full logical operation support.
 - `SyncString`: Thread-safe mutable wrapper around Python’s `str`, with full dunder and method coverage.
 - `SyncFloat`: Atomic float wrapper with arithmetic and bitwise support.
+- `SyncRef`: Thread-safe, atomic reference to any object — enables safe read/write access and conditional updates.
 
 These types are ideal for shared state in threaded environments, worker pools, and agent execution contexts.
 
