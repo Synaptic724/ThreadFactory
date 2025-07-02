@@ -121,6 +121,29 @@ class SignalBarrier(IDisposable):
                 # Fail silently if registration fails, maintaining standalone functionality.
                 pass
 
+
+    def dispose(self):
+        """
+        Releases all resources and unblocks waiting threads.
+
+        This method marks the semaphore as disposed and removes references
+        to callbacks and controllers. All currently waiting threads are notified
+        and allowed to exit.
+
+        This method is idempotent and safe to call multiple times.
+        """
+        with self._lock:
+            if self._disposed:
+                return
+            self._disposed = True
+            # Clean up references
+            self._controller = None
+            self._signal_callback = None
+            self._callback = None
+
+        with self._condition:
+            self._condition.notify_all()
+
     # --- Controller Contract Properties ---
 
     @property
@@ -161,28 +184,6 @@ class SignalBarrier(IDisposable):
         }
 
     # --- Core Methods (with integration) ---
-
-    def dispose(self):
-        """
-        Releases all resources and unblocks waiting threads.
-
-        This method marks the semaphore as disposed and removes references
-        to callbacks and controllers. All currently waiting threads are notified
-        and allowed to exit.
-
-        This method is idempotent and safe to call multiple times.
-        """
-        with self._lock:
-            if self._disposed:
-                return
-            self._disposed = True
-            # Clean up references
-            self._controller = None
-            self._signal_callback = None
-            self._callback = None
-
-        with self._condition:
-            self._condition.notify_all()
 
     def is_spent(self) -> bool:
         """

@@ -22,7 +22,7 @@ class TestComprehensiveControllerSemaphore(unittest.TestCase):
     def setUp(self):
         """Set up a new controller with a mock logger for each test."""
         self.mock_logger = MagicMock(spec=logging.Logger)
-        self.controller = Controller(logger=self.mock_logger)
+        self.controller = SignalController(logger=self.mock_logger)
 
     def tearDown(self):
         """Ensure the controller is disposed of after each test."""

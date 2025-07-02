@@ -1,3 +1,4 @@
+from __future__ import annotations
 import ulid
 from thread_factory.utils import IDisposable
 import inspect
@@ -12,11 +13,15 @@ from thread_factory.utils.coordination.outcome import Outcome
 
 
 class Conductor(IDisposable):
-    """A reusable, data-aware barrier for synchronizing threads.
+    """A reusable, data-aware synchronization point and work executor.
 
     The Conductor blocks a group of threads until a specified threshold is met.
     Once the threshold is reached, it can optionally execute a series of tasks,
     capture their results and exceptions, and then release all waiting threads.
+
+    It effectively acts as a dynamic barrier that can also manage and collect
+    outcomes from a coordinated execution phase, making it suitable for managing
+    batches of work in a multi-threaded environment.
 
     It serves as a powerful synchronization primitive for scenarios like:
     - Ensuring N worker threads are ready before starting a computation.
@@ -24,41 +29,17 @@ class Conductor(IDisposable):
     - Launching a set of dependent tasks only after setup is complete.
 
     Key Features:
-    - **Data-Aware**: Executes tasks and captures their results or exceptions.
-    - **Reusable**: Can be configured to reset itself automatically for use in loops.
-    - **Manual Control**: Supports manual release for fine-grained control.
-    - **Timeout Capable**: Can be configured with a global timeout to prevent deadlocks.
-    - **Thread-Safe**: Designed for safe use in concurrent applications.
-
-    Usage Example:
-        def my_task():
-            print("Threshold met, executing task!")
-            return "Task Complete"
-
-        # Create a conductor that waits for 3 threads and runs one task.
-        conductor = Conductor(threshold=3, tasks=my_task)
-
-        def worker(thread_id):
-            print(f"Thread {thread_id} is ready and waiting.")
-            was_released = conductor.wait(timeout=5)
-            if was_released:
-                print(f"Thread {thread_id} has been released.")
-            else:
-                print(f"Thread {thread_id} was not released (timeout/disposed).")
-
-        threads = [threading.Thread(target=worker, args=(i,)) for i in range(3)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        print(f"Conductor results: {conductor.results}")
+    - **Data-Aware**: Executes tasks and robustly captures their results or exceptions, holding them until explicitly cleared.
+    - **Reusable**: Designed for repeated use across multiple cycles of coordination. For reusable instances, results from a completed cycle persist until `reset()` is manually called by the user, allowing for thorough inspection and collection before the next cycle.
+    - **Result Persistence**: Captured outcomes are held by the Conductor instance after a cycle completes until `reset()` is explicitly invoked or `dispose()` is called.
+    - **Manual Control**: Supports explicit `release()` for fine-grained control when `manual_release` is enabled, allowing threads to proceed only when externally commanded.
+    - **Timeout Capable**: Can be configured with a global timeout to prevent deadlocks if the threshold is not met within a specified duration.
+    - **Thread-Safe**: Internally designed with robust synchronization primitives for safe concurrent use across multiple threads.
     """
     __slots__ = IDisposable.__slots__ + [
         "_threshold", "tasks", "reusable", "manual_release", "_timeout", "_raise_on_timeout",
         "_id", "outcomes", "_released", "_broken", "_create_field", "_multiple_outcomes_per_task",
-        "_lock", "_clock_barrier", "_signal_barrier", "_dynaphore",
-        "_entrance_barrier", "_internal_threshold_barrier", "_flow_regulator"
+        "_lock", "_clock_barrier", "_signal_barrier", "_dynaphore", "_internal_threshold_barrier", "_flow_regulator"
     ]
 
     def __init__(
@@ -130,7 +111,6 @@ class Conductor(IDisposable):
         self._lock = threading.RLock()
         self._clock_barrier = None
         self._signal_barrier = None
-        self._entrance_barrier = None
         self._internal_threshold_barrier = None
         self._dynaphore = Dynaphore(self._threshold)
         self._flow_regulator = FlowRegulator(0)
@@ -157,6 +137,14 @@ class Conductor(IDisposable):
         if self._disposed: return
         with self._lock: # Keep this lock for overall Conductor state
             self._disposed = True
+            if self._clock_barrier:
+                self._clock_barrier.dispose()
+            if self._signal_barrier:
+                self._signal_barrier.dispose()
+            if self._internal_threshold_barrier:
+                self._internal_threshold_barrier.dispose()
+            if self._dynaphore:
+                self._dynaphore.dispose()
             if self.outcomes:
                 for key, value in self.outcomes.items():
                     if self._multiple_outcomes_per_task:
@@ -175,22 +163,23 @@ class Conductor(IDisposable):
         This method is called internally by the `reusable` mode logic and should
         generally not be called publicly. It clears all previous outcomes.
         """
-        if self.outcomes:
-            for key, value in self.outcomes.items():
-                if self._multiple_outcomes_per_task:
-                    # value is ConcurrentList[Outcome]
-                    for obj in value:
-                        obj.dispose()
-                else: # value is single Outcome
-                    value.dispose()
-        self.outcomes.clear()
+        if self.reusable:
+            if self.outcomes:
+                for key, value in self.outcomes.items():
+                    if self._multiple_outcomes_per_task:
+                        # value is ConcurrentList[Outcome]
+                        for obj in value:
+                            obj.dispose()
+                    else: # value is single Outcome
+                        value.dispose()
+            self.outcomes.clear()
 
-        self._released = False
-        self._broken = False
-        if self._timeout is not None:
-            self._clock_barrier.reset()
-        elif self._signal_barrier is not None:
-            self._signal_barrier.reset()
+            self._released = False
+            self._broken = False
+            if self._timeout is not None:
+                self._clock_barrier.reset()
+            elif self._signal_barrier is not None:
+                self._signal_barrier.reset()
 
     @property
     def results(self) -> List[Any]:
@@ -278,7 +267,7 @@ class Conductor(IDisposable):
             return self._clock_barrier.wait()
         except Exception as e:
             if self._raise_on_timeout:
-                raise TimeoutError(f"Conductor wait timed out after {self._timeout}s.") from e
+                raise TimeoutError(f"Conductor wait timed out after {self._timeout}s.")
             else:
                 return True
 
@@ -300,7 +289,7 @@ class Conductor(IDisposable):
         print("Tasks to execute:", len(self.tasks))
         for index, task in enumerate(self.tasks):
             self._execute_operation(task, index)
-            self._internal_threshold_sema.wait() # Still commented out, which is fine for single thread.
+            self._internal_threshold_barrier.wait() # Still commented out, which is fine for single thread.
         print("Tasks to execute:", len(self.tasks))
         if not self.manual_release:
             self._released = True
@@ -407,10 +396,6 @@ class Conductor(IDisposable):
                 self._released = True
                 # No notify_all() equivalent on RLock, so threads will unblock when they can acquire the lock.
 
-        # Reset if reusable and last thread out
-        if self.reusable and was_released:
-            with self._lock:
-                self.reset()
         # Return whether the conductor was successfully released
         print("Ending 2")
 

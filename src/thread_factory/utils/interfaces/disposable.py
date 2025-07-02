@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from thread_factory.concurrency.sync_types.sync_bool import SyncBool
 
 class IDisposable(ABC):
     """
@@ -24,17 +25,17 @@ class IDisposable(ABC):
     __slots__ = ['_disposed',]
 
     def __init__(self):
-        self._disposed = False
+        self._disposed = SyncBool(False)
 
     @property
     def disposed(self) -> bool:
         """Returns True if the object has already been disposed."""
-        return self._disposed
+        return bool(self._disposed)
 
     @property
     def is_disposed(self) -> bool:
         """Alias for `disposed`."""
-        return self._disposed
+        return bool(self._disposed)
 
     def __enter__(self):
         """Enable usage with `with` statements."""

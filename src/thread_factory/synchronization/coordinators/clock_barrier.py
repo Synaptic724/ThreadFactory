@@ -141,7 +141,7 @@ class ClockBarrier(IDisposable):
         self._controller  = controller
 
         # Synchronisation primitives
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._cond = threading.Condition(self._lock)
 
         # Runtime state
@@ -156,6 +156,29 @@ class ClockBarrier(IDisposable):
                 self._controller.register(self)
             except Exception:              # noqa: BLE001 – controller is optional
                 pass                       # Stand-alone use is still valid
+
+
+    # ------------------------------------------------------------------ #
+    # Disposal / cleanup
+    # ------------------------------------------------------------------ #
+    def dispose(self) -> None:
+        """
+        Break the barrier permanently and wake all waiters.
+
+        Notes
+        -----
+        • After disposal, the barrier can no longer be reused – any call to
+          :py:meth:`wait` raises :class:`threading.BrokenBarrierError`.
+        • The controller reference is cleared *before* emitting events to
+          avoid cascading notifications during application shutdown.
+        """
+        if self._disposed:
+            return
+
+        self._disposed  = True
+        self._controller = None          # Prevent further notifications
+        with self._cond:
+            self._break_barrier_locked()
 
     # ------------------------------------------------------------------ #
     # Context-manager convenience
@@ -373,28 +396,6 @@ class ClockBarrier(IDisposable):
                 self._on_broken()
             except Exception:   # noqa: BLE001
                 pass
-
-    # ------------------------------------------------------------------ #
-    # Disposal / cleanup
-    # ------------------------------------------------------------------ #
-    def dispose(self) -> None:
-        """
-        Break the barrier permanently and wake all waiters.
-
-        Notes
-        -----
-        • After disposal, the barrier can no longer be reused – any call to
-          :py:meth:`wait` raises :class:`threading.BrokenBarrierError`.
-        • The controller reference is cleared *before* emitting events to
-          avoid cascading notifications during application shutdown.
-        """
-        if self._disposed:
-            return
-
-        self._disposed  = True
-        self._controller = None          # Prevent further notifications
-        with self._cond:
-            self._break_barrier_locked()
 
     # Alias demanded by project style guide ------------------------------ #
     cleanup = dispose  # functionally identical but improves discoverability
