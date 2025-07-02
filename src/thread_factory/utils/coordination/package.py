@@ -1,14 +1,19 @@
 from __future__ import annotations
-
 import inspect
 import types
 from collections import OrderedDict
 from functools import update_wrapper
 from threading import RLock
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, Tuple, Iterable, Union, Optional
+from types import SimpleNamespace
+
+from thread_factory import ConcurrentList
+from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.concurrency.concurrent_list import ConcurrentList
 
 
-class Package:
+class Package(IDisposable):
     """
     A thread-safe, delegate-style callable wrapper that supports argument memory,
     currying, composition, introspection, and function-style combination.
@@ -43,10 +48,10 @@ class Package:
 
     Note:
     -----
-    Coroutine functions are rejected. This class is strictly for sync callables.
+    Coroutine and generator functions are rejected. This class is strictly for sync callables.
     """
 
-    __slots__ = ["_func", "_args", "_kwargs", "_signature_cache", "_frozen", "_lock"]
+    __slots__ = IDisposable.__slots__ + ["_func", "_args", "_kwargs", "_signature_cache", "_frozen", "_lock"]
 
     def __init__(self, func: Callable[..., Any], *args: Any, **kwargs: Any):
         """
@@ -58,18 +63,29 @@ class Package:
             **kwargs: Keyword arguments to pre-bind.
 
         Raises:
-            TypeError: If func is not a callable or is a coroutine function.
+            TypeError: If func is not a callable or is a coroutine/generator function.
         """
-        if not callable(func):
-            raise TypeError(f"Expected a callable, got {type(func).__name__}")
-        if inspect.iscoroutinefunction(func):
-            raise TypeError("Coroutine functions are not supported in Pack.")
-        self._func: Callable[..., Any] = update_wrapper(lambda *a, **kw: func(*a, **kw), func)
-        self._args: Tuple[Any, ...] = args
-        self._kwargs: Dict[str, Any] = kwargs
-        self._signature_cache: types.SimpleNamespace | None = None
+        super().__init__()
+        normalized = self.normalize_task(func)  # Use helper for validation
+        self._func: Callable[..., Any] = update_wrapper(lambda *a, **kw: normalized(*a, **kw), normalized)
+        self._args: ConcurrentList = ConcurrentList(args)
+        self._kwargs: ConcurrentDict = ConcurrentDict(kwargs)
+        self._signature_cache: SimpleNamespace | None = None
         self._frozen: bool = False
         self._lock: RLock = RLock()
+
+    def dispose(self) -> None:
+        """
+        Dispose of the Package, releasing any resources.
+        This is a no-op for Package since it does not hold resources.
+        """
+        if self.disposed:
+            return
+        self._func = None
+        self._args.clear()
+        self._kwargs.clear()
+        self._signature_cache = None
+        self._disposed = True
 
     @property
     def is_async(self) -> bool:
@@ -98,8 +114,8 @@ class Package:
                        missing positional args are filled with `0` as fallback.
         """
         with self._lock:
-            all_args = self._args + extra_args
-            all_kwargs = {**self._kwargs, **extra_kwargs}
+            all_args = tuple(self._args) + extra_args
+            all_kwargs = {**dict(self._kwargs), **extra_kwargs}
             try:
                 return self._func(*all_args, **all_kwargs)
             except TypeError as e:
@@ -115,6 +131,187 @@ class Package:
                         all_args += (0,) * (len(required) - len(all_args))
                         return self._func(*all_args, **all_kwargs)
                 raise
+
+    @staticmethod
+    def normalize_task(task: Union[Callable, Package]) -> Callable:
+        """
+        Validate a callable or Package. If it's a Package, return its inner function.
+        If it's a callable, validate it. No wrapping is done here to avoid recursion.
+
+        Args:
+            task: A raw callable or Package.
+
+        Returns:
+            A validated callable (either unwrapped or raw).
+
+        Raises:
+            TypeError: If task is invalid.
+        """
+        if task is None:
+            raise TypeError("Cannot normalize None as a task.")
+        if isinstance(task, Package):
+            return task._func.__wrapped__  # allow deeper introspection for equality, etc.
+        if not callable(task):
+            raise TypeError(f"Expected callable, got {type(task).__name__}")
+        if inspect.iscoroutinefunction(task):
+            raise TypeError(f"Coroutine functions are not supported: {getattr(task, '__name__', repr(task))}")
+        if inspect.isgeneratorfunction(task):
+            raise TypeError(f"Generator functions are not supported: {getattr(task, '__name__', repr(task))}")
+        return task
+
+    @staticmethod
+    def is_valid_callable(obj: Any) -> bool:
+        """
+        Lightweight boolean check used in discovery / plugin loading paths.
+
+        Returns:
+            True if `obj` is a sync callable (or Package); False otherwise.
+        """
+        return (
+            isinstance(obj, Package)
+            or (
+                callable(obj)
+                and not inspect.iscoroutinefunction(obj)
+                and not inspect.isgeneratorfunction(obj)
+            )
+        )
+
+    @staticmethod
+    def ensure(task: Any) -> Optional["Package"]:
+        """
+        Attempt to wrap *task* in a Package.
+
+        Returns:
+            - The Package instance if wrap succeeds (or the original Package if it already is one)
+            - None if the task is invalid.
+        """
+        if isinstance(task, Package):
+            return task
+        if Package.is_valid_callable(task):
+            try:
+                return Package(task)  # safe wrap
+            except Exception:
+                return None
+        return None
+
+
+    @staticmethod
+    def safe(task: Any) -> Union["Package", Any]:
+        """
+        Soft-wrap: if *task* is a safe callable it becomes a Package, otherwise it is
+        passed through untouched.  Great for low-assumption APIs.
+
+        Example:
+            task = Package.safe(user_obj)
+            executor.submit(task)  # works for both Pack and raw objects
+        """
+        if isinstance(task, Package):
+            return task
+        if Package.is_valid_callable(task):
+            return Package(task)  # type: ignore[arg-type]
+        return task
+
+    @staticmethod
+    def from_partial(func: Callable[..., Any], *args: Any, **kwargs: Any) -> "Package":
+        """
+        Convenience factory for quickly creating an already-curried Package.
+        Equivalent to ``Package(func, *args, **kwargs)``.
+        """
+        return Package(func, *args, **kwargs)
+
+    @staticmethod
+    def merge_many(packs: Iterable["Package"]) -> "Package":
+        """
+        Pipe a sequence of Packages left-to-right into a single composite Package.
+
+        Example:
+            combo = Package.merge_many([p1, p2, p3])
+            result = combo(x)   # ≈ p3(p2(p1(x)))
+        """
+        packs_iter = list(packs)
+        if not packs_iter:
+            raise ValueError("merge_many() requires at least one Package")
+        for i, p in enumerate(packs_iter):
+            if not isinstance(p, Package):
+                raise TypeError(f"Item at index {i} is not a Package: {p!r}")
+
+        def _composed(*a: Any, **kw: Any) -> Any:
+            val = packs_iter[0](*a, **kw)
+            for p in packs_iter[1:]:
+                val = p(val)
+            return val
+
+        return Package(_composed)
+
+
+    @staticmethod
+    def normalize_many(
+        tasks: Union[Callable, Package, Iterable[Union[Callable, Package]]]
+    ) -> ConcurrentList[Package]:
+        """
+        Normalize a single callable, Package, or an iterable of them into a ConcurrentList of Package instances.
+
+        This is used to ensure all tasks are safe, wrapped, and concurrency-ready before use in
+        thread-based systems like Group or Conductor.
+
+        Args:
+            tasks: A single task or a collection of tasks.
+
+        Returns:
+            A ConcurrentList of validated, thread-safe Package instances.
+
+        Raises:
+            TypeError: If any task is invalid, None, or an async/coroutine/generator.
+        """
+        if tasks is None:
+            raise TypeError("Tasks input cannot be None.")
+
+        # Handle single callable or Package
+        if isinstance(tasks, (Callable, Package)):
+            return ConcurrentList([Package(Package.normalize_task(tasks))])
+
+        if not isinstance(tasks, Iterable):
+            raise TypeError(f"Expected a callable or iterable of callables, got {type(tasks).__name__}")
+
+        result = ConcurrentList()
+        for i, task in enumerate(tasks):
+            try:
+                if task is None:
+                    raise TypeError("Task is None.")
+                if not callable(task):
+                    raise TypeError(f"Expected callable, got {type(task).__name__}")
+                if inspect.iscoroutinefunction(task):
+                    raise TypeError(f"Coroutine functions are not supported: {getattr(task, '__name__', repr(task))}")
+                if inspect.isgeneratorfunction(task):
+                    raise TypeError(f"Generator functions are not supported: {getattr(task, '__name__', repr(task))}")
+                result.append(task if isinstance(task, Package) else Package(task))
+            except Exception as e:
+                raise TypeError(f"Invalid task at index {i}: {e}") from e
+
+        return result
+
+
+    @staticmethod
+    def validate_callable(task: Any, index: int = -1) -> None:
+        """
+        Validates that a task is callable and not an async/coroutine/generator function.
+
+        Args:
+            task: The task to validate.
+            index: Optional index for detailed error messaging.
+
+        Raises:
+            TypeError: If task is invalid.
+        """
+        label = f" at index {index}" if index >= 0 else ""
+        if task is None:
+            raise TypeError(f"Task{label} cannot be None.")
+        if not callable(task):
+            raise TypeError(f"Expected callable{label}, got {type(task).__name__}")
+        if inspect.iscoroutinefunction(task):
+            raise TypeError(f"Coroutine function{label} is not allowed: {getattr(task, '__name__', repr(task))}")
+        if inspect.isgeneratorfunction(task):
+            raise TypeError(f"Generator function{label} is not allowed: {getattr(task, '__name__', repr(task))}")
 
     def bind(self, **new_kwargs: Any) -> Package:
         """
@@ -150,7 +347,7 @@ class Package:
         """
         with self._lock:
             func = self._func.__wrapped__ if (args or kwargs) else self._func
-            return Package(func, *(self._args + args), **{**self._kwargs, **kwargs})
+            return Package(func, *(tuple(self._args) + args), **{**dict(self._kwargs), **kwargs})
 
     def freeze(self) -> None:
         """
@@ -163,13 +360,13 @@ class Package:
     def args(self) -> Tuple[Any, ...]:
         """Return the stored positional arguments."""
         with self._lock:
-            return self._args
+            return tuple(self._args)
 
     @property
-    def kwargs(self) -> Dict[str, Any]:
-        """Return a copy of the stored keyword arguments."""
+    def kwargs(self) -> ConcurrentDict:
+        """Return a thread-safe copy of the stored keyword arguments."""
         with self._lock:
-            return dict(self._kwargs)
+            return ConcurrentDict(self._kwargs)
 
     @property
     def signature(self):
@@ -177,12 +374,12 @@ class Package:
         Return a pseudo-signature object representing bound args.
 
         Returns:
-            SimpleNamespace with `arguments` dict containing arg0, arg1... and kwarg names.
+            SimpleNamespace with `arguments` ConcurrentDict containing arg0, arg1... and kwarg names.
         """
         with self._lock:
             if self._signature_cache is None:
                 sig = inspect.signature(self._func.__wrapped__)
-                arg_map = OrderedDict()
+                arg_map = ConcurrentDict()
                 for i, value in enumerate(self._args):
                     arg_map[f"arg{i}"] = value
                 arg_map.update(self._kwargs)
@@ -201,8 +398,8 @@ class Package:
         with self._lock, other._lock:
             return (
                 self._func.__wrapped__ is other._func.__wrapped__ and
-                self._args == other._args and
-                self._kwargs == other._kwargs
+                tuple(self._args) == tuple(other._args) and
+                dict(self._kwargs) == dict(other._kwargs)
             )
 
     def __hash__(self) -> int:
@@ -212,7 +409,7 @@ class Package:
         with self._lock:
             return hash((
                 id(self._func.__wrapped__),
-                self._args,
+                tuple(self._args),
                 frozenset(self._kwargs.items()),
             ))
 
@@ -264,7 +461,7 @@ class Package:
         )
 
     def __repr__(self) -> str:
-        return f"Package({self._func.__name__}, args={self._args}, kwargs={self._kwargs})"
+        return f"Package({self._func.__name__}, args={tuple(self._args)}, kwargs={dict(self._kwargs)})"
 
 
 # Short alias

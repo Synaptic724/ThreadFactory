@@ -24,20 +24,17 @@ if DEBUG_MODE:
     version += "-dev"
 __version__ = version
 
+# Import Concurrency Collections
+from thread_factory.concurrency.concurrent_buffer import ConcurrentBuffer
+from thread_factory.concurrency.concurrent_bag import ConcurrentBag
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.concurrency.concurrent_list import ConcurrentList
+from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
+from thread_factory.concurrency.concurrent_set import ConcurrentSet
+from thread_factory.concurrency.concurrent_stack import ConcurrentStack
+from thread_factory.concurrency.concurrent_collection import ConcurrentCollection
+from thread_factory.concurrency.concurrent_core import Concurrent
 
-from thread_factory.concurrency import (
-    ConcurrentBag,
-    ConcurrentDict,
-    ConcurrentList,
-    ConcurrentQueue,
-    Concurrent,
-    ConcurrentStack,
-    ConcurrentBuffer,
-    ConcurrentCollection,
-    ConcurrentSet,
-)
-# ---- Core Concurrency Primitives ----
-from thread_factory.concurrency import __all__ as concurrency_all
 # ---- Utilities ----
 from thread_factory.utils.exceptions.empty import Empty
 from thread_factory.utils.timing_tools.auto_reset_timer import AutoResetTimer
@@ -56,7 +53,19 @@ from thread_factory.synchronization.primitives import __all__ as primatives_all
 from thread_factory.runtime.factory.operations import (
     Work # this will be implemented in the future
 )
-__all__ = primatives_all + concurrency_all + [
+__all__ = primatives_all + [
+    # Concurrency Collections
+    "ConcurrentBuffer",
+    "ConcurrentBag",
+    "ConcurrentDict",
+    "ConcurrentList",
+    "ConcurrentQueue",
+    "ConcurrentSet",
+    "ConcurrentStack",
+    "ConcurrentCollection",
+    "ConcurrentCore",
+
+    # Synchronization Primitives
     "Empty",
     "Stopwatch",
     "AutoResetTimer",

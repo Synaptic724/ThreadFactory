@@ -52,6 +52,204 @@ class TestPackageThreadSafety(unittest.TestCase):
         for t in threads: t.start()
         for t in threads: t.join()
 
+    def test_normalize_task_accepts_package(self):
+        p = Package(_add, 1, 2)
+        normalized = Package.normalize_task(p)
+        self.assertEqual(normalized(3, 4), 7)
+
+    def test_normalize_task_accepts_callable(self):
+        fn = lambda x: x + 1
+        normalized = Package.normalize_task(fn)
+        self.assertEqual(normalized(4), 5)
+
+    def test_normalize_task_rejects_none(self):
+        with self.assertRaises(TypeError):
+            Package.normalize_task(None)
+
+    def test_normalize_task_rejects_coroutines(self):
+        async def coro(): pass
+
+        with self.assertRaises(TypeError):
+            Package.normalize_task(coro)
+
+    def test_normalize_task_rejects_generators(self):
+        def gen(): yield 1
+
+        with self.assertRaises(TypeError):
+            Package.normalize_task(gen)
+
+    def test_validate_callable_valid_function(self):
+        Package.validate_callable(lambda x: x + 1)  # should not raise
+
+    def test_validate_callable_invalid_type(self):
+        with self.assertRaises(TypeError):
+            Package.validate_callable(123)
+
+    def test_validate_callable_is_none(self):
+        with self.assertRaises(TypeError):
+            Package.validate_callable(None)
+
+    def test_validate_callable_rejects_coroutines(self):
+        async def fake(): pass
+
+        with self.assertRaises(TypeError):
+            Package.validate_callable(fake)
+
+    def test_validate_callable_rejects_generators(self):
+        def bad(): yield 1
+
+        with self.assertRaises(TypeError):
+            Package.validate_callable(bad)
+
+    def test_normalize_many_single_callable(self):
+        out = Package.normalize_many(_square)
+        self.assertEqual(len(out), 1)
+        self.assertIsInstance(out[0], Package)
+
+    def test_normalize_many_single_package(self):
+        p = Package(_square)
+        out = Package.normalize_many(p)
+        self.assertEqual(out[0], p)
+
+    def test_normalize_many_rejects_none(self):
+        with self.assertRaises(TypeError):
+            Package.normalize_many(None)
+
+    def test_normalize_many_rejects_non_iterable_non_callable(self):
+        with self.assertRaises(TypeError):
+            Package.normalize_many(1234)
+
+    def test_normalize_many_rejects_coroutine_in_iterable(self):
+        async def bad(): pass
+
+        with self.assertRaises(TypeError):
+            Package.normalize_many([_add, bad])
+
+    def test_normalize_many_rejects_generator_in_iterable(self):
+        def gen(): yield
+
+        with self.assertRaises(TypeError):
+            Package.normalize_many([_add, gen])
+
+    def test_normalize_many_valid_list_mixed_packages_and_funcs(self):
+        items = [_add, Package(_square, 4)]
+        out = Package.normalize_many(items)
+        self.assertEqual(len(out), 2)
+        self.assertTrue(all(isinstance(p, Package) for p in out))
+
+    # ─────────────────────── helpers: is_valid_callable ─────────────────────── #
+    def test_is_valid_callable_with_function(self):
+        self.assertTrue(Package.is_valid_callable(lambda x: x + 1))
+
+    def test_is_valid_callable_with_package(self):
+        p = Package(len)
+        self.assertTrue(Package.is_valid_callable(p))
+
+    def test_is_valid_callable_rejects_coroutine(self):
+        async def bad(): pass
+
+        self.assertFalse(Package.is_valid_callable(bad))
+
+    def test_is_valid_callable_rejects_generator(self):
+        def gen(): yield 1
+
+        self.assertFalse(Package.is_valid_callable(gen))
+
+    # ───────────────────────────── helpers: ensure ──────────────────────────── #
+    def test_ensure_returns_package_on_valid_callable(self):
+        out = Package.ensure(abs)
+        self.assertIsInstance(out, Package)
+
+    def test_ensure_returns_none_on_invalid(self):
+        self.assertIsNone(Package.ensure(123))
+
+    def test_ensure_returns_none_on_coroutine(self):
+        async def bad(): pass
+
+        self.assertIsNone(Package.ensure(bad))
+
+    # ───────────────────────────── helpers: safe ────────────────────────────── #
+    def test_safe_wraps_callable(self):
+        wrapped = Package.safe(sum)
+        self.assertIsInstance(wrapped, Package)
+
+    def test_safe_passthrough_invalid(self):
+        obj = 99
+        self.assertIs(Package.safe(obj), obj)
+
+    def test_safe_passthrough_package(self):
+        p = Package(pow, 2, 3)
+        self.assertIs(Package.safe(p), p)
+
+    # ───────────────────────── helper: from_partial ─────────────────────────── #
+    def test_from_partial_creates_curried_package(self):
+        p = Package.from_partial(pow, 2, exp=3)
+        self.assertEqual(p(), 8)
+
+    # ─────────────────────────── helper: merge_many ──────────────────────────── #
+    def test_merge_many_basic_pipeline(self):
+        p1 = Package(lambda x: x + 1)
+        p2 = Package(lambda x: x * 2)
+        combo = Package.merge_many([p1, p2])  # (x + 1) * 2
+        self.assertEqual(combo(3), 8)
+
+    def test_merge_many_requires_at_least_one(self):
+        with self.assertRaises(ValueError):
+            Package.merge_many([])
+
+    def test_merge_many_rejects_non_package(self):
+        p1 = Package(abs)
+        with self.assertRaises(TypeError):
+            Package.merge_many([p1, 123])
+
+    def test_merge_many_chains_three(self):
+        p1 = Package(lambda x: x + 1)
+        p2 = Package(lambda x: x * 2)
+        p3 = Package(lambda x: x - 3)
+        combo = Package.merge_many([p1, p2, p3])  # ((x+1)*2) -3
+        self.assertEqual(combo(4), 7)  # 7 is the correct result
+
+    # ---------------------------------------------------------------------------
+    #  Add these into your TestPackage class (or a new TestPackageHelpers class).
+    #  They assume `Package` has the five helper methods we just added.
+    # ---------------------------------------------------------------------------
+
+    def test_signature_updates_after_multiple_binds(self):
+        p = Package(pow, 2)
+        _ = p.signature
+        p.bind(exp=3)
+        self.assertEqual(p.signature.arguments["exp"], 3)
+        p.bind(exp=5)
+        self.assertEqual(p.signature.arguments["exp"], 5)
+
+    def test_signature_with_args_and_kwargs(self):
+        p = Package(pow, 2, exp=3)
+        sig = p.signature.arguments
+        self.assertEqual(sig["arg0"], 2)
+        self.assertEqual(sig["exp"], 3)
+
+    def test_bind_threadsafe_multiple_threads(self):
+        p = Package(_add, 1)
+        threads = []
+
+        def do_bind():
+            for i in range(3):
+                p.bind(debug=True)
+
+        for _ in range(4):
+            t = threading.Thread(target=do_bind)
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        self.assertEqual(p.kwargs["debug"], True)
+
+    def test_repr_works_when_func_is_lambda(self):
+        p = Package(lambda x: x)
+        self.assertIn("lambda", repr(p))
+
     def test_signature_cache_shared_safely(self):
         """Ensure the signature property is thread-safe and consistent."""
         p = Package(delayed_add, 5, 7)
