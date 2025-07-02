@@ -1,24 +1,8 @@
-"""
-Robust SyncRef test-suite
-=========================
-
-• Place next to the rest of your `tests/` tree and run with
-  `python -m unittest discover -s tests` (or via PyCharm).
-
-• Assumes SyncRef lives in
-  `thread_factory.concurrency.value_types.sync_ref`.
-  Adjust the import path if you drop the class elsewhere.
-"""
-
 import copy
 import pickle
 import random
 import threading
-import time
 import unittest
-from collections import Counter
-from dataclasses import dataclass
-
 from thread_factory.concurrency.sync_types.sync_ref import SyncRef
 from thread_factory.concurrency.sync_types.sync_int import SyncInt   # integration check
 from thread_factory.utils.interfaces.isync import ISync
