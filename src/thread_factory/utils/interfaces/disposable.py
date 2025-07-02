@@ -28,14 +28,14 @@ class IDisposable(ABC):
         self._disposed = SyncBool(False)
 
     @property
-    def disposed(self) -> bool:
+    def disposed(self) -> SyncBool:
         """Returns True if the object has already been disposed."""
-        return bool(self._disposed)
+        return self._disposed
 
     @property
-    def is_disposed(self) -> bool:
+    def is_disposed(self) -> SyncBool:
         """Alias for `disposed`."""
-        return bool(self._disposed)
+        return self._disposed
 
     def __enter__(self):
         """Enable usage with `with` statements."""
