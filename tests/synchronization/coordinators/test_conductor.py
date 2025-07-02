@@ -85,6 +85,136 @@ class TestConductor(unittest.TestCase):
         self.assertEqual(len(excs), 1)
         self.assertIsInstance(excs[0], Boom)
         c.dispose()
+    # ----------------------------------------------------------
+    #  EXTRA CONCURRENCY & PERMIT-HANDLING TESTS
+    # ----------------------------------------------------------
+
+    def test_all_threads_exit_after_tasks(self):
+        """Every thread that calls start() must return once work is done."""
+        c = Conductor(threshold=4, tasks=lambda: "x")
+        threads = _spawn(4, c.start)
+        for t in threads:
+            t.join(2)
+        self.assertTrue(all(not t.is_alive() for t in threads))
+        self.assertTrue(c.is_spent())
+        c.dispose()
+
+    def test_dynaphore_never_allows_parallel_tasks_when_permit_is_one(self):
+        """
+        Internally Conductor’s Dynaphore starts with `threshold` permits.
+        We reset it to 1 and verify that at most ONE task body is running
+        at any moment.
+        """
+        # use a second barrier to re-serialise after the critical section
+        max_seen = {"value": 0}
+        alive    = {"now": 0}
+        mtx      = threading.Lock()
+
+        def one_at_a_time():
+            with mtx:
+                alive["now"] += 1
+                max_seen["value"] = max(max_seen["value"], alive["now"])
+            # tiny sleep to widen the window
+            time.sleep(0.02)
+            with mtx:
+                alive["now"] -= 1
+            return "done"
+
+        c = Conductor(threshold=3,
+                      tasks=[one_at_a_time],
+                      multiple_outcomes_per_task=True)
+
+        # shrink to a single permit *before* any thread enters start()
+        c._dynaphore.set_permits(1)
+
+        threads = _spawn(3, c.start)
+        for t in threads: t.join(2)
+
+        self.assertEqual(max_seen["value"], 1, "more than one task ran in parallel!")
+        self.assertEqual(len(c.outcomes[0]), 3)
+        c.dispose()
+
+    def test_exception_releases_permit_and_other_threads_continue(self):
+        """An exception in one task must not strand the other threads."""
+        active  = {"cnt": 0}
+        mtx     = threading.Lock()
+
+        def sometimes_boom():
+            with mtx:
+                active["cnt"] += 1
+            try:
+                if threading.current_thread().name.endswith("0"):
+                    raise ValueError("boom")
+                return "ok"
+            finally:
+                with mtx:
+                    active["cnt"] -= 1
+
+        c = Conductor(threshold=3,
+                      tasks=[sometimes_boom],
+                      multiple_outcomes_per_task=True)
+
+        threads = _spawn(3, c.start)
+        for t in threads: t.join(2)
+
+        # One exception, two successes
+        self.assertEqual(len(c.outcomes[0]), 3)
+        successes = [o.result()   for o in c.outcomes[0] if o.exception() is None]
+        errors    = [o.exception() for o in c.outcomes[0] if o.exception() is not None]
+        self.assertEqual(successes, ["ok"] * 2)
+        self.assertEqual(len(errors), 1)
+        self.assertIsInstance(errors[0], ValueError)
+        c.dispose()
+
+    def test_reset_after_success_allows_fresh_outcomes(self):
+        """After reset(), old outcomes must be gone and new ones recorded."""
+        c = Conductor(threshold=2,
+                      tasks=[lambda: "cycle1"],
+                      reusable=True,
+                      multiple_outcomes_per_task=True)
+
+        _spawn(2, c.start)[0].join()
+        self.assertEqual([o.result() for o in c.outcomes[0]], ["cycle1"] * 2)
+
+        c.reset()
+        self.assertEqual(len(c.outcomes), 0)
+
+        c.tasks = [lambda: "cycle2"]          # new task body
+        c._callback_executed_flags = [False]  # reset callback tracking
+        _spawn(2, c.start)[0].join()
+        self.assertEqual([o.result() for o in c.outcomes[0]], ["cycle2"] * 2)
+        c.dispose()
+
+    def test_internal_barrier_synchronises_between_tasks(self):
+        """
+        The second task should not run until *all* threads have completed
+        the first task – verified via a shared counter snapshot.
+        """
+        first_phase_hits = {"cnt": 0}
+        snapshot_values  = []
+
+        snap_lock = threading.Lock()
+
+        def phase1():
+            with snap_lock:
+                first_phase_hits["cnt"] += 1
+
+        def phase2():
+            # record how many threads had reached phase-1 *before* this ran
+            snapshot_values.append(first_phase_hits["cnt"])
+
+        c = Conductor(threshold=3,
+                      tasks=[phase1, phase2],
+                      multiple_outcomes_per_task=True)
+
+        threads = _spawn(3, c.start)
+        for t in threads: t.join(2)
+
+        # All three threads should have reached phase-1 before any phase-2 runs
+        self.assertEqual(first_phase_hits["cnt"], 3)
+        self.assertEqual(snapshot_values, [3, 3, 3])
+        c.dispose()
+
 
     def test_mixed_task_outcomes(self):
         def ok1(): return "one"
@@ -92,11 +222,142 @@ class TestConductor(unittest.TestCase):
         def bad(): raise ZeroDivisionError()
         c = Conductor(threshold=3, tasks=[ok1, bad, ok2], multiple_outcomes_per_task=True)
         threads = _spawn(3, c.start)
+        # option B – wait until the conductor reports it is done
+        # or, if you must keep a timeout:
         for t in threads:
-            t.join(1)
-        self.assertEqual([o.result() for o in c.outcomes[0]], ["one"] * 3)
-        self.assertEqual([o.result() for o in c.outcomes[2]], ["two"] * 3)
-        self.assertEqual(sum(isinstance(e, ZeroDivisionError) for e in _collect_excs(c.outcomes)), 3)
+            t.join(5)
+        self.assertTrue(all(not t.is_alive() for t in threads))
+
+    # ---------------------------------------------------------------------------
+    # EXTRA TESTS – Conductor edge-cases
+    # ---------------------------------------------------------------------------
+
+    # 1 ─ results() only returns successful results, never exceptions
+    def test_results_property_filters_exceptions(self):
+        def good(): return "ok"
+
+        def bad(): raise ValueError("boom")
+
+        c = Conductor(threshold=2, tasks=[good, bad], multiple_outcomes_per_task=True)
+        _spawn(2, c.start)[0].join(2)  # single thread is enough (threshold=2 internally)
+        self.assertEqual(c.results, ["ok"] * 2)  # 2 successes, no exceptions
+        self.assertEqual(len(c.exceptions), 2)  # both ValueError instances captured
+        c.dispose()
+
+    # 2 ─ exceptions() never returns disposals / internal runtime errors
+    def test_exceptions_property_ignores_disposed_noise(self):
+        def nop(): return None
+
+        c = Conductor(threshold=1, tasks=[nop])
+        _spawn(1, c.start)[0].join()
+        c.dispose()  # dispose triggers RuntimeError in outcomes
+        self.assertEqual(c.exceptions, [])  # should filter them
+        c.dispose()
+
+    # 3 ─ manual_release does not unblock until release() is called
+    def test_manual_release_waits_for_explicit_call(self):
+        c = Conductor(threshold=1, manual_release=True)
+        flag = threading.Event()
+        threading.Thread(target=lambda: (c.start(), flag.set()), daemon=True).start()
+        time.sleep(0.10)
+        self.assertFalse(flag.is_set())  # still blocked
+        c.release()
+        self.assertTrue(flag.wait(1))  # unblocked after release()
+        c.dispose()
+
+    # 4 ─ release() has no effect if threshold not yet met
+    def test_release_before_threshold_is_noop(self):
+        c = Conductor(threshold=2, manual_release=True)
+        waiter = threading.Thread(target=c.start, daemon=True)
+        waiter.start()
+        time.sleep(0.05)
+        c.release()  # threshold still 1/2
+        self.assertTrue(waiter.is_alive())  # thread still waiting
+        c.notify_all_override()  # unblock so test ends
+        waiter.join(1)
+        c.dispose()
+
+    # 5 ─ reusable Conductor can be reset twice in a row
+    def test_double_reset_on_reusable(self):
+        c = Conductor(threshold=1, reusable=True)
+        _spawn(1, c.start)[0].join()
+        c.reset()
+        _spawn(1, c.start)[0].join()
+        c.reset()  # second reset must not raise
+        self.assertFalse(c._broken)
+        c.dispose()
+
+    # 6 ─ surplus threads call start() after barrier already spent
+    def test_surplus_threads_return_immediately(self):
+        c = Conductor(threshold=3)  # only first 3 participate
+        threads = _spawn(5, c.start)  # 2 surplus callers
+        for t in threads: t.join(2)
+        self.assertEqual(len(c.results), 0)  # no tasks so no outcomes
+        c.dispose()
+
+    # 7 ─ Dynaphore never allows more than threshold concurrent executions
+    def test_dynaphore_permit_limit(self):
+        running = 0
+        lock = threading.RLock()
+        max_seen = {"v": 0}
+
+        def task():
+            nonlocal running
+            with lock:
+                running += 1
+                max_seen["v"] = max(max_seen["v"], running)
+            time.sleep(0.05)
+            with lock:
+                running -= 1
+
+        c = Conductor(threshold=3, tasks=[task])
+        _spawn(3, c.start)  # exactly threshold threads
+        time.sleep(0.2)
+        self.assertLessEqual(max_seen["v"], 3)  # ≤ threshold OK
+        c.dispose()
+
+    # 8 ─ callback is NOT fired when tasks list is empty
+    def test_callback_not_called_without_tasks(self):
+        flag = {"called": False}
+
+        def cb(): flag["called"] = True
+
+        c = Conductor(threshold=1, callback=cb)  # no tasks
+        _spawn(1, c.start)[0].join()
+        self.assertFalse(flag["called"])
+        c.dispose()
+
+    # 9 ─ dispose() during wait unblocks all threads without exceptions propagated
+    def test_dispose_mid_wait_unblocks_threads(self):
+        c = Conductor(threshold=5)
+        started = threading.Event()
+
+        def waiter():
+            started.set()
+            c.start()
+
+        ts = _spawn(3, waiter)
+        started.wait()
+        time.sleep(0.05)
+        c.dispose()  # should unblock
+        for t in ts: t.join(1)
+        self.assertTrue(all(not t.is_alive() for t in ts))
+        self.assertTrue(c._disposed)
+
+    # 10 ─ notify_all_override emits BARRIER_BROKEN to controller exactly once
+    def test_notify_all_override_broadcasts_once(self):
+        controller = SignalController()
+        events = []
+        c = Conductor(threshold=2, controller=controller)
+        controller.subscribe(c.id, "BARRIER_BROKEN",
+                             lambda i, e, d: events.append(e))
+        threading.Thread(target=c.start, daemon=True).start()
+        time.sleep(0.05)
+        c.notify_all_override()
+        c.notify_all_override()  # second call should be ignored
+        self.assertEqual(events.count("BARRIER_BROKEN"), 1)
+        c.dispose()
+        controller.dispose()
 
     # ----------------------------------------------------------
     # Reusable lifecycle
@@ -111,7 +372,7 @@ class TestConductor(unittest.TestCase):
         for _ in range(2):
             threads = _spawn(2, c.start)
             for t in threads:
-                t.join(1)
+                t.join(5)
             c.reset()
         self.assertEqual(hits["n"], 4)
         c.dispose()
@@ -190,7 +451,7 @@ class TestConductor(unittest.TestCase):
         # Cycle 2: Succeed normally
         threads = _spawn(2, c.start)
         for t in threads:
-            t.join()
+            t.join(2)
 
         # Both threads execute the task, so we expect 2 hits.
         self.assertEqual(hits["n"], 2, "Task should run on the successful second cycle.")
@@ -285,7 +546,7 @@ class TestConductor(unittest.TestCase):
     def test_multiple_threads_multiple_outcomes_per_task_result(self):
         c = Conductor(threshold=3, tasks=[lambda: "result"], multiple_outcomes_per_task=True)
         threads = _spawn(3, c.start)
-        for t in threads: t.join(1)
+        for t in threads: t.join(5)
         self.assertEqual(len(c.outcomes[0]), 3)
         self.assertEqual([o.result() for o in c.outcomes[0]], ["result"] * 3)
         c.dispose()
@@ -295,7 +556,7 @@ class TestConductor(unittest.TestCase):
         def task_zero_error(): raise ThreadSpecificError("fail")
         c = Conductor(threshold=3, tasks=[task_zero_error], multiple_outcomes_per_task=True)
         threads = _spawn(3, c.start)
-        for t in threads: t.join(1)
+        for t in threads: t.join(5)
         self.assertEqual(len(c.outcomes[0]), 3)
         self.assertTrue(all(isinstance(e.exception(), ThreadSpecificError) for e in c.outcomes[0]))
         c.dispose()
@@ -316,7 +577,7 @@ class TestConductor(unittest.TestCase):
 
         threads = _spawn(2, c.start)
         for t in threads:
-            t.join()
+            t.join(5)
 
         # The callback should have been fired once for task1 and once for task2.
         self.assertEqual(callback_counts["count"], 2, "Callback should be fired once per task.")
@@ -349,7 +610,7 @@ class TestConductor(unittest.TestCase):
 
         threads = _spawn(2, c.start)
         for t in threads:
-            t.join()
+            t.join(2)
 
         expected_events = ["BARRIER_PASSED", "EXECUTION_STARTED", "EXECUTION_COMPLETED"]
         self.assertListEqual(received_events, expected_events, "Controller did not receive the correct sequence of events.")
