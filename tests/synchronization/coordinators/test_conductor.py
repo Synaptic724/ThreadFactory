@@ -8,22 +8,10 @@ import time
 import unittest
 import logging
 from typing import List, Any, Dict, Union, Optional
-
-# Mock the controller for standalone testing if it's not available
-# In your actual project, you would import your real classes
-try:
-    from thread_factory.synchronization.coordinators.conductor import Conductor
-    from thread_factory.synchronization.controllers.signal_controller import SignalController
-    from thread_factory.utils.coordination.outcome import Outcome
-    from thread_factory.concurrency import ConcurrentDict, ConcurrentList
-except ImportError:
-    # Create mock objects if the real ones aren't in the path
-    # This allows the test file to be self-contained for analysis
-    SignalController = type('SignalController', (object,), {'_logger': logging.getLogger('mock_controller')})
-    Conductor = type('Conductor', (object,), {})
-    Outcome = type('Outcome', (object,), {})
-    ConcurrentDict = dict
-    ConcurrentList = list
+from thread_factory.synchronization.coordinators.conductor import Conductor
+from thread_factory.synchronization.controllers.signal_controller import SignalController
+from thread_factory.utils.coordination.outcome import Outcome
+from thread_factory.concurrency import ConcurrentDict, ConcurrentList
 
 
 # --- Supporting functions ---
@@ -106,9 +94,9 @@ class TestConductor(unittest.TestCase):
         threads = _spawn(3, c.start)
         for t in threads:
             t.join(1)
-        self.assertCountEqual(_collect_results(c.outcomes), ["one"] * 3 + ["two"] * 3)
+        self.assertEqual([o.result() for o in c.outcomes[0]], ["one"] * 3)
+        self.assertEqual([o.result() for o in c.outcomes[2]], ["two"] * 3)
         self.assertEqual(sum(isinstance(e, ZeroDivisionError) for e in _collect_excs(c.outcomes)), 3)
-        c.dispose()
 
     # ----------------------------------------------------------
     # Reusable lifecycle

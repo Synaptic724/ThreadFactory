@@ -1,241 +1,379 @@
-import threading
-import time
-from typing import Any, Callable, List, Optional
-import ulid
-from thread_factory.utils import Group, IDisposable
+from __future__ import annotations
+import threading, inspect, ulid, time
+from typing import Optional, Callable, List, Union, Any, Dict
+from thread_factory.utils import IDisposable, Group
+from thread_factory.concurrency import ConcurrentDict, ConcurrentList
+from thread_factory.utils.coordination.outcome import Outcome
+from thread_factory.synchronization.primitives import Dynaphore
+from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
+from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
 
 
 class MultiConductor(IDisposable):
-    """A coordinated, multi-group conductor that synchronizes threads and runs tasks.
-
-    The MultiConductor manages multiple `Group` objects, each with its own
-    thread threshold and list of tasks. As each group's threshold is met,
-    its specific tasks are executed and their outcomes are captured.
-
-    Once ALL managed groups are "ready", the MultiConductor performs a global
-    release, unblocking all threads that are waiting on it.
-
-    This is ideal for complex, phased startup sequences where different
-    sub-systems (groups) need to complete their own setup tasks before the
-    main application logic proceeds.
-
-    Usage Example:
-        # Group for database connections
-        db_group = Group(threshold=2, tasks=[lambda: "db_init_ok"])
-        # Group for API connections
-        api_group = Group(threshold=3, tasks=[lambda: "api_init_ok"])
-
-        conductor = MultiConductor(groups=[db_group, api_group])
-
-        def db_worker():
-            print("DB worker waiting...")
-            conductor.wait(0)
-            print("DB worker released!")
-
-        def api_worker():
-            print("API worker waiting...")
-            conductor.wait(1)
-            print("API worker released!")
-
-        # Start 2 DB workers and 3 API workers
-        threads = [threading.Thread(target=db_worker) for _ in range(2)]
-        threads += [threading.Thread(target=api_worker) for _ in range(3)]
-
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        print(f"DB Group results: {db_group.results}")
-        print(f"API Group results: {api_group.results}")
     """
+    MultiConductor
+    --------------------------
+    A reusable, data-aware synchronization point that executes tasks organized into groups.
+    This class maintains the exact execution schema of the Conductor: all participating
+    threads wait at a single barrier. Once the threshold is met, ALL threads are released
+    and proceed to execute ALL tasks from ALL groups in lock-step synchronization.
+
+    This ensures that if 50 threads arrive, all 50 threads will execute task 1 (of group 1),
+    then synchronize, then all 50 execute task 2 (of group 1), and so on for all tasks in
+    all groups.
+    """
+
+    # Define all instance attributes in __slots__ for memory optimization.
     __slots__ = IDisposable.__slots__ + [
-        "groups", "reusable", "manual_release", "timeout", "raise_on_timeout",
-        "_enabled", "_lock", "_condition", "_released", "_start_time",
-        "_broken", "_total_waiting_threads", "_id"
+        "_threshold", "groups", "reusable", "manual_release",
+        "_timeout", "_raise_on_timeout", "_multiple_outcomes_per_task", "_callback",
+        "_controller", "_id", "_released", "_broken", "_main_barrier",
+        "_lock", "_dynaphore", "_manual_release_gate", "_callback_executed_flags",
+        "_barrier_passed_notified", "_execution_started_notified", "_execution_completed_notified",
+        "_clock_barrier", "_signal_barrier", "_internal_threshold_barrier", "outcomes", "_enabled"
     ]
 
     def __init__(
             self,
+            threshold: int,
             groups: Optional[List[Group]] = None,
             reusable: bool = False,
             manual_release: bool = False,
             timeout: Optional[float] = None,
-            raise_on_timeout: bool = False
+            raise_on_timeout: bool = False,
+            multiple_outcomes_per_task: bool = False,
+            callback: Optional[Callable[[], None]] = None,
+            controller: Optional['SignalController'] = None
     ):
-        """Initializes the MultiConductor.
-
-        Args:
-            groups (Optional[List[Group]]): A list of pre-configured Group
-                objects to manage.
-            reusable (bool): If True, the conductor and all its groups will
-                reset after all threads from a cycle have passed.
-            manual_release (bool): If True, waits for an explicit `release()`
-                call even after all groups are ready.
-            timeout (Optional[float]): A global timeout in seconds. If not all
-                groups become ready in this time, the conductor breaks.
-            raise_on_timeout (bool): If True, raises `TimeoutError` on timeout.
-        """
         super().__init__()
-        self.groups: List[Group] = groups if groups is not None else []
+        # The overall number of threads that must call start() before execution begins.
+        if threshold <= 0:
+            raise ValueError("Threshold must be a positive integer.")
+
+        # --- Core Fields ---
+        self._threshold = threshold
+        self.groups = ConcurrentList()
         self.reusable = reusable
         self.manual_release = manual_release
-        self.timeout = timeout
-        self.raise_on_timeout = raise_on_timeout
+        self._timeout = timeout
+        self._raise_on_timeout = raise_on_timeout
+        self._multiple_outcomes_per_task = multiple_outcomes_per_task
+        self._callback = callback
+        self._controller = controller
         self._id = str(ulid.ULID())
+        self._enabled = False  # A flag to prevent adding groups after starting.
 
-        self._enabled = bool(self.groups)
-        self._lock = threading.Lock()
-        self._condition = threading.Condition(self._lock)
-        self._released = False
-        self._start_time = None
-        self._broken = False
-        self._total_waiting_threads = 0
+        # This dictionary will map group names to their respective outcome lists.
+        self.outcomes = ConcurrentDict()
 
-    @property
-    def all_outcomes(self) -> List['Outcome']:
-        """A convenience property to get a flat list of all outcomes from all groups."""
-        if self.disposed: return []
-        return [outcome for group in self.groups for outcome in group.outcomes]
+        # If groups are provided at initialization, add them.
+        if groups:
+            for group in groups:
+                self.add_group(group)
 
-    def dispose(self):
-        """Disposes of the MultiConductor and cascades disposal to all its Groups."""
-        if self.disposed: return
-        with self._condition:
-            self._disposed = True
-            for group in self.groups:
-                group.dispose()
-            self.groups.clear()
-            self._broken = True
-            self._released = True
-            self._condition.notify_all()
+        # --- State and Primitives (Identical to Conductor) ---
+        self._released = False  # True when the conductor has finished its cycle.
+        self._broken = False  # True if the conductor is forcibly broken (e.g., by timeout).
+        self._lock = threading.RLock()  # A reentrant lock for managing internal state.
+        self._dynaphore = Dynaphore(threshold)  # Manages permits for threads to execute tasks.
+        self._manual_release_gate = threading.Event() if manual_release else None  # An event to hold threads if manual_release is True.
+        self._internal_threshold_barrier = SignalBarrier(threshold,
+                                                         reusable=True)  # Barrier to sync threads BETWEEN tasks.
+
+        # --- Notification Flags ---
+        self._barrier_passed_notified = False
+        self._execution_started_notified = False
+        self._execution_completed_notified = False
+        self._callback_executed_flags = {}  # Tracks if the callback for a specific task has run.
+
+        # --- Main Barrier Initialization (Identical to Conductor) ---
+        # Selects the appropriate barrier type based on whether a timeout is specified.
+        if timeout is not None:
+            if timeout <= 0: raise ValueError("Timeout must be positive.")
+            self._clock_barrier = ClockBarrier(threshold, timeout, self.notify_all_override, controller)
+        else:
+            self._signal_barrier = SignalBarrier(threshold, reusable, controller)
+        self._main_barrier = self._clock_barrier or self._signal_barrier
+
+        # --- Controller Registration ---
+        # If a SignalController is provided, register this MultiConductor instance with it.
+        if self._controller:
+            try:
+                self._controller.register(self)
+            except Exception:
+                pass  # Registration is optional, so we fail silently.
 
     def add_group(self, group: Group):
-        """Adds a new, pre-configured Group to the conductor.
-
-        This must be called before the conductor is enabled via `enable()`.
-
-        Args:
-            group (Group): The Group instance to add.
-
-        Raises:
-            RuntimeError: If called after the conductor is enabled.
-            TypeError: If the provided object is not a Group instance.
-        """
+        """Adds a group to the conductor. Must be called before the conductor is active."""
         if self._enabled:
-            raise RuntimeError("Cannot add groups after MultiConductor is enabled.")
+            raise RuntimeError("Cannot add groups after MultiConductor is active.")
         if not isinstance(group, Group):
             raise TypeError("Only Group objects can be added.")
         self.groups.append(group)
+        # Map the group's name to its list of outcomes for easy lookup.
+        self.outcomes[group.name] = group.outcomes
+        # If a callback is used, initialize tracking flags for this group's tasks.
+        if self._callback:
+            self._callback_executed_flags[group.name] = [False for _ in group.tasks]
+
+    def remove_group(self, group: Group):
+        """Removes a group from the conductor. Must be called before the conductor is active."""
+        if self._enabled:
+            raise RuntimeError("Cannot remove groups after MultiConductor is active.")
+        try:
+            self.groups.remove(group)
+            del self.outcomes[group.name]
+            if self._callback:
+                del self._callback_executed_flags[group.name]
+        except (ValueError, KeyError):
+            pass  # Ignore if the group is not found.
 
     def enable(self):
-        """Enables the MultiConductor, preventing further groups from being added."""
-        if self._enabled: return
-        if not self.groups:
-            raise ValueError("Cannot enable with no groups.")
+        """Locks the configuration, preparing the conductor for use and preventing further changes."""
         self._enabled = True
 
-    def release(self):
-        """Manually releases the conductor.
+    # ============================================================
+    #  Entry Point - Identical to Conductor
+    # ============================================================
+    def start(self, timeout: float = None) -> None:
+        """The main entry point for threads. Blocks until the threshold is met."""
+        if not self._enabled: self.enable()
+        if self._disposed or self._broken or self.is_spent():
+            return
+        try:
+            # 1. All threads wait here until `_threshold` threads have arrived.
+            self._main_barrier.wait()
+            if self._broken: return
 
-        This is only effective when `manual_release=True` and all groups have
-        already met their respective thresholds.
+            # 2. Notify the controller that the barrier has been passed.
+            with self._lock:
+                if self._controller and not self._barrier_passed_notified:
+                    self._barrier_passed_notified = True
+                    self._controller.notify(self.id, "BARRIER_PASSED")
+
+            # 3. Acquire a permit to proceed with task execution.
+            if not self._dynaphore.wait_for_permit(timeout): return
+
+            # 4. Execute the main operation pipeline.
+            try:
+                self._execute_operations()
+            finally:
+                # 5. Release the permit after execution is complete.
+                self._dynaphore.decrease_permits()
+
+        except Exception as e:
+            # Handle timeouts and other exceptions.
+            if self._raise_on_timeout and isinstance(e, threading.BrokenBarrierError):
+                raise TimeoutError("MultiConductor wait timed out.") from e
+            self.notify_all_override()
+
+    # ============================================================
+    #  Execution Pipeline - Modified for Groups
+    # ============================================================
+    def _execute_operations(self):
         """
-        with self._condition:
-            if self.disposed: return
-            if self.manual_release and not self._released and all(g.ready for g in self.groups):
-                self._released = True
-                self._condition.notify_all()
-
-    def wait(self, group_index: int) -> bool:
-        """Blocks the calling thread until all groups are ready and releases.
-
-        As soon as this thread's group meets its threshold, its tasks are
-        executed. The thread will then continue to block until ALL groups are ready.
-
-        Args:
-            group_index (int): The index of the group this thread belongs to.
-
-        Returns:
-            bool: `True` for a successful release, `False` otherwise (timeout,
-                disposed, or broken by an override).
-
-        Raises:
-            RuntimeError: If called before `enable()`.
-            IndexError: If `group_index` is out of bounds.
+        Iterates through all groups and their tasks, executing each one
+        and synchronizing all threads after every single task.
         """
-        if not self._enabled:
-            raise RuntimeError("MultiConductor not enabled.")
+        if self.groups:
+            with self._lock:
+                if self._controller and not self._execution_started_notified:
+                    self._execution_started_notified = True
+                    self._controller.notify(self.id, "EXECUTION_STARTED")
 
-        # This will raise IndexError for invalid indices, which is appropriate.
-        group = self.groups[group_index]
-        with self._condition:
-            # Check for terminal states first.
-            if self.disposed or self._broken: return False
+            # THE CRITICAL DOUBLE FOR-LOOP for lock-step execution.
+            for group in self.groups:
+                for task_index, task in enumerate(group.tasks):
+                    if self._broken or self._disposed: break
 
-            if self._start_time is None: self._start_time = time.monotonic()
+                    # All threads execute the same task concurrently.
+                    self._execute_operation(task, group, task_index)
 
-            self._total_waiting_threads += 1
-            group.count += 1
+                    # All threads wait here. No thread proceeds to the next task
+                    # until all have finished the current one.
+                    self._internal_threshold_barrier.wait()
 
-            # If this thread's arrival makes its group ready, execute the group's tasks.
-            # This block runs only once per group, per cycle.
-            if group.count >= group.threshold and not group.ready:
-                group.ready = True
-                # The thread completing the group is responsible for running its tasks.
-                for task, outcome in zip(group.tasks, group.outcomes):
-                    try:
-                        result = task()
-                        outcome.set_result(result)
-                    except Exception as e:
-                        outcome.set_exception(e)
+                    # If a callback is defined, execute it (only one thread will succeed).
+                    if self._callback:
+                        self._execute_callback(group, task_index)
 
-            # Check if ALL groups are now ready, which triggers the global release.
-            if all(g.ready for g in self.groups) and not self.manual_release:
-                self._released = True
-                self._condition.notify_all()
+                if self._broken or self._disposed: break
 
-            # Wait until the global release is signaled or a failure occurs.
-            remaining_time = None
-            if self.timeout is not None:
-                elapsed = time.monotonic() - self._start_time
-                remaining_time = max(0, self.timeout - elapsed)
+            with self._lock:
+                if self._controller and not self._execution_completed_notified and not (self._broken or self._disposed):
+                    self._execution_completed_notified = True
+                    self._controller.notify(self.id, "EXECUTION_COMPLETED")
 
-            was_released = self._condition.wait_for(
-                lambda: self._released or self._disposed or self._broken,
-                timeout=remaining_time
-            )
+            self._internal_threshold_barrier.wait()  # Wait for all threads to complete the current task
 
-            # --- CRITICAL SECTION FOR RACE-CONDITION-SAFE REUSABILITY ---
-            # Capture the "broken" state AT THIS MOMENT, before any reset logic runs.
-            is_broken_on_exit = self._broken
+        # After all tasks are done, wait for a manual release if configured.
+        if self.manual_release:
+            self._manual_release_gate.wait()
+        else:
+            self._released = True
 
-            # If the wait ended due to a timeout, break the barrier for everyone.
-            if not was_released and not self.disposed:
-                self._broken = True
-                self._released = True
-                self._condition.notify_all()
-                if self.raise_on_timeout:
-                    raise TimeoutError("MultiConductor wait timed out.")
+    def _execute_callback(self, group: Group, task_index: int):
+        """Executes the shared callback, ensuring it runs only once per task."""
+        with self._lock:
+            # Check if the callback for this specific task has already been run.
+            if not self._callback_executed_flags[group.name][task_index]:
+                self._callback_executed_flags[group.name][task_index] = True
+                try:
+                    self._callback()
+                except Exception as e:
+                    # Log any errors in the callback via the controller's logger.
+                    if self._controller and hasattr(self._controller, '_logger'):
+                        self._controller._logger.error(f"Error in MultiConductor callback: {e}", exc_info=True)
 
-            # This thread is now leaving the wait block.
-            self._total_waiting_threads -= 1
+    def _execute_operation(self, task: Callable, group: Group, task_index: int):
+        """Executes a single task and records its outcome in the correct group."""
+        try:
+            result = task()
+            # Store the successful result.
+            self._set_result(result, group, task_index)
+        except Exception as e:
+            # Store the exception.
+            self._set_exception(e, group, task_index)
 
-            # In reusable mode, reset only when the VERY LAST thread from ALL groups has exited.
-            if self.reusable and self._total_waiting_threads == 0 and self._released:
-                self.reset()
+    def _set_result(self, result: Any, group: Group, task_index: int):
+        """Stores a successful task result in the group's outcomes."""
+        outcome = Outcome()
+        outcome.set_result(result)
+        if self._multiple_outcomes_per_task:
+            # Append the new outcome if multiple are allowed.
+            group.outcomes[task_index].append(outcome)
+        else:
+            # Otherwise, overwrite the existing outcome for that task.
+            group.outcomes[task_index] = outcome
 
-            # The final return value depends on the captured "broken" state to avoid race conditions.
-            return was_released and not self.disposed and not is_broken_on_exit
+    def _set_exception(self, e: Exception, group: Group, task_index: int):
+        """Stores a task exception in the group's outcomes."""
+        outcome = Outcome()
+        outcome.set_exception(e)
+        if self._multiple_outcomes_per_task:
+            group.outcomes[task_index].append(outcome)
+        else:
+            group.outcomes[task_index] = outcome
 
+    # ============================================================
+    #  Lifecycle & Properties - Adapted for Groups
+    # ============================================================
     def reset(self):
-        """Resets the conductor and all its groups for another cycle.
+        """Resets the conductor and all its groups for another cycle."""
+        if self._disposed: raise RuntimeError("Cannot reset a disposed MultiConductor.")
+        if not self.reusable: return
 
-        This method is for internal use by the `reusable` mode logic.
-        """
-        self._released = False
-        self._broken = False
-        self._start_time = None
-        # Cascade the reset to all contained groups.
-        for group in self.groups:
-            group.reset()
+        with self._lock:
+            # Cascade the reset call to each individual group.
+            for group in self.groups:
+                group.reset()
+            # Re-link the main outcomes dictionary after groups are reset.
+            self.outcomes = ConcurrentDict({g.name: g.outcomes for g in self.groups})
+
+            # Reset all state flags and primitives to their initial state.
+            self._released = False
+            self._broken = False
+            self._barrier_passed_notified = False
+            self._execution_started_notified = False
+            self._execution_completed_notified = False
+            self._callback_executed_flags = {g.name: [False] * len(g.tasks) for g in self.groups if self._callback}
+
+            if self._clock_barrier: self._clock_barrier.reset()
+            if self._signal_barrier: self._signal_barrier.reset()
+            self._internal_threshold_barrier.reset()
+            if self._manual_release_gate: self._manual_release_gate.clear()
+            self._dynaphore.set_permits(self._threshold)
+
+            if self._controller: self._controller.notify(self.id, "RESET")
+
+    def dispose(self):
+        """Fully disposes the conductor and cascades the disposal to all groups."""
+        if self._disposed: return
+        with self._lock:
+            self._disposed = True
+            if self._controller:
+                self._controller.notify(self.id, "DISPOSED")
+                self._controller = None
+
+            # Cascade the dispose call to each group.
+            for group in self.groups:
+                group.dispose()
+            self.groups.clear()
+            self.outcomes.clear()
+
+            # Dispose all internal synchronization primitives.
+            if self._clock_barrier: self._clock_barrier.dispose()
+            if self._signal_barrier: self._signal_barrier.dispose()
+            if self._internal_threshold_barrier: self._internal_threshold_barrier.dispose()
+            if self._dynaphore: self._dynaphore.dispose()
+            if self._manual_release_gate: self._manual_release_gate.set()
+
+            self._released = True
+            self._broken = True
+
+    def get_all_outcomes(self, as_concurrent_dict: bool = True) -> Union[Dict, ConcurrentDict]:
+        """Returns all outcomes from all groups, keyed by group name."""
+        return self.outcomes if as_concurrent_dict else dict(self.outcomes)
+
+    @property
+    def results(self) -> List[Any]:
+        """Returns a flat list of all successful results from all tasks in all groups."""
+        if self._disposed: return []
+        # List comprehension to gather results from every group.
+        return [res for group in self.groups for res in group.results]
+
+    @property
+    def exceptions(self) -> List[Exception]:
+        """Returns a flat list of all exceptions from all tasks in all groups."""
+        if self._disposed: return []
+        # List comprehension to gather exceptions from every group.
+        return [exc for group in self.groups for exc in group.exceptions]
+
+    def is_spent(self) -> bool:
+        """Checks if the conductor has completed its cycle and is not reusable."""
+        return self._released and not self.reusable
+
+    # --- Unchanged methods from Conductor ---
+
+    def release(self):
+        """Manually releases the conductor when `manual_release` is True."""
+        with self._lock:
+            if self._disposed or not self.manual_release or self._released: return
+            self._released = True
+            if self._manual_release_gate: self._manual_release_gate.set()
+            if self._controller: self._controller.notify(self.id, "MANUALLY_RELEASED")
+
+    def notify_all_override(self):
+        """Forcibly unblocks all waiting threads and breaks the conductor."""
+        with self._lock:
+            if self._disposed or self._released: return
+            self._broken = True
+            self._released = True
+            if self._main_barrier:
+                try:
+                    if hasattr(self._main_barrier, "notify_all_override"):
+                        self._main_barrier.notify_all_override()
+                    else:
+                        self._main_barrier.release()
+                except Exception:
+                    pass
+            if self._dynaphore: self._dynaphore.release_all()
+            if self._manual_release_gate: self._manual_release_gate.set()
+            if self._controller and not self._barrier_passed_notified:
+                self._barrier_passed_notified = True
+                self._controller.notify(self.id, "BARRIER_BROKEN")
+
+    @property
+    def id(self) -> str:
+        """The unique identifier for this MultiConductor instance."""
+        return self._id
+
+    def _get_object_details(self) -> Dict[str, Any]:
+        """Provides metadata for SignalController integration, exposing commands."""
+        return {
+            'name': 'multiconductor',
+            'commands': {
+                'dispose': self.dispose, 'reset': self.reset, 'release': self.release,
+                'notify_all_override': self.notify_all_override, 'is_spent': self.is_spent,
+            }
+        }

@@ -148,6 +148,37 @@ class Conductor(IDisposable):
             except Exception:
                 pass  # soft failure; registration is optional
 
+    def dispose(self):
+        """
+        Cleanly disposes the Conductor instance.
+        This method wakes all internal barriers and gates, clears internal data structures,
+        and notifies the associated SignalController (if any) of the disposal.
+        It makes the Conductor unusable after calling.
+        """
+        if self._disposed:
+            return
+        with self._lock:
+            self._disposed = True
+            if self._controller:
+                self._controller.notify(self.id, "DISPOSED")
+                self._controller = None # Dereference the controller
+
+            # Dispose of all internal threading primitives
+            if self._clock_barrier: self._clock_barrier.dispose()
+            if self._signal_barrier: self._signal_barrier.dispose()
+            if self._internal_threshold_barrier: self._internal_threshold_barrier.dispose()
+            if self._dynaphore: self._dynaphore.dispose()
+            if self._manual_release_gate: self._manual_release_gate.set() # Set the event to unblock waiters
+
+            # Dispose of all outcome objects and clear the outcomes dictionary
+            for v in self.outcomes.values():
+                outcomes = v if self._multiple_outcomes_per_task else [v]
+                for o in outcomes: o.dispose()
+            self.outcomes.clear()
+
+            self._released = True # Mark as released
+            self._broken = True # Mark as broken to prevent further operations
+
     # ============================================================
     #  Controller Integration – Contract Exposure
     # ============================================================
@@ -181,6 +212,7 @@ class Conductor(IDisposable):
     # ============================================================
     #  Public Lifecycle / Entry Points
     # ============================================================
+
     def start(self, timeout: float = None) -> None:
         """
         Blocks the calling thread until the defined threshold of participants is met,
@@ -223,37 +255,6 @@ class Conductor(IDisposable):
             if self._raise_on_timeout and isinstance(e, threading.BrokenBarrierError):
                 raise TimeoutError("Conductor wait timed out.") from e
             self.notify_all_override() # Forcibly unblock if an unexpected exception occurs.
-
-    def dispose(self):
-        """
-        Cleanly disposes the Conductor instance.
-        This method wakes all internal barriers and gates, clears internal data structures,
-        and notifies the associated SignalController (if any) of the disposal.
-        It makes the Conductor unusable after calling.
-        """
-        if self._disposed:
-            return
-        with self._lock:
-            self._disposed = True
-            if self._controller:
-                self._controller.notify(self.id, "DISPOSED")
-                self._controller = None # Dereference the controller
-
-            # Dispose of all internal threading primitives
-            if self._clock_barrier: self._clock_barrier.dispose()
-            if self._signal_barrier: self._signal_barrier.dispose()
-            if self._internal_threshold_barrier: self._internal_threshold_barrier.dispose()
-            if self._dynaphore: self._dynaphore.dispose()
-            if self._manual_release_gate: self._manual_release_gate.set() # Set the event to unblock waiters
-
-            # Dispose of all outcome objects and clear the outcomes dictionary
-            for v in self.outcomes.values():
-                outcomes = v if self._multiple_outcomes_per_task else [v]
-                for o in outcomes: o.dispose()
-            self.outcomes.clear()
-
-            self._released = True # Mark as released
-            self._broken = True # Mark as broken to prevent further operations
 
     def reset(self):
         """
@@ -365,7 +366,10 @@ class Conductor(IDisposable):
                 if self._broken or self._disposed:
                     break
                 self._execute_operation(task, index) # Execute a single task
-                self._internal_threshold_barrier.wait() # Wait for all threads to complete the current task
+                try:
+                    self._internal_threshold_barrier.wait()
+                except threading.BrokenBarrierError:
+                    pass  # D
 
                 if self._callback:
                     with self._lock:
@@ -386,6 +390,7 @@ class Conductor(IDisposable):
                 if self._controller and not self._execution_completed_notified and not (self._broken or self._disposed):
                     self._execution_completed_notified = True
                     self._controller.notify(self.id, "EXECUTION_COMPLETED")
+            self._internal_threshold_barrier.wait()  # Wait for all threads to complete the current task
 
         # Wait on manual release gate if manual_release is enabled, otherwise mark as released
         if self.manual_release:
@@ -470,6 +475,25 @@ class Conductor(IDisposable):
                     except Exception:
                         pass # Ignore exceptions during result retrieval if already marked as no exception
         return successful
+
+    def get_outcomes(self, as_concurrent_dict: bool = True) -> Union[Dict, ConcurrentDict]:
+        """
+        Returns the collected outcomes of all executed tasks.
+
+        Args:
+            as_concurrent_dict (bool): If True (default), returns the outcomes as a ConcurrentDict.
+                                       If False, returns the outcomes as a standard Python dictionary.
+
+        Returns:
+            Union[Dict, ConcurrentDict]: A dictionary containing the outcomes, where keys are task indices
+                                         and values are either single Outcome objects or ConcurrentLists of Outcomes.
+        """
+        if as_concurrent_dict:
+            return self.outcomes
+        else:
+            # Convert ConcurrentDict to a regular dict for standard dictionary behavior
+            return dict(self.outcomes)
+
 
     @property
     def exceptions(self) -> List[Exception]:
