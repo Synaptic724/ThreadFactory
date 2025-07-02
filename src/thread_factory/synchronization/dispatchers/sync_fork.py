@@ -4,7 +4,6 @@ from typing import Callable, List, Optional, Tuple
 import inspect
 import ulid
 from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.synchronization.coordinators.scout import Scout
 
 # --------------------------------------------------------------------------- #
 #                               Support Structs                               #
@@ -116,7 +115,7 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
 
         self._timeout_duration = timeout_duration
         self._timed_out = False  # Flag set by Scout if timeout occurs
-        self._scout: Optional[Scout] = None  # Scout instance for barrier timeout
+        self._scout: Optional['Scout'] = None  # Scout instance for barrier timeout
 
         self._detect_number_of_routes()
 
@@ -292,6 +291,7 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
             • If all forks are already closed / at capacity.
             • If the barrier times out before all slots are claimed.
         """
+        from thread_factory.synchronization.coordinators.scout import Scout
         if self._disposed:
             raise RuntimeError("Cannot use a disposed SyncFork.")
 

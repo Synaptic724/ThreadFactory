@@ -1,4 +1,6 @@
 from __future__ import annotations
+from thread_factory.synchronization.dispatchers.fork import Fork
+from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
 import threading, ulid
 from typing import Optional, Callable, List, Union, Any, Dict
 from thread_factory.utils.interfaces.disposable import IDisposable
