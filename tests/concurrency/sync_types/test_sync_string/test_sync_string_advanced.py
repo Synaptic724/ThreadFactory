@@ -502,53 +502,6 @@ class TestSyncStringExtended(unittest.TestCase):
         self.assertEqual(s.get(), "abc")
         self.assertEqual(new_s, "abcabcabc")
 
-    def test_init_safe_protection_effectiveness(self):
-        # This is hard to "prove" with a simple assertion, but we can try to
-        # trigger contention and ensure no errors/race conditions occur
-        # that would lead to uninitialized state.
-        results = []
-
-        def create_and_check():
-            try:
-                s = SyncString("initial_value", init_safe=True)
-                results.append(s.get())
-            except Exception as e:
-                results.append(f"Error: {e}")
-
-        threads = [threading.Thread(target=create_and_check) for _ in range(100)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        self.assertEqual(len(results), 100)
-        self.assertTrue(all(val == "initial_value" for val in results))
-        self.assertFalse(any("Error:" in val for val in results))
-
-    def test_init_not_safe_behavior_no_central_lock(self):
-        # This test ensures that when init_safe=False, the central lock is indeed skipped.
-        # It's hard to directly test a lock NOT being used, but we can verify performance
-        # or the absence of the central lock's influence if it were to somehow fail.
-        # Practically, just confirming it initializes correctly is enough for init_safe=False.
-        results = []
-
-        def create_and_check():
-            try:
-                s = SyncString("fast_init", init_safe=False)
-                results.append(s.get())
-            except Exception as e:
-                results.append(f"Error: {e}")
-
-        threads = [threading.Thread(target=create_and_check) for _ in range(100)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        self.assertEqual(len(results), 100)
-        self.assertTrue(all(val == "fast_init" for val in results))
-        self.assertFalse(any("Error:" in val for val in results))
-
     def test_complex_chained_operations_thread_safety(self):
         s = SyncString("  aBcDeFgH  ")
 

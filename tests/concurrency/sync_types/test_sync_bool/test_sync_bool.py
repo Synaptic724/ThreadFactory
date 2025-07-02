@@ -281,39 +281,6 @@ class TestSyncBool(unittest.TestCase):
         b.set("")
         self.assertFalse(b.get())
 
-    def test_init_safe_concurrency(self):
-        num_threads = 20
-        num_instances_per_thread = 5
-        instances = []
-        lock = threading.Lock() # For protecting list append
-
-        def create_syncbool():
-            sb = SyncBool(initial=True, init_safe=True)
-            with lock:
-                instances.append(sb)
-
-        _spawn_threads(create_syncbool, num_threads=num_threads, iterations_per_thread=num_instances_per_thread)
-        self.assertEqual(len(instances), num_threads * num_instances_per_thread)
-        for sb in instances:
-            self.assertTrue(sb.get())
-            self.assertIsInstance(sb, SyncBool)
-
-    def test_init_unsafe_concurrency(self):
-        num_threads = 20
-        num_instances_per_thread = 5
-        instances = []
-        lock = threading.Lock()
-
-        def create_syncbool_unsafe():
-            sb = SyncBool(initial=False, init_safe=False)
-            with lock:
-                instances.append(sb)
-
-        _spawn_threads(create_syncbool_unsafe, num_threads=num_threads, iterations_per_thread=num_instances_per_thread)
-        self.assertEqual(len(instances), num_threads * num_instances_per_thread)
-        for sb in instances:
-            self.assertFalse(sb.get())
-            self.assertIsInstance(sb, SyncBool)
 
     # 2. Arithmetic Operations (as numeric)
     def test_add_with_various_types(self):

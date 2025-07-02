@@ -580,35 +580,6 @@ class TestSyncFloatComprehensive(unittest.TestCase): # Renamed for clarity
         self.assertEqual(len(results), 2 * num_ops_per_thread)
         self.assertTrue(all(r == 15.0 for r in results))
 
-    def test_concurrent_init_safe(self):
-        num_threads = 10
-        num_instances_per_thread = 10
-        expected_total_instances = num_threads * num_instances_per_thread
-        instances = []
-        instances_lock = threading.Lock()
-        def create_instance_worker():
-            with instances_lock:
-                instances.append(SyncFloat(1.0, init_safe=True))
-        _spawn_threads(create_instance_worker, num_threads=num_threads, iterations_per_thread=num_instances_per_thread)
-        self.assertEqual(len(instances), expected_total_instances)
-        for inst in instances:
-            self.assertEqual(inst.get(), 1.0)
-            self.assertIsInstance(inst, SyncFloat)
-
-    def test_concurrent_init_unsafe(self):
-        num_threads = 10
-        num_instances_per_thread = 10
-        expected_total_instances = num_threads * num_instances_per_thread
-        instances = []
-        instances_lock = threading.Lock()
-        def create_instance_unsafe_worker():
-            with instances_lock:
-                instances.append(SyncFloat(1.0, init_safe=False))
-        _spawn_threads(create_instance_unsafe_worker, num_threads=num_threads, iterations_per_thread=num_instances_per_thread)
-        self.assertEqual(len(instances), expected_total_instances)
-        for inst in instances:
-            self.assertEqual(inst.get(), 1.0)
-            self.assertIsInstance(inst, SyncFloat)
 
     def test_reentrant_lock_within_instance(self):
         f = SyncFloat(5.0)

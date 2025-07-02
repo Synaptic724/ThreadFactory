@@ -19,8 +19,8 @@ R = TypeVar("R")
 
 class SyncRef(ISync, Generic[T]):
     """
-    SyncRef(obj, *, init_safe=True)
-    ===============================
+    SyncRef(obj)
+    ============
 
     A **thread-safe mutable reference** to *any* Python object – a list, dict,
     user-defined class, function, you name it.  Think of it as “`SyncAny`”.
@@ -45,17 +45,6 @@ class SyncRef(ISync, Generic[T]):
     # compare-and-set (CAS) – swap only if identical (identity, not ==)
     cart.cas(snapshot, {"items": [], "total": 0.0})
     ```
-
-    ────────────────────────────────────────────────────────────────
-    Goodies added in this version
-    ────────────────────────────────────────────────────────────────
-    * **`swap(new)`**    → replace value, *return old* (atomic)
-    * **`modify(fn)`**  → `new = fn(old)` then *store & return new* (functional style)
-    * **`transform(fn)` / `map(fn)`**  → read-only helpers
-    * **`__enter__/__exit__`**   so you can simply `with ref as obj:`
-    * **`snapshot` property**   alias for `get()`
-    * **rich docstrings & inline comments**
-
     Thread-safety strategy
     ----------------------
     * Every public API that accesses or mutates the payload grabs
@@ -70,20 +59,18 @@ class SyncRef(ISync, Generic[T]):
     – you keep full control over what executes under the lock.
     """
 
-    # ────────────────────────────────────────────────────────────
-    # construction
-    # ────────────────────────────────────────────────────────────
-    _central_lock = threading.Lock()
     __slots__ = ("_value", "_lock")
 
-    def __init__(self, obj: T, *, init_safe: bool = True):
-        if init_safe:
-            with SyncRef._central_lock:
-                self._value = obj
-                self._lock = threading.RLock()
-        else:
-            self._value = obj
-            self._lock = threading.RLock()
+    def __init__(self, obj: T):
+        """
+        Initialize a thread-safe reference to any object.
+
+        Args:
+            obj (T): The object to wrap in a thread-safe reference.
+        """
+        self._value = obj
+        self._lock = threading.RLock()
+
 
     # ────────────────────────────────────────────────────────────
     # ISync plumbing

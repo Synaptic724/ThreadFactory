@@ -28,14 +28,6 @@ class SyncFloat(ISync):
     - Reverse operation support (`__radd__`, `__rsub__`, etc.)
     - CPython compatibility with `as_integer_ratio`, `hex`, and `fromhex`
 
-    🧷 Central Lock Initialization
-    -----------------------------
-    SyncFloat offers an optional `init_safe` parameter for thread-safe construction.
-
-    - If `init_safe=True` (default), a global lock (`_central_lock`) ensures
-      multiple threads can initialize SyncFloat instances safely without race conditions.
-    - This is **strongly recommended** when creating many SyncFloat instances concurrently.
-
     🧠 Deadlock Prevention
     ----------------------
     For binary operations involving multiple Sync types, locks are always acquired in order
@@ -58,26 +50,18 @@ class SyncFloat(ISync):
         e = SyncFloat.safe_pow(a, d, 2)  # Apply ternary pow safely (custom)
     """
 
-    _central_lock = threading.Lock()
     __slots__ = ["_value", "_lock"]
 
-    def __init__(self, initial: float = 0.0, init_safe: bool = True):
+    def __init__(self, initial: float = 0.0):
         """
         Initialize the SyncFloat with an initial floating-point value.
 
         Parameters:
             initial (float): The float value to store.
-            init_safe (bool): If True (default), uses a global lock to ensure thread-safe
-                              initialization. If False, skips locking (not recommended for
-                              concurrent environments).
         """
-        if init_safe:
-            with SyncFloat._central_lock:
-                self._value = float(initial)
-                self._lock = threading.RLock()
-        else:
-            self._value = float(initial)
-            self._lock = threading.RLock()
+        self._value = float(initial)
+        self._lock = threading.RLock()
+
 
     # ──────────────────────────────────────────────────────────────────
     # Core helpers

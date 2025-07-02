@@ -24,15 +24,6 @@ class SyncInt(ISync):
     - Type conversion (`int()`, `float()`, `str()`)
     - Manual and atomic value access via `.get()` and `.set()`
     - Safe thread-aware binary operations with locking on both operands
-    - Optional **init-safe mode** using a centralized lock
-
-    🧷 Central Lock Initialization
-    -----------------------------
-    The `SyncInt` class offers an optional `init_safe` parameter for thread-safe construction.
-
-    - If `init_safe=True` (default), a global lock (`_central_lock`) ensures
-      multiple threads can initialize `SyncInt` instances safely without race conditions.
-    - This is **strongly recommended** when creating many SyncInt instances concurrently.
 
     ⚡ Power Operation Support
     --------------------------
@@ -73,26 +64,18 @@ class SyncInt(ISync):
         pow(3, SyncInt(3), 5)                     # ❌ Will raise TypeError
     """
 
-    _central_lock = threading.Lock()  # Used for init safety
     __slots__ = ["_value", "_lock"]
 
-    def __init__(self, initial: int = 0, init_safe: bool = True):
+    def __init__(self, initial: int = 0):
         """
         Initialize the SyncInt with an initial integer value.
 
         Parameters:
             initial (int): The integer value to store.
-            init_safe (bool): If True (default), use a central lock to guarantee
-                              thread-safe initialization. If False, skip central lock
-                              and initialize independently (not recommended for concurrent use).
         """
-        if init_safe:
-            with SyncInt._central_lock:
-                self._value = int(initial)
-                self._lock = threading.RLock()
-        else:
-            self._value = int(initial)
-            self._lock = threading.RLock()
+        self._value = int(initial)
+        self._lock = threading.RLock()
+
 
     def _unwrap_other(self, other):
         """

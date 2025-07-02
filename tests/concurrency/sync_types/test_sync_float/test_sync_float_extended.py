@@ -415,45 +415,6 @@ class TestSyncFloatExtended(unittest.TestCase):
         self.assertEqual(f * 2.0, 11.0)
         self.assertEqual(2.0 * f, 11.0)
 
-    # ────────────────────────────────────────────────────────────────
-    # New: Concurrent Initialization
-    # ────────────────────────────────────────────────────────────────
-    def test_concurrent_init_safe(self):
-        num_threads = 10
-        num_instances_per_thread = 10  # Each thread creates 10 instances
-        expected_total_instances = num_threads * num_instances_per_thread
-        instances = []
-        instances_lock = threading.Lock()  # Protect list append
-
-        def create_instance_worker():
-            with instances_lock:  # Ensure thread-safe append to list
-                instances.append(SyncFloat(1.0, init_safe=True))
-
-        _spawn_threads(create_instance_worker, num_threads=num_threads, iterations_per_thread=num_instances_per_thread)
-
-        self.assertEqual(len(instances), expected_total_instances)
-        for inst in instances:
-            self.assertEqual(inst.get(), 1.0)
-            self.assertIsInstance(inst, SyncFloat)
-
-    def test_concurrent_init_unsafe(self):
-        num_threads = 10
-        num_instances_per_thread = 10
-        expected_total_instances = num_threads * num_instances_per_thread
-        instances = []
-        instances_lock = threading.Lock()  # Protect list append
-
-        def create_instance_unsafe_worker():
-            with instances_lock:  # Ensure thread-safe append to list
-                instances.append(SyncFloat(1.0, init_safe=False))
-
-        _spawn_threads(create_instance_unsafe_worker, num_threads=num_threads,
-                       iterations_per_thread=num_instances_per_thread)
-
-        self.assertEqual(len(instances), expected_total_instances)
-        for inst in instances:
-            self.assertEqual(inst.get(), 1.0)
-            self.assertIsInstance(inst, SyncFloat)
 
     # ────────────────────────────────────────────────────────────────
     # New: RLock Re-entrancy

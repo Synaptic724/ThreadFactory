@@ -277,35 +277,6 @@ class TestSyncString(unittest.TestCase):
         # This will now pass every time
         self.assertEqual(len(s.get()), 500)
 
-    def test_concurrent_instantiation_init_safe(self):
-        instances = []
-
-        def create():
-            instances.append(SyncString("test", init_safe=True))
-
-        threads = [threading.Thread(target=create) for _ in range(100)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        self.assertEqual(len(instances), 100)
-        self.assertTrue(all(s.get() == "test" for s in instances))
-
-    def test_concurrent_instantiation_init_not_safe(self):
-        instances = []
-
-        def create():
-            instances.append(SyncString("test", init_safe=False))
-
-        threads = [threading.Thread(target=create) for _ in range(100)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        self.assertEqual(len(instances), 100)
-        self.assertTrue(all(s.get() == "test" for s in instances))
 
     def test_getitem_slice(self):
         s = SyncString("abcdefgh")
