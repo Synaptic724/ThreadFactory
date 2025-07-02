@@ -2,15 +2,7 @@ from __future__ import annotations
 import threading
 import copy
 from contextlib import contextmanager
-from typing import (
-    Any,
-    Callable,
-    Generic,
-    Iterator,
-    Optional,
-    TypeVar,
-)
-
+from typing import Any, Callable, Generic, Iterator, Optional, TypeVar
 from thread_factory.utils.interfaces.isync import ISync
 
 T = TypeVar("T")
@@ -22,41 +14,28 @@ class SyncRef(ISync, Generic[T]):
     SyncRef(obj)
     ============
 
-    A **thread-safe mutable reference** to *any* Python object – a list, dict,
-    user-defined class, function, you name it.  Think of it as “`SyncAny`”.
+    A thread-safe mutable reference to any Python object.
 
-    ────────────────────────────────────────────────────────────────
-    Quick-start
-    ────────────────────────────────────────────────────────────────
-    ```python
-    cart = SyncRef({"items": [], "total": 0.0})
+    This class allows atomic read/write access, in-place mutation,
+    and transactional control over the wrapped value. It supports
+    compare-and-set, lambda-based transformation, and deep copying
+    for safe inter-thread communication.
 
-    # atomic one-liner mutation
-    cart.update(lambda c: c["items"].append(("widget", 3.99)))
+    Common use cases include:
 
-    # multi-line transaction
-    with cart.locked() as c:
-        c["total"] += 3.99
-        c["discount"] = 0.1
+    - Shared mutable state across threads
+    - Agent memory cells
+    - Snapshot-style history
+    - Dynamic live references (`SyncRef[List[Task]]`, etc.)
 
-    # read snapshot (no lock afterwards)
-    snapshot = cart.get()
-
-    # compare-and-set (CAS) – swap only if identical (identity, not ==)
-    cart.cas(snapshot, {"items": [], "total": 0.0})
-    ```
-    Thread-safety strategy
-    ----------------------
-    * Every public API that accesses or mutates the payload grabs
-      `_lock` (a `threading.RLock`).
-    * When interacting with another `Sync*` instance we can use
-      `ISync._acquire_two()` for deterministic lock ordering (not strictly
-      needed here but provided for external composition).
-    * Pickle/deep-copy only serialises the payload – a fresh lock is created
-      on load so the object remains shareable between threads.
-
-    NOTE: Attribute forwarding (`__getattr__`) is intentionally **not** added
-    – you keep full control over what executes under the lock.
+    Examples:
+    ---------
+    >>> ref = SyncRef({"key": 42})
+    >>> ref.update(lambda d: d.update({"key": 99}))
+    >>> with ref.locked() as obj:
+    ...     obj["other"] = 100
+    >>> snapshot = ref.get()
+    >>> ref.cas(snapshot, {"key": 0})
     """
 
     __slots__ = ("_value", "_lock")
@@ -65,61 +44,89 @@ class SyncRef(ISync, Generic[T]):
         """
         Initialize a thread-safe reference to any object.
 
-        Args:
-            obj (T): The object to wrap in a thread-safe reference.
+        Parameters:
+            obj (T): The object to wrap.
         """
         self._value = obj
         self._lock = threading.RLock()
 
-
-    # ────────────────────────────────────────────────────────────
-    # ISync plumbing
-    # ────────────────────────────────────────────────────────────
     @classmethod
     def _coerce(cls, val):
+        """Internal ISync helper – no coercion is needed for SyncRef."""
         return val
 
     def _unwrap_other(self, other):
+        """Unwrap a Sync wrapper to access its raw value."""
         return other.get() if ISync._is_sync(other) else other
 
-    # ────────────────────────────────────────────────────────────
-    # core API
-    # ────────────────────────────────────────────────────────────
-    def get(self) -> T:                                       # snapshot
+    def get(self) -> T:
+        """
+        Return a snapshot of the current value.
+
+        Returns:
+            T: A thread-safe read of the internal value.
+        """
         with self._lock:
             return self._value
 
-    snapshot = property(get)                                  # read-only alias
+    snapshot = property(get)
+    """Alias for `get()` – read-only snapshot of the internal value."""
 
-    def set(self, obj: T) -> None:                            # wholesale replace
+    def set(self, obj: T) -> None:
+        """
+        Replace the internal value with a new object.
+
+        Parameters:
+            obj (T): The new value to store.
+        """
         with self._lock:
             self._value = obj
 
-    # -------- atomic single-lambda mutation --------------------
     def update(self, mutator: Callable[[T], Any]) -> T:
         """
-        *Mutate in-place* inside the lock, returning the mutated object.
+        Atomically mutate the internal value in place.
 
-        The callback **must not** call back into this `SyncRef` (no nested locks).
+        The provided function receives the current value and can mutate it.
+        Avoid reentrant calls to the same SyncRef within this function.
+
+        Parameters:
+            mutator (Callable[[T], Any]): A function that modifies the internal value.
+
+        Returns:
+            T: The mutated value (same reference).
         """
         with self._lock:
             mutator(self._value)
             return self._value
 
-    # -------- functional replace helper -----------------------
     def modify(self, fn: Callable[[T], R]) -> R:
         """
-        Functional update: `new = fn(old)` – store **and** return *new*.
+        Apply a functional update: store and return the result.
+
+        Equivalent to: new_val = fn(old_val); set(new_val)
+
+        Parameters:
+            fn (Callable[[T], R]): A transformer function.
+
+        Returns:
+            R: The new value.
         """
         with self._lock:
             new_val = fn(self._value)
             self._value = new_val
             return new_val
 
-    # -------- compare-and-set ---------------------------------
     def cas(self, expected: T, new: T) -> bool:
         """
-        Compare-and-set using **identity** (is).  Returns True on success.
+        Compare-and-set: if current value is `expected` (by identity),
+        replace it with `new`.
+
+        Parameters:
+            expected (T): Expected object reference (not equality).
+            new (T): Replacement if matched.
+
+        Returns:
+            bool: True if replacement occurred.
         """
         with self._lock:
             if self._value is expected:
@@ -127,72 +134,107 @@ class SyncRef(ISync, Generic[T]):
                 return True
             return False
 
-    # -------- swap helper -------------------------------------
     def swap(self, new: T) -> T:
         """
-        Atomically replace the value with *new* and **return the old value**.
+        Replace the value and return the old one.
+
+        Parameters:
+            new (T): New value to store.
+
+        Returns:
+            T: Previous stored value.
         """
         with self._lock:
             old = self._value
             self._value = new
             return old
 
-    # -------- read-only transforms ----------------------------
     def transform(self, fn: Callable[[T], R]) -> R:
         """
-        Apply *fn* to the current value **under the lock** and return the result
-        without changing the stored object.
+        Read-only application of a function to the stored value.
+
+        Parameters:
+            fn (Callable[[T], R]): A transformation function.
+
+        Returns:
+            R: The result of applying the function.
         """
         with self._lock:
             return fn(self._value)
 
-    map = transform                                            # synonym
+    map = transform
+    """Alias for `transform()` – supports functional pipelines."""
 
-    # -------- multi-line transaction --------------------------
     @contextmanager
     def locked(self) -> Iterator[T]:
         """
-        ```python
-        with ref.locked() as obj:
-            # obj is the *live* payload; lock held for the entire block
-            ...
-        ```
+        Context manager that locks the object and yields the live reference.
+
+        Example:
+            >>> with ref.locked() as obj:
+            ...     obj["key"] = 1
+
+        Yields:
+            T: The internal object (locked during use).
         """
         with self._lock:
             yield self._value
 
-    # Convenient “with ref as obj:” syntax
-    def __enter__(self):
+    def __enter__(self) -> T:
+        """
+        Enter a manual locking context using `with ref as obj:`.
+
+        Returns:
+            T: The internal value (locked).
+        """
         self._lock.acquire()
         return self._value
 
-    def __exit__(self, exc_type, exc, tb):
-        self._lock.release()
-        return False  # propagate exceptions
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        """
+        Exit the lock context. Propagates exceptions.
 
-    # ────────────────────────────────────────────────────────────
-    # represent / compare / hash
-    # ────────────────────────────────────────────────────────────
-    def __repr__(self):
+        Returns:
+            bool: False – do not suppress exceptions.
+        """
+        self._lock.release()
+        return False
+
+    def __repr__(self) -> str:
+        """String representation of the SyncRef."""
         return f"SyncRef({self.get()!r})"
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
+        """Equality comparison based on stored value."""
         if ISync._is_sync(other):
             return self.get() == other.get()
         return self.get() == other
 
-    def __hash__(self):
+    def __hash__(self) -> int:
+        """
+        Hash the contained object if possible.
+        Fallbacks to `id()` if not hashable.
+        """
         try:
             return hash(self.get())
         except TypeError:
             return id(self)
 
-    # ────────────────────────────────────────────────────────────
-    # pickle & deepcopy (same pattern as your other wrappers)
-    # ────────────────────────────────────────────────────────────
-    def __getstate__(self):
+    def __getstate__(self) -> dict:
+        """
+        Return the pickled state.
+
+        Returns:
+            dict: A deep copy of the internal value.
+        """
         return {"_value": copy.deepcopy(self.get())}
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: dict):
+        """
+        Restore from a pickled state. A fresh lock is always created.
+
+        Parameters:
+            state (dict): Pickled state with key '_value'.
+        """
         self._value = state["_value"]
         self._lock = threading.RLock()
