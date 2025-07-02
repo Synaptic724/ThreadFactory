@@ -40,7 +40,7 @@ class Group(IDisposable):
         self.id = str(ulid.ULID())
         self.name = name
         self._multiple_outcomes_per_task = multiple_outcomes_per_task
-        self.tasks: ConcurrentList[Pack] = Pack.normalize_many(tasks) if tasks else ConcurrentList()
+        self.tasks: ConcurrentList[Pack] = Pack._pack_many(tasks) if tasks else ConcurrentList()
         self.outcomes: ConcurrentDict[int, Union[Outcome, ConcurrentList[Outcome]]] = ConcurrentDict()
         self.reset()
 
@@ -61,6 +61,26 @@ class Group(IDisposable):
         self.tasks.clear()
         self._disposed = True
 
+    def __repr__(self):
+        """
+        Return a string representation of the Group.
+        """
+        return f"<Group name={self.name!r} id={self.id} tasks={len(self.tasks)}>"
+
+    def __contains__(self, item: Union[Callable, Pack]) -> bool:
+        """
+        Check if a task is registered in the group.
+        """
+        return Pack._pack(item) in self.tasks
+
+    def __iter__(self):
+        """
+        Allow iteration over the group's tasks.
+        """
+        if self.disposed:
+            return iter([])
+        return iter(self.tasks)
+
     def register(self, task: Union[Callable, Pack]) -> int:
         """
         Register a new task dynamically after init.
@@ -68,7 +88,7 @@ class Group(IDisposable):
         Returns:
             Index of the new task in the group.
         """
-        p = Pack.ensure(task)
+        p = Pack._pack(task)
         if not p:
             raise TypeError(f"Invalid task: {task}")
         index = len(self.tasks)
