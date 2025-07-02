@@ -35,7 +35,8 @@ class MultiConductor(IDisposable):
         "_controller", "_id", "_released", "_broken", "_main_barrier",
         "_lock", "_dynaphore", "_manual_release_gate", "_callback_executed_flags",
         "_barrier_passed_notified", "_execution_started_notified", "_execution_completed_notified",
-        "_clock_barrier", "_signal_barrier", "_internal_threshold_barrier", "outcomes", "_enabled"
+        "_clock_barrier", "_signal_barrier", "_internal_threshold_barrier", "outcomes", "_enabled",
+        "_concurrent", "_parallel"
     ]
     def __init__(
             self,
@@ -46,8 +47,8 @@ class MultiConductor(IDisposable):
             timeout: Optional[float] = None,
             raise_on_timeout: bool = False,
             multiple_outcomes_per_task: bool = False,
-            task_concurrent_execution: bool = False,
-            parallel_sync_execution: bool = False,
+            concurrent_execution: bool = False,
+            parallel_execution: bool = False,
             callback: Optional[Callable[[], None]] = None,
             controller: Optional['SignalController'] = None
     ):
@@ -86,8 +87,8 @@ class MultiConductor(IDisposable):
         if threshold <= 0:
             raise ValueError("Threshold must be a positive integer.")
 
-        self._parallel = task_concurrent_execution
-        self._parallel_sync_execution = parallel_sync_execution
+        self._concurrent = concurrent_execution
+        self._parallel = parallel_execution
         self._threshold = threshold
         self.groups = []
         self.reusable = reusable
@@ -295,12 +296,36 @@ class MultiConductor(IDisposable):
 
             if self._broken or self._disposed: break
 
+    def _concurrent_execution_loop(self):
+        fork = Fork()
+
+        for group in self.groups:
+            for task_index, task in enumerate(group.tasks):
+
+                if self._broken or self._disposed: break
+
+                self._execute_operation(task, group, task_index)
+                self._internal_threshold_barrier.wait()
+
+                if self._callback:
+                    self._execute_callback(group, task_index)
+
+            if self._broken or self._disposed: break
+
+
     def _parallel_execution_loop(self):
-        pass
+        for group in self.groups:
+            for task_index, task in enumerate(group.tasks):
 
+                if self._broken or self._disposed: break
 
-    def _parallel_sync_execution_loop(self):
-        pass
+                self._execute_operation(task, group, task_index)
+                self._internal_threshold_barrier.wait()
+
+                if self._callback:
+                    self._execute_callback(group, task_index)
+
+            if self._broken or self._disposed: break
 
     def _execute_operations(self):
         """Orchestrates the entire task execution sequence across all groups.
@@ -316,7 +341,12 @@ class MultiConductor(IDisposable):
                     self._execution_started_notified = True
                     self._controller.notify(self.id, "EXECUTION_STARTED")
 
-            self._execution_loop()
+            if self._parallel:
+                self._parallel_execution_loop()
+            elif self._concurrent:
+                self._concurrent_execution_loop()
+            else:
+                self._general_execution_loop()
 
             with self._lock:
                 if self._controller and not self._execution_completed_notified and not (self._broken or self._disposed):
