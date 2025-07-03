@@ -94,7 +94,7 @@ class SignalLatch(IDisposable):
         self._id: str = str(ulid.ULID())
         self._cond: TransitCondition = cond or TransitCondition()
         self._open: bool = False
-        self._signal_callback = signal_callback if signal_callback is None else Pack._pack(signal_callback)
+        self._signal_callback = signal_callback if signal_callback is None else Pack.bundle(signal_callback)
         self._lock = threading.RLock()
         self._controller = controller
 

@@ -40,7 +40,18 @@ class Group(IDisposable):
         self.id = str(ulid.ULID())
         self.name = name
         self._multiple_outcomes_per_task = multiple_outcomes_per_task
-        self.tasks: ConcurrentList[Pack] = Pack._pack_many(tasks) if tasks else ConcurrentList()
+
+        if tasks is None:
+            self.tasks: ConcurrentList[Pack] = ConcurrentList()
+        else:
+            packified_result = Pack.bundle(tasks)
+            if isinstance(packified_result, Pack):
+                # If bundle returned a single Pack, put it into a list
+                self.tasks = ConcurrentList([packified_result])
+            else:
+                # If bundle returned a ConcurrentList (for iterables), use it directly
+                self.tasks = packified_result
+
         self.outcomes: ConcurrentDict[int, Union[Outcome, ConcurrentList[Outcome]]] = ConcurrentDict()
         self.reset()
 
@@ -71,7 +82,7 @@ class Group(IDisposable):
         """
         Check if a task is registered in the group.
         """
-        return Pack._pack(item) in self.tasks
+        return Pack.bundle(item) in self.tasks
 
     def __iter__(self):
         """
@@ -88,7 +99,7 @@ class Group(IDisposable):
         Returns:
             Index of the new task in the group.
         """
-        p = Pack._pack(task)
+        p = Pack.bundle(task)
         if not p:
             raise TypeError(f"Invalid task: {task}")
         index = len(self.tasks)
@@ -104,15 +115,6 @@ class Group(IDisposable):
             int: The number of registered Pack-wrapped callables.
         """
         return len(self.tasks)
-
-    def __iter__(self):
-        """
-        Allow iteration over the group's tasks directly.
-
-        Yields:
-            Pack: Each registered task in insertion order.
-        """
-        return iter(self.tasks)
 
     def reset(self):
         """

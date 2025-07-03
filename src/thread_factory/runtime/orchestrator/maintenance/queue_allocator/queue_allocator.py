@@ -1,5 +1,6 @@
-from thread_factory.concurrency import ConcurrentQueue
-from thread_factory.utils import Empty, IDisposable
+from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
+from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utils.exceptions.empty import Empty
 
 
 class QueueAllocator(IDisposable):

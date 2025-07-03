@@ -131,6 +131,13 @@ Simple nanosecond-precision profiler. Used for queue stats, lock contention trac
 
 ---
 
+## ⏱️ Utilities – `thread_factory.utils.coordination.package`
+
+### ⏲️ `Package`
+Thread-safe delegate style wrapper for callables.
+
+---
+
 ## 📦 Queues and Stacks – `thread_factory.concurrency`
 
 ### 🪜 `ConcurrentQueue` / `ConcurrentStack`
@@ -138,17 +145,6 @@ New features:
 - `is_empty()` added for shutdown checks
 - `batch_steal()` support for optimized consumer loops
 - Thread-safe with no-lock peek/guard patterns
-
----
-
-## 🧪 Performance Benchmarks
-
-| Primitive      | Avg Time |
-|----------------|----------|
-| `threading.Lock` | 0.07 µs |
-| `SwitchLock`      | 4.40 µs |
-| `threading.Thread()` startup | 195.8 µs |
-| `SignalCondition.wait()` | ~6.4× slower than bare RLock |
 
 ---
 

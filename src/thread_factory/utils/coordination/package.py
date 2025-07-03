@@ -85,11 +85,14 @@ class Package(IDisposable):
         """
         if self.disposed:
             return
-        self._func = None
-        self._args.clear()
-        self._kwargs.clear()
-        self._signature_cache = None
-        self._disposed = True
+        with self._lock:
+            self._func = None
+            self._args.dispose()
+            self._args = None
+            self._kwargs.dispose()
+            self._kwargs = None
+            self._signature_cache = None
+            self._disposed = True
 
     @property
     def __doc__(self):
@@ -122,40 +125,6 @@ class Package(IDisposable):
 
         return Package(composed_callable)
 
-    # def __call__(self, *extra_args: Any, **extra_kwargs: Any) -> Any:
-    #     """
-    #     Calls the wrapped function with all stored and extra arguments.
-    #
-    #     Args:
-    #         *extra_args: Additional positional arguments.
-    #         **extra_kwargs: Additional keyword arguments.
-    #
-    #     Returns:
-    #         The result of calling the function with combined arguments.
-    #     """
-    #     with self._lock:
-    #         # Combine stored arguments with extra ones passed at the time of call
-    #         all_args = tuple(self._args) + extra_args
-    #         all_kwargs = {**dict(self._kwargs), **extra_kwargs}
-    #
-    #         try:
-    #             return self._func(*all_args, **all_kwargs)
-    #         except TypeError as e:
-    #             if "missing" in str(e) and "positional argument" in str(e):
-    #                 # Inspect the function signature to identify required arguments
-    #                 sig = inspect.signature(self._func.__wrapped__)
-    #                 required = [
-    #                     p for p in sig.parameters.values()
-    #                     if p.default is p.empty and p.kind in (
-    #                         p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD
-    #                     )
-    #                 ]
-    #                 # If missing required arguments, raise a more informative error
-    #                 missing_args_count = len(required) - len(all_args)
-    #                 if missing_args_count > 0:
-    #                     raise TypeError(f"Missing {missing_args_count} required positional arguments")
-    #             raise
-    # ──────────────────────────── Packify Method ─────────────────────────── #
     @staticmethod
     def bundle(
             item: Optional[Union[Callable[..., Any], Package, Iterable[Union[Callable[..., Any], Package]]]]

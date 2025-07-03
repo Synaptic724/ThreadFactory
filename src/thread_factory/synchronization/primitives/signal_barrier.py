@@ -101,7 +101,7 @@ class SignalBarrier(IDisposable):
 
         self._id = str(ulid.ULID())
         self._threshold = threshold
-        self._signal_callback = signal_callback if signal_callback is None else Pack._pack(signal_callback)
+        self._signal_callback = signal_callback if signal_callback is None else Pack.bundle(signal_callback)
         self._reusable = reusable
         self._manual_release = manual_release
 
@@ -112,7 +112,7 @@ class SignalBarrier(IDisposable):
 
         # --- Controller Integration ---
         self._controller = controller
-        self._transit_callback = transit_callback if transit_callback is None else Pack._pack(transit_callback)
+        self._transit_callback = transit_callback if transit_callback is None else Pack.bundle(transit_callback)
 
         if self._controller:
             try:

@@ -89,7 +89,7 @@ class SmartCondition(IDisposable):
         self._callback_registry: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
         # A default callback to be executed if no specific callback is bound for a notified thread.
         self._default_callback: Optional['Package'] = (
-            Pack._pack(default_callback) if default_callback is not None else None
+            Pack.bundle(default_callback) if default_callback is not None else None
         )
 
     def dispose(self) -> None:
@@ -190,7 +190,7 @@ class SmartCondition(IDisposable):
         """
         if fn is None:
             raise TypeError("Callback must have a callable function")
-        self._callback_registry[factory_id] = Pack._pack(fn)
+        self._callback_registry[factory_id] = Pack.bundle(fn)
 
 
     def set_default_callback(self, fn: Union[Callable[..., None], Pack]) -> None:
@@ -204,7 +204,7 @@ class SmartCondition(IDisposable):
         """
         if fn is None:
             raise TypeError("Default callback must have a callable function")
-        self._default_callback = Pack._pack(fn)
+        self._default_callback = Pack.bundle(fn)
 
     def notify_and_call(self, n: int = 1, factory_ids: Optional[Union[str, Iterable[str]]] = None,
                         callback: Optional[Union[Callable[..., None], Pack]] = None,
@@ -274,7 +274,7 @@ class SmartCondition(IDisposable):
             chosen_callback = callback or self._callback_registry.get(w.factory_id) or self._default_callback
             if chosen_callback:
                 # If the chosen callback is a callable, ensure it is packed correctly.
-                chosen_callback = Pack._pack(chosen_callback)
+                chosen_callback = Pack.bundle(chosen_callback)
 
             if awaited_caller:
                 # If awaited_caller is True, store the callback in the Waiter object
@@ -436,7 +436,7 @@ class SmartCondition(IDisposable):
                 # store it in the Waiter object for the awaited thread to execute.
                 cb_to_pass = self._callback_registry.get(w.factory_id) or self._default_callback
                 if cb_to_pass:
-                    w.callback = Pack._pack(cb_to_pass)
+                    w.callback = Pack.bundle(cb_to_pass)
             # In 'notify', if awaited_caller is False, no callback is executed here.
 
             try:
@@ -472,7 +472,7 @@ class SmartCondition(IDisposable):
                 # for the awaited thread to execute.
                 cb_to_pass = self._callback_registry.get(w.factory_id) or self._default_callback
                 if cb_to_pass:
-                    w.callback = Pack._pack(cb_to_pass)
+                    w.callback = Pack.bundle(cb_to_pass)
             else:
                 # If awaited_caller is False, call the callback directly from the notifying thread
                 cb_to_pass = self._callback_registry.get(w.factory_id) or self._default_callback
@@ -545,7 +545,7 @@ class SmartCondition(IDisposable):
                 or self._default_callback
             )
             if chosen_cb:
-                chosen_cb = Pack._pack(chosen_cb)
+                chosen_cb = Pack.bundle(chosen_cb)
             if awaited_caller:
                 if chosen_cb:
                     w.callback = chosen_cb    # executed by waiter after wake
@@ -592,7 +592,7 @@ class SmartCondition(IDisposable):
         # which `self.wait()` then releases and re-acquires.
         with self._lock:
             if predicate:
-                predicate = Pack._pack(predicate)  # Ensure the predicate is a Pack if it isn't already.
+                predicate = Pack.bundle(predicate)  # Ensure the predicate is a Pack if it isn't already.
             endtime = time.time() + timeout if timeout is not None else None
             while True:
                 # First, evaluate the predicate. If it's already true, we can return immediately.

@@ -65,7 +65,7 @@ class TransitCondition(IDisposable):
         self.release: Callable = self._lock.release
         self._waiters: ConcurrentQueue[Waiter] = ConcurrentQueue()
         self._default_callback: Optional['Pack'] = (
-            Pack._pack(default_callback) if default_callback is not None else None
+            Pack.bundle(default_callback) if default_callback is not None else None
         )
 
     def dispose(self) -> None:
@@ -113,7 +113,7 @@ class TransitCondition(IDisposable):
         """
         if not callable(fn):
             raise TypeError("Default callback must be a callable function")
-        self._default_callback = Pack._pack(fn)
+        self._default_callback = Pack.bundle(fn)
 
     def find_waiter_count(self) -> int:
         """
@@ -161,7 +161,7 @@ class TransitCondition(IDisposable):
             while True:
 
                 if predicate:
-                    predicate = Pack._pack(predicate)
+                    predicate = Pack.bundle(predicate)
                 # First, evaluate the predicate. If it's already true, we can return immediately.
                 if predicate():
                     return True  # Predicate satisfied
@@ -244,7 +244,7 @@ class TransitCondition(IDisposable):
         if not self._is_owned():
             raise RuntimeError("cannot notify on un-acquired lock")
         if callback:
-            callback = Pack._pack(callback)
+            callback = Pack.bundle(callback)
         to_notify: List[Waiter] = []
         for w in list(self._waiters):
             if n == 0:
@@ -273,7 +273,7 @@ class TransitCondition(IDisposable):
         if not self._is_owned():
             raise RuntimeError("cannot notify_all on un-acquired lock")
         if callback:
-            callback = Pack._pack(callback)
+            callback = Pack.bundle(callback)
 
         for w in list(self._waiters):
             if self._waiters.remove_item(w):
