@@ -46,17 +46,19 @@ class BypassConductor(IDisposable):
         "_dynaphore", "_threshold_sema", "_outcome_set", "_id"
     ]
 
-    def __init__(self, func: Union[Union[Callable[..., Any], Pack], list[Union[Callable[..., Any], Pack]]],
-                 limit: int = 1, *args, **kwargs):
+    def __init__(self, func: Union[Union[Callable[..., Any], Pack], list[Union[Callable[..., Any], Pack]],
+    ConcurrentList[Union[Callable[..., Any], Pack]]], limit: int = 1):
         super().__init__()
 
         if limit < 0:
             raise ValueError("Limit must be non-negative")
 
-        if isinstance(func, list, ConcurrentList):
+        if isinstance(func, (list, ConcurrentList)):
+            # If func is already a list or ConcurrentList, use _pack_many to handle it
             self._func = Pack._pack_many(func)
         else:
-            self._func = Pack._pack(functools.partial(func, *args, **kwargs))
+            # If it's a single callable, wrap it in a Package
+            self._func = [Pack(func)]
 
         self._id = str(ulid.ULID())
         self._limit = limit
@@ -135,6 +137,11 @@ class BypassConductor(IDisposable):
             for item in range(len(self._func)):
                 self._dynaphore.acquire()
                 try:
+
+                    # Debugging the arguments passed to the function
+                    print(
+                        f"Running stage {item} with args: {self._func[item]._args} and kwargs: {self._func[item]._kwargs}")
+                    # Execute one stage of the pipeline
                     # Execute one stage of the pipeline
                     self._set_result(self._func[item]())
                 except Exception as e:
