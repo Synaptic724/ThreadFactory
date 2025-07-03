@@ -221,20 +221,6 @@ ThreadFactory includes precise **Timing Utilities** for orchestration, diagnosti
 * ⏲️ `AutoResetTimer`: A **self-resetting timer** that automatically expires and restarts, ideal for retry loops, cooldown mechanisms, debounce filters, and heartbeat monitoring.
 * 🕰️ `Stopwatch`: A **high-resolution, nanosecond-accurate profiler** built with `time.perf_counter_ns()` for ultra-low overhead. Use it to precisely measure critical path latency, thread execution time, and pinpoint performance bottlenecks.
 
-### ⚡ Performance Note
-
-| Primitive                | Time (µs)    |
-|--------------------------|--------------|
-| `threading.Lock`         | ~0.07        |
-| `SwitchLock`             | ~4.40        |
-| Thread Spawn (bare)      | ~195.8       |
-| `RLock.acquire/release`  | ~1.96        |
-| `SignalCondition`        | ~12.56       |
-
-- `SignalCondition` is ~6.4× slower than a raw `RLock`, but offers structured wait/notify with internal callback support.
-- `SwitchLock` is an ideal middle-ground for dynamic permits and targeted thread gating.
-- `Dynaphore` sits between a classic semaphore and `SwitchLock` — faster and simpler when IDs aren’t needed.
-
 ---
 
 
@@ -288,6 +274,18 @@ Threadfactory is coming soon...
 
 > All benchmark tests below are available if you clone the library and run the tests.  
 > See the [Benchmark Details 🚀](https://github.com/Synaptic724/threadfactory/blob/production/benchmarks/benchmark_data/general_benchmarks.md) for more benchmark stats.
+
+| Primitive                | Time (µs)    |
+|--------------------------|--------------|
+| `threading.Lock`         | ~0.07        |
+| `FlowRegulator`             | ~4.40        |
+| Thread Spawn (bare)      | ~195.8       |
+| `RLock.acquire/release`  | ~1.96        |
+| `TransitCondition`        | ~12.56       |
+
+- `TransitCondition` is ~6.4× slower than a raw `RLock`, but offers structured wait/notify with internal callback support.
+- `FlowRegulator` is an ideal middle-ground for dynamic permits and targeted thread gating.
+- `Dynaphore` sits between a classic semaphore and `SwitchLock` — faster and simpler when IDs aren’t needed.
 
 ## 🔥 Benchmark Results (10,000,000 ops — 10 producers / 10 consumers)
 
