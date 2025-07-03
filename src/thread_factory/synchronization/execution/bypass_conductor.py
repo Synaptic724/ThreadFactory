@@ -3,6 +3,7 @@ import inspect
 import threading
 from typing import Callable, Optional, List, Any, Union
 import ulid
+from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.synchronization.primitives.dynaphore import Dynaphore
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
 from thread_factory.utils.coordination.package import Pack
@@ -17,23 +18,27 @@ class BypassConductor(IDisposable):
     A limited-entry execution gate that runs a pre-bound callable up to N times.
 
     Features:
+    ---------
     • Callable is supplied at construction.
     • Up to `limit` threads may execute the callable; others skip.
     • Each successful execution returns an Outcome tracking result or exception.
 
     Args:
-        func (Union[Callable, list[Callable]]): A synchronous function or a list
-                                                 of functions to execute in a pipeline.
-                                                 If a single callable, it can accept arguments
-                                                 passed via *args and **kwargs.
-        limit (int): Maximum number of allowed executions.
-        *args: Positional args to pass to the callable if it's a single item.
-        **kwargs: Keyword args to pass to the callable if it's a single item.
+        func (Union[Callable, list[Callable]]):
+            A synchronous function or a list of functions to execute in a pipeline.
+            If a single callable, it can accept arguments passed via *args and **kwargs.
+        limit (int):
+            Maximum number of allowed executions.
+        *args:
+            Positional args to pass to the callable if it's a single item.
+        **kwargs:
+            Keyword args to pass to the callable if it's a single item.
 
-    Example Use:
+    Example:
+    --------
     >>> def log_task(): print("Task complete")
-    >>> conductor = BypassConductor(log_task, limit=3) # Changed TransitGate to BypassConductor
-    >>> outcome = conductor.transit() # Changed gate.transit()
+    >>> conductor = BypassConductor(log_task, limit=3)
+    >>> outcome = conductor.transit()
     """
 
     __slots__ = IDisposable.__slots__ + [
@@ -48,19 +53,10 @@ class BypassConductor(IDisposable):
         if limit < 0:
             raise ValueError("Limit must be non-negative")
 
-        if callable(func):
-            self._func = [functools.partial(func, *args, **kwargs)]
-        elif isinstance(func, list):
-            if not all(callable(f) for f in func):
-                raise TypeError("Provided list must contain only callables.")
-            self._func = func
+        if isinstance(func, list, ConcurrentList):
+            self._func = Pack._pack_many(func)
         else:
-            raise TypeError("Provided 'func' must be a callable or a list of callables.")
-
-        for f in self._func:
-            # Updated type error to reflect the correct class name
-            if inspect.iscoroutinefunction(f):
-                raise TypeError("BypassConductor does not support coroutine functions.")
+            self._func = Pack._pack(functools.partial(func, *args, **kwargs))
 
         self._id = str(ulid.ULID())
         self._limit = limit
@@ -72,9 +68,36 @@ class BypassConductor(IDisposable):
         self._threshold_sema = SignalBarrier(limit, reusable=True)
         self._outcome_set = False
 
-    # --- NEW HELPER METHOD TO FIX RACE CONDITION ---
+    def dispose(self):
+        """
+        Disposes internal structures and clears all state.
+
+        Behavior:
+            - Disables further access.
+            - Frees the dynaphore and threshold barrier.
+            - Clears the outcomes list.
+        """
+        if self._disposed:
+            return
+        self._disposed = True
+        with self._lock:
+            self._collapsed = True
+            self._outcomes.clear()
+            if self._dynaphore:
+                self._dynaphore.dispose()
+                self._dynaphore = None
+            if self._threshold_sema:
+                self._threshold_sema.dispose()
+                self._threshold_sema = None
+
     def _try_claim_slot(self) -> bool:
-        """Atomically checks for a slot and claims it if available."""
+        """
+        Attempt to atomically claim a slot for execution.
+
+        Returns:
+            bool: True if this thread successfully claimed a slot and is allowed to proceed;
+                  False if the gate is collapsed or all slots are used.
+        """
         # A quick unlocked check for performance on a busy gate
         if self._collapsed or self._count >= self._limit:
             return False
@@ -86,13 +109,18 @@ class BypassConductor(IDisposable):
             self._count += 1
             return True
 
-    # --- REVISED transit() METHOD ---
     def transit(self):
         """
         Attempts to claim a slot and run the callable pipeline.
 
         Returns:
-            None: This method's return is for bypassing; results are in `.outcomes()`.
+            None: No value is returned. Results are stored internally and accessed via `.outcomes()`.
+
+        Behavior:
+            - Only `limit` threads may pass through.
+            - Each thread runs all steps in the pipeline sequentially.
+            - A thread waits at a barrier between steps to ensure all threads sync up before moving forward.
+            - After the final step, the gate is collapsed.
         """
         if self._disposed:
             return None
@@ -130,6 +158,15 @@ class BypassConductor(IDisposable):
         return None
 
     def increase_limit(self, n: int = 1):
+        """
+        Increases the number of available execution slots.
+
+        Args:
+            n (int): Number of new permits to add.
+
+        Raises:
+            ValueError: If n is negative.
+        """
         if n < 0:
             raise ValueError("Cannot increase by negative")
         self._dynaphore.increase_permits(n)
@@ -137,10 +174,30 @@ class BypassConductor(IDisposable):
             self._limit += n
             self._threshold_sema.set_threshold(self._limit)
 
+    def decrease_limit(self, n: int = 1):
+        """
+        Decreases the number of available execution slots.
+
+        Args:
+            n (int): Number of permits to remove.
+
+        Raises:
+            ValueError: If n is negative.
+        """
+        if n < 0:
+            raise ValueError("Cannot decrease by negative")
+        self._dynaphore.decrease_permits(n)
+        with self._lock:
+            self._limit = max(0, self._limit - n)
+            self._threshold_sema.set_threshold(self._limit)
+
+
     def _increase_count(self):
         """
-        Increments the count of active executions.
-        This is called internally before each callable execution.
+        Internal method to increment the number of active executions.
+
+        Raises:
+            RuntimeError: If incrementing would exceed the allowed limit.
         """
         with self._lock:
             if self._count >= self._limit:
@@ -149,25 +206,19 @@ class BypassConductor(IDisposable):
 
     def _decrement_count(self):
         """
-        Decrements the count of active executions.
-        This is called internally after each callable execution.
+        Internal method to decrement the number of active executions.
+        Called after thread completes its pipeline.
         """
         with self._lock:
             if self._count > 0:
                 self._count -= 1
 
-    def decrease_limit(self, n: int = 1):
-        if n < 0:
-            raise ValueError("Cannot decrease by negative")
-        self._dynaphore.decrease_permits(n)
-        with self._lock:
-            self._limit = max(0, self._limit - n)
-            self._threshold_sema.set_threshold(self._limit)
-
     def _set_result(self, result: Any):
         """
-        Sets the result of the callable execution.
-        This method is called internally after the callable completes.
+        Records a successful result for this pipeline stage.
+
+        Args:
+            result (Any): The return value of the executed function.
         """
         if self._outcome_set:
             return
@@ -181,8 +232,10 @@ class BypassConductor(IDisposable):
 
     def _set_exception(self, e: Exception):
         """
-        Sets the exception of the callable execution.
-        This method is called internally if the callable raises an exception.
+        Records an exception raised during pipeline execution.
+
+        Args:
+            e (Exception): The exception thrown by a pipeline stage.
         """
         if self._outcome_set:
             return
@@ -195,10 +248,24 @@ class BypassConductor(IDisposable):
             self._outcomes.append(outcome)
 
     def collapse(self):
+        """
+        Collapses the gate, preventing any new threads from entering.
+        This can be triggered manually or after the final stage completes.
+        """
         with self._lock:
             self._collapsed = True
 
     def reset(self, new_limit: Optional[int] = None):
+        """
+        Resets the conductor to its original state or a new limit.
+
+        Args:
+            new_limit (Optional[int]):
+                If provided, sets a new limit on executions.
+
+        Raises:
+            ValueError: If the new limit is negative.
+        """
         with self._lock:
             self._count = 0
             if new_limit is not None:
@@ -209,19 +276,10 @@ class BypassConductor(IDisposable):
             self._outcomes.clear()
 
     def outcomes(self) -> List[Outcome]:
-        """Returns all outcome objects recorded so far."""
-        return self._outcomes
+        """
+        Retrieve the list of outcomes recorded so far.
 
-    def dispose(self):
-        if self._disposed:
-            return
-        self._disposed = True
-        with self._lock:
-            self._collapsed = True
-            self._outcomes.clear()
-            if self._dynaphore:
-                self._dynaphore.dispose()
-                self._dynaphore = None
-            if self._threshold_sema:
-                self._threshold_sema.dispose()
-                self._threshold_sema = None
+        Returns:
+            List[Outcome]: A list of result/exception Outcome objects, one per stage.
+        """
+        return self._outcomes
