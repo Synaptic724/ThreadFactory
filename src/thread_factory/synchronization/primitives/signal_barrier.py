@@ -83,7 +83,7 @@ class SignalBarrier(IDisposable):
     __slots__ = IDisposable.__slots__ + [
         "_threshold", "_transit_callback", "_reusable", "_manual_release",
         "_lock", "_condition", "_count", "_released", "_id",
-        "_controller", "_signal_callback"
+        "_controller", "_signal_callback", "_wait_notification"
     ]
 
     def __init__(
@@ -109,6 +109,7 @@ class SignalBarrier(IDisposable):
         self._condition = threading.Condition(self._lock)
         self._count = 0
         self._released = False
+        self._wait_notification = False
 
         # --- Controller Integration ---
         self._controller = controller
@@ -183,7 +184,6 @@ class SignalBarrier(IDisposable):
             }
         }
 
-    # --- Core Methods (with integration) ---
 
     def is_spent(self) -> bool:
         """
@@ -283,6 +283,7 @@ class SignalBarrier(IDisposable):
         """
         with self._condition:
             self._count = 0
+            self._wait_notification = False
             self._released = False
 
     # In the SignalBarrier class...
@@ -319,6 +320,11 @@ class SignalBarrier(IDisposable):
         if self.is_spent():
             return False  # Corrected from our last session
 
+        if not self._released and not self._wait_notification:
+            self._wait_notification = True
+            if self._controller:
+                self._controller.notify(self.id, "WAIT_STARTING")
+
         with self._condition:
             if self._disposed:
                 return False
@@ -349,14 +355,13 @@ class SignalBarrier(IDisposable):
 
             was_released = self._condition.wait_for(lambda: self._released or self._disposed, timeout=timeout)
 
-            # ---- START: REVISED REUSABLE LOGIC ----
             if was_released and self._reusable:
                 # Each thread decrements the counter as it passes the barrier.
                 self._count -= 1
                 # The very last thread to pass is responsible for resetting the
                 # semaphore for the next group.
                 if self._count == 0:
+                    self._wait_notification = False
                     self._released = False
-            # ---- END: REVISED REUSABLE LOGIC ----
 
             return was_released and not self._disposed

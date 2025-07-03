@@ -76,7 +76,9 @@ class TransitBarrier(IDisposable):
 
     @property
     def id(self) -> str:
-        """The unique identifier for this component."""
+        """
+        The unique identifier for this component.
+        """
         return self._id
 
     def _get_object_details(self) -> Dict[str, Any]:
@@ -183,10 +185,13 @@ class TransitBarrier(IDisposable):
         if self.is_spent():
             return False
 
+        if self._count < self._threshold and not self._released:
+            if self._controller:
+                self._controller.notify(self.id, "WAIT_STARTING")
+
         with self._condition:
             if self._released:
                 return True
-
             if self._disposed:
                 return False
 
