@@ -100,37 +100,46 @@ class Conductor(IDisposable):
         if threshold <= 0:
             raise ValueError("Threshold must be a positive integer.")
 
-        self._clock_barrier: Optional[ClockBarrier] = None
-        self._signal_barrier: Optional[SignalBarrier]  = None
-
-        self._threshold: int = threshold
-        self.tasks: ConcurrentList[Callable] = Pack.bundle(tasks) if tasks else ConcurrentList()
-        self._internal_threshold_barrier: Optional[SignalBarrier] = None
+        if tasks is None:
+            self.tasks: ConcurrentList[Pack] = ConcurrentList()
+        else:
+            packified_result = Pack.bundle(tasks)
+            if isinstance(packified_result, Pack):
+                # If bundle returned a single Pack, put it into a list
+                self.tasks = ConcurrentList([packified_result])
+            else:
+                # If bundle returned a ConcurrentList (for iterables), use it directly
+                self.tasks = packified_result
 
         self._callback: Union[Callable[..., None], Pack] = callback
         self._callback_executed_flags: List[bool] = []
 
-        self._internal_threshold_barrier = SignalBarrier(self._threshold, reusable=True)
         if self._callback:
             Pack.bundle(self._callback)
             self._callback_executed_flags = [False for _ in self.tasks]
+        self.outcomes: ConcurrentDict[int, Union[Outcome, ConcurrentList[Outcome]]] = ConcurrentDict()
 
+
+        # State management
+        self._id: str = str(ulid.ULID())
+        self._threshold: int = threshold
+        self._released: bool = False
+        self._broken: bool = False
+        self._barrier_passed_notified: bool = False
+        self._execution_started_notified: bool = False
+        self._execution_completed_notified: bool = False
         self.reusable: bool = reusable
         self.manual_release: bool = manual_release
         self._timeout: float = timeout
         self._raise_on_timeout: float = raise_on_timeout
         self._multiple_outcomes_per_task: bool = multiple_outcomes_per_task
 
-        self._id: str = str(ulid.ULID())
-        self.outcomes: ConcurrentDict[int, Union[Outcome, ConcurrentList[Outcome]]] = ConcurrentDict()
-
-        self._released: bool = False
-        self._broken: bool = False
-        self._barrier_passed_notified: bool = False
-        self._execution_started_notified: bool = False
-        self._execution_completed_notified: bool = False
+        # Synchronization primitives
+        self._clock_barrier: Optional[ClockBarrier] = None
+        self._signal_barrier: Optional[SignalBarrier]  = None
         self._main_barrier: Optional[Union[SignalBarrier, ClockBarrier]] = None
-
+        self._internal_threshold_barrier: Optional[SignalBarrier] = None
+        self._internal_threshold_barrier = SignalBarrier(self._threshold, reusable=True)
         self._lock: threading.RLock = threading.RLock()
         self._dynaphore: Dynaphore = Dynaphore(self._threshold)
         self._manual_release_gate: Optional[threading.Event] = threading.Event() if self.manual_release else None
