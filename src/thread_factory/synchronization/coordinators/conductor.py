@@ -1,5 +1,7 @@
 from __future__ import annotations
 import ulid
+
+from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 import inspect
 import threading
@@ -44,7 +46,7 @@ class Conductor(IDisposable):
     def __init__(
             self,
             threshold: int,
-            tasks: Optional[Union[Callable, List[Callable]]] = None,
+            tasks: Optional[Union[Union[Callable[..., None], Pack], List[Union[Callable[..., None], Pack]]]] = None,
             reusable: bool = False,
             manual_release: bool = False,
             timeout: Optional[float] = None,
@@ -99,52 +101,42 @@ class Conductor(IDisposable):
         if threshold <= 0:
             raise ValueError("Threshold must be a positive integer.")
 
-        self._clock_barrier = None
-        self._signal_barrier = None
+        self._clock_barrier: Optional[ClockBarrier] = None
+        self._signal_barrier: Optional[SignalBarrier]  = None
 
-        self._threshold = threshold
-        self.tasks: List[Callable] = []
-        self._internal_threshold_barrier = None
+        self._threshold: int = threshold
+        self.tasks: ConcurrentList[Callable] = Pack.bundle(tasks) if tasks else ConcurrentList()
+        self._internal_threshold_barrier: Optional[SignalBarrier] = None
 
-        self._callback = callback
+        self._callback: Union[Callable[..., None], Pack] = callback
         self._callback_executed_flags: List[bool] = []
 
-        if tasks:
-            task_list = [tasks] if callable(tasks) else tasks
-            if not isinstance(task_list, list) or not all(callable(cb) for cb in task_list):
-                raise TypeError("tasks must be a callable function or a list of callables.")
+        self._internal_threshold_barrier = SignalBarrier(self._threshold, reusable=True)
+        if self._callback:
+            Pack.bundle(self._callback)
+            self._callback_executed_flags = [False for _ in self.tasks]
 
-            for task in task_list:
-                if inspect.iscoroutinefunction(task):
-                    raise TypeError("Coroutines are not supported.")
-                self.tasks.append(task)
+        self.reusable: bool = reusable
+        self.manual_release: bool = manual_release
+        self._timeout: float = timeout
+        self._raise_on_timeout: float = raise_on_timeout
+        self._multiple_outcomes_per_task: bool = multiple_outcomes_per_task
 
-            self._internal_threshold_barrier = SignalBarrier(self._threshold, reusable=True)
-            if self._callback:
-                if not callable(callback): raise TypeError("Callback must be a callable function.")
-                self._callback_executed_flags = [False for _ in self.tasks]
-
-        self.reusable = reusable
-        self.manual_release = manual_release
-        self._timeout = timeout
-        self._raise_on_timeout = raise_on_timeout
-        self._multiple_outcomes_per_task = multiple_outcomes_per_task
-
-        self._id = str(ulid.ULID())
+        self._id: str = str(ulid.ULID())
         self.outcomes: ConcurrentDict[int, Union[Outcome, ConcurrentList[Outcome]]] = ConcurrentDict()
 
-        self._released = False
-        self._broken = False
-        self._barrier_passed_notified = False
-        self._execution_started_notified = False
-        self._execution_completed_notified = False
-        self._main_barrier = None
+        self._released: bool = False
+        self._broken: bool = False
+        self._barrier_passed_notified: bool = False
+        self._execution_started_notified: bool = False
+        self._execution_completed_notified: bool = False
+        self._main_barrier: Optional[Union[SignalBarrier, ClockBarrier]] = None
 
-        self._lock = threading.RLock()
-        self._dynaphore = Dynaphore(self._threshold)
-        self._manual_release_gate = threading.Event() if self.manual_release else None
+        self._lock: threading.RLock = threading.RLock()
+        self._dynaphore: Dynaphore = Dynaphore(self._threshold)
+        self._manual_release_gate: Optional[threading.Event] = threading.Event() if self.manual_release else None
 
-        self._controller = controller
+        self._controller: 'Controller' = controller
         if self._controller:
             try:
                 self._controller.register(self)
@@ -366,7 +358,8 @@ class Conductor(IDisposable):
             if self._controller: self._controller.notify(self.id, "MANUALLY_RELEASED")
 
     def notify_all_override(self) -> None:
-        """Forcibly breaks the barrier and releases all waiting threads.
+        """
+        Forcibly breaks the barrier and releases all waiting threads.
 
         This method immediately puts the Conductor into a "broken" state. It
         releases all internal barriers and gates, ensuring that any thread currently
@@ -401,7 +394,8 @@ class Conductor(IDisposable):
                 self._controller.notify(self.id, "BARRIER_BROKEN")
 
     def _execute_operation(self, task: Callable, index: int) -> None:
-        """Executes a single task and captures its outcome.
+        """
+        Executes a single task and captures its outcome.
 
         This method serves as the direct executor for an individual task. It first
         waits on an internal barrier, which ensures that all participating threads
@@ -422,7 +416,8 @@ class Conductor(IDisposable):
             self._set_exception(e, index)
 
     def _execute_operations(self):
-        """Orchestrates the entire task execution and callback sequence.
+        """
+        Orchestrates the entire task execution and callback sequence.
 
         This method is the control loop for all post-barrier work. It first checks
         if any tasks are defined. If so, it notifies the controller that execution
@@ -435,7 +430,7 @@ class Conductor(IDisposable):
         invoked only once per task completion.
 
         After all tasks are processed, it notifies the controller that execution
-    is complete. Finally, it handles the release logic: it either blocks until
+        is complete. Finally, it handles the release logic: it either blocks until
         `release()` is called (if `manual_release` is True) or immediately marks
         the Conductor as released.
         """
@@ -474,7 +469,8 @@ class Conductor(IDisposable):
             self._released = True
 
     def _set_result(self, result: Any, index: int):
-        """Creates and stores a successful Outcome for a given task.
+        """
+        Creates and stores a successful Outcome for a given task.
 
         This internal helper method wraps the successful result of a task in an
         `Outcome` object. It then stores this outcome in the `self.outcomes`
@@ -498,7 +494,8 @@ class Conductor(IDisposable):
             self.outcomes.setdefault(index, new_outcome)
 
     def _set_exception(self, e: Exception, index: int):
-        """Creates and stores a failure Outcome for a given task.
+        """
+        Creates and stores a failure Outcome for a given task.
 
         This internal helper method captures an exception from a failed task and
         wraps it in an `Outcome` object. It then stores this outcome in the
@@ -521,7 +518,8 @@ class Conductor(IDisposable):
             self.outcomes.setdefault(index, new_outcome)
 
     def _set_main_barrier(self) -> None:
-        """Internal: Selects the primary barrier based on configuration.
+        """
+        Internal: Selects the primary barrier based on configuration.
 
         This method is called during initialization to set `self._main_barrier`.
         It defaults to using the `_clock_barrier` if a timeout was specified,
@@ -534,7 +532,8 @@ class Conductor(IDisposable):
         self._main_barrier = self._clock_barrier or self._signal_barrier
 
     def start(self, timeout: float = None) -> None:
-        """Blocks the calling thread until the threshold is met or an override occurs.
+        """
+        Blocks the calling thread until the threshold is met or an override occurs.
 
         This is the primary entry point for threads synchronizing on the Conductor.
         Each call to `start()` decrements the main barrier's count. The calling
