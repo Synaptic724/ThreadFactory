@@ -6,7 +6,6 @@ from functools import update_wrapper
 from threading import RLock
 from typing import Any, Callable, Dict, Tuple, Iterable, Union, Optional
 from types import SimpleNamespace
-
 from thread_factory import ConcurrentList
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict

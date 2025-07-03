@@ -5,6 +5,8 @@ from typing import Any
 
 # Import the new, refactored SignalLatch
 from thread_factory.synchronization.primitives.signal_latch import SignalLatch, TransitCondition
+from thread_factory.utils.coordination.package import Pack
+
 
 # Assuming a placeholder IDisposable for testing context
 class IDisposable:
@@ -70,12 +72,25 @@ class TestSignalLatch(unittest.TestCase):
             cond=mock_cond,
             controller=self.mock_controller
         )
+
         self.assertIsInstance(latch.id, str)
         self.assertFalse(latch.is_open())
         self.assertIs(latch._cond, mock_cond)
-        self.assertEqual(latch._signal_callback, self.mock_signal_callback)
+
+        # ✅ Confirm the callback is wrapped in a Pack and matches expected func by name/module
+        self.assertIsInstance(latch._signal_callback, Pack)
+        self.assertEqual(
+            latch._signal_callback._func.__name__,
+            self.mock_signal_callback.__name__
+        )
+        self.assertEqual(
+            latch._signal_callback._func.__module__,
+            self.mock_signal_callback.__module__
+        )
+
         self.assertIs(latch._controller, self.mock_controller)
-        # Verify registration with the mock controller
+
+        # ✅ Confirm the latch was registered with the controller
         self.assertIn(latch.id, self.mock_controller.registry)
 
     def test_get_object_details_contract(self):

@@ -3,6 +3,7 @@ import ulid
 from typing import Callable, Optional, Any, Dict
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utils.coordination.package import Pack
 
 
 class SignalLatch(IDisposable):
@@ -93,7 +94,7 @@ class SignalLatch(IDisposable):
         self._id: str = str(ulid.ULID())
         self._cond: TransitCondition = cond or TransitCondition()
         self._open: bool = False
-        self._signal_callback = signal_callback
+        self._signal_callback = signal_callback if signal_callback is None else Pack._pack(signal_callback)
         self._lock = threading.RLock()
         self._controller = controller
 

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import ulid
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utils.coordination.package import Pack
 
 
 @dataclass
@@ -49,7 +50,7 @@ class TransitCondition(IDisposable):
     __slots__ = IDisposable.__slots__ + [
         "_lock", "acquire", "release", "_waiters", "_default_callback", "_id",
     ]
-    def __init__(self, lock = None):
+    def __init__(self, lock = None, default_callback: Optional[Callable[[], None]] = None):
         """
         Initialize the SignalCondition.
 
@@ -63,7 +64,9 @@ class TransitCondition(IDisposable):
         self.acquire: Callable = self._lock.acquire
         self.release: Callable = self._lock.release
         self._waiters: ConcurrentQueue[Waiter] = ConcurrentQueue()
-        self._default_callback: Optional[Callable[[], None]] = None
+        self._default_callback: Optional['Package'] = (
+            Pack._pack(default_callback) if default_callback is not None else None
+        )
 
     def dispose(self) -> None:
         """
@@ -108,7 +111,9 @@ class TransitCondition(IDisposable):
         Args:
             fn (Callable[[], None]): The default callable to attach to future wake-ups.
         """
-        self._default_callback = fn
+        if not callable(fn):
+            raise TypeError("Default callback must be a callable function")
+        self._default_callback = Pack._pack(fn)
 
     def find_waiter_count(self) -> int:
         """
