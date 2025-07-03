@@ -443,7 +443,7 @@ class SignalController(IDisposable):
         # Dispatch the event to subscribers if any exist for this object and event type
         # Check if _subscribers is not None (in case controller is disposing concurrently)
         if self._subscribers and object_id in self._subscribers:
-            object_subscribers = self._subscribers.get(object_id, {})
+            object_subscribers = self._subscribers.get(object_id, ConcurrentDict())
             if event_type in object_subscribers:
                 for callback in object_subscribers[event_type]:
                     try:
@@ -478,7 +478,7 @@ class SignalController(IDisposable):
             # Use setdefault for ConcurrentDicts to safely initialize nested dictionaries and lists
             self._subscribers.setdefault(object_id, ConcurrentDict())
             # Get the inner ConcurrentDict for the object, then setdefault for the event type list
-            self._subscribers[object_id].setdefault(event_type, [])
+            self._subscribers[object_id].setdefault(event_type, ConcurrentList())
             # Only add the callback if it's not already in the list to prevent duplicate subscriptions
             if callback not in self._subscribers[object_id][event_type]:
                 self._subscribers[object_id][event_type].append(callback)
