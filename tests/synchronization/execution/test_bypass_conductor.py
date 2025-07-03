@@ -74,7 +74,7 @@ class TestBypassConductor(unittest.TestCase):
             return self.record(msg)
 
         # Pass the argument correctly to the Pack constructor
-        gate = BypassConductor(Pack(func=greet, msg="hi"), limit=1)
+        gate = BypassConductor(Pack(func=greet,msg="hi"), limit=1)
         gate.transit()
         self.assertEqual(gate.outcomes()[0].result(), "hi")  # Expect "hi" as the result
 
@@ -307,12 +307,13 @@ class TestBypassConductor1(_Base):
         def greet(name: str):
             return self.record(f"Hi {name}!")
 
-        # Binding the 'name' parameter when creating the Pack
+        # The 'name' parameter is correctly bound as a kwarg when creating the Pack
         gate = BypassConductor(Pack(func=greet, name="Mark"), limit=1)
         gate.transit()
 
         self.assertEqual(self.call_count, 1)
-        self.assertEqual(gate.outcomes()[0].result(), "Hi Mark!")  # Expect "Hi Mark!" as the result
+        # Now, the Pack correctly calls greet with name="Mark"
+        self.assertEqual(gate.outcomes()[0].result(), "Hi Mark!")
 
     def test_callable_with_multiple_parameters(self):
         def add(a, b):
