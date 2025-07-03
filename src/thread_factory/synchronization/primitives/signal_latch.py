@@ -128,12 +128,12 @@ class SignalLatch(IDisposable):
         """
         return ConcurrentDict({
             "name": "latch",
-            "commands": {
+            "commands": ConcurrentDict({
                 "open":   self.open,
                 "reset":  self.reset,
                 "is_open": self.is_open,
                 "dispose": self.dispose,
-            },
+            }),
         })
 
     # ──────────────────────────────────────────────────────────────────

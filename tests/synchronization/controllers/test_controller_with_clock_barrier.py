@@ -19,12 +19,14 @@ import threading
 import time
 import unittest
 import ulid
+from typing import Any, Dict, Callable # Import necessary types
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict # Import ConcurrentDict
+
 
 # --- SUT imports ----------------------------------------------------------
 from thread_factory.synchronization.controllers import SignalController  # fix path if different
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier   # fix path if different
 # -------------------------------------------------------------------------
-
 
 class CallbackRecorder:
     """
@@ -157,8 +159,6 @@ Scenarios
 8. Near-zero timeout breaks instantly
 """
 
-
-
 class DummyCmd:
     """Tiny controllable exposing `ping()` that can optionally explode."""
     def __init__(self, name="dummy", boom=False):
@@ -174,12 +174,17 @@ class DummyCmd:
         return "pong"
 
     # controller contract
-    def _get_object_details(self):
-        return {"name": self._name, "commands": {"ping": self.ping, "dispose": self.dispose}}
+    def _get_object_details(self) -> ConcurrentDict[str, Any]: # Add type hint for clarity
+        return ConcurrentDict({ # <--- CHANGE THIS: Use ConcurrentDict
+            "name": self._name,
+            "commands": ConcurrentDict({ # <--- CHANGE THIS: Use ConcurrentDict
+                "ping": self.ping,
+                "dispose": self.dispose
+            })
+        })
 
     def dispose(self):
         pass  # nothing to clean
-
 
 # --------------------------------------------------------------------------- #
 # TestCase

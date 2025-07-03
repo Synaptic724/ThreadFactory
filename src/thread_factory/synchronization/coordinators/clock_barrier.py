@@ -142,11 +142,11 @@ class ClockBarrier(IDisposable):
         """
         return ConcurrentDict({
             "name": "clock_barrier",
-            "commands": {
+            "commands": ConcurrentDict({
                 "reset":             self.reset,
                 "is_broken":         self.is_broken,
                 "get_waiting_count": self.get_waiting_count,
-            },
+            }),
         })
 
     def release(self) -> None:

@@ -1,10 +1,10 @@
 import logging
 import threading
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.utils.interfaces.disposable import IDisposable
-
+from thread_factory.utils.coordination.package import Pack
 
 class SignalController(IDisposable):
     """
@@ -97,7 +97,7 @@ class SignalController(IDisposable):
     # Hook Registration
     # -------------------------------------------
 
-    def add_pre_invoke_hook(self, callback: Callable[[str, str], None]):
+    def add_pre_invoke_hook(self, callback: Union[Callable[..., None], Pack]):
         """
         Registers a function to be executed *before* any command invocation.
 
@@ -114,7 +114,7 @@ class SignalController(IDisposable):
 
     def add_post_invoke_hook(
             self,
-            callback: Callable[[str, str, Any, Optional[Exception]], None]
+            callback: Union[Callable[..., Any], Pack]
     ):
         """
         Registers a function to be executed *after* any command invocation.
@@ -300,7 +300,7 @@ class SignalController(IDisposable):
         if not (isinstance(details, ConcurrentDict) and 'name' in details and 'commands' in details and isinstance(
                 details['commands'], ConcurrentDict)):
             raise TypeError("'_get_object_details' must return a dictionary with 'name' (str) and 'commands' "
-                            "(Dict[str, Callable]) keys.")
+                            "(ConcurrentDict([str, Callable]) keys.")
 
         obj_id = registrant.id
         with self._outer_lock:
@@ -454,7 +454,7 @@ class SignalController(IDisposable):
                         self._logger.error(f"Subscriber callback failed for event '{event_type}' on '{object_id}': {e}",
                                            exc_info=True)
 
-    def subscribe(self, object_id: str, event_type: str, callback: Callable):
+    def subscribe(self, object_id: str, event_type: str, callback: Union[Callable[..., None], Pack]):
         """
         Subscribe a callback function to a specific event type for a specific object.
 

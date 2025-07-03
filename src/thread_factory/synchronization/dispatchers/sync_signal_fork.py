@@ -25,7 +25,7 @@ class ForkUnit:
     gate_uses : int
         Current number of threads that have claimed this unit.
     """
-    fork_callable: Optional[Callable[..., None], Pack]
+    fork_callable: Optional[Union[Callable[..., None], Pack]]
     usage_cap: int
     lock: threading.Lock = dataclasses.field(default_factory=threading.RLock)
     gate: bool = False
@@ -222,11 +222,11 @@ class SyncSignalFork(IDisposable):
 
         return ConcurrentDict({
             "name": "sync_signal_fork",
-            "commands": {
+            "commands": ConcurrentDict({
                 "release": self.release,
                 "reset":   self.reset,
                 "dispose": self.dispose,
-            },
+            }),
         })
 
     def _detect_number_of_routes(self) -> None:

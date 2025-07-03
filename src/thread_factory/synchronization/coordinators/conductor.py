@@ -197,10 +197,10 @@ class Conductor(IDisposable):
         """
         return ConcurrentDict({
             'name': 'conductor',
-            'commands': {
+            'commands': ConcurrentDict({
                 'dispose': self.dispose, 'reset': self.reset, 'release': self.release,
                 'notify_all_override': self.notify_all_override, 'is_spent': self.is_spent,
-            }
+            })
         })
 
     def dispose(self):

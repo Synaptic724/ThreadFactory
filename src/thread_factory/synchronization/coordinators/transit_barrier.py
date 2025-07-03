@@ -123,7 +123,7 @@ class TransitBarrier(IDisposable):
         """
         return ConcurrentDict({
             'name': 'transit_barrier',
-            'commands': {
+            'commands': ConcurrentDict({
                 'release': self.release,
                 'reset': self.reset,
                 'is_spent': self.is_spent,
@@ -131,7 +131,7 @@ class TransitBarrier(IDisposable):
                 'release_with_action': self.release_with_action,
                 # Re-added for production compatibility
                 'notify_all_override': self.notify_all_override,
-            }
+            })
         })
 
     def release_with_action(self, callback: Optional[Union[Callable[..., None], Pack]] = None) -> None:

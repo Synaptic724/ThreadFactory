@@ -176,14 +176,14 @@ class SignalBarrier(IDisposable):
         """
         return ConcurrentDict({
             'name': 'threshold_semaphore',
-            'commands': {
+            'commands': ConcurrentDict({
                 'release': self.release,
                 'reset': self.reset,
                 'set_threshold': self.set_threshold,
                 'is_spent': self.is_spent,
                 'notify_all_override': self.notify_all_override,
                 'dispose': self.dispose
-            }
+            })
         })
 
 
