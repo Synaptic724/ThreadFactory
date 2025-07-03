@@ -165,26 +165,52 @@ class Package(IDisposable):
         raise TypeError(
             f"Cannot Packify input of type {type(item).__name__}. Expected callable, Package, or iterable thereof.")
 
+    # ───────────────────────── helper for deterministic dual lock ────────────
+    @staticmethod
+    def _acquire_two(a: "Package", b: "Package"):
+        """
+        Deterministic ordering helper for dual-lock acquisition.
+        Always returns the two Package instances in ascending id() order, so
+        every thread grabs multiple Package locks in the same sequence.
+        """
+        return (a, b) if id(a) <= id(b) else (b, a)
+
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Package):
+            return False
+
+        first, second = Package._acquire_two(self, other)
+        with first._lock, second._lock:
+            return (
+                    self._func.__wrapped__ is other._func.__wrapped__ and
+                    tuple(self._args) == tuple(other._args) and
+                    dict(self._kwargs) == dict(other._kwargs)
+            )
+
+
+    def __hash__(self) -> int:
+        # copy under lock, then compute hash lock-free
+        with self._lock:
+            f = self._func.__wrapped__
+            a = tuple(self._args)
+            k = frozenset(self._kwargs.items())
+        return hash((id(f), a, k))
 
     def __call__(self, *extra_args: Any, **extra_kwargs: Any) -> Any:
         """
         Calls the wrapped function with all stored and extra arguments.
-
-        Args:
-            *extra_args: Additional positional arguments.
-            **extra_kwargs: Additional keyword arguments.
-
-        Returns:
-            The result of calling the function with combined arguments.
+        Gathers the arguments under the lock, then releases the lock
+        before invoking the underlying function to avoid cross-thread
+        contention when nested calls occur.
         """
+        # ── gather args/kwargs atomically ────────────────────────────────
         with self._lock:
             all_args = tuple(self._args) + extra_args
             all_kwargs = {**dict(self._kwargs), **extra_kwargs}
 
-            # Simply call the function. Python's built-in argument binding
-            # will raise a precise TypeError if arguments are truly missing
-            # or incompatible.
-            return self._func(*all_args, **all_kwargs)
+        # ── invoke outside the lock for dead-lock freedom ───────────────
+        return self._func(*all_args, **all_kwargs)
 
     @staticmethod
     def merge_many(packs: Iterable["Package"]) -> "Package":
@@ -404,33 +430,6 @@ class Package(IDisposable):
                 arg_map.update(self._kwargs)
                 self._signature_cache = types.SimpleNamespace(arguments=arg_map)
             return self._signature_cache
-
-    def __eq__(self, other: object) -> bool:
-        """
-        Compare Packages by identity of function and equality of args/kwargs.
-
-        Returns:
-            True if equal, False otherwise.
-        """
-        if not isinstance(other, Package):
-            return False
-        with self._lock, other._lock:
-            return (
-                self._func.__wrapped__ is other._func.__wrapped__ and
-                tuple(self._args) == tuple(other._args) and
-                dict(self._kwargs) == dict(other._kwargs)
-            )
-
-    def __hash__(self) -> int:
-        """
-        Hash based on function identity and arguments.
-        """
-        with self._lock:
-            return hash((
-                id(self._func.__wrapped__),
-                tuple(self._args),
-                frozenset(self._kwargs.items()),
-            ))
 
 
     def __add__(self, other: Package) -> Package:

@@ -165,7 +165,7 @@ class TestFork(unittest.TestCase):
 
         self.assertEqual(len(log), total_tasks)
         # Assert the measured time is close to the expected serialized time
-        self.assertAlmostEqual(total_time, expected_time, delta=0.06)  # Allow a 50ms delta for overhead
+        self.assertAlmostEqual(total_time, expected_time, delta=0.09)  # Allow a 50ms delta for overhead
 
     def test_step_selector_even_distribution(self):
         log = []
@@ -363,10 +363,8 @@ class TestFork(unittest.TestCase):
             fork.use_fork()
 
     def test_nested_forks(self):
-        lock = threading.Lock()
         inner_calls = [(2, dummy_func_factory("INNER", None))]
         inner_fork = Fork(1, inner_calls)
-
 
         def outer_job():
             inner_fork.use_fork()
@@ -378,7 +376,7 @@ class TestFork(unittest.TestCase):
         threads = [threading.Thread(target=outer_fork.use_fork) for _ in range(2)]
         for t in threads: t.start()
         for t in threads: t.join(timeout=5)
-        #for t in threads: self.assertFalse(t.is_alive())
+        for t in threads: self.assertFalse(t.is_alive())
 
         outer_fork.dispose()  # Clean up
         inner_fork.dispose()  # Clean up

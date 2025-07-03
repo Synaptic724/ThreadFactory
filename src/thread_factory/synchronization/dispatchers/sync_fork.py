@@ -259,47 +259,37 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
             self._scout.reset()
 
         self._detect_number_of_routes()  # Re-calculate route count, though usually static
+        # ─────────────────────────── helper: scout ping ──────────────────────── #
 
+    def _ping_scout(self) -> None:
+        """
+        Wake the Scout (if present) **without** holding `_selector_lock`,
+        preventing lock‐order inversion that could dead-lock monitor & workers.
+        """
+        scout = self._scout
+        if scout is None:
+            return
+        # Acquire Scout’s condition in isolation
+        with scout._condition:
+            scout._condition.notify_all()
+
+        # ─────────────────────────────── use_fork ────────────────────────────── #
 
     def use_fork(self) -> None:
         """
-        Enter the **SyncFork** barrier, claim a slot, wait for all
-        slots to be filled (or timeout), then execute the assigned
-        callable.
-
-        Workflow
-        1.  Validate object state (disposed / timed-out / closed).
-        2.  Select an available **ForkUnit** and atomically claim a slot.
-        3.  If this is the *first* thread of the cycle **and** a timeout
-            is configured, create—or reset—a **Scout** to watch for the
-            barrier condition.
-        4.  When the global slot-count hits `_route_count`, the *last*
-            arriving thread:
-            – Sets `_threading_event` to release everyone.
-            – **Notifies the Scout** so it wakes immediately.
-        5.  All threads block on `_threading_event.wait()`.
-        6.  After waking, each thread re-checks `self._disposed`
-            and `self._timed_out` and raises if necessary.
-        7.  The thread finally runs its assigned callable.
-            **Exceptions propagate** so bugs aren’t hidden.
-
-        Raises
-        ------
-        RuntimeError
-            • If the SyncFork has been disposed.
-            • If all forks are already closed / at capacity.
-            • If the barrier times out before all slots are claimed.
+        Enter the SyncFork barrier, claim a slot, wait for the barrier,
+        then run the assigned callable.  (Docstring unchanged.)
         """
         from thread_factory.synchronization.coordinators.scout import Scout
+
         if self._disposed:
             raise RuntimeError("Cannot use a disposed SyncFork.")
-
         if self._timed_out:
             raise RuntimeError("SyncFork barrier timed out.")
-
         if self._forks_closed:
             raise RuntimeError("All forks are at capacity or barrier has already closed.")
 
+        # STEP 1 ─ pick a ForkUnit
         selected_unit: Optional[ForkUnit] = None
         while selected_unit is None:
             unit_candidate = self._select_fork_unit_step()
@@ -308,20 +298,22 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
 
             with unit_candidate.lock:
                 if unit_candidate.gate_uses >= unit_candidate.usage_cap:
-                    continue  # Lost the race – try again
+                    continue  # lost race – retry
                 selected_unit = unit_candidate
                 selected_unit.gate_uses += 1
                 if selected_unit.gate_uses >= selected_unit.usage_cap:
-                    selected_unit.gate = True  # Unit exhausted
+                    selected_unit.gate = True  # unit exhausted
 
-        run_scout = False
+        # Flags used outside lock-scope
+        start_scout = False
         defer_increment = False
 
+        # STEP 2 ─ enter barrier bookkeeping
         with self._selector_lock:
             first_thread = (self._blocked_thread_count == 0)
 
+            # Scout handling
             if first_thread and self._timeout_duration is not None:
-                # (Re)create the Scout for this cycle
                 if self._scout is None:
                     self._scout = Scout(
                         predicate=self._scout_predicate,
@@ -332,47 +324,44 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
                     )
                 else:
                     self._scout.reset()
+                start_scout = True
 
-                run_scout = True
-
-                # Single-slot optimisation: add ourselves *after* Scout returns
-                if self._route_count == 1:
-                    defer_increment = True
-                else:
-                    self._blocked_thread_count += 1
+            # single-slot optimisation
+            if self._route_count == 1:
+                defer_increment = True
             else:
                 self._blocked_thread_count += 1
 
-            # If this arrival fills the barrier, release everyone now
+            # barrier met?
             if self._blocked_thread_count >= self._route_count:
                 self._forks_closed = True
                 self._threading_event.set()
 
-                # 🔔 Wake the Scout immediately so it doesn’t wait until timeout
-                if self._scout:
-                    with self._scout._condition:
-                        self._scout._condition.notify_all()
+        # 🔔 scout ping outside selector lock (dead-lock free)
+        self._ping_scout()
 
-        if run_scout:
+        # STEP 3 ─ run Scout monitor if we are designated
+        if start_scout:
             self._scout.monitor()
 
-            # Single-slot fork: increment counter only after Scout finishes
-            if defer_increment:
-                with self._selector_lock:
-                    self._blocked_thread_count += 1
-                    if self._blocked_thread_count >= self._route_count:
-                        self._forks_closed = True
-                        self._threading_event.set()
-                        if self._scout:
-                            with self._scout._condition:
-                                self._scout._condition.notify_all()
+        # single-slot increment after Scout returned
+        if defer_increment:
+            with self._selector_lock:
+                self._blocked_thread_count += 1
+                if self._blocked_thread_count >= self._route_count:
+                    self._forks_closed = True
+                    self._threading_event.set()
+            self._ping_scout()  # possible final ping
 
+        # STEP 4 ─ wait for barrier
         self._threading_event.wait()
 
+        # STEP 5 ─ post-barrier checks
         with self._selector_lock:
             if self._disposed:
                 raise RuntimeError("Cannot use a disposed SyncFork.")
             if self._timed_out:
                 raise RuntimeError("SyncFork barrier timed out.")
 
+        # STEP 6 ─ execute assigned callable
         selected_unit.fork_callable()

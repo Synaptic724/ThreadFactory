@@ -340,7 +340,6 @@ class TestSyncSignalFork(unittest.TestCase):
 
 
     def test_nested_forks(self):
-        lock = threading.Lock()
         inner_calls = [(2, dummy_func_factory("INNER", self.log))]
         inner_fork = SyncSignalFork(1, inner_calls)
 

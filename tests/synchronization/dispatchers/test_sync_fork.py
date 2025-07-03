@@ -167,10 +167,8 @@ class TestSyncFork(unittest.TestCase):
         fork.dispose()  # Clean up
 
     def test_nested_forks(self):
-        lock = threading.Lock()
-        inner_calls = [(2, dummy_func_factory("INNER", self.log))]
+        inner_calls = [(2, Pack(dummy_func_factory("INNER", self.log)))]
         inner_fork = SyncFork(1, inner_calls)
-
 
         def outer_job():
             inner_fork.use_fork()
@@ -184,8 +182,8 @@ class TestSyncFork(unittest.TestCase):
         for t in threads: t.join(timeout=5)
         #for t in threads: self.assertFalse(t.is_alive())
 
-        self.assertEqual(self.log.count("OUTER"), 1)
-        self.assertEqual(self.log.count("INNER"), 1)
+        self.assertEqual(self.log.count("OUTER"), 2)
+        self.assertEqual(self.log.count("INNER"), 2)
         outer_fork.dispose()  # Clean up
         inner_fork.dispose()  # Clean up
 
