@@ -109,6 +109,8 @@ class SignalController(IDisposable):
                                                    `object_id` (the ID of the object on which the command is invoked)
                                                    and `command` (the name of the command being invoked).
         """
+        if callback:
+            Pack.bundle(callback)
         self._hooks['pre_invoke'].append(callback)
         self._logger.debug(f"Added pre-invoke hook: {getattr(callback, '__name__', 'unnamed')}")
 
@@ -130,6 +132,8 @@ class SignalController(IDisposable):
                 - `result` (Any): The return value of the invoked command. This will be `None` if an exception occurred during the invocation.
                 - `exception` (Optional[Exception]): The exception object if the command invocation failed, otherwise `None`.
         """
+        if callback:
+            Pack.bundle(callback)
         self._hooks['post_invoke'].append(callback)
         self._logger.debug(f"Added post-invoke hook: {getattr(callback, '__name__', 'unnamed')}")
 
@@ -468,6 +472,9 @@ class SignalController(IDisposable):
                                  It should accept arguments matching the `notify` method's
                                  signature for data dispatch: `object_id` (str), `event_type` (str),
                                  and `data` (Optional[Dict]).
+
+        # INTERNAL NOTE:
+            We will not Pack the callback as its internal.
         """
         with self._outer_lock:
             if object_id not in self._registry:
