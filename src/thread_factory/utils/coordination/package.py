@@ -65,7 +65,7 @@ class Package(IDisposable):
             TypeError: If func is not a callable or is a coroutine/generator function.
         """
         super().__init__()
-        normalized = self.normalize_task(func)  # Use helper for validation
+        normalized = self._normalize_task(func)  # Use helper for validation
         self._func: Callable[..., Any] = update_wrapper(lambda *a, **kw: normalized(*a, **kw), normalized)
         self._args: ConcurrentList = ConcurrentList(args)
         self._kwargs: ConcurrentDict = ConcurrentDict(kwargs)
@@ -151,15 +151,6 @@ class Package(IDisposable):
                         return self._func(*all_args, **all_kwargs)
                 raise
 
-
-    @staticmethod
-    def from_partial(func: Callable[..., Any], *args: Any, **kwargs: Any) -> "Package":
-        """
-        Convenience factory for quickly creating an already-curried Package.
-        Equivalent to ``Package(func, *args, **kwargs)``.
-        """
-        return Package(func, *args, **kwargs)
-
     @staticmethod
     def merge_many(packs: Iterable["Package"]) -> "Package":
         """
@@ -186,7 +177,7 @@ class Package(IDisposable):
 
 
     @staticmethod
-    def normalize_task(task: Union[Callable, Package]) -> Callable:
+    def _normalize_task(task: Union[Callable, Package]) -> Callable:
         """
         Validate a callable or Package. If it's a Package, return its inner function.
         If it's a callable, validate it. No wrapping is done here to avoid recursion.
@@ -213,7 +204,7 @@ class Package(IDisposable):
         return task
 
     @staticmethod
-    def normalize_many(
+    def _normalize_many(
         tasks: Union[Callable, Package, Iterable[Union[Callable, Package]]]
     ) -> ConcurrentList[Package]:
         """
@@ -236,7 +227,7 @@ class Package(IDisposable):
 
         # Handle single callable or Package
         if isinstance(tasks, (Callable, Package)):
-            return ConcurrentList([Package(Package.normalize_task(tasks))])
+            return ConcurrentList([Package(Package._normalize_task(tasks))])
 
         if not isinstance(tasks, Iterable):
             raise TypeError(f"Expected a callable or iterable of callables, got {type(tasks).__name__}")
@@ -305,6 +296,22 @@ class Package(IDisposable):
                 raise TypeError(f"Invalid task at index {i}: {e}") from e
 
         return result
+
+    @staticmethod
+    def many(tasks: Union[Callable, Package, Iterable[Union[Callable, Package]]]) -> ConcurrentList['Package']:
+        """
+        Public-facing version of `_pack_many`. Safely wraps callables into Package instances.
+
+        Args:
+            tasks: A callable, Package, or iterable of either.
+
+        Returns:
+            ConcurrentList of wrapped Package instances.
+
+        Raises:
+            TypeError: On invalid input.
+        """
+        return Package._pack_many(tasks)
 
     def bind(self, **new_kwargs: Any) -> Package:
         """

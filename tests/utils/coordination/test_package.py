@@ -54,29 +54,29 @@ class TestPackageThreadSafety(unittest.TestCase):
 
     def test_normalize_task_accepts_package(self):
         p = Package(_add, 1, 2)
-        normalized = Package.normalize_task(p)
+        normalized = Package._normalize_task(p)
         self.assertEqual(normalized(3, 4), 7)
 
     def test_normalize_task_accepts_callable(self):
         fn = lambda x: x + 1
-        normalized = Package.normalize_task(fn)
+        normalized = Package._normalize_task(fn)
         self.assertEqual(normalized(4), 5)
 
     def test_normalize_task_rejects_none(self):
         with self.assertRaises(TypeError):
-            Package.normalize_task(None)
+            Package._normalize_task(None)
 
     def test_normalize_task_rejects_coroutines(self):
         async def coro(): pass
 
         with self.assertRaises(TypeError):
-            Package.normalize_task(coro)
+            Package._normalize_task(coro)
 
     def test_normalize_task_rejects_generators(self):
         def gen(): yield 1
 
         with self.assertRaises(TypeError):
-            Package.normalize_task(gen)
+            Package._normalize_task(gen)
 
     def test_validate_callable_valid_function(self):
         Package(lambda x: x + 1)  # should not raise
@@ -102,38 +102,38 @@ class TestPackageThreadSafety(unittest.TestCase):
             Package(bad)
 
     def test_normalize_many_single_callable(self):
-        out = Package.normalize_many(_square)
+        out = Package._normalize_many(_square)
         self.assertEqual(len(out), 1)
         self.assertIsInstance(out[0], Package)
 
     def test_normalize_many_single_package(self):
         p = Package(_square)
-        out = Package.normalize_many(p)
+        out = Package._normalize_many(p)
         self.assertEqual(out[0], p)
 
     def test_normalize_many_rejects_none(self):
         with self.assertRaises(TypeError):
-            Package.normalize_many(None)
+            Package._normalize_many(None)
 
     def test_normalize_many_rejects_non_iterable_non_callable(self):
         with self.assertRaises(TypeError):
-            Package.normalize_many(1234)
+            Package._normalize_many(1234)
 
     def test_normalize_many_rejects_coroutine_in_iterable(self):
         async def bad(): pass
 
         with self.assertRaises(TypeError):
-            Package.normalize_many([_add, bad])
+            Package._normalize_many([_add, bad])
 
     def test_normalize_many_rejects_generator_in_iterable(self):
         def gen(): yield
 
         with self.assertRaises(TypeError):
-            Package.normalize_many([_add, gen])
+            Package._normalize_many([_add, gen])
 
     def test_normalize_many_valid_list_mixed_packages_and_funcs(self):
         items = [_add, Package(_square, 4)]
-        out = Package.normalize_many(items)
+        out = Package._normalize_many(items)
         self.assertEqual(len(out), 2)
         self.assertTrue(all(isinstance(p, Package) for p in out))
 
@@ -157,7 +157,7 @@ class TestPackageThreadSafety(unittest.TestCase):
 
     # ───────────────────────── helper: from_partial ─────────────────────────── #
     def test_from_partial_creates_curried_package(self):
-        p = Package.from_partial(pow, 2, exp=3)
+        p = Package(pow, 2, exp=3)
         self.assertEqual(p(), 8)
 
     # ─────────────────────────── helper: merge_many ──────────────────────────── #
