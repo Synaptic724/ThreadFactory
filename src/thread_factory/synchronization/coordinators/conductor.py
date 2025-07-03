@@ -11,10 +11,6 @@ from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.utils.coordination.outcome import Outcome
 
-
-# Assuming SignalController is available for import
-# from .signal_controller import SignalController
-
 class Conductor(IDisposable):
     """A reusable, data-aware synchronization point and work executor.
 

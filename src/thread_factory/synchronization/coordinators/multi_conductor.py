@@ -1,8 +1,10 @@
 from __future__ import annotations
+from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.synchronization.dispatchers.fork import Fork
 from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
 import threading, ulid
 from typing import Optional, Callable, List, Union, Any, Dict
+from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.group import Group
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
@@ -13,21 +15,42 @@ from thread_factory.synchronization.primitives.signal_barrier import SignalBarri
 
 
 class MultiConductor(IDisposable):
-    """A reusable, data-aware synchronization point that executes tasks in groups.
+    """
+    MultiConductor
+    --------------
+    A reusable, data-aware synchronization point that manages multiple groups of tasks.
 
-    The MultiConductor extends the Conductor's pattern to manage multiple, named
-    groups of tasks. It acts as a single, overarching barrier that synchronizes
-    all participating threads. Once the specified `threshold` of threads arrives,
-    all threads are released to execute every task from every group in a
-    lock-step, synchronized manner.
+    The `MultiConductor` extends the functionality of a traditional `Conductor` to manage multiple,
+    named groups of tasks, ensuring they are executed in a synchronized and lock-step manner. This
+    means that once the required threshold of threads has arrived, each thread will execute every task
+    from every group sequentially, synchronizing between tasks. If there are multiple groups, all tasks
+    in a group will be executed before moving on to the next group.
 
-    This ensures that if 50 threads arrive at a MultiConductor with two groups
-    of tasks, all 50 threads will execute task 1 of group 1, then synchronize,
-    then execute task 2 of group 1, synchronize, and then proceed to execute
-    all tasks of group 2 in the same fashion.
+    Features:
+    ----------
+    - **Task Synchronization**: Ensures that multiple tasks across groups are executed in lock-step.
+    - **Manual Release**: Supports manual release to ensure threads only proceed when explicitly instructed.
+    - **Timeout Handling**: Includes optional timeout behavior, raising a `TimeoutError` if tasks don't complete in time.
+    - **Reusability**: The conductor can be reset to synchronize tasks across multiple cycles.
+    - **Multiple Outcomes per Task**: Allows tracking of multiple results per task, useful for reusable cycles.
 
-    It supports the same features as the Conductor, including reusability,
-    manual release, timeouts, and SignalController integration.
+    This class is particularly useful in scenarios where a large number of threads need to execute tasks
+    across multiple groups while maintaining synchronization at each stage of execution.
+
+    Attributes:
+    -----------
+    - `threshold`: The number of threads required to execute tasks.
+    - `groups`: The list of task groups to be executed by threads.
+    - `reusable`: If True, the conductor can be reused after completing a cycle.
+    - `manual_release`: If True, threads will only proceed when manually released.
+    - `timeout`: The timeout duration for waiting on threads to arrive.
+    - `callback`: An optional callback to be executed after each task.
+    - `controller`: An optional signal controller for managing state changes.
+
+    Example:
+    --------
+    >>> conductor = MultiConductor(threshold=5, groups=[group1, group2])
+    >>> conductor.start()
     """
     __slots__ = IDisposable.__slots__ + [
         "_threshold", "groups", "reusable", "manual_release",
@@ -49,59 +72,59 @@ class MultiConductor(IDisposable):
             multiple_outcomes_per_task: bool = False,
             concurrent_execution: bool = False,
             parallel_execution: bool = False,
-            callback: Optional[Callable[[], None]] = None,
+            callback: Optional[Union[Callable[..., None], Pack]] = None,
             controller: Optional['SignalController'] = None
     ):
-        """Initializes a new MultiConductor instance.
+        """
+        Initializes the MultiConductor with the provided configuration.
 
         Args:
             threshold (int):
-                The number of threads that must call `start()` before the barrier
-                is passed and tasks are executed. Must be a positive integer.
+                The number of threads required to meet the synchronization point. Must be positive.
             groups (Optional[List[Group]]):
-                An optional initial list of `Group` objects, each containing its
-                own set of tasks.
+                A list of `Group` objects, each representing a set of tasks to be executed in parallel.
             reusable (bool):
-                If True, the conductor can be reset for subsequent synchronization
-                cycles. Defaults to False.
+                If True, the conductor can be reused for multiple cycles.
             manual_release (bool):
-                If True, the conductor will wait for an explicit call to `release()`
-                after all tasks are complete. Defaults to False.
+                If True, threads will only proceed when manually released via `release()`.
             timeout (Optional[float]):
-                The maximum time in seconds to wait for the threshold to be met.
-                Must be a positive number if provided.
+                The maximum time to wait for the threshold to be met, in seconds. If None, no timeout.
             raise_on_timeout (bool):
-                If True, raises a `TimeoutError` when a timeout occurs.
-                Defaults to False.
+                If True, raises a `TimeoutError` if the timeout occurs.
             multiple_outcomes_per_task (bool):
-                If True, allows each task to store multiple results in a list,
-                useful for reusable cycles. Defaults to False.
+                If True, allows storing multiple outcomes per task in a list.
+            concurrent_execution (bool):
+                If True, the tasks will be executed concurrently across threads.
+            parallel_execution (bool):
+                If True, the tasks will be executed in parallel, with each task assigned to a different thread.
             callback (Optional[Callable[[], None]]):
-                An optional function to be called after each task in every group
-                completes its execution.
+                A callback function to be executed after each task is completed.
             controller (Optional['SignalController']):
-                An optional `SignalController` for receiving state change
-                notifications.
+                An optional controller that can notify state changes during the execution.
+
+        Raises:
+            ValueError: If `threshold` is not a positive integer.
         """
+
         super().__init__()
         if threshold <= 0:
             raise ValueError("Threshold must be a positive integer.")
 
-        self._concurrent = concurrent_execution
-        self._parallel = parallel_execution
-        self._threshold = threshold
-        self.groups = []
-        self.reusable = reusable
-        self.manual_release = manual_release
-        self._timeout = timeout
-        self._raise_on_timeout = raise_on_timeout
-        self._multiple_outcomes_per_task = multiple_outcomes_per_task
-        self._callback = callback
-        self._controller = controller
-        self._id = str(ulid.ULID())
-        self._enabled = False
+        self._concurrent: bool = concurrent_execution
+        self._parallel: bool = parallel_execution
+        self._threshold: int = threshold
+        self.groups: Optional[Group] | ConcurrentList[Group] = ConcurrentList[Group]()
+        self.reusable: bool = reusable
+        self.manual_release: bool = manual_release
+        self._timeout: float = timeout
+        self._raise_on_timeout:bool  = raise_on_timeout
+        self._multiple_outcomes_per_task: bool = multiple_outcomes_per_task
+        self._callback: Union[Callable[..., None], Pack] = Pack.bundle(callback) if callback else None
+        self._controller: 'Controller' = controller
+        self._id: str = str(ulid.ULID())
+        self._enabled: bool = False
+        self.outcomes: ConcurrentDict = ConcurrentDict()
 
-        self.outcomes = ConcurrentDict()
         if groups:
             for group in groups:
                 # ✅ This check ensures the Group and MultiConductor configurations match.
@@ -112,18 +135,18 @@ class MultiConductor(IDisposable):
                     )
                 self.add_group(group)
 
-        self._released = False
-        self._broken = False
-        self._lock = threading.RLock()
-        self._dynaphore = Dynaphore(threshold)
-        self._manual_release_gate = threading.Event() if manual_release else None
-        self._internal_threshold_barrier = SignalBarrier(threshold, reusable=True)
-        self._barrier_passed_notified = False
-        self._execution_started_notified = False
-        self._execution_completed_notified = False
+        self._released: bool = False
+        self._broken: bool = False
+        self._lock: threading.RLock = threading.RLock()
+        self._dynaphore: Dynaphore = Dynaphore(threshold)
+        self._manual_release_gate: threading.Event | None = threading.Event() if manual_release else None
+        self._internal_threshold_barrier: SignalBarrier = SignalBarrier(threshold, reusable=True)
+        self._barrier_passed_notified: bool = False
+        self._execution_started_notified: bool = False
+        self._execution_completed_notified: bool = False
         self._callback_executed_flags = {}
-        self._clock_barrier = None
-        self._signal_barrier = None
+        self._clock_barrier: ClockBarrier | None = None
+        self._signal_barrier: SignalBarrier | None = None
 
         if timeout is not None:
             if timeout <= 0:
@@ -141,10 +164,20 @@ class MultiConductor(IDisposable):
             try: self._controller.register(self)
             except Exception: pass
 
-
     def dispose(self):
         """
-        Disposes of the MultiConductor and all its associated resources.
+        Disposes of the MultiConductor and all associated resources.
+
+        This method releases all synchronization primitives, disposes of any barriers and groups,
+        and marks the conductor as disposed. Once disposed, the conductor is no longer usable.
+
+        The following actions occur:
+        - Releases all waiters to prevent deadlocks.
+        - Notifies the controller (if provided) that the conductor has been disposed.
+        - Disposes of any internal barriers such as the `ClockBarrier`, `SignalBarrier`, and `Dynaphore`.
+        - Clears the groups and outcomes data structures, ensuring no references remain.
+
+        If called multiple times, this method will safely exit without performing any additional work.
         """
         if self._disposed:
             return
@@ -185,18 +218,21 @@ class MultiConductor(IDisposable):
             self.outcomes.clear()
 
     def add_group(self, group: Group):
-        """Adds a group of tasks to the conductor.
+        """
+        Adds a group of tasks to the conductor.
 
-        This method must be called before the conductor is first used (i.e.,
-        before the first call to `start()`).
+        This method allows you to add a new `Group` to the MultiConductor. The group can then be included
+        in the synchronization process, and its tasks will be executed in order once the threshold of threads
+        has been reached.
 
         Args:
-            group (Group): The `Group` object to add.
+            group (Group): The `Group` object containing tasks to be executed.
 
         Raises:
-            RuntimeError: If called after the conductor has been enabled.
-            TypeError: If the object provided is not an instance of `Group`.
+            RuntimeError: If this method is called after the conductor has been enabled (i.e., after the first `start()`).
+            TypeError: If the provided object is not an instance of `Group`.
         """
+
         if self._enabled:
             raise RuntimeError("Cannot add groups after MultiConductor is active.")
         if not isinstance(group, Group):
@@ -236,22 +272,22 @@ class MultiConductor(IDisposable):
         self._enabled = True
 
     def start(self, timeout: float = None) -> None:
-        """Blocks the calling thread until the threshold is met, then executes tasks.
+        """
+        Blocks the calling thread until the threshold is met, then executes tasks in lock-step.
 
-        This is the primary entry point for threads. Each call blocks until the
-        `threshold` number of threads has arrived. Once the barrier passes,
-        the thread acquires a permit to participate in the synchronized execution
-        of all tasks across all groups.
+        This is the primary method for starting the execution of tasks across all groups in the MultiConductor.
+        The method will block until the `threshold` number of threads has arrived at the barrier. Once the barrier
+        is passed, all threads will execute tasks across groups in a synchronized manner.
 
         Args:
             timeout (float, optional):
-                A timeout for the permit acquisition phase. If a permit cannot
-                be acquired in time, the method returns.
+                The maximum time in seconds to wait for the threshold to be met. If not provided or set to `None`,
+                the conductor will wait indefinitely until the threshold is reached.
 
         Raises:
-            TimeoutError:
-                If `raise_on_timeout` is True and the main barrier wait times out.
+            TimeoutError: If `raise_on_timeout` is True and the wait times out before the threshold is met.
         """
+
         if not self._enabled:
             self.enable()
         if self._disposed or self._broken or self.is_spent():
@@ -328,13 +364,22 @@ class MultiConductor(IDisposable):
             if self._broken or self._disposed: break
 
     def _execute_operations(self):
-        """Orchestrates the entire task execution sequence across all groups.
-
-        This method is the control loop for all post-barrier work. It iterates
-        through each group, and for each task within that group, it coordinates
-        all participating threads to execute the task and then synchronize at a
-        barrier before any thread can proceed to the next task.
         """
+        Orchestrates the task execution across all groups.
+
+        This method is responsible for coordinating the execution of tasks within each group once the threshold
+        has been met. It synchronizes the execution of tasks, ensuring that all threads execute the tasks in the
+        correct order, and waits at barriers between each task.
+
+        The method also ensures that the appropriate callbacks are executed after each task completes.
+
+        If concurrent or parallel execution is enabled, it will modify the execution flow accordingly to achieve
+        the desired behavior.
+
+        The method ensures that the task execution continues until all tasks from all groups have been executed,
+        or the conductor is disposed or broken.
+        """
+
         if self.groups:
             with self._lock:
                 if self._controller and not self._execution_started_notified:
@@ -378,7 +423,7 @@ class MultiConductor(IDisposable):
                     if self._controller and hasattr(self._controller, '_logger'):
                         self._controller._logger.error(f"Error in MultiConductor callback: {e}", exc_info=True)
 
-    def _execute_operation(self, task: Callable, group: Group, task_index: int):
+    def _execute_operation(self, task: Union[Callable[..., None], Pack], group: Group, task_index: int):
         """Executes a single task and records its outcome in the correct group.
 
         Args:
@@ -387,7 +432,7 @@ class MultiConductor(IDisposable):
             task_index (int): The index of the task, used for storing the outcome.
         """
         try:
-            result = task()
+            result = task() # Should already be a Pack
             self._set_result(result, group, task_index)
         except Exception as e:
             self._set_exception(e, group, task_index)
@@ -461,41 +506,78 @@ class MultiConductor(IDisposable):
             self._dynaphore.set_permits(self._threshold)
             if self._controller: self._controller.notify(self.id, "RESET")
 
-
     def get_all_outcomes(self, as_concurrent_dict: bool = True) -> Union[Dict, ConcurrentDict]:
-        """Returns all outcomes from all groups, keyed by group name.
+        """
+        Returns all outcomes from all groups, keyed by group name.
+
+        This method aggregates the outcomes from all tasks within each group and returns them as a dictionary
+        (either `ConcurrentDict` or standard Python `dict`, based on the `as_concurrent_dict` flag). Outcomes
+        include both results and exceptions that occurred during task execution.
 
         Args:
-            as_concurrent_dict (bool): If True, returns the internal
-                `ConcurrentDict`. If False, returns a standard `dict` copy.
+            as_concurrent_dict (bool): If True, returns the internal `ConcurrentDict` that stores the outcomes.
+                                       If False, returns a standard Python `dict` containing a copy of the outcomes.
 
         Returns:
-            Union[Dict, ConcurrentDict]: A dictionary of all group outcomes.
+            Union[Dict, ConcurrentDict]: A dictionary containing the outcomes for each group. The outcomes
+                                         are grouped by the group name (keys), with the values being a list
+                                         of the results and exceptions for the respective tasks.
         """
         return self.outcomes if as_concurrent_dict else dict(self.outcomes)
 
     @property
     def results(self) -> List[Any]:
-        """A flat list of all successful results from all tasks in all groups."""
+        """
+        A flat list of all successful results from all tasks in all groups.
+
+        This property extracts and returns all successful task results from every task in every group, concatenated
+        into a single, flat list. If the `MultiConductor` has been disposed, it will return an empty list.
+
+        Returns:
+            List[Any]: A list of all successful results collected from the tasks across all groups.
+        """
         if self._disposed: return []
         return [res for group in self.groups for res in group.results]
 
     @property
     def exceptions(self) -> List[Exception]:
-        """A flat list of all exceptions from all tasks in all groups."""
+        """
+        A flat list of all exceptions from all tasks in all groups.
+
+        This property extracts and returns all exceptions that occurred during the execution of tasks across all groups,
+        concatenated into a single, flat list. If the `MultiConductor` has been disposed, it will return an empty list.
+
+        Returns:
+            List[Exception]: A list of all exceptions collected from the tasks across all groups.
+        """
         if self._disposed: return []
         return [exc for group in self.groups for exc in group.exceptions]
 
     def is_spent(self) -> bool:
-        """Checks if the conductor has completed its cycle and is not reusable."""
+        """
+        Checks if the conductor has completed its cycle and is not reusable.
+
+        This method checks whether the conductor has been released (i.e., its cycle has been completed) and if
+        the conductor is not reusable. It is used to determine whether the conductor can be reused for another cycle
+        or if it has reached its end.
+
+        Returns:
+            bool: True if the conductor has completed its cycle and is not reusable, False otherwise.
+        """
         return self._released and not self.reusable
 
     def release(self):
-        """Manually releases the conductor from its final wait state.
+        """
+        Manually releases the conductor from its final wait state.
 
-        If the conductor was initialized with `manual_release=True`, calling this
-        method will allow the `start()` method to finally complete. It has no
-        effect otherwise.
+        This method is used to manually release the conductor from its waiting state, allowing all threads to proceed.
+        It is only effective if the `manual_release` flag was set to `True` during initialization. This will trigger
+        the conductor to notify the controller (if any) and proceed with task execution.
+
+        If `manual_release` is not set to `True`, calling this method will have no effect.
+
+        Raises:
+            RuntimeError: If the conductor is already disposed or broken, or if it's not in a manual release state.
         """
         with self._lock:
             if self._disposed or not self.manual_release or self._released: return
@@ -504,7 +586,18 @@ class MultiConductor(IDisposable):
             if self._controller: self._controller.notify(self.id, "MANUALLY_RELEASED")
 
     def notify_all_override(self):
-        """Forcibly breaks the barrier and releases all waiting threads."""
+        """
+        Forcibly breaks the barrier and releases all waiting threads.
+
+        This method immediately releases all waiting threads, bypassing the normal synchronization process. It is
+        intended for emergency situations or when an external event requires immediate intervention. Calling this
+        method will break the barrier and release all threads regardless of whether the threshold is met.
+
+        If the conductor has been disposed or is already released, this method has no effect.
+
+        Raises:
+            RuntimeError: If the conductor is disposed or broken, preventing the barrier from being forcibly released.
+        """
         with self._lock:
             if self._disposed or self._released: return
             self._broken = True
@@ -525,11 +618,28 @@ class MultiConductor(IDisposable):
 
     @property
     def id(self) -> str:
-        """The unique, time-sortable identifier for this MultiConductor."""
+        """
+        The unique, time-sortable identifier for this MultiConductor.
+
+        This property returns the unique identifier (ULID) assigned to the MultiConductor instance. The identifier
+        is time-sortable, meaning that lexicographically sorting the IDs will result in a chronological order.
+
+        Returns:
+            str: The unique identifier for this MultiConductor.
+        """
         return self._id
 
     def _get_object_details(self) -> Dict[str, Any]:
-        """Prepares a summary of the instance for controller registration."""
+        """
+        Prepares a summary of the instance for controller registration.
+
+        This method returns a dictionary containing key metadata about the `MultiConductor` instance. It provides
+        details such as the name of the component and a set of commands that can be executed by the controller.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the name of the instance and the commands that can be triggered
+                             by the controller.
+        """
         return {
             'name': 'multiconductor',
             'commands': {
@@ -537,4 +647,3 @@ class MultiConductor(IDisposable):
                 'notify_all_override': self.notify_all_override, 'is_spent': self.is_spent,
             }
         }
-

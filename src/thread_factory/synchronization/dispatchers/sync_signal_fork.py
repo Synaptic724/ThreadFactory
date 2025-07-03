@@ -171,14 +171,18 @@ class SyncSignalFork(IDisposable):
 
     def dispose(self) -> None:
         """
-        Disposes the SyncSignalFork instance. Makes it permanently unusable.
-        - Releases all waiting threads.
-        - Disposes all ForkUnits (clears their callables).
-        - Signals Scout (if present) to clean up.
-        - Unregisters from controller if supported.
+        Dispose the SyncSignalFork instance and release all held resources.
 
-        Idempotent: Safe to call multiple times.
+        This method:
+        • Sets `_disposed = True` to block future usage.
+        • Releases all waiting threads via `_threading_event`.
+        • Disposes all ForkUnits by clearing their callables.
+        • Disposes the Scout (if active).
+        • Unregisters from the controller (if provided).
+
+        This method is idempotent and can be safely called multiple times.
         """
+
         if self._disposed:
             return
 
@@ -203,13 +207,25 @@ class SyncSignalFork(IDisposable):
                 except Exception:
                     pass
 
-
     @property
     def id(self) -> str:  # noqa: D401
-        """ULID used by the controller as a stable key."""
+        """
+        Returns the ULID identifier for this fork.
+
+        Used as a unique key when interacting with an external controller.
+        """
+
         return self._id
 
     def _get_object_details(self) -> Dict[str, Any]:
+        """
+        Returns a dictionary of metadata about this object.
+
+        Used for controller registration or introspection. Exposes:
+        • name: Identifier string.
+        • commands: Public methods that can be triggered by controller (release, reset, dispose).
+        """
+
         return {
             "name": "sync_signal_fork",
             "commands": {
@@ -219,11 +235,25 @@ class SyncSignalFork(IDisposable):
             },
         }
 
-
     def _detect_number_of_routes(self) -> None:
+        """
+        Computes the total number of slot claims across all ForkUnits.
+
+        Sets `_route_count` which determines the barrier threshold.
+        """
+
         self._route_count = sum(u.usage_cap for u in self._list_of_forks)
 
     def _select_fork_unit_step(self) -> Optional[ForkUnit]:
+        """
+        Selects the next available ForkUnit based on round-robin logic.
+
+        Returns:
+            ForkUnit if a slot is available; None if all units are exhausted.
+
+        Updates `_selector_step_counter` to maintain stride distribution.
+        """
+
         if self._forks_closed:
             return None
 
@@ -245,23 +275,59 @@ class SyncSignalFork(IDisposable):
 
     # ---------------- Scout predicates/callbacks ---------------- #
     def _scout_predicate(self) -> bool:
+        """
+        Returns True if the barrier condition has been met (all slots claimed).
+
+        Used as a predicate for the Scout's timeout monitoring.
+        """
+
         with self._selector_lock:
             return self._blocked_thread_count >= self._route_count
 
     def _handle_scout_timeout(self) -> None:
+        """
+        Called by the Scout if the barrier is not filled within the timeout window.
+
+        Triggers timeout behavior:
+        • Sets `_timed_out = True`
+        • Closes the fork
+        • Releases all waiting threads
+        """
+
         with self._selector_lock:
             if not self._timed_out:
                 self._timed_out = True
                 self._forks_closed = True
                 self._threading_event.set()
 
-    def _handle_scout_success(self) -> None:  # noqa: D401
+    def _handle_scout_success(self) -> None:
+        """
+        Called by the Scout if the barrier is filled before timeout.
+
+        Currently a no-op, but can be extended for logging or diagnostics.
+        """
+
         pass
 
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
     def use_fork(self) -> None:
+        """
+        Claim a slot, wait for the barrier, and execute the assigned callable.
+
+        This method is called by each participating thread. It:
+        • Acquires a slot from the available ForkUnits.
+        • Tracks progress toward the barrier threshold.
+        • Starts the Scout if timeout logic is enabled.
+        • Optionally calls `callback` and notifies the controller.
+        • Waits on `_threading_event` for the release signal.
+        • Executes the selected callable once the barrier is released.
+
+        Raises:
+            RuntimeError: If disposed, timed out, or fork is closed and released.
+        """
+
         if self._disposed:
             raise RuntimeError("Cannot use a disposed SyncSignalFork.")
         if self._timed_out:
@@ -374,10 +440,12 @@ class SyncSignalFork(IDisposable):
 
     def release(self) -> None:
         """
-        Manually release the fork (only effective when *manual_release=True*).
+        Manually releases the barrier (only if `manual_release=True`).
 
-        Emits ``"SEMAPHORE_RELEASED"`` via controller.
+        Sets `_released = True`, unblocks all waiting threads,
+        and notifies the controller via `"SEMAPHORE_RELEASED"`.
         """
+
         if not self._manual_release:
             return
         with self._selector_lock:
@@ -391,13 +459,18 @@ class SyncSignalFork(IDisposable):
 
     def reset(self) -> None:
         """
-        Reset the fork so it can be reused.
+        Resets internal state, allowing the fork to be reused for another cycle.
 
-        Raises
-        ------
-        RuntimeError
-            If called after disposal.
+        Resets:
+        • ForkUnit gate flags and counters
+        • Selector step index
+        • Blocked thread count and barrier flags
+        • Scout state (if applicable)
+
+        Raises:
+            RuntimeError: If called on a disposed instance.
         """
+
         if self._disposed:
             raise RuntimeError("Cannot reset a disposed SyncSignalFork.")
 
