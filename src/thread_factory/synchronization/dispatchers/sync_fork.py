@@ -1,8 +1,11 @@
 import dataclasses
 import threading
-from typing import Callable, List, Optional, Tuple
+from multiprocessing.synchronize import RLock
+from typing import Callable, List, Optional, Tuple, Union
 import inspect
 import ulid
+from thread_factory.concurrency.concurrent_list import ConcurrentList
+from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 # --------------------------------------------------------------------------- #
@@ -24,7 +27,7 @@ class ForkUnit:
     Used internally by SyncFork to coordinate slot-based callable execution.
     """
 
-    fork_callable: Callable | None
+    fork_callable: Union[Callable[..., None], Pack] | None
     usage_cap: int
     lock: threading.Lock = dataclasses.field(default_factory=threading.RLock)
     gate: bool = False
@@ -77,7 +80,7 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
     def __init__(
             self,
             number_of_forks: int,
-            callables: List[Tuple[int, Callable]],
+            callables: List[Tuple[int, Union[Callable[..., None], Pack]]],
             selector_step: int = 1,
             timeout_duration: Optional[float] = None,  # New optional timeout parameter
     ):
@@ -92,28 +95,24 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
             cap, fn = item
             if not isinstance(cap, int):
                 raise TypeError(f"usage_cap at index {i} must be int, got {type(cap).__name__}")
-            if not callable(fn):
-                raise TypeError(f"Callable expected at index {i}, got {type(fn).__name__}")
-            if inspect.iscoroutinefunction(fn):
-                raise TypeError(f"Coroutine functions not supported (index {i}: {fn.__name__})")
 
         if timeout_duration is not None and (not isinstance(timeout_duration, (int, float)) or timeout_duration <= 0):
             raise ValueError("timeout_duration must be a positive number or None.")
 
+        # Use tuple unpacking to set the individual usage_cap for each ForkUnit.
+        # Use the _packed_callables list directly for initializing _list_of_forks
+        self._list_of_forks: ConcurrentList[ForkUnit] = ConcurrentList([ForkUnit(fork_callable=Pack.bundle(fn), usage_cap=cap)
+                                               for cap, fn in callables])
         # Init internal state
         self._threading_event = threading.Event()  # Shared barrier event for all threads
-        self._list_of_forks: List[ForkUnit] = [
-            ForkUnit(fork_callable=fn, usage_cap=cap) for cap, fn in callables
-        ]
-
         self._id = str(ulid.ULID())
-        self._forks_closed = False
+        self._forks_closed: bool = False
         self._selector_step = max(1, selector_step)
-        self._selector_step_counter = 0
-        self._selector_lock = threading.RLock()  # Protects _blocked_thread_count and _selector_step_counter
-        self._blocked_thread_count = 0
+        self._selector_step_counter: int = 0
+        self._selector_lock: threading.RLock = threading.RLock()  # Protects _blocked_thread_count and _selector_step_counter
+        self._blocked_thread_count: int = 0
 
-        self._timeout_duration = timeout_duration
+        self._timeout_duration: float = timeout_duration
         self._timed_out = False  # Flag set by Scout if timeout occurs
         self._scout: Optional['Scout'] = None  # Scout instance for barrier timeout
 

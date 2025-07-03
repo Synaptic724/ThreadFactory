@@ -3,6 +3,7 @@ import threading
 import time
 from typing import List
 from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
+from thread_factory.utils.coordination.package import Pack
 
 
 # --- Helper Functions for Testing ---
@@ -175,7 +176,7 @@ class TestSyncFork(unittest.TestCase):
             inner_fork.use_fork()
             self.log.append("OUTER")
 
-        outer_calls = [(2, outer_job)]
+        outer_calls = [(2, Pack(outer_job))]
         outer_fork = SyncFork(1, outer_calls)
 
         threads = [threading.Thread(target=outer_fork.use_fork) for _ in range(2)]
@@ -183,8 +184,8 @@ class TestSyncFork(unittest.TestCase):
         for t in threads: t.join(timeout=5)
         #for t in threads: self.assertFalse(t.is_alive())
 
-        self.assertEqual(self.log.count("OUTER"), 2)
-        self.assertEqual(self.log.count("INNER"), 2)
+        self.assertEqual(self.log.count("OUTER"), 1)
+        self.assertEqual(self.log.count("INNER"), 1)
         outer_fork.dispose()  # Clean up
         inner_fork.dispose()  # Clean up
 

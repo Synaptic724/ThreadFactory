@@ -121,14 +121,20 @@ class SyncSignalFork(IDisposable):
         # can sometimes be less clear or lead to subtle bugs if not careful.
         # Creating a new list ensures the original input isn't unintentionally altered,
         # and it makes the packing process explicit.
-        _packed_callables = []
-        for i, (cap, fn) in enumerate(callables):
+        for i, item in enumerate(callables):
+            if not isinstance(item, tuple) or len(item) != 2:
+                raise TypeError(f"Tuple (usage_cap, Callable) expected at index {i}, got {item!r}")
+            cap, fn = item
             if not isinstance(cap, int):
                 raise TypeError(f"usage_cap at index {i} must be int, got {type(cap).__name__}")
 
-            # FIX: Use Pack.bundle() here to correctly handle existing Pack instances
-            # This will create a new Pack for raw callables or return the existing Pack.
-            _packed_callables.append((cap, Pack.bundle(fn)))
+        if timeout_duration is not None and (not isinstance(timeout_duration, (int, float)) or timeout_duration <= 0):
+            raise ValueError("timeout_duration must be a positive number or None.")
+
+        # Use tuple unpacking to set the individual usage_cap for each ForkUnit.
+        # Use the _packed_callables list directly for initializing _list_of_forks
+        self._list_of_forks: ConcurrentList[ForkUnit] = ConcurrentList([ForkUnit(fork_callable=Pack.bundle(fn), usage_cap=cap)
+                                               for cap, fn in callables])
 
         if timeout_duration is not None and (timeout_duration <= 0):
             raise ValueError("timeout_duration must be > 0 or None.")
@@ -144,10 +150,6 @@ class SyncSignalFork(IDisposable):
 
         # ----------------- state ----------------- #
         self._threading_event = threading.Event()
-        # Use the _packed_callables list directly for initializing _list_of_forks
-        self._list_of_forks: ConcurrentList[ForkUnit] = ConcurrentList([ForkUnit(fork_callable=fn, usage_cap=cap)
-                                               for cap, fn in _packed_callables])
-
         self._selector_step = max(1, selector_step)
         self._selector_step_counter = 0
         self._selector_lock = threading.RLock()
