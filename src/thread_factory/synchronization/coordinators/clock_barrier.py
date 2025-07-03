@@ -1,8 +1,7 @@
-import threading
-import time
+import threading, ulid, time
 from typing import Callable, Optional, Dict, Any, Union
-import ulid
 from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 
 class ClockBarrier(IDisposable):
@@ -32,7 +31,6 @@ class ClockBarrier(IDisposable):
         "_count", "_start_time", "_broken", "_generation", "_id",
         "_controller"
     ]
-
     def __init__(
         self,
         threshold: int,
@@ -135,21 +133,21 @@ class ClockBarrier(IDisposable):
         """
         return self._id
 
-    def _get_object_details(self) -> Dict[str, Any]:
+    def _get_object_details(self) -> ConcurrentDict[str, Any]:
         """
         Provides the metadata for the barrier, used by the controller for dynamic interaction.
 
         Returns:
             dict: A dictionary with the barrier's name and commands available for the controller to invoke.
         """
-        return {
+        return ConcurrentDict({
             "name": "clock_barrier",
             "commands": {
                 "reset":             self.reset,
                 "is_broken":         self.is_broken,
                 "get_waiting_count": self.get_waiting_count,
             },
-        }
+        })
 
     def release(self) -> None:
         """

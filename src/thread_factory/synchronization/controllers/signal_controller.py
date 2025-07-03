@@ -2,6 +2,7 @@ import logging
 import threading
 from typing import Any, Callable, Dict, List, Optional
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 
@@ -72,7 +73,7 @@ class SignalController(IDisposable):
         # 'instance' (Any): The actual object instance.
         # 'name' (str): The object's human-readable name.
         # 'commands' (Dict[str, Callable]): A dictionary of callable commands exposed by the object.
-        self._registry: ConcurrentDict[str, Dict[str, Any]] = ConcurrentDict()
+        self._registry: ConcurrentDict[str, ConcurrentDict[str, Any]] = ConcurrentDict()
 
         # Tracks which objects are currently in a "waiting" state.
         # Maps object_id (str) to a status string (e.g., "WAITING").
@@ -84,13 +85,13 @@ class SignalController(IDisposable):
 
         # Event subscribers: maps object_id (str) to a ConcurrentDict, which then maps
         # event_type (str) to a list of registered callback functions (List[Callable]).
-        self._subscribers: ConcurrentDict[str, ConcurrentDict[str, List[Callable]]] = ConcurrentDict()
+        self._subscribers: ConcurrentDict[str, ConcurrentDict[str, ConcurrentList[Callable]]] = ConcurrentDict()
 
         # Hook system for pre/post-invocation.
         # Maps hook_name (str, e.g., 'pre_invoke', 'post_invoke') to a list of callable hooks.
-        self._hooks: ConcurrentDict[str, List[Callable]] = ConcurrentDict()
-        self._hooks['pre_invoke'] = []  # List to store pre-invocation callbacks.
-        self._hooks['post_invoke'] = [] # List to store post-invocation callbacks.
+        self._hooks: ConcurrentDict[str, ConcurrentList[Callable]] = ConcurrentDict()
+        self._hooks['pre_invoke'] = ConcurrentList()  # List to store pre-invocation callbacks.
+        self._hooks['post_invoke'] = ConcurrentList() # List to store post-invocation callbacks.
 
     # -------------------------------------------
     # Hook Registration
@@ -296,8 +297,8 @@ class SignalController(IDisposable):
             raise TypeError("Object must have 'id' attribute and '_get_object_details' method.")
 
         details = registrant._get_object_details()
-        if not (isinstance(details, dict) and 'name' in details and 'commands' in details and isinstance(
-                details['commands'], dict)):
+        if not (isinstance(details, ConcurrentDict) and 'name' in details and 'commands' in details and isinstance(
+                details['commands'], ConcurrentDict)):
             raise TypeError("'_get_object_details' must return a dictionary with 'name' (str) and 'commands' "
                             "(Dict[str, Callable]) keys.")
 
@@ -308,11 +309,11 @@ class SignalController(IDisposable):
                 raise ValueError(f"Object with ID '{obj_id}' is already registered.")
 
             # Store the object instance, its name, and its commands in the registry
-            self._registry[obj_id] = {
+            self._registry[obj_id] = ConcurrentDict({
                 'instance': registrant,
                 'name': details['name'],
                 'commands': details['commands']
-            }
+            })
             self._logger.debug(f"Registered object: ID='{obj_id}', Name='{details['name']}'")
 
     def unregister(self, object_id: str, dispose_object: bool = True):

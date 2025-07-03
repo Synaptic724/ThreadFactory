@@ -1,9 +1,7 @@
-import dataclasses
-import inspect
-import threading
-import ulid
+import dataclasses, threading, ulid
 from typing import Callable, List, Optional, Tuple, Any, Dict, Union
 from thread_factory.concurrency.concurrent_list import ConcurrentList
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.synchronization.coordinators.scout import Scout
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.package import Pack
@@ -27,7 +25,7 @@ class ForkUnit:
     gate_uses : int
         Current number of threads that have claimed this unit.
     """
-    fork_callable: Pack | None
+    fork_callable: Optional[Callable[..., None], Pack]
     usage_cap: int
     lock: threading.Lock = dataclasses.field(default_factory=threading.RLock)
     gate: bool = False
@@ -142,11 +140,9 @@ class SyncSignalFork(IDisposable):
         # ----------------- immutable config ----------------- #
         self._id: str = str(ulid.ULID())
         self._manual_release: bool = bool(manual_release)
-
-        # FIX: Consistently pack callbacks using Pack.bundle()
-        self._callback = Pack.bundle(callback) if callback is not None else None
+        self._callback: Optional[ConcurrentList[Union[Callable[..., None], Pack]]] = Pack.bundle(callback) if callback else None
         self._controller = controller
-        self._signal_callback = Pack.bundle(signal_callback) if signal_callback is not None else None
+        self._signal_callback: Union[Callable[..., None], Pack] = Pack.bundle(signal_callback) if signal_callback else None
 
         # ----------------- state ----------------- #
         self._threading_event = threading.Event()
@@ -156,11 +152,9 @@ class SyncSignalFork(IDisposable):
         self._blocked_thread_count = 0
         self._forks_closed = False
         self._released = False
-
         self._timeout_duration = timeout_duration
         self._timed_out = False
         self._scout: Optional[Scout] = None  # Assuming Scout manages the timeout logic
-
         self._detect_number_of_routes()
 
         if self._controller:
@@ -217,7 +211,7 @@ class SyncSignalFork(IDisposable):
 
         return self._id
 
-    def _get_object_details(self) -> Dict[str, Any]:
+    def _get_object_details(self) -> ConcurrentDict[str, Any]:
         """
         Returns a dictionary of metadata about this object.
 
@@ -226,14 +220,14 @@ class SyncSignalFork(IDisposable):
         • commands: Public methods that can be triggered by controller (release, reset, dispose).
         """
 
-        return {
+        return ConcurrentDict({
             "name": "sync_signal_fork",
             "commands": {
                 "release": self.release,
                 "reset":   self.reset,
                 "dispose": self.dispose,
             },
-        }
+        })
 
     def _detect_number_of_routes(self) -> None:
         """
@@ -306,12 +300,8 @@ class SyncSignalFork(IDisposable):
 
         Currently a no-op, but can be extended for logging or diagnostics.
         """
-
         pass
 
-    # ------------------------------------------------------------------ #
-    # Public API
-    # ------------------------------------------------------------------ #
     def use_fork(self) -> None:
         """
         Claim a slot, wait for the barrier, and execute the assigned callable.

@@ -34,13 +34,10 @@ class Conductor(IDisposable):
         "_threshold", "tasks", "reusable", "manual_release", "_timeout", "_raise_on_timeout",
         "_id", "outcomes", "_released", "_broken", "_multiple_outcomes_per_task",
         "_lock", "_clock_barrier", "_signal_barrier", "_dynaphore", "_internal_threshold_barrier",
-        "_manual_release_gate",
-        "_controller", "_callback",
+        "_manual_release_gate", "_controller", "_callback",
         "_callback_executed_flags", "_barrier_passed_notified", "_execution_started_notified",
-        "_execution_completed_notified",
-        "_main_barrier",
+        "_execution_completed_notified","_main_barrier",
     ]
-
     def __init__(
             self,
             threshold: int,
@@ -100,6 +97,7 @@ class Conductor(IDisposable):
         if threshold <= 0:
             raise ValueError("Threshold must be a positive integer.")
 
+        # Callback Management
         if tasks is None:
             self.tasks: ConcurrentList[Pack] = ConcurrentList()
         else:
@@ -110,15 +108,11 @@ class Conductor(IDisposable):
             else:
                 # If bundle returned a ConcurrentList (for iterables), use it directly
                 self.tasks = packified_result
-
         self._callback: Union[Callable[..., None], Pack] = callback
         self._callback_executed_flags: List[bool] = []
-
         if self._callback:
             Pack.bundle(self._callback)
             self._callback_executed_flags = [False for _ in self.tasks]
-        self.outcomes: ConcurrentDict[int, Union[Outcome, ConcurrentList[Outcome]]] = ConcurrentDict()
-
 
         # State management
         self._id: str = str(ulid.ULID())
@@ -144,6 +138,7 @@ class Conductor(IDisposable):
         self._dynaphore: Dynaphore = Dynaphore(self._threshold)
         self._manual_release_gate: Optional[threading.Event] = threading.Event() if self.manual_release else None
 
+        # Controller management
         self._controller: 'Controller' = controller
         if self._controller:
             try:
@@ -151,6 +146,7 @@ class Conductor(IDisposable):
             except Exception:
                 pass
 
+        # Set up the main barrier based on timeout
         if timeout is not None:
             if timeout <= 0: raise ValueError("Timeout must be a positive number.")
             self._clock_barrier = ClockBarrier(
@@ -162,6 +158,9 @@ class Conductor(IDisposable):
                 self._threshold, reusable=reusable, controller=self._controller
             )
         self._set_main_barrier()
+
+        # Outcomes management
+        self.outcomes: ConcurrentDict[int, Union[Outcome, ConcurrentList[Outcome]]] = ConcurrentDict()
 
     @property
     def id(self) -> str:
@@ -179,7 +178,7 @@ class Conductor(IDisposable):
         """
         return self._id
 
-    def _get_object_details(self) -> Dict[str, Any]:
+    def _get_object_details(self) -> ConcurrentDict[str, Any]:
         """
         Prepares a summary of the instance for controller registration.
 
@@ -196,13 +195,13 @@ class Conductor(IDisposable):
             Dict[str, Any]: A dictionary containing the object's name and
                             callable command methods.
         """
-        return {
+        return ConcurrentDict({
             'name': 'conductor',
             'commands': {
                 'dispose': self.dispose, 'reset': self.reset, 'release': self.release,
                 'notify_all_override': self.notify_all_override, 'is_spent': self.is_spent,
             }
-        }
+        })
 
     def dispose(self):
         """

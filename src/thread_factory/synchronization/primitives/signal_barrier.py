@@ -3,6 +3,7 @@ from typing import Optional, Callable, Any, Dict, Union
 import ulid
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.package import Pack
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 
 # Assuming Controller is in a file that can be imported
 # from thread_factory.controller import Controller
@@ -99,21 +100,23 @@ class SignalBarrier(IDisposable):
         if threshold <= 0:
             raise ValueError("Threshold must be greater than 0")
 
-        self._id = str(ulid.ULID())
-        self._threshold = threshold
-        self._signal_callback = signal_callback if signal_callback is None else Pack.bundle(signal_callback)
-        self._reusable = reusable
-        self._manual_release = manual_release
-
+        # --- Synchronization Primitives ---
         self._lock = threading.RLock()
         self._condition = threading.Condition(self._lock)
-        self._count = 0
-        self._released = False
-        self._wait_notification = False
+
+        # --- State Management ---
+        self._count: int = 0
+        self._released: bool = False
+        self._wait_notification: bool = False
+        self._reusable: bool = reusable
+        self._manual_release: bool = manual_release
+        self._id = str(ulid.ULID())
+        self._threshold: int = threshold
+        self._signal_callback = signal_callback if signal_callback is None else Pack.bundle(signal_callback)
 
         # --- Controller Integration ---
-        self._controller = controller
-        self._transit_callback = transit_callback if transit_callback is None else Pack.bundle(transit_callback)
+        self._controller: 'Controller' = controller
+        self._transit_callback: Union[Callable[..., None], Pack] = transit_callback if transit_callback is None else Pack.bundle(transit_callback)
 
         if self._controller:
             try:
@@ -121,7 +124,6 @@ class SignalBarrier(IDisposable):
             except Exception:
                 # Fail silently if registration fails, maintaining standalone functionality.
                 pass
-
 
     def dispose(self):
         """
@@ -160,7 +162,7 @@ class SignalBarrier(IDisposable):
         """
         return self._id
 
-    def _get_object_details(self) -> Dict[str, Any]:
+    def _get_object_details(self) -> ConcurrentDict[str, Any]:
         """
         Provides controller-compatible metadata and command bindings.
 
@@ -172,7 +174,7 @@ class SignalBarrier(IDisposable):
                 - 'name': A string descriptor of the object ("threshold_semaphore").
                 - 'commands': A dictionary mapping command names to bound methods.
         """
-        return {
+        return ConcurrentDict({
             'name': 'threshold_semaphore',
             'commands': {
                 'release': self.release,
@@ -182,7 +184,7 @@ class SignalBarrier(IDisposable):
                 'notify_all_override': self.notify_all_override,
                 'dispose': self.dispose
             }
-        }
+        })
 
 
     def is_spent(self) -> bool:

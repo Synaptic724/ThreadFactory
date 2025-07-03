@@ -104,18 +104,18 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
         self._list_of_forks: ConcurrentList[ForkUnit] = ConcurrentList([ForkUnit(fork_callable=Pack.bundle(fn), usage_cap=cap)
                                                for cap, fn in callables])
         # Init internal state
-        self._threading_event = threading.Event()  # Shared barrier event for all threads
         self._id = str(ulid.ULID())
         self._forks_closed: bool = False
         self._selector_step = max(1, selector_step)
         self._selector_step_counter: int = 0
-        self._selector_lock: threading.RLock = threading.RLock()  # Protects _blocked_thread_count and _selector_step_counter
         self._blocked_thread_count: int = 0
-
         self._timeout_duration: float = timeout_duration
         self._timed_out = False  # Flag set by Scout if timeout occurs
-        self._scout: Optional['Scout'] = None  # Scout instance for barrier timeout
 
+        # --- Synchronization state --- #
+        self._threading_event = threading.Event()  # Shared barrier event for all threads
+        self._selector_lock: threading.RLock = threading.RLock()  # Protects _blocked_thread_count and _selector_step_counter
+        self._scout: Optional['Scout'] = None  # Scout instance for barrier timeout
         self._detect_number_of_routes()
 
     def dispose(self) -> None:

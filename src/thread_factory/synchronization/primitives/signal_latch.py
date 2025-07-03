@@ -4,6 +4,7 @@ from typing import Callable, Optional, Any, Dict, Union
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.package import Pack
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 
 
 class SignalLatch(IDisposable):
@@ -94,9 +95,9 @@ class SignalLatch(IDisposable):
         self._id: str = str(ulid.ULID())
         self._cond: TransitCondition = cond or TransitCondition()
         self._open: bool = False
-        self._signal_callback = signal_callback if signal_callback is None else Pack.bundle(signal_callback)
+        self._signal_callback: Union[Callable[..., None], Pack] = signal_callback if signal_callback is None else Pack.bundle(signal_callback)
         self._lock = threading.RLock()
-        self._controller = controller
+        self._controller: 'Controller' = controller
 
         # Auto-register with controller (best-effort)
         if self._controller:
@@ -115,7 +116,7 @@ class SignalLatch(IDisposable):
         """
         return self._id
 
-    def _get_object_details(self) -> Dict[str, Any]:
+    def _get_object_details(self) -> ConcurrentDict[str, Any]:
         """
         Metadata dictionary expected by the project’s :class:`Controller`.
 
@@ -125,7 +126,7 @@ class SignalLatch(IDisposable):
             Contains a human-readable *name* and a *commands* map exposing
             safe operations that the controller may invoke.
         """
-        return {
+        return ConcurrentDict({
             "name": "latch",
             "commands": {
                 "open":   self.open,
@@ -133,7 +134,7 @@ class SignalLatch(IDisposable):
                 "is_open": self.is_open,
                 "dispose": self.dispose,
             },
-        }
+        })
 
     # ──────────────────────────────────────────────────────────────────
     # Context-manager & cleanup helpers
@@ -227,9 +228,6 @@ class SignalLatch(IDisposable):
         """
         return self._open
 
-    # ──────────────────────────────────────────────────────────────────
-    # Disposal
-    # ──────────────────────────────────────────────────────────────────
     def dispose(self) -> None:
         """
         Release all blocked threads **permanently**; further operations raise.

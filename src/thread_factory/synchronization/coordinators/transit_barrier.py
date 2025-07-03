@@ -1,18 +1,49 @@
-import threading
+import threading, ulid
 from typing import Optional, Callable, Any, Dict, Union
-import ulid
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 
 class TransitBarrier(IDisposable):
     """
     TransitBarrier
     ------------------
-    A reusable, controllable barrier that executes a `transit` action.
-    When in manual mode and managed by a Controller, it signals the
-    Controller upon reaching its threshold and waits for a command.
+    A reusable, controllable barrier that synchronizes threads based on a predefined threshold.
+    Once the threshold number of threads has called `wait()`, the barrier releases all waiting threads simultaneously.
+
+    When in manual mode and managed by a Controller, the barrier signals the Controller upon reaching its threshold and
+    waits for a command to proceed. The barrier can also trigger a custom action (referred to as `transit`) once the threshold is met.
+
+    Key Features:
+    -------------
+    • **Threshold-Based Synchronization**: Threads wait until the threshold number of threads have reached the barrier.
+    • **Auto-Release or Manual Release**: The barrier can either auto-release threads once the threshold is met or wait for an explicit `release()` call.
+    • **Controller Integration**: Supports integration with a Controller for remote management and event broadcasting.
+    • **Custom Transit Action**: A custom `transit` action can be executed when the threshold is met, or a one-time action can be provided.
+    • **Reusability**: If `reusable=True`, the barrier resets automatically after each complete release cycle.
+    • **Timeout Support**: Threads can specify a timeout for waiting at the barrier.
+
+    Parameters:
+    -----------
+    threshold (int):
+        The number of threads required to trigger the release and transit action. Must be greater than 0.
+    transit (Optional[Union[Callable[..., None], Pack]]):
+        A callable function or a `Pack` containing the action to execute once the threshold is met.
+    reusable (bool):
+        If `True`, the barrier will reset after the release, making it reusable for subsequent groups of threads. Default is `False`.
+    manual_release (bool):
+        If `True`, the barrier requires an explicit call to `release()` after the threshold is met. Default is `False` (auto-release).
+    controller (Optional['Controller']):
+        An optional `Controller` instance for managing the barrier and broadcasting events.
+
+    Notes:
+    ------
+    - In **manual mode**, threads remain blocked after the threshold is met until the `release()` method is explicitly called.
+    - In **auto-release mode**, the barrier will automatically release all waiting threads once the threshold is met.
+    - **Reusability** allows the barrier to reset and be reused after a full release cycle, but is ignored when `manual_release=True`.
     """
+
     __slots__ = IDisposable.__slots__ + [
         "_threshold", "_transit", "_reusable", "_manual_release",
         "_lock", "_condition", "_count", "_released", "_transit_fired",
@@ -81,7 +112,7 @@ class TransitBarrier(IDisposable):
         """
         return self._id
 
-    def _get_object_details(self) -> Dict[str, Any]:
+    def _get_object_details(self) -> ConcurrentDict[str, Any]:
         """
         Provides metadata and command hooks for integration with a controller.
 
@@ -90,7 +121,7 @@ class TransitBarrier(IDisposable):
                 - name: Logical name of this component.
                 - commands: Callable controller-accessible methods.
         """
-        return {
+        return ConcurrentDict({
             'name': 'transit_barrier',
             'commands': {
                 'release': self.release,
@@ -101,7 +132,7 @@ class TransitBarrier(IDisposable):
                 # Re-added for production compatibility
                 'notify_all_override': self.notify_all_override,
             }
-        }
+        })
 
     def release_with_action(self, callback: Optional[Union[Callable[..., None], Pack]] = None) -> None:
         """

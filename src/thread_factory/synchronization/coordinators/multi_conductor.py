@@ -1,9 +1,9 @@
 from __future__ import annotations
+import threading, ulid
+from typing import Optional, Callable, List, Union, Any, Dict
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.synchronization.dispatchers.fork import Fork
 from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
-import threading, ulid
-from typing import Optional, Callable, List, Union, Any, Dict
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.group import Group
@@ -64,7 +64,7 @@ class MultiConductor(IDisposable):
     def __init__(
             self,
             threshold: int,
-            groups: Optional[List[Group]] = None,
+            groups: Optional[Union[List[Group], ConcurrentList[Group]]] = None,
             reusable: bool = False,
             manual_release: bool = False,
             timeout: Optional[float] = None,
@@ -105,26 +105,30 @@ class MultiConductor(IDisposable):
         Raises:
             ValueError: If `threshold` is not a positive integer.
         """
-
         super().__init__()
         if threshold <= 0:
             raise ValueError("Threshold must be a positive integer.")
 
+        # --- Initialization of internal state ---
+        self._id: str = str(ulid.ULID())
+        self._enabled: bool = False
         self._concurrent: bool = concurrent_execution
         self._parallel: bool = parallel_execution
         self._threshold: int = threshold
-        self.groups: Optional[Group] | ConcurrentList[Group] = ConcurrentList[Group]()
         self.reusable: bool = reusable
         self.manual_release: bool = manual_release
         self._timeout: float = timeout
         self._raise_on_timeout:bool  = raise_on_timeout
         self._multiple_outcomes_per_task: bool = multiple_outcomes_per_task
-        self._callback: Union[Callable[..., None], Pack] = Pack.bundle(callback) if callback else None
-        self._controller: 'Controller' = controller
-        self._id: str = str(ulid.ULID())
-        self._enabled: bool = False
-        self.outcomes: ConcurrentDict = ConcurrentDict()
+        self._released: bool = False
+        self._broken: bool = False
+        self._barrier_passed_notified: bool = False
+        self._execution_started_notified: bool = False
+        self._execution_completed_notified: bool = False
 
+        # --- Callback Management ---
+        self.groups: Optional[Group] | ConcurrentList[Group] = ConcurrentList[Group]()
+        self._callback: Union[Callable[..., None], Pack] = Pack.bundle(callback) if callback else None
         if groups:
             for group in groups:
                 # ✅ This check ensures the Group and MultiConductor configurations match.
@@ -134,20 +138,17 @@ class MultiConductor(IDisposable):
                         f"MultiConductor and Group '{group.name}'."
                     )
                 self.add_group(group)
+        self._callback_executed_flags = {}
 
-        self._released: bool = False
-        self._broken: bool = False
+        # --- Synchronization primitives ---
         self._lock: threading.RLock = threading.RLock()
         self._dynaphore: Dynaphore = Dynaphore(threshold)
         self._manual_release_gate: threading.Event | None = threading.Event() if manual_release else None
         self._internal_threshold_barrier: SignalBarrier = SignalBarrier(threshold, reusable=True)
-        self._barrier_passed_notified: bool = False
-        self._execution_started_notified: bool = False
-        self._execution_completed_notified: bool = False
-        self._callback_executed_flags = {}
         self._clock_barrier: ClockBarrier | None = None
         self._signal_barrier: SignalBarrier | None = None
 
+        # --- Initialize the main barrier based on timeout ---
         if timeout is not None:
             if timeout <= 0:
                 raise ValueError("Timeout must be positive.")
@@ -160,9 +161,15 @@ class MultiConductor(IDisposable):
             )
 
         self._main_barrier = self._clock_barrier or self._signal_barrier
+
+        # --- Initialize the controller if provided ---
+        self._controller: 'Controller' = controller
         if self._controller:
             try: self._controller.register(self)
             except Exception: pass
+
+        # --- Initialize outcomes storage ---
+        self.outcomes: ConcurrentDict = ConcurrentDict()
 
     def dispose(self):
         """
@@ -264,7 +271,8 @@ class MultiConductor(IDisposable):
             pass
 
     def enable(self):
-        """Locks the conductor's configuration.
+        """
+        Locks the conductor's configuration.
 
         After this method is called (which happens automatically on the first
         call to `start()`), no more groups can be added or removed.
@@ -629,7 +637,7 @@ class MultiConductor(IDisposable):
         """
         return self._id
 
-    def _get_object_details(self) -> Dict[str, Any]:
+    def _get_object_details(self) -> ConcurrentDict[str, Any]:
         """
         Prepares a summary of the instance for controller registration.
 
@@ -637,13 +645,13 @@ class MultiConductor(IDisposable):
         details such as the name of the component and a set of commands that can be executed by the controller.
 
         Returns:
-            Dict[str, Any]: A dictionary containing the name of the instance and the commands that can be triggered
+            ConcurrentDict[str, Any]: A dictionary containing the name of the instance and the commands that can be triggered
                              by the controller.
         """
-        return {
+        return ConcurrentDict({
             'name': 'multiconductor',
             'commands': {
                 'dispose': self.dispose, 'reset': self.reset, 'release': self.release,
                 'notify_all_override': self.notify_all_override, 'is_spent': self.is_spent,
             }
-        }
+        })

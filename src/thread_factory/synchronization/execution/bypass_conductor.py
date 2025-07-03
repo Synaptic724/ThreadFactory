@@ -1,8 +1,5 @@
-import functools
-import inspect
-import threading
+import threading, ulid
 from typing import Callable, Optional, List, Any, Union
-import ulid
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.synchronization.primitives.dynaphore import Dynaphore
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
@@ -49,25 +46,31 @@ class BypassConductor(IDisposable):
     def __init__(self, func: Union[Union[Callable[..., Any], Pack], list[Union[Callable[..., Any], Pack]],
     ConcurrentList[Union[Callable[..., Any], Pack]]], limit: int = 1):
         super().__init__()
-
         if limit < 0:
             raise ValueError("Limit must be non-negative")
 
+        # --- Callable Handling ---
         packified_result = Pack.bundle(func)
         if isinstance(packified_result, Pack):
             self._func = [packified_result]
         else: # It must be a ConcurrentList[Package] because Pack.Packify guarantees valid output
             self._func = packified_result
 
-        self._id = str(ulid.ULID())
-        self._limit = limit
-        self._count = 0
+        # --- Synchronization Primitives ---
         self._lock = threading.RLock()
-        self._collapsed = False
-        self._outcomes: List[Outcome] = []
-        self._dynaphore = Dynaphore(limit)
-        self._threshold_sema = SignalBarrier(limit, reusable=True)
+        self._dynaphore: Dynaphore = Dynaphore(limit)
+        self._threshold_sema: SignalBarrier = SignalBarrier(limit, reusable=True)
+
+        # --- State Management ---
+        self._id: str = str(ulid.ULID())
+        self._limit: int = limit
+        self._count: int = 0
+        self._collapsed: bool = False
         self._outcome_set = False
+
+        # --- Outcomes Storage ---
+        self._outcomes: ConcurrentList[Outcome] = ConcurrentList()
+
 
     def dispose(self):
         """
@@ -281,7 +284,7 @@ class BypassConductor(IDisposable):
             self._collapsed = False
             self._outcomes.clear()
 
-    def outcomes(self) -> List[Outcome]:
+    def outcomes(self) -> ConcurrentList[Outcome]:
         """
         Retrieve the list of outcomes recorded so far.
 
