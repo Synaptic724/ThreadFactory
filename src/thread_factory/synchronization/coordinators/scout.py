@@ -1,7 +1,8 @@
 import threading
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 import ulid
 from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utils.coordination.package import Pack
 
 
 class Scout(IDisposable):
@@ -38,30 +39,30 @@ class Scout(IDisposable):
     ]
     def __init__(
             self,
-            predicate: Callable[[], bool],
+            predicate: Union[Callable[..., bool], Pack],
             timeout_duration: float,
-            on_timeout_callable: Callable,
-            on_success_callable: Optional[Callable] = None,
+            on_timeout_callable: Union[Callable[..., None], Pack],
+            on_success_callable: Optional[Union[Callable[..., None], Pack]] = None,
             autoreset_on_exit: bool = False,
     ):
         """
 
         """
         super().__init__()  # Initialize _disposed = False
-        if not callable(predicate):
-            raise TypeError("predicate must be a callable function.")
         if not isinstance(timeout_duration, (int, float)) or timeout_duration <= 0:
             raise ValueError("timeout_duration must be a positive number.")
         if not callable(on_timeout_callable):
             raise TypeError("on_timeout_callable must be a callable function.")
+        if not callable(predicate):
+            raise TypeError("predicate must be a callable function.")
         if on_success_callable is not None and not callable(on_success_callable):
             raise TypeError("on_success_callable must be a callable function or None.")
 
         self._id = str(ulid.ULID())
-        self._predicate = predicate
+        self._predicate = Pack.bundle(predicate) if predicate else None
         self._timeout_duration = timeout_duration
-        self._on_timeout_callable = on_timeout_callable
-        self._on_success_callable = on_success_callable
+        self._on_timeout_callable = Pack.bundle(on_timeout_callable) if on_timeout_callable else None
+        self._on_success_callable = Pack.bundle(on_success_callable) if on_success_callable else None
         self._autoreset_on_exit = autoreset_on_exit
 
         # Use a Condition to manage exclusive entry, active status, and the predicate wait.

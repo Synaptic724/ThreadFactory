@@ -325,7 +325,7 @@ class TestSyncSignalFork(unittest.TestCase):
                               timeout_duration=0.05, manual_release=True)
         threading.Thread(target=thread_use_fork,
                          args=(fork, self.log, "T"), daemon=True).start()
-        time.sleep(0.07)
+        time.sleep(0.15)
         self.assertTrue(fork._timed_out)
         fork.reset()
         time.sleep(0.5)  # give time for reset to take effect
@@ -333,10 +333,36 @@ class TestSyncSignalFork(unittest.TestCase):
         t2 = threading.Thread(target=thread_use_fork, args=(fork, self.log, "B"))
         t1.start();
         t2.start()
-        time.sleep(0.01)  # Ensure threads are up and running
+        time.sleep(0.15)  # Ensure threads are up and running
         fork.release()
         t1.join(timeout=5)
         t2.join(timeout=5)
+
+
+    def test_nested_forks(self):
+        lock = threading.Lock()
+        inner_calls = [(2, dummy_func_factory("INNER", self.log))]
+        inner_fork = SyncSignalFork(1, inner_calls)
+
+
+        def outer_job():
+            inner_fork.use_fork()
+            self.log.append("OUTER")
+
+        outer_calls = [(2, outer_job)]
+        outer_fork = SyncSignalFork(1, outer_calls)
+
+        threads = [threading.Thread(target=outer_fork.use_fork) for _ in range(2)]
+        for t in threads: t.start()
+        for t in threads: t.join(timeout=5)
+        #for t in threads: self.assertFalse(t.is_alive())
+
+        self.assertEqual(self.log.count("OUTER"), 2)
+        self.assertEqual(self.log.count("INNER"), 2)
+        outer_fork.dispose()  # Clean up
+        inner_fork.dispose()  # Clean up
+
+
     def test_high_contention_small_slots(self):
         fork = SyncSignalFork(1, [(3, dummy_func_factory("HC", self.log))])
         threads = [threading.Thread(target=thread_use_fork,

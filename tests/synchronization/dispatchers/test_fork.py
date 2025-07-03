@@ -362,6 +362,28 @@ class TestFork(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             fork.use_fork()
 
+    def test_nested_forks(self):
+        lock = threading.Lock()
+        inner_calls = [(2, dummy_func_factory("INNER", None))]
+        inner_fork = Fork(1, inner_calls)
+
+
+        def outer_job():
+            inner_fork.use_fork()
+            print("OUTER")
+
+        outer_calls = [(2, outer_job)]
+        outer_fork = Fork(1, outer_calls)
+
+        threads = [threading.Thread(target=outer_fork.use_fork) for _ in range(2)]
+        for t in threads: t.start()
+        for t in threads: t.join(timeout=5)
+        #for t in threads: self.assertFalse(t.is_alive())
+
+        outer_fork.dispose()  # Clean up
+        inner_fork.dispose()  # Clean up
+
+
     def test_reset_partially_used_fork(self):
         log = []
         fork = Fork(

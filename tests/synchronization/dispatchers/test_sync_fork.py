@@ -11,11 +11,13 @@ def dummy_func_factory(name: str, log: List[str], delay: float = 0):
     """
     Creates a simple callable function that logs its name and optionally waits.
     """
+    lock = threading.Lock()
 
     def func():
-        if delay > 0:
-            time.sleep(delay)
-        log.append(name)
+        with lock:
+            if delay > 0:
+                time.sleep(delay)
+            log.append(name)
 
     return func
 
@@ -171,8 +173,7 @@ class TestSyncFork(unittest.TestCase):
 
         def outer_job():
             inner_fork.use_fork()
-            with lock:
-                self.log.append("OUTER")
+            self.log.append("OUTER")
 
         outer_calls = [(2, outer_job)]
         outer_fork = SyncFork(1, outer_calls)
