@@ -5,6 +5,7 @@ import ulid
 from thread_factory.concurrency.concurrent_set import ConcurrentSet
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.synchronization.primitives.smart_condition import SmartCondition
+from thread_factory.utils.coordination.package import Pack
 
 #FlowRegulator class
 
@@ -187,7 +188,7 @@ class FlowRegulator(IDisposable):
         thread = threading.current_thread()
         return hasattr(thread, "_factory_id")
 
-    def set_callback(self, factory_id: str, callback: Callable[[], None]) -> None:
+    def set_callback(self, factory_id: str, callback: Union[Callable[..., None], Pack]) -> None:
         """
         Registers a specific callback for a particular factory_id.
 
@@ -195,9 +196,11 @@ class FlowRegulator(IDisposable):
             factory_id (str): The unique identifier of the waiting thread.
             callback (Callable[[], None]): The callback to be executed when this thread is notified.
         """
+        if callback:
+            callback = Pack(callback)  # Ensure callback is wrapped in Pack if provided
         self._cond.bind_callback(factory_id, callback)
 
-    def set_default_callback(self, callback: Callable[[], None]) -> None:
+    def set_default_callback(self, callback: Union[Callable[..., None], Pack]) -> None:
         """
         Registers a default callback to be executed if no specific callback
         is bound to a waiting thread.
@@ -205,9 +208,11 @@ class FlowRegulator(IDisposable):
         Args:
             callback (Callable[[], None]): The callback to be executed for any notified thread without a specific callback.
         """
+        if callback:
+            callback = Pack(callback)  # Ensure callback is wrapped in Pack if provided
         self._cond.set_default_callback(callback)
 
-    def _attempt_bias_flush(self, n: int, factory_ids: Optional[Union[str, Iterable[str]]] = None, callback: Optional[Callable[[], None]] = None,
+    def _attempt_bias_flush(self, n: int, factory_ids: Optional[Union[str, Iterable[str]]] = None, callback: Optional[Union[Callable[..., None], Pack]] = None,
                                awaited_caller: bool = False):
         """
         Flush buffered permits and wake *at most* `max_to_wake` threads
@@ -216,6 +221,8 @@ class FlowRegulator(IDisposable):
         """
         if self._bias_threshold is None or self._pending_permits == 0:
             return  # classic mode / nothing buffered
+        if callback:
+            callback = Pack(callback)  # Ensure callback is wrapped in Pack if provided
 
         waiters = len(self._cond.get_all_waiters())
         excess = max(0, waiters - self._bias_threshold)  # threads allowed to wake
@@ -227,7 +234,7 @@ class FlowRegulator(IDisposable):
             self._cond.notify_and_call(n=to_flush, factory_ids=factory_ids, callback=callback, awaited_caller=awaited_caller)
 
     def _attempt_bias_flush_all(self, factory_ids: Optional[Union[str, Iterable[str]]] = None,
-                   awaited_caller: bool = False, callback: Optional[Callable[[], None]] = None):
+                   awaited_caller: bool = False, callback: Optional[Union[Callable[..., None], Pack]] = None):
         """
         Flush buffered permits and wake *at most* `max_to_wake` threads
         without violating the bias reserve.
@@ -235,6 +242,8 @@ class FlowRegulator(IDisposable):
         """
         if self._bias_threshold is None or self._pending_permits == 0:
             return  # classic mode / nothing buffered
+        if callback:
+            callback = Pack(callback)  # Ensure callback is wrapped in Pack if provided
 
         waiters = len(self._cond.get_all_waiters())
         excess = max(0, waiters - self._bias_threshold)  # threads allowed to wake
@@ -245,7 +254,7 @@ class FlowRegulator(IDisposable):
             self._pending_permits -= to_flush
             self._cond.notify_and_call(n=to_flush, factory_ids=factory_ids, callback=callback, awaited_caller=awaited_caller)
 
-    def bypass_bias_and_notify(self, n: int, factory_ids: Optional[Union[str, Iterable[str]]] = None, callback: Optional[Callable[[], None]] = None,
+    def bypass_bias_and_notify(self, n: int, factory_ids: Optional[Union[str, Iterable[str]]] = None, callback: Optional[Union[Callable[..., None], Pack]] = None,
                                awaited_caller: bool = False) -> None:
         """
         Bypass the bias and notify up to `n` threads.
@@ -262,6 +271,8 @@ class FlowRegulator(IDisposable):
             raise ValueError("n must be >= 1")
         if self._disposed:
             return
+        if callback:
+            callback = Pack(callback)  # Ensure callback is wrapped in Pack if provided
 
         with self._cond:
             to_flush = min(self._pending_permits, n)
@@ -382,7 +393,7 @@ class FlowRegulator(IDisposable):
                 self._attempt_bias_flush(n, factory_ids)
 
     def notify(self, n: int = 1, factory_ids: Optional[Union[str, Iterable[str]]] = None,
-               awaited_caller: bool = False, callback: Optional[Callable[[], None]] = None) -> None:
+               awaited_caller: bool = False, callback: Optional[Union[Callable[..., None], Pack]] = None) -> None:
         """
         Notifies `n` waiting threads, increments permits by `n`, and executes their callbacks.
         This method combines permit release with flexible notification and callback execution.
@@ -397,6 +408,8 @@ class FlowRegulator(IDisposable):
             raise ValueError("Number of permits/notifications (n) must be >= 1.")
         if self._disposed:
             return
+        if callback:
+            callback = Pack(callback)  # Ensure callback is wrapped in Pack if provided
 
         with self._cond:  # Acquire the internal condition's lock for synchronized state modification
             self._buffer_or_grant(n)
@@ -411,7 +424,7 @@ class FlowRegulator(IDisposable):
                 self._attempt_bias_flush(n, factory_ids)
 
     def notify_all(self, factory_ids: Optional[Union[str, Iterable[str]]] = None,
-                   awaited_caller: bool = False, callback: Optional[Callable[[], None]] = None) -> None:
+                   awaited_caller: bool = False, callback: Optional[Union[Callable[..., None], Pack]] = None) -> None:
         """
         Notifies all waiting threads, potentially increments permits, and executes their callbacks.
         This method combines permit release with flexible notification and callback execution.
@@ -423,6 +436,8 @@ class FlowRegulator(IDisposable):
         """
         if self._disposed:
             return
+        if callback:
+            callback = Pack(callback)  # Ensure callback is wrapped in Pack if provided
 
         with self._cond:  # Acquire the internal condition's lock for synchronized state modification
             # Get a snapshot of currently waiting threads within the lock to ensure consistency

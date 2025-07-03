@@ -40,6 +40,64 @@ class CallbackRecorder:
 class TestTransitConditionBasic(unittest.TestCase):
     """Re‑implements the original five basic tests (sanity coverage)."""
 
+
+    def test_notify_executes_callback_n_times(self):
+        count = {"hits": 0}
+        lock = threading.RLock()
+
+        def transit():
+            with threading.Lock():
+                count["hits"] += 1
+
+        cond = TransitCondition(lock)
+
+        def worker():
+            with cond:
+                cond.wait()
+
+        threads = [threading.Thread(target=worker) for _ in range(5)]
+        for t in threads:
+            t.start()
+
+        # Allow threads to block on wait()
+        threading.Event().wait(0.1)
+
+        with cond:
+            cond.notify(3, transit)
+
+        for t in threads:
+            t.join(timeout=1)
+
+        self.assertEqual(count["hits"], 3)
+
+    def test_notify_all_executes_callback_for_all(self):
+        count = {"hits": 0}
+        lock = threading.RLock()
+
+        def transit():
+            with threading.Lock():
+                count["hits"] += 1
+
+        cond = TransitCondition(lock)
+
+        def worker():
+            with cond:
+                cond.wait()
+
+        threads = [threading.Thread(target=worker) for _ in range(4)]
+        for t in threads:
+            t.start()
+
+        threading.Event().wait(0.1)
+
+        with cond:
+            cond.notify_all(transit)
+
+        for t in threads:
+            t.join(timeout=1)
+
+        self.assertEqual(count["hits"], 4)
+
     def test_notify_wakes_exact_n(self):
         cond, results = TransitCondition(), []
         workers = [SimpleWorker(cond, results, f"t{i}") for i in range(4)]
@@ -119,7 +177,7 @@ class TestTransitConditionBasic(unittest.TestCase):
                     ok = cond.wait(timeout=0.05)
                 timed_out.append(ok)
 
-        t = TimeoutWorker(); t.start(); t.join()
+        t = TimeoutWorker(); t.start(); t.join(2)
         self.assertEqual(timed_out, [False])
         self.assertEqual(cond.find_waiter_count(), 0)
 

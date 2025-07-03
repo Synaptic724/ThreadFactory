@@ -1,6 +1,6 @@
 import threading
 import ulid
-from typing import Callable, Optional, Any, Dict
+from typing import Callable, Optional, Any, Dict, Union
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.package import Pack
@@ -66,7 +66,7 @@ class SignalLatch(IDisposable):
     # ──────────────────────────────────────────────────────────────────
     def __init__(
         self,
-        signal_callback: Optional[Callable[[str], None]] = None,
+        signal_callback: Optional[Union[Callable[..., None], Pack]] = None,
         cond: Optional[TransitCondition] = None,
         controller: Optional["Controller"] = None,
     ):
@@ -110,7 +110,9 @@ class SignalLatch(IDisposable):
     # ──────────────────────────────────────────────────────────────────
     @property
     def id(self) -> str:  # noqa: D401
-        """ULID that uniquely identifies this latch."""
+        """
+        ULID that uniquely identifies this latch.
+        """
         return self._id
 
     def _get_object_details(self) -> Dict[str, Any]:

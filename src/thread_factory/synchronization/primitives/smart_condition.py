@@ -1,7 +1,7 @@
 import threading
 import time
 import ulid
-from typing import Optional, Union, Iterable, Any, Callable
+from typing import Optional, Union, Iterable, Any, Callable, List
 from dataclasses import dataclass
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
@@ -24,14 +24,14 @@ class Waiter:
                                a `notify()` or `notify_all()` call.
         thread (threading.Thread): A direct reference to the `threading.Thread`
                                    object that is waiting.
-        callback (Optional[Callable[[], None]]): An optional callable to be
+        callback (Optional[Union[Callable[..., None], Pack]]): An optional callable to be
                                                 executed by the awaited thread
                                                 itself, if `awaited_caller` is True.
     """
     factory_id: str
     lock: threading.Lock
     thread: threading.Thread
-    callback: Optional[Callable[[], None]] = None
+    callback: Optional[Union[Callable[..., None], Pack]] = None
 
 
 class SmartCondition(IDisposable):
@@ -63,7 +63,7 @@ class SmartCondition(IDisposable):
     __slots__ = IDisposable.__slots__ + [
     "_lock", "acquire", "release", "_waiters", "_callback_registry", "_default_callback", "_id",
     ]
-    def __init__(self, lock: Optional[threading.Lock] = None, default_callback: Optional[Callable[[], None]] = None):
+    def __init__(self, lock: Optional[threading.Lock] = None, default_callback: Optional[Union[Callable[..., None], Pack]] = None):
         """
         Initializes the SmartCondition.
 
@@ -86,7 +86,7 @@ class SmartCondition(IDisposable):
             Waiter]()  # A thread-safe queue of `Waiter` objects, representing all blocked threads.
 
         # Registry for callbacks specific to a factory_id, executed upon notification.
-        self._callback_registry: ConcurrentDict[str, Callable[[], None]] = ConcurrentDict()
+        self._callback_registry: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
         # A default callback to be executed if no specific callback is bound for a notified thread.
         self._default_callback: Optional['Package'] = (
             Pack._pack(default_callback) if default_callback is not None else None
@@ -177,7 +177,7 @@ class SmartCondition(IDisposable):
 
         return thread.factory_id  # Returns the now-guaranteed-to-be-set factory_id
 
-    def bind_callback(self, factory_id: str, fn: Callable[[], None]) -> None:
+    def bind_callback(self, factory_id: str, fn: Union[Callable[..., None], Pack]) -> None:
         """
         Binds a specific callable function (`fn`) to a given `factory_id`.
         When a thread with this `factory_id` is notified via `notify_and_call()`,
@@ -193,7 +193,7 @@ class SmartCondition(IDisposable):
         self._callback_registry[factory_id] = Pack._pack(fn)
 
 
-    def set_default_callback(self, fn: Callable[[], None]) -> None:
+    def set_default_callback(self, fn: Union[Callable[..., None], Pack]) -> None:
         """
         Sets a fallback callback function that will be executed for any notified thread
         that does not have a specific callback bound via `bind_callback()`.
@@ -207,7 +207,7 @@ class SmartCondition(IDisposable):
         self._default_callback = Pack._pack(fn)
 
     def notify_and_call(self, n: int = 1, factory_ids: Optional[Union[str, Iterable[str]]] = None,
-                        callback: Optional[Callable[[], None]] = None,
+                        callback: Optional[Union[Callable[..., None], Pack]] = None,
                         awaited_caller: bool = False) -> None:
         """
         Notifies `n` waiting threads (optionally targeted by `factory_ids`) and
@@ -491,7 +491,7 @@ class SmartCondition(IDisposable):
         self,
         factory_ids: Optional[Union[str, Iterable[str]]] = None,
         awaited_caller: bool = False,
-        callback: Optional[Callable[[], None]] = None,
+        callback: Optional[Union[Callable[..., None], Pack]] = None,
     ) -> None:
         """
         Wake *every* eligible waiter and optionally run a callback.
@@ -544,10 +544,11 @@ class SmartCondition(IDisposable):
                 or self._callback_registry.get(w.factory_id)
                 or self._default_callback
             )
-
+            if chosen_cb:
+                chosen_cb = Pack._pack(chosen_cb)
             if awaited_caller:
                 if chosen_cb:
-                    w.callback = Pack._pack(chosen_cb)      # executed by waiter after wake
+                    w.callback = chosen_cb    # executed by waiter after wake
             else:
                 if chosen_cb:
                     try:
@@ -564,7 +565,7 @@ class SmartCondition(IDisposable):
                 pass
 
 
-    def wait_for(self, predicate: Callable[[], bool], timeout: Optional[float] = None) -> bool:
+    def wait_for(self, predicate: Union[Callable[..., bool], Pack], timeout: Optional[float] = None) -> bool:
         """
         Waits until a given `predicate` function evaluates to `True`, or until an
         optional `timeout` occurs. The `predicate` is checked repeatedly: initially,
@@ -590,6 +591,8 @@ class SmartCondition(IDisposable):
         # This is the standard pattern for condition variables: the caller holds the lock,
         # which `self.wait()` then releases and re-acquires.
         with self._lock:
+            if predicate:
+                predicate = Pack._pack(predicate)  # Ensure the predicate is a Pack if it isn't already.
             endtime = time.time() + timeout if timeout is not None else None
             while True:
                 # First, evaluate the predicate. If it's already true, we can return immediately.
@@ -609,7 +612,7 @@ class SmartCondition(IDisposable):
                 # and re-acquire it when woken or after timeout.
                 self.wait(timeout=remaining if endtime else None)
 
-    def get_all_waiting_factory_ids(self) -> ConcurrentList[str]:
+    def get_all_waiting_factory_ids(self) -> list[str]:
         """
         Returns a snapshot (a new list) of all `factory_id` strings for threads
         that are currently registered as waiting on this SmartCondition.
@@ -620,9 +623,9 @@ class SmartCondition(IDisposable):
         """
         # Accessing `_waiters` iterates over a copy of the list of items
         # in the `ConcurrentQueue`, ensuring thread safety for this snapshot.
-        return ConcurrentList([w.factory_id for w in self._waiters])
+        return list([w.factory_id for w in self._waiters])
 
-    def get_all_waiters(self) -> ConcurrentList[Waiter]:
+    def get_all_waiters(self) -> List[Waiter]:
         """
         Returns a full snapshot (a new list) of all `Waiter` objects
         currently blocking on this SmartCondition. Each `Waiter` object
@@ -634,7 +637,7 @@ class SmartCondition(IDisposable):
                           Returns an empty list if no threads are waiting.
         """
         # Returns a copy of the list of `Waiter` objects from the `ConcurrentQueue`.
-        return ConcurrentList(self._waiters)
+        return list(self._waiters)
 
     def _release_save(self) -> Any:
         """

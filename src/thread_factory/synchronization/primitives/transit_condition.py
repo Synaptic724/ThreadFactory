@@ -1,6 +1,6 @@
 import threading
 import time
-from typing import Optional, Callable, Any, List
+from typing import Optional, Callable, Any, List, Union
 from dataclasses import dataclass
 import ulid
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
@@ -20,7 +20,7 @@ class Waiter:
     """
     lock: threading.Lock
     thread: threading.Thread
-    callback: Optional[Callable[[], None]] = None
+    callback: Optional[Union[Callable[..., None], Pack]] = None
 
 
 class TransitCondition(IDisposable):
@@ -50,7 +50,7 @@ class TransitCondition(IDisposable):
     __slots__ = IDisposable.__slots__ + [
         "_lock", "acquire", "release", "_waiters", "_default_callback", "_id",
     ]
-    def __init__(self, lock = None, default_callback: Optional[Callable[[], None]] = None):
+    def __init__(self, lock = None, default_callback: Optional[Union[Callable[..., None], Pack]] = None):
         """
         Initialize the SignalCondition.
 
@@ -64,7 +64,7 @@ class TransitCondition(IDisposable):
         self.acquire: Callable = self._lock.acquire
         self.release: Callable = self._lock.release
         self._waiters: ConcurrentQueue[Waiter] = ConcurrentQueue()
-        self._default_callback: Optional['Package'] = (
+        self._default_callback: Optional['Pack'] = (
             Pack._pack(default_callback) if default_callback is not None else None
         )
 
@@ -103,7 +103,7 @@ class TransitCondition(IDisposable):
         """Exit the context manager and release the lock."""
         return self._lock.__exit__(exc_type, exc_val, exc_tb)
 
-    def set_default_callback(self, fn: Callable[[], None]) -> None:
+    def set_default_callback(self, fn: Union[Callable[..., None], Pack]) -> None:
         """
         Sets a fallback callback to be run by any woken thread that
         does not receive a specific callback via `notify()` or `notify_all()`.
@@ -131,7 +131,7 @@ class TransitCondition(IDisposable):
         """
         return list(self._waiters)
 
-    def wait_for(self, predicate: Callable[[], bool], timeout: Optional[float] = None) -> bool:
+    def wait_for(self, predicate: Union[Callable[..., bool], Pack], timeout: Optional[float] = None) -> bool:
         """
         Waits until a given `predicate` function evaluates to `True`, or until an
         optional `timeout` occurs. The `predicate` is checked repeatedly: initially,
@@ -159,6 +159,9 @@ class TransitCondition(IDisposable):
         with self._lock:
             endtime = time.time() + timeout if timeout is not None else None
             while True:
+
+                if predicate:
+                    predicate = Pack._pack(predicate)
                 # First, evaluate the predicate. If it's already true, we can return immediately.
                 if predicate():
                     return True  # Predicate satisfied
@@ -225,7 +228,7 @@ class TransitCondition(IDisposable):
                 # If the wait timed out, clean up the queue entry.
                 self._waiters.remove_item(waiter)
 
-    def notify(self, n: int = 1, callback: Optional[Callable[[], None]] = None) -> None:
+    def notify(self, n: int = 1, callback: Optional[Union[Callable[..., None], Pack]] = None) -> None:
         """
         Wake up to `n` waiters, optionally assigning a callback to each.
 
@@ -240,7 +243,8 @@ class TransitCondition(IDisposable):
             return
         if not self._is_owned():
             raise RuntimeError("cannot notify on un-acquired lock")
-
+        if callback:
+            callback = Pack._pack(callback)
         to_notify: List[Waiter] = []
         for w in list(self._waiters):
             if n == 0:
@@ -256,7 +260,7 @@ class TransitCondition(IDisposable):
             except RuntimeError:
                 pass  # Thread likely timed out and already moved on.
 
-    def notify_all(self, callback: Optional[Callable[[], None]] = None) -> None:
+    def notify_all(self, callback: Optional[Union[Callable[..., None], Pack]] = None) -> None:
         """
         Wake all current waiters and optionally assign a callback to each.
 
@@ -268,6 +272,8 @@ class TransitCondition(IDisposable):
         """
         if not self._is_owned():
             raise RuntimeError("cannot notify_all on un-acquired lock")
+        if callback:
+            callback = Pack._pack(callback)
 
         for w in list(self._waiters):
             if self._waiters.remove_item(w):

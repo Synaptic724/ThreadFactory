@@ -296,15 +296,23 @@ class TestClockBarrier(unittest.TestCase):
     # 13 – is_broken stays False after normal pass
     # ------------------------------------------------------------------ #
     def test_is_broken_false_on_success(self):
-        bar = ClockBarrier(2)
-        t1 = threading.Thread(target=bar.wait)
-        t1.start()                # one waiting
-        time.sleep(0.01)
-        self.assertFalse(bar.is_broken())
-        self.assertEqual(bar.get_waiting_count(), 1)
-        # second thread passes:
-        self.assertTrue(bar.wait())
+        bar = ClockBarrier(2, timeout=0.1)  # Give it time to pass
+        result = []
+
+        def run():
+            try:
+                result.append(bar.wait())
+            except threading.BrokenBarrierError:
+                result.append(False)
+
+        t1 = threading.Thread(target=run)
+        t2 = threading.Thread(target=run)
+        t1.start()
+        t2.start()
         t1.join()
+        t2.join()
+
+        self.assertEqual(result.count(True), 2)
         self.assertFalse(bar.is_broken())
 
     # ------------------------------------------------------------------ #

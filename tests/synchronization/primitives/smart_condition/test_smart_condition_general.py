@@ -72,6 +72,80 @@ class TestSmartCondition(unittest.TestCase):
         self.assertIn("callback-ran", result)
         self.assertNotIn("should-not-run-here", result)
 
+    def test_notify_all_and_call_runs_callback_for_each_thread(self):
+        cond = SmartCondition()
+        result = []
+        num_threads = 5
+        events = [threading.Event() for _ in range(num_threads)]
+
+        def make_worker(i):
+            def cb():
+                result.append(f"cb-{i}")
+                events[i].set()
+
+            def thread_fn():
+                threading.current_thread().factory_id = f"worker-{i}"
+                cond.bind_callback(f"worker-{i}", cb)
+                with cond:
+                    cond.wait()
+
+            return threading.Thread(target=thread_fn, name=f"worker-{i}")
+
+        threads = [make_worker(i) for i in range(num_threads)]
+        for t in threads:
+            t.start()
+
+        time.sleep(0.2)  # Ensure all are blocking on cond.wait()
+
+        with cond:
+            cond.notify_all_and_call(awaited_caller=True)
+
+        for e in events:
+            self.assertTrue(e.wait(1), "Callback did not execute in time")
+
+        for t in threads:
+            t.join()
+
+        self.assertEqual(sorted(result), [f"cb-{i}" for i in range(num_threads)])
+    def test_notify_with_awaited_caller_invokes_callback_per_thread(self):
+        cond = SmartCondition()
+        result = []
+        num_threads = 5
+        events = [threading.Event() for _ in range(num_threads)]
+
+        def make_worker(i):
+            def cb():
+                result.append(f"cb-{i}")
+                events[i].set()
+
+            def thread_fn():
+                threading.current_thread().factory_id = f"worker-{i}"
+                cond.bind_callback(f"worker-{i}", cb)
+                with cond:
+                    cond.wait()
+
+            return threading.Thread(target=thread_fn, name=f"worker-{i}")
+
+        threads = [make_worker(i) for i in range(num_threads)]
+        for t in threads:
+            t.start()
+
+        time.sleep(0.2)  # Give time for threads to enter wait
+
+        with cond:
+            for i in range(num_threads):
+                cond.notify(awaited_caller=True)
+                time.sleep(0.05)  # Small gap to ensure fair wakeup
+
+        for e in events:
+            self.assertTrue(e.wait(1), "Callback did not execute in time")
+
+        for t in threads:
+            t.join()
+
+        self.assertEqual(sorted(result), [f"cb-{i}" for i in range(num_threads)])
+
+
     def test_wait_timeout(self):
         cond = SmartCondition()
         result = []

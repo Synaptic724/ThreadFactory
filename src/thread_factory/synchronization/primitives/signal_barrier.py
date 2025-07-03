@@ -1,5 +1,5 @@
 import threading
-from typing import Optional, Callable, Any, Dict
+from typing import Optional, Callable, Any, Dict, Union
 import ulid
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.package import Pack
@@ -51,7 +51,7 @@ class SignalBarrier(IDisposable):
     -------------
     threshold (int):
         Number of threads required to reach the release point.
-    callback (Optional[Callable[[], None]]):
+    callback (Optional[Union[Callable[..., None], Pack]]):
         A function invoked once when the threshold is reached (before releasing threads).
     reusable (bool):
         If True, the semaphore resets itself after each full release cycle. Default is False.
@@ -59,7 +59,7 @@ class SignalBarrier(IDisposable):
         If True, prevents automatic release and requires an explicit call to `release()`.
     controller (Optional[Controller]):
         A `Controller` instance used for central management and event emission.
-    signal_callback (Optional[Callable[[str], None]]):
+    signal_callback (Optional[Union[Callable[..., None], Pack]]):
         A hook called just before a thread blocks in `wait()`. Typically used to notify a controller.
 
     🚨 Exceptions:
@@ -81,7 +81,7 @@ class SignalBarrier(IDisposable):
             threading.Thread(target=worker).start()
     """
     __slots__ = IDisposable.__slots__ + [
-        "_threshold", "_callback", "_reusable", "_manual_release",
+        "_threshold", "_transit_callback", "_reusable", "_manual_release",
         "_lock", "_condition", "_count", "_released", "_id",
         "_controller", "_signal_callback"
     ]
@@ -89,11 +89,11 @@ class SignalBarrier(IDisposable):
     def __init__(
             self,
             threshold: int,
-            callback: Optional[Callable[[], None]] = None,
+            signal_callback: Optional[Union[Callable[..., None], Pack]] = None,
             reusable: bool = False,
             manual_release: bool = False,
             controller: Optional['Controller'] = None,
-            signal_callback: Optional[Callable[[str], None]] = None
+            transit_callback: Optional[Union[Callable[..., None], Pack]] = None
     ):
         super().__init__()
         if threshold <= 0:
@@ -101,7 +101,7 @@ class SignalBarrier(IDisposable):
 
         self._id = str(ulid.ULID())
         self._threshold = threshold
-        self._callback = callback
+        self._signal_callback = signal_callback if signal_callback is None else Pack._pack(signal_callback)
         self._reusable = reusable
         self._manual_release = manual_release
 
@@ -112,7 +112,7 @@ class SignalBarrier(IDisposable):
 
         # --- Controller Integration ---
         self._controller = controller
-        self._signal_callback = signal_callback
+        self._transit_callback = transit_callback if transit_callback is None else Pack._pack(transit_callback)
 
         if self._controller:
             try:
@@ -139,7 +139,7 @@ class SignalBarrier(IDisposable):
             # Clean up references
             self._controller = None
             self._signal_callback = None
-            self._callback = None
+            self._transit_callback = None
 
         with self._condition:
             self._condition.notify_all()
@@ -326,9 +326,9 @@ class SignalBarrier(IDisposable):
             self._count += 1
 
             if self._count == self._threshold:
-                if self._callback:
+                if self._signal_callback:
                     try:
-                        self._callback()
+                        self._signal_callback()
                     except Exception:
                         pass
 
@@ -341,9 +341,9 @@ class SignalBarrier(IDisposable):
                         self._controller.notify(self.id, "SEMAPHORE_RELEASED")
                     self._condition.notify_all()
 
-            if not self._released and self._signal_callback:
+            if self._transit_callback:
                 try:
-                    self._signal_callback(self.id)
+                    self._transit_callback(self.id)
                 except Exception:
                     pass
 

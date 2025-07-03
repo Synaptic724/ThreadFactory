@@ -23,6 +23,32 @@ class TestTransitBarrier(unittest.TestCase):
 
         self.assertEqual(sorted(result), [0, 1, 2])
 
+    class TestTransitBarrierCallback(unittest.TestCase):
+
+        def test_transit_callback_called_by_all_threads(self):
+            """
+            Ensure every waiting thread executes the transit callback
+            when the TransitBarrier reaches its threshold.
+            """
+            lock = threading.Lock()
+            call_count = 0
+
+            def transit():
+                nonlocal call_count
+                with lock:
+                    call_count += 1
+
+            barrier = TransitBarrier(threshold=5, transit=transit)
+            threads = [threading.Thread(target=barrier.wait) for _ in range(5)]
+
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+            self.assertEqual(call_count, 5, f"Expected 5 transit calls, got {call_count}")
+
+
     def test_notify_all_override_unblocks_threads(self):
         barrier = TransitBarrier(threshold=5, reusable=True)
         results = []

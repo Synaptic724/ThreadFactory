@@ -259,7 +259,7 @@ class TestSignalBarrier(unittest.TestCase):
         def cb():
             called["count"] += 1
 
-        barrier = SignalBarrier(threshold=2, manual_release=True, callback=cb)
+        barrier = SignalBarrier(threshold=2, manual_release=True, signal_callback=cb)
 
         threads = [
             threading.Thread(target=barrier.wait)
@@ -302,7 +302,7 @@ class TestSignalBarrier(unittest.TestCase):
         def cb():
             call_count["count"] += 1
 
-        barrier = SignalBarrier(threshold=3, reusable=False, callback=cb)
+        barrier = SignalBarrier(threshold=3, reusable=False, signal_callback=cb)
 
         threads = [
             threading.Thread(target=barrier.wait)
@@ -342,7 +342,7 @@ class TestSignalBarrier(unittest.TestCase):
         def callback():
             flag["called"] = True
 
-        barrier = SignalBarrier(threshold=2, callback=callback)
+        barrier = SignalBarrier(threshold=2, signal_callback=callback)
 
         t1 = threading.Thread(target=barrier.wait)
         t2 = threading.Thread(target=barrier.wait)
@@ -353,6 +353,101 @@ class TestSignalBarrier(unittest.TestCase):
         t2.join()
 
         self.assertTrue(flag["called"])
+
+    def test_signal_callback_called_once_on_threshold(self):
+        call_counter = {"count": 0}
+
+        def signal_cb():
+            call_counter["count"] += 1
+
+        barrier = SignalBarrier(threshold=3, signal_callback=signal_cb)
+        threads = [threading.Thread(target=barrier.wait) for _ in range(3)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+
+        assert call_counter["count"] == 1
+
+
+    def test_signal_callback_called_once_per_cycle_when_reusable(self):
+        call_counter = {"count": 0}
+
+        def signal_cb():
+            call_counter["count"] += 1
+
+        barrier = SignalBarrier(threshold=2, reusable=True, signal_callback=signal_cb)
+
+        def worker():
+            barrier.wait()
+
+        for _ in range(2):  # Two cycles
+            t1 = threading.Thread(target=worker)
+            t2 = threading.Thread(target=worker)
+            t1.start()
+            t2.start()
+            t1.join()
+            t2.join()
+
+        assert call_counter["count"] == 2
+
+    def test_transit_callback_called_for_each_waiting_thread(self):
+        call_ids = []
+
+        def transit_cb(barrier_id):
+            call_ids.append(barrier_id)
+
+        barrier = SignalBarrier(threshold=3, transit_callback=transit_cb)
+        threads = [threading.Thread(target=barrier.wait) for _ in range(3)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+
+        print("Number of Callbacks sent: " + str(len(call_ids)))
+        assert len(call_ids) == 3
+        assert all(i == barrier.id for i in call_ids)
+
+    def test_transit_callback_not_called_if_barrier_is_spent(self):
+        transit_calls = []
+
+        def transit_cb(barrier_id):
+            transit_calls.append(barrier_id)
+
+        # Non-reusable: threshold will only happen once
+        barrier = SignalBarrier(threshold=2, reusable=False, transit_callback=transit_cb)
+
+        def worker(): barrier.wait()
+
+        # First cycle
+        t1 = threading.Thread(target=worker)
+        t2 = threading.Thread(target=worker)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        # Second round (won't do anything)
+        t3 = threading.Thread(target=worker)
+        t3.start()
+        t3.join()
+
+        print(f"Number of Callbacks sent: " + str(len(transit_calls)))
+        assert len(transit_calls) == 2  # Only first two should trigger transit_cb
+
+    def test_signal_callback_not_called_if_threshold_not_reached(self):
+        called = {"fired": False}
+
+        def signal_cb(): called["fired"] = True
+
+        barrier = SignalBarrier(threshold=3, signal_callback=signal_cb)
+
+        def worker(): barrier.wait(timeout=0.1)
+
+        t1 = threading.Thread(target=worker)
+        t2 = threading.Thread(target=worker)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert not called["fired"]
 
     def test_reusable_threshold(self):
         barrier = SignalBarrier(threshold=2, reusable=True)
