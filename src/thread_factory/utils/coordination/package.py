@@ -65,6 +65,11 @@ class Package(IDisposable):
             TypeError: If func is not a callable or is a coroutine/generator function.
         """
         super().__init__()
+        if isinstance(func, Package):
+            raise TypeError("Cannot create a Package from an existing Package instance directly. "
+                            "Use .curry() or .bind() on the existing instance if you want to extend it, "
+                            "or Pack.many() for collections.")
+
         normalized = self._normalize_task(func)  # Use helper for validation
         self._func: Callable[..., Any] = update_wrapper(lambda *a, **kw: normalized(*a, **kw), normalized)
         self._args: ConcurrentList = ConcurrentList(args)
@@ -117,9 +122,84 @@ class Package(IDisposable):
 
         return Package(composed_callable)
 
+    # def __call__(self, *extra_args: Any, **extra_kwargs: Any) -> Any:
+    #     """
+    #     Calls the wrapped function with all stored and extra arguments.
+    #
+    #     Args:
+    #         *extra_args: Additional positional arguments.
+    #         **extra_kwargs: Additional keyword arguments.
+    #
+    #     Returns:
+    #         The result of calling the function with combined arguments.
+    #     """
+    #     with self._lock:
+    #         # Combine stored arguments with extra ones passed at the time of call
+    #         all_args = tuple(self._args) + extra_args
+    #         all_kwargs = {**dict(self._kwargs), **extra_kwargs}
+    #
+    #         try:
+    #             return self._func(*all_args, **all_kwargs)
+    #         except TypeError as e:
+    #             if "missing" in str(e) and "positional argument" in str(e):
+    #                 # Inspect the function signature to identify required arguments
+    #                 sig = inspect.signature(self._func.__wrapped__)
+    #                 required = [
+    #                     p for p in sig.parameters.values()
+    #                     if p.default is p.empty and p.kind in (
+    #                         p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD
+    #                     )
+    #                 ]
+    #                 # If missing required arguments, raise a more informative error
+    #                 missing_args_count = len(required) - len(all_args)
+    #                 if missing_args_count > 0:
+    #                     raise TypeError(f"Missing {missing_args_count} required positional arguments")
+    #             raise
+    # ──────────────────────────── Packify Method ─────────────────────────── #
+    @staticmethod
+    def bundle(
+            item: Optional[Union[Callable[..., Any], Package, Iterable[Union[Callable[..., Any], Package]]]]
+    ) -> Union[Package, ConcurrentList[Package]]:
+        """
+        Converts the input into a single Pack instance or a ConcurrentList of Pack instances.
+        Handles None, single callables, single Pack instances, and iterables of mixed types.
+
+        Args:
+            item: The input to "packify". Can be None, a single callable, a single Pack instance,
+                  or an iterable containing callables and/or Pack instances.
+
+        Returns:
+            A single Package instance if the input was a single callable or Pack.
+            A ConcurrentList of Package instances if the input was an iterable.
+
+        Raises:
+            TypeError: If the input is None or contains invalid callable types (e.g., async/generator).
+        """
+        if item is None:
+            raise TypeError("Cannot Packify None input.")
+
+        # If it's already a single Pack instance, return it directly
+        if isinstance(item, Package):
+            return item
+
+        # If it's an iterable (list, tuple, etc.), use Pack.many to process it
+        # Note: `Pack.many` already handles if elements within the iterable are already Packs
+        if isinstance(item, Iterable):
+            return Pack._pack_many(item)
+
+        # If it's a single callable (and not already a Package), wrap it in a new Pack
+        if callable(item):
+            # The Pack constructor itself will validate the callable (sync/async/generator checks)
+            return Pack(item)
+
+        # If none of the above, it's an invalid type
+        raise TypeError(
+            f"Cannot Packify input of type {type(item).__name__}. Expected callable, Package, or iterable thereof.")
+
+
     def __call__(self, *extra_args: Any, **extra_kwargs: Any) -> Any:
         """
-        Call the wrapped function with all stored and extra arguments.
+        Calls the wrapped function with all stored and extra arguments.
 
         Args:
             *extra_args: Additional positional arguments.
@@ -127,29 +207,15 @@ class Package(IDisposable):
 
         Returns:
             The result of calling the function with combined arguments.
-
-        Raises:
-            TypeError: If required positional args are missing. In some cases,
-                       missing positional args are filled with `0` as fallback.
         """
         with self._lock:
             all_args = tuple(self._args) + extra_args
             all_kwargs = {**dict(self._kwargs), **extra_kwargs}
-            try:
-                return self._func(*all_args, **all_kwargs)
-            except TypeError as e:
-                if "missing" in str(e) and "positional argument" in str(e):
-                    sig = inspect.signature(self._func.__wrapped__)
-                    required = [
-                        p for p in sig.parameters.values()
-                        if p.default is p.empty and p.kind in (
-                            p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD
-                        )
-                    ]
-                    if len(all_args) < len(required):
-                        all_args += (0,) * (len(required) - len(all_args))
-                        return self._func(*all_args, **all_kwargs)
-                raise
+
+            # Simply call the function. Python's built-in argument binding
+            # will raise a precise TypeError if arguments are truly missing
+            # or incompatible.
+            return self._func(*all_args, **all_kwargs)
 
     @staticmethod
     def merge_many(packs: Iterable["Package"]) -> "Package":
@@ -296,22 +362,6 @@ class Package(IDisposable):
                 raise TypeError(f"Invalid task at index {i}: {e}") from e
 
         return result
-
-    @staticmethod
-    def many(tasks: Union[Callable, Package, Iterable[Union[Callable, Package]]]) -> ConcurrentList['Package']:
-        """
-        Public-facing version of `_pack_many`. Safely wraps callables into Package instances.
-
-        Args:
-            tasks: A callable, Package, or iterable of either.
-
-        Returns:
-            ConcurrentList of wrapped Package instances.
-
-        Raises:
-            TypeError: On invalid input.
-        """
-        return Package._pack_many(tasks)
 
     def bind(self, **new_kwargs: Any) -> Package:
         """

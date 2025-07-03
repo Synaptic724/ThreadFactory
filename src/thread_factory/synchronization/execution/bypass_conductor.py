@@ -53,12 +53,11 @@ class BypassConductor(IDisposable):
         if limit < 0:
             raise ValueError("Limit must be non-negative")
 
-        if isinstance(func, (list, ConcurrentList)):
-            # If func is already a list or ConcurrentList, use _pack_many to handle it
-            self._func = Pack._pack_many(func)
-        else:
-            # If it's a single callable, wrap it in a Package
-            self._func = [Pack(func)]
+        packified_result = Pack.bundle(func)
+        if isinstance(packified_result, Pack):
+            self._func = [packified_result]
+        else: # It must be a ConcurrentList[Package] because Pack.Packify guarantees valid output
+            self._func = packified_result
 
         self._id = str(ulid.ULID())
         self._limit = limit
