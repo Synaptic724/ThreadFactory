@@ -1,7 +1,8 @@
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 import threading
 from typing import Callable, Optional, List
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
+from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 
@@ -42,7 +43,7 @@ class AgentOrchestrator(IDisposable):
         coordinator.run()
     """
 
-    def __init__(self, group_size: int, fn: Callable, strict: bool = True):
+    def __init__(self, group_size: int, fn: Union[Callable[..., None], Pack], strict: bool = True):
         if group_size <= 0:
             raise ValueError("group_size must be positive")
 

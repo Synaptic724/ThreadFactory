@@ -5,6 +5,7 @@ from typing import Callable, Optional, List, Any, Union
 import ulid
 from thread_factory.synchronization.primitives.dynaphore import Dynaphore
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
+from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.outcome import Outcome
 
@@ -40,7 +41,8 @@ class BypassConductor(IDisposable):
         "_dynaphore", "_threshold_sema", "_outcome_set", "_id"
     ]
 
-    def __init__(self, func: Union[Callable, list[Callable]], limit: int = 1, *args, **kwargs):
+    def __init__(self, func: Union[Union[Callable[..., Any], Pack], list[Union[Callable[..., Any], Pack]]],
+                 limit: int = 1, *args, **kwargs):
         super().__init__()
 
         if limit < 0:
