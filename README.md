@@ -275,17 +275,6 @@ Threadfactory is coming soon...
 > All benchmark tests below are available if you clone the library and run the tests.  
 > See the [Benchmark Details 🚀](https://github.com/Synaptic724/threadfactory/blob/production/benchmarks/benchmark_data/general_benchmarks.md) for more benchmark stats.
 
-| Primitive                | Time (µs)    |
-|--------------------------|--------------|
-| `threading.Lock`         | ~0.07        |
-| `FlowRegulator`             | ~4.40        |
-| Thread Spawn (bare)      | ~195.8       |
-| `RLock.acquire/release`  | ~1.96        |
-| `TransitCondition`        | ~12.56       |
-
-- `TransitCondition` is ~6.4× slower than a raw `RLock`, but offers structured wait/notify with internal callback support.
-- `FlowRegulator` is an ideal middle-ground for dynamic permits and targeted thread gating.
-- `Dynaphore` sits between a classic semaphore and `SwitchLock` — faster and simpler when IDs aren’t needed.
 
 ## 🔥 Benchmark Results (10,000,000 ops — 10 producers / 10 consumers)
 
@@ -328,8 +317,6 @@ Threadfactory is coming soon...
 - `ConcurrentQueue` is proving to be the general-purpose winner for most balanced threaded workloads.
 - For **~40 threads**, `ConcurrentBuffer` shows ~**25% drop** when doubling the number of shards due to increased dequeue complexity.
 - All queues emptied correctly (`final length = 0`).
-
-
 
 ---
 
