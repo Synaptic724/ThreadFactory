@@ -431,7 +431,7 @@ class TestSyncFork(unittest.TestCase):
             t.start()
 
         # Give threads a moment to enter the fork and for the barrier to be met
-        time.sleep(0.3)
+        time.sleep(0.5)
 
         for t in threads:
             t.join(timeout=5)
