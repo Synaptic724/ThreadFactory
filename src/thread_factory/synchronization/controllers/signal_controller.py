@@ -1,8 +1,10 @@
 import logging
 import threading
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utils.coordination.package import Pack
 
 
 class SignalController(IDisposable):
@@ -88,32 +90,32 @@ class SignalController(IDisposable):
 
         # Hook system for pre/post-invocation.
         # Maps hook_name (str, e.g., 'pre_invoke', 'post_invoke') to a list of callable hooks.
-        self._hooks: ConcurrentDict[str, List[Callable]] = ConcurrentDict()
-        self._hooks['pre_invoke'] = []  # List to store pre-invocation callbacks.
-        self._hooks['post_invoke'] = [] # List to store post-invocation callbacks.
+        self._hooks: ConcurrentDict[str, ConcurrentList[Callable]] = ConcurrentDict()
+        self._hooks['pre_invoke'] = ConcurrentList()  # List to store pre-invocation callbacks.
+        self._hooks['post_invoke'] = ConcurrentList() # List to store post-invocation callbacks.
 
     # -------------------------------------------
     # Hook Registration
     # -------------------------------------------
 
-    def add_pre_invoke_hook(self, callback: Callable[[str, str], None]):
+    def add_pre_invoke_hook(self, callback: Union[Callable[..., None], Pack]):
         """
         Registers a function to be executed *before* any command invocation.
 
         Pre-invoke hooks receive the `object_id` and `command` name as arguments.
 
         Args:
-            callback (Callable[[str, str], None]): The function to register.
+            callback (Union[Callable[..., None], Pack]): The function to register.
                                                    It should accept two string arguments:
                                                    `object_id` (the ID of the object on which the command is invoked)
                                                    and `command` (the name of the command being invoked).
         """
-        self._hooks['pre_invoke'].append(callback)
+        self._hooks['pre_invoke'].append(Pack.bundle(callback))
         self._logger.debug(f"Added pre-invoke hook: {getattr(callback, '__name__', 'unnamed')}")
 
     def add_post_invoke_hook(
             self,
-            callback: Callable[[str, str, Any, Optional[Exception]], None]
+            callback: Union[Callable[..., None], Pack]
     ):
         """
         Registers a function to be executed *after* any command invocation.
@@ -122,14 +124,14 @@ class SignalController(IDisposable):
         invocation, and any `exception` that occurred (if any).
 
         Args:
-            callback (Callable[[str, str, Any, Optional[Exception]], None]): The function to register.
+            callback (Union[Callable[..., None], Pack]): The function to register.
                 It should accept four arguments:
                 - `object_id` (str): The ID of the object on which the command was invoked.
                 - `command` (str): The name of the command that was invoked.
                 - `result` (Any): The return value of the invoked command. This will be `None` if an exception occurred during the invocation.
                 - `exception` (Optional[Exception]): The exception object if the command invocation failed, otherwise `None`.
         """
-        self._hooks['post_invoke'].append(callback)
+        self._hooks['post_invoke'].append(Pack.bundle(callback))
         self._logger.debug(f"Added post-invoke hook: {getattr(callback, '__name__', 'unnamed')}")
 
     def _run_hooks(self, hook_name: str, *args):
@@ -147,10 +149,6 @@ class SignalController(IDisposable):
                 # Log any errors occurring within a hook to prevent it from crashing the main flow.
                 self._logger.error(f"Error in '{hook_name}' hook '{getattr(hook, '__name__', 'unnamed')}': {e}",
                                    exc_info=True)
-
-    # -------------------------------------------
-    # Object Invocation
-    # -------------------------------------------
 
     def invoke(self, object_id: str, command: str, *args, **kwargs) -> Any:
         """
@@ -214,10 +212,6 @@ class SignalController(IDisposable):
             raise exception
 
         return result
-
-    # -------------------------------------------
-    # Lifecycle Management
-    # -------------------------------------------
 
     def dispose(self) -> None:
         """
@@ -453,7 +447,7 @@ class SignalController(IDisposable):
                         self._logger.error(f"Subscriber callback failed for event '{event_type}' on '{object_id}': {e}",
                                            exc_info=True)
 
-    def subscribe(self, object_id: str, event_type: str, callback: Callable):
+    def subscribe(self, object_id: str, event_type: str, callback: Union[Callable[..., None], Pack]):
         """
         Subscribe a callback function to a specific event type for a specific object.
 
@@ -480,7 +474,7 @@ class SignalController(IDisposable):
             self._subscribers[object_id].setdefault(event_type, [])
             # Only add the callback if it's not already in the list to prevent duplicate subscriptions
             if callback not in self._subscribers[object_id][event_type]:
-                self._subscribers[object_id][event_type].append(callback)
+                self._subscribers[object_id][event_type].append(Pack.bundle(callback))
                 self._logger.debug(f"New subscription to '{event_type}' on '{object_id}'")
 
     # -------------------------------------------
