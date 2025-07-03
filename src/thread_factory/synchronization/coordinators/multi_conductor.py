@@ -1,6 +1,6 @@
 from __future__ import annotations
 import threading, ulid
-from typing import Optional, Callable, List, Union, Any, Dict
+from typing import Optional, Callable, List, Union, Any, Dict, Tuple
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.synchronization.dispatchers.fork import Fork
 from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
@@ -68,7 +68,8 @@ class MultiConductor(IDisposable):
         "_lock", "_dynaphore", "_manual_release_gate", "_callback_executed_flags",
         "_barrier_passed_notified", "_execution_started_notified", "_execution_completed_notified",
         "_clock_barrier", "_signal_barrier", "_internal_threshold_barrier", "outcomes", "_enabled",
-        "_distributed_execution", "_sync_distributed_execution", "_create_fork"
+        "_distributed_execution", "_sync_distributed_execution", "_create_fork", "_fork_processor",
+
     ]
     def __init__(
             self,
@@ -381,57 +382,99 @@ class MultiConductor(IDisposable):
                 self._execute_operation(task, group, task_index)
                 self._internal_threshold_barrier.wait()
 
-                if self._callback:
-                    self._execute_callback(group, task_index)
+                # if self._callback:
+                #     self._execute_callback(group, task_index)
 
             if self._broken or self._disposed: break
 
-    def _calculate_sync_fork_processor(self) -> SyncFork:
-        pass
 
-    def _concurrent_execution_loop(self):
-        fork = Fork()
+    def _execute_operation(self, task: Union[Callable[..., None], Pack], group: Group, task_index: int):
+        """Executes a single task and records its outcome in the correct group.
 
+        Args:
+            task (Callable): The task function to execute.
+            group (Group): The group that owns the task.
+            task_index (int): The index of the task, used for storing the outcome.
+        """
+        try:
+            result = task() # Should already be a Pack
+            self._set_result(result, group, task_index)
+        except Exception as e:
+            self._set_exception(e, group, task_index)
+
+        # If a callback is set, execute it after the task completes
+        if self._callback:
+             self._execute_callback(group, task_index)
+
+    def _create_fork_processor(self, group: Group, sync: bool = None) -> Fork | SyncFork:
+        """
+        Calculates how the threshold workers are distributed among the tasks of a group
+        for a non-synchronizing Fork processor.
+
+        Args:
+            group (Group): The group containing tasks to be processed.
+
+        Returns:
+            Fork: The configured Fork object with worker distribution. # <-- Docstring return type changed to Fork
+        """
+        if sync is None:
+            raise ValueError("Sync parameter must be explicitly set to True or False.")
+
+        number_of_tasks = len(group.tasks)
+        if number_of_tasks == 0:
+            raise ValueError("Cannot create Fork processor for a group with no tasks.")
+
+        # Prepare data for worker distribution: use lists for usage_cap to allow modification
+        fork_units_config: list[list[Union[int, Pack]]] = []  # Type hint for list of lists
+
+        # Initialize each task with an initial usage_cap of 0
+        for task_index, task in enumerate(group.tasks):
+            # ***CRITICAL FIX: Append a LIST here, NOT a tuple***
+            fork_units_config.append([0, Pack(self._execute_operation, task, group, task_index)])
+
+        # Initialize counter to 0 for standard round-robin distribution
+        current_task_index: int = 0
+
+        # Distribute all 'self._threshold' workers across the tasks in a round-robin fashion
+        for _ in range(self._threshold):
+            # Increase worker count (usage_cap) for the current task
+            fork_units_config[current_task_index][0] += 1
+            # Move to the next task in a circular fashion
+            current_task_index = (current_task_index + 1) % number_of_tasks
+
+        # Convert the list-based config to tuple-based for the Fork/SyncFork constructor
+        final_fork_callables = [(cap, fn) for cap, fn in fork_units_config]
+
+        # Return the correct Fork or SyncFork type based on the 'sync' parameter
+        if sync:
+            return SyncFork(number_of_tasks, final_fork_callables)
+        else:
+            return Fork(number_of_tasks, final_fork_callables, rotate_selectors=False)
+
+    def _calculate_fork_processor(self, group: Group) -> Optional[Fork, SyncFork]:
+        """
+        Determines the appropriate fork processor based on the conductor's configuration.
+        """
+        if self._sync_distributed_execution and not self._distributed_execution:
+            return self._create_fork_processor(group, sync=True)
+        elif self._distributed_execution:
+            return self._create_fork_processor(group, sync=False)
+        else:
+            raise ValueError(
+                "Unknown Error, please check your MultiConductor configuration. "
+            )
+
+    def _fork_execution_loop(self):
+        """
+        Executes tasks in a forked manner, using the Fork or SyncFork processor.
+        """
         for group in self.groups:
-
-            if not self._create_fork:
-                #self._fork_processor
-                pass
-
-            for task_index, task in enumerate(group.tasks):
-
-                if self._broken or self._disposed: break
-
-                self._execute_operation(task, group, task_index)
-                self._internal_threshold_barrier.wait()
-
-                if self._callback:
-                    self._execute_callback(group, task_index)
-
             if self._broken or self._disposed: break
-
-
-    def _calculate_sync_fork_processor(self) -> SyncFork:
-        pass
-
-    def _parallel_execution_loop(self):
-        fork = SyncFork()
-        for group in self.groups:
-
             if not self._create_fork:
-                #self._fork_processor
-                pass
-            for task_index, task in enumerate(group.tasks):
-
-                if self._broken or self._disposed: break
-
-                self._execute_operation(task, group, task_index)
-                self._internal_threshold_barrier.wait()
-
-                if self._callback:
-                    self._execute_callback(group, task_index)
-
-            if self._broken or self._disposed: break
+                self._fork_processor = self._calculate_fork_processor(group)
+            self._fork_processor.use_fork()
+            self._internal_threshold_barrier.wait()
+            self._create_fork = False
 
     def _execute_operations(self):
         """
@@ -449,17 +492,14 @@ class MultiConductor(IDisposable):
         The method ensures that the task execution continues until all tasks from all groups have been executed,
         or the conductor is disposed or broken.
         """
-
         if self.groups:
             with self._lock:
                 if self._controller and not self._execution_started_notified:
                     self._execution_started_notified = True
                     self._controller.notify(self.id, "EXECUTION_STARTED")
 
-            if self._sync_distributed_execution and not self._distributed_execution:
-                self._parallel_execution_loop()
-            elif self._distributed_execution:
-                self._concurrent_execution_loop()
+            if self._sync_distributed_execution or self._distributed_execution:
+                self._fork_execution_loop()
             else:
                 self._general_execution_loop()
 
@@ -473,7 +513,7 @@ class MultiConductor(IDisposable):
         else:
             self._released = True
 
-    def _execute_callback(self, group: Group, task_index: int):
+    def _execute_callback(self, group: Group, task_index: int = None, ignore_task_id: bool = False):
         """Executes the shared callback, ensuring it runs only once per task.
 
         This method uses a lock and a flag to guarantee that, even though all
@@ -485,27 +525,21 @@ class MultiConductor(IDisposable):
             task_index (int): The index of the completed task within the group.
         """
         with self._lock:
-            if not self._callback_executed_flags[group.name][task_index]:
-                self._callback_executed_flags[group.name][task_index] = True
+            if ignore_task_id:
+                try:
+                    self._callback()
+                except Exception as e:
+                    if self._controller and hasattr(self._controller, '_logger'):
+                        self._controller._logger.error(f"Error in MultiConductor callback: {e}", exc_info=True)
+            else:
+                if not self._callback_executed_flags[group.name][task_index]:
+                    self._callback_executed_flags[group.name][task_index] = True
                 try:
                     self._callback()
                 except Exception as e:
                     if self._controller and hasattr(self._controller, '_logger'):
                         self._controller._logger.error(f"Error in MultiConductor callback: {e}", exc_info=True)
 
-    def _execute_operation(self, task: Union[Callable[..., None], Pack], group: Group, task_index: int):
-        """Executes a single task and records its outcome in the correct group.
-
-        Args:
-            task (Callable): The task function to execute.
-            group (Group): The group that owns the task.
-            task_index (int): The index of the task, used for storing the outcome.
-        """
-        try:
-            result = task() # Should already be a Pack
-            self._set_result(result, group, task_index)
-        except Exception as e:
-            self._set_exception(e, group, task_index)
 
     def _set_result(self, result: Any, group: Group, task_index: int):
         """

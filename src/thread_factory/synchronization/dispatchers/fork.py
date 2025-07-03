@@ -81,8 +81,17 @@ class Fork(IDisposable):
         If False, uses a step-based selection strategy (`_select_fork_unit_step`).
 
     selector_step : int (default 1)
-        Only applicable if `rotate_selectors` is False. Defines the step size
-        for the `_select_fork_unit_step` method.
+        Only applicable if `rotate_selectors` is False. This value determines
+        the 'stride' or jump size for the selection process.
+        - **Scanning within a call:** When a thread calls `use_fork()`, the selector
+          will scan through the available `ForkUnit`s by jumping `selector_step` positions
+          at a time from its current starting point, rather than checking sequentially.
+        - **Next starting point:** After an available `ForkUnit` is found and used,
+          the internal counter for the *next* selection's starting point will
+          advance by `selector_step` from the index of the unit that was just claimed.
+        A value of 1 (default) results in a simple round-robin or sequential scan.
+        Larger values can help distribute usage more broadly across ForkUnits
+        under high contention.
 
     ------
     Methods

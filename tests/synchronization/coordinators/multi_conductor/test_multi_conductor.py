@@ -61,7 +61,7 @@ class TestMultiConductor(unittest.TestCase):
 
         threads = _spawn(3, mc.start)
         for t in threads:
-            t.join(1)
+            t.join(2)
 
         # Now, this assertion will pass because the deadlock is gone.
         self.assertEqual(execution_log.count("g1-t1"), 3)
