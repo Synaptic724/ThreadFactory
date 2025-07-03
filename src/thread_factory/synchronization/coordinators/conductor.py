@@ -1,10 +1,7 @@
 from __future__ import annotations
-import ulid
-
+import ulid, threading
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
-import inspect
-import threading
 from thread_factory.synchronization.primitives import Dynaphore
 from typing import Optional, Callable, List, Union, Any, Dict, Iterable
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
@@ -14,7 +11,8 @@ from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.utils.coordination.outcome import Outcome
 
 class Conductor(IDisposable):
-    """A reusable, data-aware synchronization point and work executor.
+    """
+    A reusable, data-aware synchronization point and work executor.
 
     The Conductor acts as an advanced, thread-safe barrier that orchestrates the
     synchronization of multiple threads. It blocks callers of its `start` method
@@ -55,7 +53,8 @@ class Conductor(IDisposable):
             callback: Optional[Callable[[], None]] = None,
             controller: Optional['SignalController'] = None
     ):
-        """Initializes a new Conductor instance.
+        """
+        Initializes a new Conductor instance.
 
         This constructor sets up the synchronization primitives and configuration
         for the Conductor based on the provided parameters.
@@ -157,7 +156,8 @@ class Conductor(IDisposable):
 
     @property
     def id(self) -> str:
-        """The unique, time-sortable identifier for this Conductor instance.
+        """
+        The unique, time-sortable identifier for this Conductor instance.
 
         This property returns a ULID (Universally Unique Lexicographically
         Sortable Identifier) generated when the Conductor is initialized. This ID
@@ -171,7 +171,8 @@ class Conductor(IDisposable):
         return self._id
 
     def _get_object_details(self) -> Dict[str, Any]:
-        """Prepares a summary of the instance for controller registration.
+        """
+        Prepares a summary of the instance for controller registration.
 
         This internal method provides a structured dictionary containing key
         information about the Conductor. It is part of the contract used by the
@@ -195,7 +196,8 @@ class Conductor(IDisposable):
         }
 
     def dispose(self):
-        """Disposes of the Conductor, cleaning up all associated resources.
+        """
+        Disposes of the Conductor, cleaning up all associated resources.
 
         This method performs a full teardown of the Conductor. It marks the
         instance as disposed, notifies the controller (if any), and releases all
@@ -226,7 +228,8 @@ class Conductor(IDisposable):
             self._released = True
 
     def reset(self):
-        """Resets the Conductor to its initial state for reuse.
+        """
+        Resets the Conductor to its initial state for reuse.
 
         This method is only effective if the Conductor was initialized with
         `reusable=True`. It clears all previously collected outcomes, resets
