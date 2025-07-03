@@ -12,6 +12,7 @@ from thread_factory.utils.coordination.outcome import Outcome
 from thread_factory.synchronization.primitives import Dynaphore
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
+from thread_factory.concurrency.sync_types.sync_bool import SyncBool
 
 
 class MultiConductor(IDisposable):
@@ -33,6 +34,7 @@ class MultiConductor(IDisposable):
     - **Timeout Handling**: Includes optional timeout behavior, raising a `TimeoutError` if tasks don't complete in time.
     - **Reusability**: The conductor can be reset to synchronize tasks across multiple cycles.
     - **Multiple Outcomes per Task**: Allows tracking of multiple results per task, useful for reusable cycles.
+    - **Concurrent and Parallel Execution**: Supports both concurrent and parallel execution modes, allowing for flexible task management.
 
     This class is particularly useful in scenarios where a large number of threads need to execute tasks
     across multiple groups while maintaining synchronization at each stage of execution.
@@ -47,6 +49,13 @@ class MultiConductor(IDisposable):
     - `callback`: An optional callback to be executed after each task.
     - `controller`: An optional signal controller for managing state changes.
 
+
+    # NOTE #: Syncfork and Fork Operations:
+    - If `sync_distributed_execution` is True, the conductor will use a `SyncFork` to manage task execution.
+    - If `distributed_execution` is True, the conductor will use a `Fork` to manage task execution.
+    - If both are True, a `ValueError` is raised, as they are mutually exclusive.
+    - If neither is True, tasks will in parallel but sequentially across tasks.
+
     Example:
     --------
     >>> conductor = MultiConductor(threshold=5, groups=[group1, group2])
@@ -59,7 +68,7 @@ class MultiConductor(IDisposable):
         "_lock", "_dynaphore", "_manual_release_gate", "_callback_executed_flags",
         "_barrier_passed_notified", "_execution_started_notified", "_execution_completed_notified",
         "_clock_barrier", "_signal_barrier", "_internal_threshold_barrier", "outcomes", "_enabled",
-        "_concurrent", "_parallel"
+        "_distributed_execution", "_sync_distributed_execution", "_create_fork"
     ]
     def __init__(
             self,
@@ -70,8 +79,8 @@ class MultiConductor(IDisposable):
             timeout: Optional[float] = None,
             raise_on_timeout: bool = False,
             multiple_outcomes_per_task: bool = False,
-            concurrent_execution: bool = False,
-            parallel_execution: bool = False,
+            distributed_execution: bool = False,
+            sync_distributed_execution: bool = False,
             callback: Optional[Union[Callable[..., None], Pack]] = None,
             controller: Optional['SignalController'] = None
     ):
@@ -108,12 +117,17 @@ class MultiConductor(IDisposable):
         super().__init__()
         if threshold <= 0:
             raise ValueError("Threshold must be a positive integer.")
+        if not isinstance(threshold, int):
+            raise TypeError("Threshold must be an integer.")
+
+        # --- Initialize outcomes storage ---
+        self.outcomes: ConcurrentDict = ConcurrentDict()
 
         # --- Initialization of internal state ---
         self._id: str = str(ulid.ULID())
         self._enabled: bool = False
-        self._concurrent: bool = concurrent_execution
-        self._parallel: bool = parallel_execution
+        self._distributed_execution: bool = distributed_execution
+        self._sync_distributed_execution: bool = sync_distributed_execution
         self._threshold: int = threshold
         self.reusable: bool = reusable
         self.manual_release: bool = manual_release
@@ -125,6 +139,8 @@ class MultiConductor(IDisposable):
         self._barrier_passed_notified: bool = False
         self._execution_started_notified: bool = False
         self._execution_completed_notified: bool = False
+        self._create_fork: SyncBool = SyncBool(False)
+        self._fork_processor: Optional[SyncFork, Fork] = None
 
         # --- Callback Management ---
         self.groups: Optional[Group] | ConcurrentList[Group] = ConcurrentList[Group]()
@@ -168,8 +184,10 @@ class MultiConductor(IDisposable):
             try: self._controller.register(self)
             except Exception: pass
 
-        # --- Initialize outcomes storage ---
-        self.outcomes: ConcurrentDict = ConcurrentDict()
+        if self._distributed_execution and self._sync_distributed_execution:
+            raise ValueError("Cannot set both concurrent_execution and parallel_execution to True. Choose one.")
+        if self._sync_distributed_execution:
+            self._check_if_eligible_for_sync_fork()
 
     def dispose(self):
         """
@@ -223,6 +241,34 @@ class MultiConductor(IDisposable):
 
             self.groups.clear()
             self.outcomes.clear()
+
+    def _check_if_eligible_for_sync_fork(self) -> bool:
+        """
+        Check if the current thread is eligible to use SyncFork.
+
+        This method is used to ensure that the current thread is not already
+        blocked by another SyncFork instance or has not exceeded its usage cap.
+        """
+        counter = 0
+
+        for group in self.groups:
+            counter += len(group)
+
+        if self._threshold >= counter:
+            raise RuntimeError(
+                f"MultiConductor threshold ({self._threshold}) does not match the total number of tasks "
+                f"({counter}) across all groups. SyncFork cannot be used as it requires a consistent number of tasks "
+                "to worker ratio 1:1.  Please adjust your workload and use less callables with queues or use a Fork instead."
+            )
+
+        if not self._multiple_outcomes_per_task:
+            raise RuntimeError(
+                "SyncFork requires multiple outcomes per task to be enabled. "
+                "Please set 'multiple_outcomes_per_task=True' when initializing the MultiConductor."
+                "This operation is threadsafe and will not cause any issues. You have more workers than tasks and"
+                " therefore either reduce your worker count or increase the number of tasks per group."
+            )
+        return True
 
     def add_group(self, group: Group):
         """
@@ -340,10 +386,18 @@ class MultiConductor(IDisposable):
 
             if self._broken or self._disposed: break
 
+    def _calculate_sync_fork_processor(self) -> SyncFork:
+        pass
+
     def _concurrent_execution_loop(self):
         fork = Fork()
 
         for group in self.groups:
+
+            if not self._create_fork:
+                #self._fork_processor
+                pass
+
             for task_index, task in enumerate(group.tasks):
 
                 if self._broken or self._disposed: break
@@ -357,8 +411,16 @@ class MultiConductor(IDisposable):
             if self._broken or self._disposed: break
 
 
+    def _calculate_sync_fork_processor(self) -> SyncFork:
+        pass
+
     def _parallel_execution_loop(self):
+        fork = SyncFork()
         for group in self.groups:
+
+            if not self._create_fork:
+                #self._fork_processor
+                pass
             for task_index, task in enumerate(group.tasks):
 
                 if self._broken or self._disposed: break
@@ -394,9 +456,9 @@ class MultiConductor(IDisposable):
                     self._execution_started_notified = True
                     self._controller.notify(self.id, "EXECUTION_STARTED")
 
-            if self._parallel:
+            if self._sync_distributed_execution and not self._distributed_execution:
                 self._parallel_execution_loop()
-            elif self._concurrent:
+            elif self._distributed_execution:
                 self._concurrent_execution_loop()
             else:
                 self._general_execution_loop()
