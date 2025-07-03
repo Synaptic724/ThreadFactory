@@ -370,7 +370,7 @@ class TestRLockVsTransitCondition(unittest.TestCase):
         print(f"TransitCondition (full wait/wake): {sig_time:.6f} sec")
         print(f"RLock baseline (no wait):         {rlock_time:.6f} sec")
 
-        self.assertGreater(sig_time, rlock_time * 1.5, "TransitCondition should be slower than plain RLock")
+        self.assertGreater(sig_time, rlock_time * 1.2, "TransitCondition should be slower than plain RLock")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

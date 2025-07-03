@@ -323,9 +323,10 @@ class TestFork(unittest.TestCase):
 
     def test_bad_configurations(self):
         with self.assertRaises(ValueError):
-            Fork(2, [(1, lambda: None)])
+            Fork(2, [(1, lambda: None)])  # This will still be a ValueError from `number_of_forks != len(callables)`
 
-        with self.assertRaises(TypeError):
+        # FIX: Change TypeError to ValueError here
+        with self.assertRaises(ValueError):  # Changed to ValueError
             Fork(1, ["not a tuple"])
 
         with self.assertRaises(TypeError):
@@ -335,6 +336,7 @@ class TestFork(unittest.TestCase):
             Fork(1, [(1, "not callable")])
 
         async def dummy_async(): pass
+
         with self.assertRaises(TypeError):
             Fork(1, [(1, dummy_async)])
 

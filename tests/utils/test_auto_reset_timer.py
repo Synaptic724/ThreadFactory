@@ -1,7 +1,7 @@
 import unittest
 import time
 from threading import Event
-from thread_factory.utils import AutoResetTimer  # Adjust this import based on your structure
+from thread_factory.utils.timing_tools.auto_reset_timer import AutoResetTimer  # Adjust this import based on your structure
 
 class TestAutoResetTimer(unittest.TestCase):
 

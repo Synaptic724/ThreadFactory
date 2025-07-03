@@ -1,9 +1,11 @@
 import dataclasses
 import threading
 import time
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, Union
 import inspect
 import ulid
+from thread_factory.concurrency.concurrent_list import ConcurrentList
+from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 @dataclasses.dataclass(slots=True)
@@ -95,38 +97,25 @@ class Fork(IDisposable):
     # Removed _reusable from __slots__
     __slots__ = ["_list_of_forks", "_forks_closed", "_rotate_selectors", "_selector_step", "_selector_step_counter", "_selector_lock", "_id"]
 
-    def __init__(self, number_of_forks: int, callables: List[Tuple[int, Callable]],
+    def __init__(self, number_of_forks: int, callables: List[Tuple[int, Union[Callable[..., None], Pack]]],
                  rotate_selectors: bool = False, selector_step: int = 1):
         super().__init__()
         if number_of_forks != len(callables):
             raise ValueError("The number of forks must match the number of callables.")
 
-        # --- Validation: Ensure correct input format and callable type ---
-        for i, item in enumerate(callables):
-            # 1. Check if the item is a tuple and has two elements.
-            if not isinstance(item, tuple) or len(item) != 2:
-                raise TypeError(
-                    f"Expected a tuple of (int, Callable) at index {i}, but received {type(item).__name__} or a tuple of incorrect size.")
+        _packed_callables = []
+        for i, (cap, fn) in enumerate(callables):
+            if not isinstance(cap, int):
+                raise TypeError(f"usage_cap at index {i} must be int, got {type(cap).__name__}")
 
-            # 2. Check if the first element is an integer (the usage_cap).
-            if not isinstance(item[0], int):
-                raise TypeError(
-                    f"The first element of the tuple at index {i} must be an integer, but received {type(item[0]).__name__}.")
-
-            # 3. Check if the second element is a callable function.
-            if not callable(item[1]):
-                raise TypeError(
-                    f"The second element of the tuple at index {i} must be a callable, but received {type(item[1]).__name__}.")
-
-            # 4. Check if the callable is a coroutine function.
-            if inspect.iscoroutinefunction(item[1]):
-                raise TypeError(
-                    f"Coroutine functions are not supported for ForkUnit at index {i}. Received a coroutine: {item[1].__name__}")
+            # FIX: Use Pack.bundle() here to correctly handle existing Pack instances
+            # This will create a new Pack for raw callables or return the existing Pack.
+            _packed_callables.append((cap, Pack.bundle(fn)))
 
         # Use tuple unpacking to set the individual usage_cap for each ForkUnit.
-        self._list_of_forks: List[ForkUnit] = [
-            ForkUnit(fork_callable=call, usage_cap=cap) for cap, call in callables
-        ]
+        # Use the _packed_callables list directly for initializing _list_of_forks
+        self._list_of_forks: ConcurrentList[ForkUnit] = ConcurrentList([ForkUnit(fork_callable=fn, usage_cap=cap)
+                                               for cap, fn in _packed_callables])
         # _reusable removed
 
         self._id = str(ulid.ULID())

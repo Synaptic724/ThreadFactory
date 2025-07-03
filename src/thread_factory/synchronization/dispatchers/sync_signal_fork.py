@@ -2,9 +2,11 @@ import dataclasses
 import inspect
 import threading
 import ulid
-from typing import Callable, List, Optional, Tuple, Any, Dict
+from typing import Callable, List, Optional, Tuple, Any, Dict, Union
+from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.synchronization.coordinators.scout import Scout
 from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utils.coordination.package import Pack
 
 
 @dataclasses.dataclass(slots=True)
@@ -25,7 +27,7 @@ class ForkUnit:
     gate_uses : int
         Current number of threads that have claimed this unit.
     """
-    fork_callable: Callable | None
+    fork_callable: Pack | None
     usage_cap: int
     lock: threading.Lock = dataclasses.field(default_factory=threading.RLock)
     gate: bool = False
@@ -97,16 +99,16 @@ class SyncSignalFork(IDisposable):
     ]
 
     def __init__(
-        self,
-        number_of_forks: int,
-        callables: List[Tuple[int, Callable]],
-        *,
-        selector_step: int = 1,
-        timeout_duration: Optional[float] = None,
-        manual_release: bool = False,
-        callback: Optional[Callable[[], None]] = None,
-        controller: Optional["Controller"] = None,
-        signal_callback: Optional[Callable[[str], None]] = None,
+            self,
+            number_of_forks: int,
+            callables: List[Tuple[int, Union[Callable[..., None], Pack]]],
+            *,
+            selector_step: int = 1,
+            timeout_duration: Optional[float] = None,
+            manual_release: bool = False,
+            callback: Optional[Union[Callable[..., None], Pack]] = None,
+            controller: Optional["Controller"] = None,
+            signal_callback: Optional[Union[Callable[..., None], Pack]] = None,
     ):
         super().__init__()
 
@@ -114,13 +116,19 @@ class SyncSignalFork(IDisposable):
         if number_of_forks != len(callables):
             raise ValueError("number_of_forks must match len(callables).")
 
+        # Fix: Create a new list to store the packed callables.
+        # Modifying a list while iterating over it, although possible with reassignment,
+        # can sometimes be less clear or lead to subtle bugs if not careful.
+        # Creating a new list ensures the original input isn't unintentionally altered,
+        # and it makes the packing process explicit.
+        _packed_callables = []
         for i, (cap, fn) in enumerate(callables):
             if not isinstance(cap, int):
                 raise TypeError(f"usage_cap at index {i} must be int, got {type(cap).__name__}")
-            if not callable(fn):
-                raise TypeError(f"Callable expected at index {i}, got {type(fn).__name__}")
-            if inspect.iscoroutinefunction(fn):
-                raise TypeError(f"Coroutine functions not supported (index {i}: {fn.__name__})")
+
+            # FIX: Use Pack.bundle() here to correctly handle existing Pack instances
+            # This will create a new Pack for raw callables or return the existing Pack.
+            _packed_callables.append((cap, Pack.bundle(fn)))
 
         if timeout_duration is not None and (timeout_duration <= 0):
             raise ValueError("timeout_duration must be > 0 or None.")
@@ -128,16 +136,17 @@ class SyncSignalFork(IDisposable):
         # ----------------- immutable config ----------------- #
         self._id: str = str(ulid.ULID())
         self._manual_release: bool = bool(manual_release)
-        self._callback = callback
+
+        # FIX: Consistently pack callbacks using Pack.bundle()
+        self._callback = Pack.bundle(callback) if callback is not None else None
         self._controller = controller
-        self._signal_callback = signal_callback
+        self._signal_callback = Pack.bundle(signal_callback) if signal_callback is not None else None
 
         # ----------------- state ----------------- #
         self._threading_event = threading.Event()
-        self._list_of_forks: List[ForkUnit] = [ForkUnit(cap, cap)  # type: ignore[arg-type]
-                                               for cap, _ in callables]  # placeholder, overwritten below
-        # Re-create with actual callables to keep slot order stable
-        self._list_of_forks = [ForkUnit(fork_callable=fn, usage_cap=cap) for cap, fn in callables]
+        # Use the _packed_callables list directly for initializing _list_of_forks
+        self._list_of_forks: ConcurrentList[ForkUnit] = ConcurrentList([ForkUnit(fork_callable=fn, usage_cap=cap)
+                                               for cap, fn in _packed_callables])
 
         self._selector_step = max(1, selector_step)
         self._selector_step_counter = 0
@@ -148,7 +157,7 @@ class SyncSignalFork(IDisposable):
 
         self._timeout_duration = timeout_duration
         self._timed_out = False
-        self._scout: Optional[Scout] = None
+        self._scout: Optional[Scout] = None  # Assuming Scout manages the timeout logic
 
         self._detect_number_of_routes()
 
@@ -208,9 +217,7 @@ class SyncSignalFork(IDisposable):
             },
         }
 
-    # ------------------------------------------------------------------ #
-    # Internal helpers
-    # ------------------------------------------------------------------ #
+
     def _detect_number_of_routes(self) -> None:
         self._route_count = sum(u.usage_cap for u in self._list_of_forks)
 
