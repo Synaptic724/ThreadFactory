@@ -20,7 +20,7 @@ class ForkUnit:
     concurrent access and enforce execution limits per callable.
     """
 
-    fork_callable: Callable | None
+    fork_callable: Optional[Union[Callable, Pack]]
     usage_cap: int
     lock: threading.Lock = dataclasses.field(default_factory=threading.RLock)
     # The 'gate' is now a consumable resource. True means it's consumed.

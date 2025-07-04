@@ -2,8 +2,8 @@ from __future__ import annotations
 import threading, ulid
 from typing import Optional, Callable, List, Union, Any, Dict, Tuple
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.synchronization.dispatchers.fork import Fork
-from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
+from thread_factory.synchronization.dispatchers.signal_fork import SignalFork
+from thread_factory.synchronization.dispatchers.sync_signal_fork import SyncSignalFork
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.group import Group
@@ -141,7 +141,7 @@ class MultiConductor(IDisposable):
         self._execution_started_notified: bool = False
         self._execution_completed_notified: bool = False
         self._create_fork: SyncBool = SyncBool(False)
-        self._fork_processor: Optional[SyncFork, Fork] = None
+        self._fork_processor: Optional[SyncSignalFork, SignalFork] = None
 
         # --- Callback Management ---
         self.groups: Optional[Group] | ConcurrentList[Group] = ConcurrentList[Group]()
@@ -398,7 +398,7 @@ class MultiConductor(IDisposable):
         if self._callback:
              self._execute_callback(group, task_index)
 
-    def _create_fork_processor(self, group: Group, sync: bool = None) -> Fork | SyncFork:
+    def _create_fork_processor(self, group: Group, sync: bool = None) -> SignalFork | SyncSignalFork:
         """
         Calculates how the threshold workers are distributed among the tasks of a group
         for a non-synchronizing Fork processor.
@@ -442,11 +442,17 @@ class MultiConductor(IDisposable):
 
         # Return the correct Fork or SyncFork type based on the 'sync' parameter
         if sync:
-            return SyncFork(number_of_tasks, final_fork_callables)
+            if self._controller:
+                return SyncSignalFork(number_of_tasks, final_fork_callables, controller=self._controller)
+            else:
+                return SyncSignalFork(number_of_tasks, final_fork_callables)
         else:
-            return Fork(number_of_tasks, final_fork_callables)
+            if self._controller:
+                return SignalFork(number_of_tasks, final_fork_callables, controller=self._controller)
+            else:
+                return SignalFork(number_of_tasks, final_fork_callables)
 
-    def _calculate_fork_processor(self, group: Group) -> Optional[Fork, SyncFork]:
+    def _calculate_fork_processor(self, group: Group) -> Optional[SignalFork, SyncSignalFork]:
         """
         Determines the appropriate fork processor based on the conductor's configuration.
         """
