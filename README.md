@@ -1,4 +1,4 @@
-# ThreadFactory
+# ThreadFactory - The home of high-performance Agentic Multithreading
 
 [![PyPI version](https://badge.fury.io/py/threadfactory.svg)](https://badge.fury.io/py/threadfactory)
 [![License](https://img.shields.io/github/license/Synaptic724/threadfactory)](https://github.com/Synaptic724/threadfactory/blob/production/LICENSE)
