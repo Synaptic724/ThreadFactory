@@ -35,7 +35,8 @@ class Scout(IDisposable):
     __slots__ = IDisposable.__slots__ + [
         "_id", "_predicate", "_timeout_duration", "_on_timeout_callable",
         "_on_success_callable", "_autoreset_on_exit", "_condition",
-        "_is_active_monitoring", "_monitoring_cycle_completed", "_id"
+        "_is_active_monitoring", "_monitoring_cycle_completed", "_id",
+        "_exit_monitoring"
     ]
     def __init__(
             self,
@@ -58,6 +59,7 @@ class Scout(IDisposable):
         if on_success_callable is not None and not callable(on_success_callable):
             raise TypeError("on_success_callable must be a callable function or None.")
 
+        self._exit_monitoring = False  # True if the Scout is disposed
         self._id = str(ulid.ULID())
         self._predicate = Pack.bundle(predicate) if predicate else None
         self._timeout_duration = timeout_duration
@@ -69,6 +71,15 @@ class Scout(IDisposable):
         self._condition = threading.Condition()
         self._is_active_monitoring = False  # True if a thread is currently inside monitor()
         self._monitoring_cycle_completed = False  # True if a cycle has finished (latch state)
+
+    def exit_monitor(self):
+        """
+        Marks the Scout as disposed, effectively exiting any ongoing monitoring.
+        """
+        with self._condition:
+            self._is_active_monitoring = True
+            self._condition.notify_all()
+
 
     def monitor(self) -> bool:
         """
@@ -104,7 +115,10 @@ class Scout(IDisposable):
                 # Perform the actual wait on the predicate using the Condition.
                 # The predicate callable will be invoked internally by wait_for()
                 # while holding _condition's lock.
-                predicate_became_true = self._condition.wait_for(self._predicate, timeout=self._timeout_duration)
+                predicate_became_true = self._condition.wait_for(
+                    lambda: self._exit_monitoring or self._predicate(),
+                    timeout=self._timeout_duration
+                )
 
             with self._condition:  # Re-acquire lock to update active status and call callbacks
                 if predicate_became_true:
@@ -141,6 +155,7 @@ class Scout(IDisposable):
                 raise RuntimeError("Cannot reset a disposed Scout.")
 
             # Reset all flags that control entry and cycle state
+            self._is_active_monitoring = False
             self._is_active_monitoring = False
             self._monitoring_cycle_completed = False
             self._condition.notify_all()  # Notify any threads that were waiting for state change
