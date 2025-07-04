@@ -1,6 +1,6 @@
 from typing import Callable, Optional, Any
 from thread_factory.runtime.worker.worker.worker import Worker, WorkerState
-from thread_factory.agent_thread_pool.help_request import HelpRequest
+from thread_factory.agent.thread_pool.help_request import HelpRequest
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 from thread_factory.utils.general_helpers.coroutine_helpers import CoroutineHelpers
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
