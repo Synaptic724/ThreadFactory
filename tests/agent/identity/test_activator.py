@@ -1,7 +1,7 @@
 import threading
 import time
 import unittest
-from thread_factory.agent.identity.activator import ActivatedAgent
+from thread_factory.agent.identity.activator import AgentActivator
 from thread_factory.agent.identity.profiles.general import General  # Import General
 from thread_factory.agent.identity.profile_builder import ProfileBuilder  # Import ProfileBuilder
 
@@ -18,19 +18,19 @@ class MockFactory:
         return self.workers.get(factory_id)
 
 
-class TestActivatedAgent(unittest.TestCase):
+class TestAgentActivator(unittest.TestCase):
     def setUp(self):
         self.results = {}
         self.event = threading.Event()
         # Initialize a fresh thread for each test
         self.raw_thread = threading.Thread(target=self._test_target)
-        # self.agent will hold the ActivatedAgent instance
-        self.agent = ActivatedAgent(self.raw_thread)
+        # self.agent will hold the AgentActivator instance
+        self.agent = AgentActivator(self.raw_thread)
         # Initialize profile builder for tests that use it
         self.profile_builder = ProfileBuilder()
         # Create and bind a profile immediately for agentic features
         self.agent.profile = self.profile_builder.create_profile()
-        self.agent.profile.bind_to(self.agent)  # Bind the profile to the ActivatedAgent instance
+        self.agent.profile.bind_to(self.agent)  # Bind the profile to the AgentActivator instance
 
     def tearDown(self):
         # Ensure proper disposal after each test
@@ -44,10 +44,10 @@ class TestActivatedAgent(unittest.TestCase):
         self.agent = None
 
     def test_idempotent_activation(self):
-        # A new ActivatedAgent instance is created in setUp, so we don't need to do it here
-        # Test idempotency by creating another ActivatedAgent with the same raw_thread
-        another_agent_instance = ActivatedAgent(self.raw_thread)
-        self.assertTrue(ActivatedAgent.is_agent(self.raw_thread))
+        # A new AgentActivator instance is created in setUp, so we don't need to do it here
+        # Test idempotency by creating another AgentActivator with the same raw_thread
+        another_agent_instance = AgentActivator(self.raw_thread)
+        self.assertTrue(AgentActivator.is_agent(self.raw_thread))
         # Dispose the temporary agent instance
         another_agent_instance.dispose()
 
@@ -61,37 +61,37 @@ class TestActivatedAgent(unittest.TestCase):
         # OR:
         # raw_thread_b = threading.Thread(target=agent_b_target, args=(activator_b,)) # Pass activator_b if it's the one setting it
 
-        activator_b = ActivatedAgent(raw_thread_b, factory_id="agent_B")
+        activator_b = AgentActivator(raw_thread_b, factory_id="agent_B")
 
         # Now, ensure that the activator_b being created here and the one
         # used inside the thread are the same for setting/getting shared state.
         # It's cleaner if the agent's target *is* the agent itself, or a method on it.
 
         # Let's adjust the test to make it clearer what's being shared.
-        # The _shared_inventory is an instance attribute of ActivatedAgent.
+        # The _shared_inventory is an instance attribute of AgentActivator.
         # If you want inter-agent communication via *shared* inventory,
         # all participating agents need to point to the *same* ConcurrentDict instance.
 
         # For this test, it's about an agent setting something and then reading it.
         # The key is that `threading.current_thread()` returns the patched thread.
         # The patched methods *on that thread* are the ones that access the *original*
-        # ActivatedAgent's shared inventory.
+        # AgentActivator's shared inventory.
 
         # Let's re-examine your _patch_thread logic carefully.
         # When you do:
         # setattr(self._thread_target, 'set_shared_inventory_item', getattr(self, 'set_shared_inventory_item'))
         # This means that when thread.set_shared_inventory_item() is called, it's actually
-        # calling the `set_shared_inventory_item` method of the *original ActivatedAgent instance* that patched it.
+        # calling the `set_shared_inventory_item` method of the *original AgentActivator instance* that patched it.
         # So, the problem is likely still in `agent_b_target`:
 
         def agent_b_target():
             # The current thread *is* the patched thread. Its methods directly access
-            # the _shared_inventory of the ActivatedAgent that patched it.
+            # the _shared_inventory of the AgentActivator that patched it.
             received_message = threading.current_thread().get_shared_inventory_item("message")
             self.results['received_message'] = received_message
 
         raw_thread_b = threading.Thread(target=agent_b_target)
-        activator_b = ActivatedAgent(raw_thread_b, factory_id="agent_B")
+        activator_b = AgentActivator(raw_thread_b, factory_id="agent_B")
 
         # Set the shared inventory item on the *activator_b* instance
         activator_b.set_shared_inventory_item("message", "hello_from_outside")
@@ -106,8 +106,8 @@ class TestActivatedAgent(unittest.TestCase):
         event_b = threading.Event()
 
         def target_a():
-            # Get the ActivatedAgent instance for the current thread
-            agent = ActivatedAgent(threading.current_thread())
+            # Get the AgentActivator instance for the current thread
+            agent = AgentActivator(threading.current_thread())
             try:
                 agent.bind_to_inventory("secret", "for_A_only")
                 time.sleep(0.05)
@@ -119,8 +119,8 @@ class TestActivatedAgent(unittest.TestCase):
                 event_a.set()
 
         def target_b():
-            # Get the ActivatedAgent instance for the current thread
-            agent = ActivatedAgent(threading.current_thread())
+            # Get the AgentActivator instance for the current thread
+            agent = AgentActivator(threading.current_thread())
             try:
                 agent.bind_to_inventory("secret", "for_B_only")
                 time.sleep(0.05)
@@ -135,8 +135,8 @@ class TestActivatedAgent(unittest.TestCase):
         thread_b_raw = threading.Thread(target=target_b)
 
         # Activators are created here. They automatically patch the threads.
-        activator_a = ActivatedAgent(thread_a_raw)
-        activator_b = ActivatedAgent(thread_b_raw)
+        activator_a = AgentActivator(thread_a_raw)
+        activator_b = AgentActivator(thread_b_raw)
 
         thread_a_raw.start()
         thread_b_raw.start()
@@ -177,14 +177,14 @@ class TestActivatedAgent(unittest.TestCase):
         thread_a_raw = threading.Thread()
         thread_b_raw = threading.Thread()
 
-        # Create ActivatedAgent instances
-        activator_a = ActivatedAgent(thread_a_raw, factory_id="A")
-        activator_b = ActivatedAgent(thread_b_raw, factory_id="B")
+        # Create AgentActivator instances
+        activator_a = AgentActivator(thread_a_raw, factory_id="A")
+        activator_b = AgentActivator(thread_b_raw, factory_id="B")
 
-        # Set the factory attribute on the ActivatedAgent instances
-        # This assumes your ActivatedAgent has a 'factory' attribute or you pass it during init
+        # Set the factory attribute on the AgentActivator instances
+        # This assumes your AgentActivator has a 'factory' attribute or you pass it during init
         # Based on your _resolve_worker_by_id, it implicitly expects `self.factory` to be set
-        # You need to expose a way to set the factory on the ActivatedAgent
+        # You need to expose a way to set the factory on the AgentActivator
         # For this test, let's directly set it if it's not handled in __init__
         activator_a.factory = factory
         activator_b.factory = factory
@@ -214,8 +214,8 @@ class TestActivatedAgent(unittest.TestCase):
         thread_a_raw = threading.Thread()
         thread_b_raw = threading.Thread()
 
-        activator_a = ActivatedAgent(thread_a_raw)
-        activator_b = ActivatedAgent(thread_b_raw)
+        activator_a = AgentActivator(thread_a_raw)
+        activator_b = AgentActivator(thread_b_raw)
 
         activator_a.bind_to_inventory("x", "a_value")
         self.assertIsNone(activator_b.get_from_inventory("x"))
@@ -265,15 +265,15 @@ class TestActivatedAgent(unittest.TestCase):
         # In setUp, self.raw_thread is created and wrapped by self.agent.
         # Before setUp, the raw_thread would not be an agent.
         # After setUp, it should be.
-        self.assertTrue(ActivatedAgent.is_agent(self.raw_thread))
+        self.assertTrue(AgentActivator.is_agent(self.raw_thread))
         self.assertEqual(self.agent.factory_id, self.raw_thread.factory_id)  # factory_id is patched onto the thread
         self.assertEqual(self.raw_thread._worker_type, "agentic")
 
     def test_inventory_management(self):
         # self.agent is already set up
         def target_with_internal_assertion():
-            # Get the ActivatedAgent instance for the current thread
-            agent_in_thread = ActivatedAgent(threading.current_thread())
+            # Get the AgentActivator instance for the current thread
+            agent_in_thread = AgentActivator(threading.current_thread())
             try:
                 agent_in_thread.bind_to_inventory("private_key", "private_value")
                 retrieved_value = agent_in_thread.get_from_inventory("private_key")
@@ -330,11 +330,11 @@ class TestActivatedAgent(unittest.TestCase):
         # self.agent is set up in setUp. We test its disposal here.
         # We need a new agent for this test to dispose of, as self.agent is disposed in tearDown.
         temp_raw_thread = threading.Thread()
-        temp_agent = ActivatedAgent(temp_raw_thread)
+        temp_agent = AgentActivator(temp_raw_thread)
         temp_agent.profile = self.profile_builder.create_profile()  # create a profile for temp_agent
         temp_agent.profile.bind_to(temp_agent)
 
-        self.assertTrue(ActivatedAgent.is_agent(temp_raw_thread))
+        self.assertTrue(AgentActivator.is_agent(temp_raw_thread))
         self.assertTrue(hasattr(temp_raw_thread, 'bind_to_inventory'))
 
         temp_agent.profile.register_location("temp_loc", lambda: None)
@@ -342,9 +342,9 @@ class TestActivatedAgent(unittest.TestCase):
         self.assertEqual(len(temp_agent.profile.get_locations_dict()), 1)
         self.assertEqual(len(temp_agent._shared_inventory), 1)  # Directly access internal state for assertion
 
-        temp_agent.dispose()  # Call dispose on the ActivatedAgent instance
+        temp_agent.dispose()  # Call dispose on the AgentActivator instance
 
-        self.assertFalse(ActivatedAgent.is_agent(temp_raw_thread))
+        self.assertFalse(AgentActivator.is_agent(temp_raw_thread))
         self.assertFalse(hasattr(temp_raw_thread, 'bind_to_inventory'))
         self.assertFalse(hasattr(temp_raw_thread, 'factory_id'))
         self.assertEqual(len(temp_agent._shared_inventory), 0)
@@ -352,13 +352,13 @@ class TestActivatedAgent(unittest.TestCase):
 
     def test_id_generation(self):
         # Test creation of a new agent instance
-        activator1 = ActivatedAgent(threading.Thread())
+        activator1 = AgentActivator(threading.Thread())
         self.assertIsInstance(activator1.factory_id, str)
         self.assertTrue(len(activator1.factory_id) > 0)
         activator1.dispose()
 
         # Test with custom ID
-        activator2 = ActivatedAgent(threading.Thread(), factory_id="custom-id-123")
+        activator2 = AgentActivator(threading.Thread(), factory_id="custom-id-123")
         self.assertEqual(activator2.factory_id, "custom-id-123")
         activator2.dispose()
 

@@ -14,13 +14,6 @@ class General(IDisposable, BaseProfile, IProfile):
 
     This object may only be bound to an ActivatedAgent or Agent instance.
     """
-
-    __slots__ = IDisposable.__slots__ + [
-        "id", "name", "job", "group",
-        "save_points", "locations", "data_transfer",
-        "_bound_target"
-    ]
-
     def __init__(self):
         """
         Initializes a blank profile with default field values.
@@ -39,8 +32,6 @@ class General(IDisposable, BaseProfile, IProfile):
         self.save_points: ConcurrentDict[str, Union[Callable[..., None], "Pack"]] = ConcurrentDict()
         self.locations: ConcurrentDict[str, Union[Callable[..., None], "Pack"]] = ConcurrentDict()
         self.data_transfer: ConcurrentDict[str, Union[Callable[..., any], "Pack"]] = ConcurrentDict()
-
-        self.set_general_profile()
 
     def dispose(self):
         """
@@ -65,9 +56,7 @@ class General(IDisposable, BaseProfile, IProfile):
         self.group = None
         super().dispose()
 
-
-    def bind_defaults(self, thread: threading.Thread, command_center: 'CommandCenter' = None,
-                      id = None, name: str = None, job: str = None, group: str = None):
+    def bind_defaults(self, id = None, name: str = None, job: str = None, group: str = None):
         """
         Binds the default profile to the provided thread and command center.
 
@@ -76,8 +65,29 @@ class General(IDisposable, BaseProfile, IProfile):
             command_center (CommandCenter, optional): The command center for coordination.
             factory_id (Optional[str]): Unique identifier for the thread.
         """
-        super().bind_defaults(thread, command_center)
         self.id = id if id else str(ulid.ULID())
+        self.name = name if name else "UnnamedAgent"
+        self.job = job if job else "generic"
+        self.group = group if group else "default"
+
+    def define_defaults(self, *args, **kwargs):
+        """
+        Defines the profile with provided arguments.
+
+        Supports both positional and keyword arguments for flexibility.
+        Positional order: (id, name, job, group)
+
+        Args:
+            *args: Optional positional arguments in the order:
+                   id, name, job, group
+            **kwargs: Named arguments for any of: id, name, job, group
+        """
+        id_ = kwargs.get("id", args[0] if len(args) > 0 else None)
+        name = kwargs.get("name", args[1] if len(args) > 1 else None)
+        job = kwargs.get("job", args[2] if len(args) > 2 else None)
+        group = kwargs.get("group", args[3] if len(args) > 3 else None)
+
+        self.id = id_ if id_ else str(ulid.ULID())
         self.name = name if name else "UnnamedAgent"
         self.job = job if job else "generic"
         self.group = group if group else "default"

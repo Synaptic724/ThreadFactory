@@ -11,13 +11,14 @@ class BaseProfile(IDisposable, IProfile):
     ---------
     A lightweight container for agent identity and execution structure.
 
-    This object may only be bound to an ActivatedAgent or Agent instance.
+    This object may only be bound to an AgentActivator or Agent instance.
     """
 
     __slots__ = IDisposable.__slots__ + [
         "id", "name", "job", "group",
         "save_points", "locations", "data_transfer",
-        "_bound_target"
+        "_bound_target", "_thread_target", "_command_center",
+        "_worker_type", "_pool_agent", "_activator", "_lock", "factory_id",
     ]
 
     def __init__(self):
@@ -35,9 +36,10 @@ class BaseProfile(IDisposable, IProfile):
         self._thread_target = None
         self._pool_agent = False # Indicates this worker is part of a dynamic thread pool
         self._command_center = None  # Placeholder for a Command Center reference if needed
+        self._activator = None
         self._lock = threading.RLock()
 
-        self._bound_target: Optional[Union["ActivatedAgent", "Agent"]] = None
+        self._bound_target: Optional[Union["AgentActivator", "Agent"]] = None
 
     def dispose(self):
         """
@@ -68,7 +70,7 @@ class BaseProfile(IDisposable, IProfile):
         """
         return "This is a BaseProfile, it's purpose is to provide a base for agent profiles."
 
-    def bind_defaults(self, target: threading.Thread, command_center: 'CommandCenter') -> None:
+    def bind_essentials(self, target: threading.Thread, command_center: 'CommandCenter', agent: 'AgentActivator') -> None:
         """
         Bind default values to the profile.
 
@@ -78,12 +80,13 @@ class BaseProfile(IDisposable, IProfile):
         """
         self._thread_target = target
         self._command_center = command_center
+        self._activator = agent
 
     def __repr__(self) -> str:
-        return f"<ActivatedAgent id={self.factory_id} thread={repr(self._thread_target)}>"
+        return f"<AgentActivator id={self.factory_id} thread={repr(self._thread_target)}>"
 
     def __str__(self) -> str:
-        return f"ActivatedAgent<{self.factory_id}>"
+        return f"AgentActivator<{self.factory_id}>"
 
     @staticmethod
     def is_agent(thread: threading.Thread) -> bool:
@@ -157,12 +160,12 @@ class BaseProfile(IDisposable, IProfile):
             return self._command_center.get_agent_by_id(factory_id)
         return None
 
-    def bind_to(self, obj: Union["ActivatedAgent", "Agent"]):
+    def bind_to(self, obj: Union["AgentActivator", "Agent"]):
         """
         Bind this profile to a supported agent.
 
         Args:
-            obj: An ActivatedAgent or Agent instance.
+            obj: An AgentActivator or Agent instance.
 
         Raises:
             TypeError: If object is not a valid agent type.
@@ -171,11 +174,11 @@ class BaseProfile(IDisposable, IProfile):
         if self._bound_target is not None:
             raise RuntimeError("Profile is already bound to an agent.")
 
-        from thread_factory.agent.identity.activator import ActivatedAgent
+        from thread_factory.agent.identity.activator import AgentActivator
         from thread_factory.agent.thread_pool.agent import Agent
 
-        if not isinstance(obj, (ActivatedAgent, Agent)):
-            raise TypeError("Profile can only be bound to ActivatedAgent or Agent.")
+        if not isinstance(obj, (AgentActivator, Agent)):
+            raise TypeError("Profile can only be bound to AgentActivator or Agent.")
 
         self._bound_target = obj
 

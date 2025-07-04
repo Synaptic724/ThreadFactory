@@ -1,6 +1,6 @@
 import threading
 from typing import Callable, Union, List, Type, Set
-from thread_factory.agent import ActivatedAgent
+from thread_factory.agent import AgentActivator
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
@@ -35,6 +35,7 @@ class ProfileBuilder(IDisposable):
         """
         super().__init__()
         self._registry: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
+        self._safe_list = []
         self._collision_check = set()
         self._create_colision_checker()
         self._registered = False
@@ -117,12 +118,20 @@ class ProfileBuilder(IDisposable):
         fn = self._registry.get(name)
         if not fn:
             raise KeyError(f"No profile registered under '{name}'")
+
+        # Only instantiate once
         profile = fn()
+
         if not isinstance(profile, IProfile):
             raise TypeError(f"Profile '{name}' did not return an IProfile instance.")
+
+        if name not in self._safe_list:
+            self._check_for_collision(profile.__class__)
+            self._safe_list.append(name)
+
         return profile
 
-    def attach_profile(self, profile: General, target: Union["ActivatedAgent", "Agent"]) -> None:
+    def attach_profile(self, profile: General, target: Union["AgentActivator", "Agent"]) -> None:
         """
         Bind a profile to an agent.
 
@@ -162,14 +171,15 @@ class ProfileBuilder(IDisposable):
                 f"{', '.join(sorted(conflicts))}"
             )
 
+
     def _create_colision_checker(self) -> None:
         """
         Initializes a collision checker to ensure unique profile names.
         """
-        thread_class_data = ProfileBuilder.get_public_class_members(threading.Thread)
-        activator_class_data = ProfileBuilder.get_public_class_members(ActivatedAgent)
-        base_profile_class_data = ProfileBuilder.get_public_class_members(BaseProfile)
-        self._collision_check = thread_class_data.union(activator_class_data).union(base_profile_class_data)
+        current = threading.current_thread()
+        thread_class_data = ProfileBuilder.get_public_class_members(type(current))
+        activator_class_data = ProfileBuilder.get_public_class_members(AgentActivator)
+        self._collision_check = thread_class_data.union(activator_class_data)
 
     @staticmethod
     def get_public_class_members(cls: Type) -> Set[str]:
