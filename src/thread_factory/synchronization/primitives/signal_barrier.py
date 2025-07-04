@@ -175,7 +175,7 @@ class SignalBarrier(IDisposable):
                 - 'commands': A dictionary mapping command names to bound methods.
         """
         return ConcurrentDict({
-            'name': 'threshold_semaphore',
+            'name': 'signal_barrier',
             'commands': ConcurrentDict({
                 'release': self.release,
                 'reset': self.reset,

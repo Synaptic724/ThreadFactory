@@ -69,6 +69,7 @@ class MultiConductor(IDisposable):
         "_barrier_passed_notified", "_execution_started_notified", "_execution_completed_notified",
         "_clock_barrier", "_signal_barrier", "_internal_threshold_barrier", "outcomes", "_enabled",
         "_distributed_execution", "_sync_distributed_execution", "_create_fork", "_fork_processor",
+        "_group_execution_started_notification", "_group_execution_lock"
 
     ]
     def __init__(
@@ -140,6 +141,8 @@ class MultiConductor(IDisposable):
         self._barrier_passed_notified: bool = False
         self._execution_started_notified: bool = False
         self._execution_completed_notified: bool = False
+        self._group_execution_started_notification = False
+        self._group_execution_lock = threading.Lock()
         self._create_fork: SyncBool = SyncBool(False)
         self._fork_processor: Optional[SyncSignalFork, SignalFork] = None
 
@@ -362,23 +365,47 @@ class MultiConductor(IDisposable):
                 raise TimeoutError("MultiConductor wait timed out.") from e
             self.notify_all_override()
 
+    def _notify_group_started(self, group: Group):
+        """
+        Notifies the controller that a group has started execution.
+
+        This method is called at the beginning of each group's execution to inform the controller
+        that the group has started processing its tasks. It is used to synchronize state changes
+        and can be overridden for custom behavior.
+
+        Args:
+            group (Group): The group that has started execution.
+        """
+        if self._group_execution_started_notification:
+            return
+        with self._group_execution_lock:
+            if self._group_execution_started_notification:
+                return
+            if self._controller:
+                self._controller.notify(self.id, f"GROUP_EXECUTION_STARTED {group.id}")
+                self._group_execution_started_notification = True
+
+
+
     def _general_execution_loop(self):
         """
         The main execution loop that iterates through all groups and their tasks.
         """
         for group in self.groups:
+            self._notify_group_started(group)
             for task_index, task in enumerate(group.tasks):
 
                 if self._broken or self._disposed: break
 
                 self._execute_operation(task, group, task_index)
+
+                self._group_execution_started_notification = False
                 self._internal_threshold_barrier.wait()
 
                 # if self._callback:
                 #     self._execute_callback(group, task_index)
 
             if self._broken or self._disposed: break
-
 
     def _execute_operation(self, task: Union[Callable[..., None], Pack], group: Group, task_index: int):
         """Executes a single task and records its outcome in the correct group.
@@ -443,9 +470,9 @@ class MultiConductor(IDisposable):
         # Return the correct Fork or SyncFork type based on the 'sync' parameter
         if sync:
             if self._controller:
-                return SyncSignalFork(number_of_tasks, final_fork_callables, controller=self._controller)
+                return SyncSignalFork(number_of_tasks, final_fork_callables, controller=self._controller, manual_release=self.manual_release)
             else:
-                return SyncSignalFork(number_of_tasks, final_fork_callables)
+                return SyncSignalFork(number_of_tasks, final_fork_callables, manual_release=self.manual_release)
         else:
             if self._controller:
                 return SignalFork(number_of_tasks, final_fork_callables, controller=self._controller)

@@ -49,9 +49,9 @@ class TestControllerWithSemaphore(unittest.TestCase):
         """1. A semaphore should register itself with the controller on creation."""
         sema = self._make_semaphore(threshold=2)
         self.assertIn(sema.id, self.controller._registry)
-        self.assertEqual(self.controller._registry[sema.id]['name'], 'threshold_semaphore')
+        self.assertEqual(self.controller._registry[sema.id]['name'], 'signal_barrier')
         self.mock_logger.debug.assert_called_with(
-            f"Registered object: ID='{sema.id}', Name='threshold_semaphore'"
+            f"Registered object: ID='{sema.id}', Name='signal_barrier'"
         )
 
     def test_invoke_reset_command(self):

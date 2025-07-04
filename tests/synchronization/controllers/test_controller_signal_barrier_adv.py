@@ -52,7 +52,7 @@ class TestComprehensiveControllerSemaphore(unittest.TestCase):
 
         # Check details provided to the controller
         details = self.controller._registry[sema.id]
-        self.assertEqual(details['name'], 'threshold_semaphore')
+        self.assertEqual(details['name'], 'signal_barrier')
         self.assertIn('release', details['commands'])
         self.assertIn('reset', details['commands'])
 
