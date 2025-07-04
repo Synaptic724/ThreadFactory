@@ -1,9 +1,10 @@
 import threading
 from datetime import datetime
 from ulid import ULID
+from typing import Callable, Union
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
-from typing import Callable
 from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utils.coordination.package import Pack
 
 
 class HelpRequest(IDisposable):
@@ -69,13 +70,13 @@ class HelpRequest(IDisposable):
     __slots__ = IDisposable.__slots__ + [
         "_work_state", "_lock", "record", "_work_callable", "_return_to_pool",
     ]
-    def __init__(self, work_callable: Callable):
+    def __init__(self, work_callable: Union[Callable[..., None], Pack]):
         """
         Initialize a new HelpRequest instance with a unique task ID and a callable to execute the work.
 
         Args:
             task_id (str): Unique identifier for the task.
-            work_callable (Callable[['HelpRequest'], None]): A callable function to execute the task.
+            work_callable (Union[Callable[..., None], Pack]): A callable function to execute the task.
                 The callable will receive the HelpRequest instance itself as an argument.
 
         Initializes:
