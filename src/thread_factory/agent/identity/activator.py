@@ -31,12 +31,14 @@ class ActivatedAgent(IDisposable):
         # --- Default Factory --- #
         self._thread_target = thread
         self.factory_id = factory_id if factory_id else str(ulid.ULID())
-        self._lock = threading.RLock()
-        self._pool_agent = False # Indicates this worker is part of a dynamic thread pool
         self._worker_type = "agentic"
+        self._pool_agent = False # Indicates this worker is part of a dynamic thread pool
+        self._lock = threading.RLock()
+
         self._inventory = threading.local()
         self._inventory.data = ConcurrentDict()
         self._shared_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
+
         # --- Profiles --- #
 
 
@@ -79,14 +81,55 @@ class ActivatedAgent(IDisposable):
                         self._inventory.data.clear()
             except AttributeError as e:
                 pass
-            self._shared_inventory.clear()
-            self._data_transfer.clear()
-            self._save_points.clear()
-            self._locations.clear()
+            if hasattr(self, "profile"):
+                self.profile.dispose()
+
+            # Clear shared inventory as well
+            if self._shared_inventory:  # Add this line
+                self._shared_inventory.dispose()  # And this line
 
             # Nullify references
             self._thread_target = None
             self._disposed = True
+
+    def _patch_thread(self):
+        """
+        Internal method to patch the target thread with agentic methods and properties.
+        """
+        methods_to_patch = [
+            'bind_to_inventory', 'get_from_inventory',
+            'set_shared_inventory_item', 'get_shared_inventory_item',
+            'get_shared_inventory', 'get_factory_id',
+            'bind_to_inventory_by_id', 'get_from_inventory_by_id',
+            'dispose'
+        ]
+        for method_name in methods_to_patch:
+            setattr(self._thread_target, method_name, getattr(self, method_name))
+        setattr(self._thread_target, 'factory_id', self.factory_id)
+        setattr(self._thread_target, '_worker_type', self._worker_type)
+
+
+
+    def _unpatch_thread(self):
+        """
+        Internal method to remove all patched methods and properties from
+        the target thread during disposal.
+        """
+        methods_to_unpatch = [
+            'bind_to_inventory', 'get_from_inventory',
+            'set_shared_inventory_item', 'get_shared_inventory_item',
+            'get_shared_inventory', 'get_factory_id',
+            'bind_to_inventory_by_id', 'get_from_inventory_by_id',
+            'dispose', 'factory_id', '_worker_type',
+            'profile' # <--- ADD THIS LINE to unpatch the profile
+        ]
+        for method_name in methods_to_unpatch:
+            if hasattr(self._thread_target, method_name):
+                try:
+                    delattr(self._thread_target, method_name)
+                except AttributeError:
+                    pass
+
 
     def __call__(self) -> "ActivatedAgent":
         """
@@ -258,47 +301,6 @@ class ActivatedAgent(IDisposable):
         """
         return getattr(thread, '_worker_type', None) == 'agentic'
 
-    def _patch_thread(self):
-        """
-        Internal method to apply agentic methods and properties to the
-        target thread using `setattr`. This is the core of the
-        monkey-patching process.
-        """
-        methods_to_patch = [
-            'bind_to_inventory', 'get_from_inventory', 'set_shared_inventory_item',
-            'get_shared_inventory_item', 'get_shared_inventory', 'register_data_transfer',
-            'get_data_transfer_dict', 'execute_transfer', 'register_save_point',
-            'get_save_points_dict', 'register_location', 'get_locations_dict',
-            'get_factory_id', 'bind_to_inventory_by_id', 'get_from_inventory_by_id', 'dispose'
-        ]
-
-        for method_name in methods_to_patch:
-            setattr(self._thread_target, method_name, getattr(self, method_name))
-
-        # Patch the identifying attributes directly onto the thread.
-        setattr(self._thread_target, 'factory_id', self.factory_id)
-        setattr(self._thread_target, '_worker_type', self._worker_type)
-
-    def _unpatch_thread(self):
-        """
-        Internal method to remove all patched methods and properties from
-        the target thread during disposal.
-        """
-        methods_to_unpatch = [
-            'bind_to_inventory', 'get_from_inventory', 'set_shared_inventory_item',
-            'get_shared_inventory_item', 'get_shared_inventory', 'register_data_transfer',
-            'get_data_transfer_dict', 'execute_transfer', 'register_save_point',
-            'get_save_points_dict', 'register_location', 'get_locations_dict',
-            'get_factory_id', 'bind_to_inventory_by_id', 'get_from_inventory_by_id',
-            'dispose', 'factory_id', '_worker_type'
-        ]
-        for method_name in methods_to_unpatch:
-            if hasattr(self._thread_target, method_name):
-                try:
-                    delattr(self._thread_target, method_name)
-                except AttributeError:
-                    pass
-
     def bind_to_inventory(self, key: str, value: Any):
         """
         Binds a key-value pair to the agent's private, thread-local inventory.
@@ -355,95 +357,6 @@ class ActivatedAgent(IDisposable):
             ConcurrentDict[str, Any]: A copy of the shared inventory.
         """
         return self._shared_inventory.copy()
-
-    def register_data_transfer(self, name: str, fn: Union[Callable[..., Any], Pack]):
-        """
-        Registers a named callable function for data processing tasks.
-
-        Args:
-            name (str): The unique name for the data transfer function.
-            fn (Union[Callable[..., Any], Pack]): The function to register.
-
-        Raises:
-            TypeError: If the provided function is an async coroutine.
-        """
-        if fn:
-            fn = Pack.bundle(fn)
-        self._data_transfer[name] = fn
-
-    def get_data_transfer_dict(self) -> ConcurrentDict[str, Union[Callable[..., Any], Pack]]:
-        """
-        Retrieves a copy of all registered data transfer functions.
-
-        Returns:
-            ConcurrentDict[str, Union[Callable[..., Any], Pack]]: A dictionary of transfer functions.
-        """
-        return self._data_transfer.copy()
-
-    def execute_transfer(self, name: str) -> Any:
-        """
-        Executes a previously registered data transfer function by its name.
-
-        Args:
-            name (str): The name of the data transfer function to execute.
-
-        Returns:
-            Any: The result returned by the executed function.
-
-        Raises:
-            KeyError: If no function is registered with the given name.
-        """
-        if name not in self._data_transfer:
-            raise KeyError(f"No data_transfer entry named '{name}'")
-        return self._data_transfer[name]()
-
-    def register_save_point(self, name: str, fn: Union[Callable[..., None], Pack]):
-        """
-        Registers a named callable as a "save point" for checkpointing execution flow.
-
-        Args:
-            name (str): The unique name for the save point.
-            fn (Union[Callable[..., None], Pack]): The function representing the save point.
-
-        Raises:
-            TypeError: If the provided function is an async coroutine.
-        """
-        if fn:
-            fn = Pack.bundle(fn)
-        self._save_points[name] = fn
-
-    def get_save_points_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
-        """
-        Retrieves a copy of all registered save point functions.
-
-        Returns:
-            ConcurrentDict[str, Union[Callable[..., None], Pack]]: A dictionary of save points.
-        """
-        return self._save_points.copy()
-
-    def register_location(self, name: str, fn: Union[Callable[..., None], Pack]):
-        """
-        Registers a named callable as a distinct "location" or execution zone.
-
-        Args:
-            name (str): The unique name for the location.
-            fn (Union[Callable[..., None], Pack]): The function defining the location's behavior.
-
-        Raises:
-            TypeError: If the provided function is an async coroutine.
-        """
-        if fn:
-            fn = Pack.bundle(fn)
-        self._locations[name] = fn
-
-    def get_locations_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
-        """
-        Retrieves a copy of all registered location functions.
-
-        Returns:
-            ConcurrentDict[str, Union[Callable[..., None], Pack]]: A dictionary of locations.
-        """
-        return self._locations.copy()
 
     def get_factory_id(self) -> str:
         """

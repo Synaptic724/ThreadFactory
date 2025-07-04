@@ -28,7 +28,7 @@ class ProfileBuilder(IDisposable):
         Initializes a fresh profile builder and registers the default profile template.
         """
         super().__init__()
-        self._registry: ConcurrentDict[str, Callable[[General], None]] = ConcurrentDict()
+        self._registry: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
         self._registered = False
         self._register_defaults()
 
