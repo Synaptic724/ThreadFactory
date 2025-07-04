@@ -172,6 +172,26 @@ class CommandCenter(IDisposable):
                     thread.dispose()
         return _execute_and_dispose
 
+    def get_agent_by_id(self, factory_id: str) -> Optional[threading.Thread]:
+        """
+        Retrieves the underlying threading.Thread object of an active agent by its factory ID.
+
+        Args:
+            factory_id (str): The unique identifier of the agent.
+
+        Returns:
+            Optional[threading.Thread]: The threading.Thread object if found, otherwise None.
+        """
+        if not isinstance(factory_id, str) or not factory_id:
+            raise ValueError("factory_id must be a non-empty string.")
+
+        with self._lock:
+            # Retrieve the ActivatedAgent instance first
+            activated_agent = self._active_agents.get(factory_id)
+            if activated_agent:
+                # Return its underlying threading.Thread object
+                return activated_agent._thread_target
+            return None
 
     def _assign_profile(self, agent: ActivatedAgent, profile_key: Optional[str] = None) -> None:
         """

@@ -16,6 +16,8 @@ class ActivatedAgent(IDisposable):
 
     def __init__(
             self,
+            command_center: 'CommandCenter',
+            profile: Any,
             thread: threading.Thread,
             factory_id: Optional[str] = None
     ):
@@ -33,36 +35,11 @@ class ActivatedAgent(IDisposable):
         self.factory_id = factory_id if factory_id else str(ulid.ULID())
         self._worker_type = "agentic"
         self._pool_agent = False # Indicates this worker is part of a dynamic thread pool
+        self._command_center = command_center  # Placeholder for a Command Center reference if needed
         self._lock = threading.RLock()
+        self._profile = profile() if profile else None
 
-        self._inventory = threading.local()
-        self._inventory.data = ConcurrentDict()
-        self._shared_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
-
-        # --- Profiles --- #
-
-
-
-
-        # --- Activities --- #
-
-
-
-
-
-        # --- Agentic State Initialization ---
-
-
-
-
-
-        # --- Agent Communication Protocol Mappings --- #
-        # Placeholder for future communication protocols or mappings
-
-        # --- Machine Learning Model integration --- #
-        # Placeholder for future ML model integration or bindings
-
-        # --- Monkey-Patch the Thread ---
+        # --- Agentic State --- #
         self._patch_thread()
 
     def dispose(self):
@@ -85,11 +62,12 @@ class ActivatedAgent(IDisposable):
                 self.profile.dispose()
 
             # Clear shared inventory as well
-            if self._shared_inventory:  # Add this line
-                self._shared_inventory.dispose()  # And this line
+            if self._public_inventory:  # Add this line
+                self._private_inventory.dispose()  # And this line
 
             # Nullify references
             self._thread_target = None
+            self._command_center = None  # Clear command center reference
             self._disposed = True
 
     def _patch_thread(self):
@@ -301,63 +279,6 @@ class ActivatedAgent(IDisposable):
         """
         return getattr(thread, '_worker_type', None) == 'agentic'
 
-    def bind_to_inventory(self, key: str, value: Any):
-        """
-        Binds a key-value pair to the agent's private, thread-local inventory.
-
-        This data is only accessible to this specific agent's thread.
-
-        Args:
-            key (str): The key to store the data under.
-            value (Any): The value to store.
-        """
-        self._inventory.data[key] = value
-
-    def get_from_inventory(self, key: str, default=None) -> Any:
-        """
-        Retrieves a value from the agent's private, thread-local inventory.
-
-        Args:
-            key (str): The key of the item to retrieve.
-            default (Any, optional): The value to return if the key is not found.
-
-        Returns:
-            Any: The retrieved value, or the default if not found.
-        """
-        return self._inventory.data.get(key, default)
-
-    def set_shared_inventory_item(self, key: str, value: Any):
-        """
-        Sets a key-value pair in the shared inventory, accessible by all agents.
-
-        Args:
-            key (str): The key to store the data under.
-            value (Any): The value to store.
-        """
-        self._shared_inventory[key] = value
-
-    def get_shared_inventory_item(self, key: str, default: Any = None) -> Any:
-        """
-        Retrieves a value from the shared inventory.
-
-        Args:
-            key (str): The key of the item to retrieve.
-            default (Any, optional): The value to return if the key is not found.
-
-        Returns:
-            Any: The retrieved value, or the default if not found.
-        """
-        return self._shared_inventory.get(key, default)
-
-    def get_shared_inventory(self) -> ConcurrentDict[str, Any]:
-        """
-        Retrieves a copy of the entire shared inventory dictionary.
-
-        Returns:
-            ConcurrentDict[str, Any]: A copy of the shared inventory.
-        """
-        return self._shared_inventory.copy()
-
     def get_factory_id(self) -> str:
         """
         Retrieves the unique factory ID assigned to this agent.
@@ -411,7 +332,7 @@ class ActivatedAgent(IDisposable):
         Returns:
             Optional[threading.Thread]: The thread object if found, otherwise None.
         """
-        if self.factory and hasattr(self.factory, "get_worker_by_id"):
-            return self.factory.get_worker_by_id(factory_id)
+        if self._command_center:
+            return self._command_center.get_agent_by_id(factory_id)
         return None
 

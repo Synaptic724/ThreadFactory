@@ -1,3 +1,4 @@
+import threading
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
@@ -29,6 +30,11 @@ class General(IDisposable):
         self.job: Optional[str] = None
         self.group: Optional[str] = None
 
+        self._private_inventory = threading.local()
+        self._private_inventory.data = ConcurrentDict()
+        self._public_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
+
+        # Initialize collections for save points, locations, and data transfer functions
         self.save_points: ConcurrentDict[str, Union[Callable[..., None], "Pack"]] = ConcurrentDict()
         self.locations: ConcurrentDict[str, Union[Callable[..., None], "Pack"]] = ConcurrentDict()
         self.data_transfer: ConcurrentDict[str, Union[Callable[..., any], "Pack"]] = ConcurrentDict()
@@ -176,6 +182,64 @@ class General(IDisposable):
             ConcurrentDict[str, Union[Callable[..., None], Pack]]: A dictionary of locations.
         """
         return self.locations.copy()
+
+
+    def bind_to_inventory(self, key: str, value: Any):
+        """
+        Binds a key-value pair to the agent's private, thread-local inventory.
+
+        This data is only accessible to this specific agent's thread.
+
+        Args:
+            key (str): The key to store the data under.
+            value (Any): The value to store.
+        """
+        self._private_inventory.data[key] = value
+
+    def get_from_inventory(self, key: str, default=None) -> Any:
+        """
+        Retrieves a value from the agent's private, thread-local inventory.
+
+        Args:
+            key (str): The key of the item to retrieve.
+            default (Any, optional): The value to return if the key is not found.
+
+        Returns:
+            Any: The retrieved value, or the default if not found.
+        """
+        return self._private_inventory.data.get(key, default)
+
+    def set_shared_inventory_item(self, key: str, value: Any):
+        """
+        Sets a key-value pair in the shared inventory, accessible by all agents.
+
+        Args:
+            key (str): The key to store the data under.
+            value (Any): The value to store.
+        """
+        self._public_inventory[key] = value
+
+    def get_shared_inventory_item(self, key: str, default: Any = None) -> Any:
+        """
+        Retrieves a value from the shared inventory.
+
+        Args:
+            key (str): The key of the item to retrieve.
+            default (Any, optional): The value to return if the key is not found.
+
+        Returns:
+            Any: The retrieved value, or the default if not found.
+        """
+        return self._public_inventory.get(key, default)
+
+    def get_shared_inventory(self) -> ConcurrentDict[str, Any]:
+        """
+        Retrieves a copy of the entire shared inventory dictionary.
+
+        Returns:
+            ConcurrentDict[str, Any]: A copy of the shared inventory.
+        """
+        return self._public_inventory.copy()
 
 
     def __repr__(self) -> str:
