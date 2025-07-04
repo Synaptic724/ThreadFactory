@@ -19,48 +19,75 @@ class MultiConductor(IDisposable):
     """
     MultiConductor
     --------------
-    A reusable, data-aware synchronization point that manages multiple groups of tasks.
+    A reusable, data-aware synchronization coordinator that manages **multiple task groups** with thread thresholding,
+    step-wise execution, and optional distributed dispatch using forked models.
 
-    The `MultiConductor` extends the functionality of a traditional `Conductor` to manage multiple,
-    named groups of tasks, ensuring they are executed in a synchronized and lock-step manner. This
-    means that once the required threshold of threads has arrived, each thread will execute every task
-    from every group sequentially, synchronizing between tasks. If there are multiple groups, all tasks
-    in a group will be executed before moving on to the next group.
+    The `MultiConductor` extends traditional synchronization primitives by enabling synchronized task execution
+    across **named groups**, with rich lifecycle support, outcome collection, timeout enforcement, and manual gating.
+    It is designed for high-control concurrent scenarios where coordinated thread behavior is critical.
 
-    Features:
-    ----------
-    - **Task Synchronization**: Ensures that multiple tasks across groups are executed in lock-step.
-    - **Manual Release**: Supports manual release to ensure threads only proceed when explicitly instructed.
-    - **Timeout Handling**: Includes optional timeout behavior, raising a `TimeoutError` if tasks don't complete in time.
-    - **Reusability**: The conductor can be reset to synchronize tasks across multiple cycles.
-    - **Multiple Outcomes per Task**: Allows tracking of multiple results per task, useful for reusable cycles.
-    - **Concurrent and Parallel Execution**: Supports both concurrent and parallel execution modes, allowing for flexible task management.
-
-    This class is particularly useful in scenarios where a large number of threads need to execute tasks
-    across multiple groups while maintaining synchronization at each stage of execution.
-
-    Attributes:
-    -----------
-    - `threshold`: The number of threads required to execute tasks.
-    - `groups`: The list of task groups to be executed by threads.
-    - `reusable`: If True, the conductor can be reused after completing a cycle.
-    - `manual_release`: If True, threads will only proceed when manually released.
-    - `timeout`: The timeout duration for waiting on threads to arrive.
-    - `callback`: An optional callback to be executed after each task.
-    - `controller`: An optional signal controller for managing state changes.
-
-
-    # NOTE #: Syncfork and Fork Operations:
-    - If `sync_distributed_execution` is True, the conductor will use a `SyncFork` to manage task execution.
-    - If `distributed_execution` is True, the conductor will use a `Fork` to manage task execution.
-    - If both are True, a `ValueError` is raised, as they are mutually exclusive.
-    - If neither is True, tasks will in parallel but sequentially across tasks.
-
-    Example:
+    Features
     --------
-    >>> conductor = MultiConductor(threshold=5, groups=[group1, group2])
+    • **Threshold-Based Execution**: Blocks until `threshold` threads arrive.
+    • **Group-Oriented Synchronization**: Executes all tasks in each group in a synchronized, lock-step fashion.
+    • **Fork Mode Dispatching**: Supports non-blocking and sync-fork execution models for distributed parallelism.
+    • **Manual Release Mode**: Tasks only continue when manually released, useful for external orchestration.
+    • **Timeout Enforcement**: Optional timeouts via ClockBarrier; raises if not all threads arrive in time.
+    • **Result Tracking**: Captures individual outcomes for each task, optionally storing multiple per task.
+    • **Lifecycle Events**: Integrates with a controller for notifying key execution events like start, end, reset.
+    • **Reusability**: Optional reusable mode to allow repeated cycles of synchronization with clean state resets.
+
+    Parameters
+    ----------
+    threshold : int
+        The number of threads required to begin synchronized task execution.
+
+    groups : List[Group], optional
+        The task groups to be managed by the conductor. Each group contains one or more callables.
+
+    reusable : bool, optional
+        If True, the conductor can be reset and reused for future synchronization cycles.
+
+    manual_release : bool, optional
+        If True, the conductor will wait after task execution until explicitly released via `.release()`.
+
+    timeout : float, optional
+        Maximum number of seconds to wait for threads to arrive before timing out.
+
+    raise_on_timeout : bool, optional
+        If True, a `TimeoutError` is raised when a timeout occurs. If False, the conductor silently breaks.
+
+    multiple_outcomes_per_task : bool, optional
+        If True, each task can accumulate multiple `Outcome` objects (e.g., in retryable scenarios).
+
+    distributed_execution : bool, optional
+        If True, task execution will be forked using `SignalFork` (non-synchronized dispatch).
+
+    sync_distributed_execution : bool, optional
+        If True, task execution will use `SyncSignalFork`, synchronizing execution before continuation.
+
+    callback : Callable, optional
+        A callable to be executed after each task completes (per-thread, per-task).
+
+    controller : SignalController, optional
+        An external controller that will receive event notifications and state updates.
+
+    Raises
+    ------
+    ValueError
+        If the threshold is non-positive, timeout is invalid, or configuration is internally contradictory.
+
+    RuntimeError
+        If incompatible group configurations are detected (e.g., outcome mode mismatches).
+
+    Example
+    -------
+    >>> group1 = Group(name="load", tasks=[load_data])
+    >>> group2 = Group(name="process", tasks=[process_data])
+    >>> conductor = MultiConductor(threshold=3, groups=[group1, group2], reusable=True)
     >>> conductor.start()
     """
+
     __slots__ = IDisposable.__slots__ + [
         "_threshold", "groups", "reusable", "manual_release",
         "_timeout", "_raise_on_timeout", "_multiple_outcomes_per_task", "_callback",
