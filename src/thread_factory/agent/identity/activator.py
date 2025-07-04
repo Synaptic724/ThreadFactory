@@ -16,10 +16,8 @@ class ActivatedAgent(IDisposable):
 
     def __init__(
             self,
-            command_center: 'CommandCenter',
             profile: Any,
             thread: threading.Thread,
-            factory_id: Optional[str] = None
     ):
         """
         Initializes the Activator, sets up all agentic state, and
@@ -31,12 +29,8 @@ class ActivatedAgent(IDisposable):
         """
         super().__init__()
         # --- Default Factory --- #
-        self._thread_target = thread
-        self.factory_id = factory_id if factory_id else str(ulid.ULID())
-        self._worker_type = "agentic"
-        self._pool_agent = False # Indicates this worker is part of a dynamic thread pool
-        self._command_center = command_center  # Placeholder for a Command Center reference if needed
         self._lock = threading.RLock()
+        self._thread_target = thread
         self._profile = profile() if profile else None
 
         # --- Agentic State --- #
@@ -98,65 +92,6 @@ class ActivatedAgent(IDisposable):
                 except AttributeError:
                     pass
 
-
-    def get_factory_id(self) -> str:
-        """
-        Retrieves the unique factory ID assigned to this agent.
-
-        Returns:
-            str: The agent's unique string identifier.
-        """
-        return self.factory_id
-
-    def bind_to_inventory_by_id(self, factory_id: str, key: str, value: Any):
-        """
-        Binds a value to the private inventory of another agent, identified by its ID.
-
-        This requires the `factory` to be set during initialization.
-
-        Args:
-            factory_id (str): The ID of the target agent.
-            key (str): The key to store the data under in the target's inventory.
-            value (Any): The value to store.
-        """
-        worker = self._resolve_worker_by_id(factory_id)
-        if worker and hasattr(worker, 'bind_to_inventory'):
-            worker.bind_to_inventory(key, value)
-
-    def get_from_inventory_by_id(self, factory_id: str, key: str, default=None) -> Any:
-        """
-        Retrieves a value from the private inventory of another agent by its ID.
-
-        This requires the `factory` to be set during initialization.
-
-        Args:
-            factory_id (str): The ID of the target agent.
-            key (str): The key of the item to retrieve.
-            default (Any, optional): The value to return if not found.
-
-        Returns:
-            Any: The retrieved value or the default.
-        """
-        worker = self._resolve_worker_by_id(factory_id)
-        if worker and hasattr(worker, 'get_from_inventory'):
-            return worker.get_from_inventory(key, default)
-        return default
-
-    def _resolve_worker_by_id(self, factory_id: str) -> Optional[threading.Thread]:
-        """
-        Internal helper to find another agent thread via the managing factory.
-
-        Args:
-            factory_id (str): The ID of the agent to find.
-
-        Returns:
-            Optional[threading.Thread]: The thread object if found, otherwise None.
-        """
-        if self._command_center:
-            return self._command_center.get_agent_by_id(factory_id)
-        return None
-
-
     def __call__(self) -> "ActivatedAgent":
         """
         Returns the current ActivatedAgent instance.
@@ -186,143 +121,3 @@ class ActivatedAgent(IDisposable):
         if self._disposed or self._thread_target is None:
             raise RuntimeError("Agent has been disposed or lacks a valid thread target.")
         return self._thread_target.run()
-
-    @property
-    def native_id(self) -> Optional[int]:
-        """
-        Retrieves the native (OS-level) thread ID, if supported.
-
-        Returns:
-            Optional[int]: The native ID if available, otherwise None.
-        """
-        if self._thread_target:
-            return getattr(self._thread_target, "native_id", None)
-        return None
-
-    def start(self):
-        """
-        Starts the agent's internal thread execution.
-
-        Equivalent to `threading.Thread.start()`. Will raise if already started
-        or if the agent has been disposed.
-
-        Raises:
-            RuntimeError: If thread has already been started or disposed.
-        """
-        if self._disposed or self._thread_target is None:
-            raise RuntimeError("Cannot start a disposed or missing agent thread.")
-        self._thread_target.start()
-
-    def join(self, timeout: Optional[float] = None):
-        """
-        Blocks until the thread finishes execution.
-
-        Args:
-            timeout (Optional[float]): Optional max wait time in seconds.
-
-        Raises:
-            RuntimeError: If the agent has been disposed or lacks a thread target.
-        """
-        if self._disposed or self._thread_target is None:
-            raise RuntimeError("Cannot join a disposed or missing agent thread.")
-        self._thread_target.join(timeout)
-
-    def is_alive(self) -> bool:
-        """
-        Checks whether the underlying thread is still running.
-
-        Returns:
-            bool: True if alive, False otherwise.
-        """
-        return self._thread_target.is_alive() if self._thread_target else False
-
-    @property
-    def name(self) -> str:
-        """
-        Gets the thread's display name.
-
-        Returns:
-            str: The name of the internal thread.
-
-        Raises:
-            RuntimeError: If the thread has been disposed or unset.
-        """
-        if not self._thread_target:
-            raise RuntimeError("Agent thread is not initialized.")
-        return self._thread_target.name
-
-    @name.setter
-    def name(self, value: str):
-        """
-        Sets the thread's display name.
-
-        Args:
-            value (str): The new name to assign.
-
-        Raises:
-            RuntimeError: If the agent is disposed or the thread is not initialized.
-        """
-        if not self._thread_target:
-            raise RuntimeError("Agent thread is not initialized.")
-        self._thread_target.name = value
-
-    @property
-    def ident(self) -> Optional[int]:
-        """
-        Gets the internal thread's Python-level identifier.
-
-        Returns:
-            Optional[int]: Thread ID if started, else None.
-        """
-        return self._thread_target.ident if self._thread_target else None
-
-    @property
-    def daemon(self) -> bool:
-        """
-        Indicates whether this thread is marked as a daemon.
-
-        Returns:
-            bool: True if daemon, False otherwise.
-
-        Raises:
-            RuntimeError: If thread is not initialized.
-        """
-        if not self._thread_target:
-            raise RuntimeError("Agent thread is not initialized.")
-        return self._thread_target.daemon
-
-    @daemon.setter
-    def daemon(self, value: bool):
-        """
-        Sets the daemon status for the thread.
-
-        Args:
-            value (bool): True to mark as daemon, False otherwise.
-
-        Raises:
-            RuntimeError: If the thread is already started or uninitialized.
-        """
-        if not self._thread_target:
-            raise RuntimeError("Agent thread is not initialized.")
-        self._thread_target.daemon = value
-
-    def __repr__(self) -> str:
-        return f"<ActivatedAgent id={self.factory_id} thread={repr(self._thread_target)}>"
-
-    def __str__(self) -> str:
-        return f"ActivatedAgent<{self.factory_id}>"
-
-    @staticmethod
-    def is_agent(thread: threading.Thread) -> bool:
-        """
-        Checks if a thread has already been activated as an agent.
-
-        This is done by checking for the `_worker_type` attribute on the thread.
-
-        Args:
-            thread (threading.Thread): The thread to check.
-
-        Returns:
-            bool: True if the thread is an agent, False otherwise.
-        """
-        return getattr(thread, '_worker_type', None) == 'agentic'

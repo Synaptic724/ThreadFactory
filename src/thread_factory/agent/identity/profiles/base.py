@@ -1,11 +1,10 @@
 import threading
-from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-from thread_factory.utils.coordination.package import Pack
+import ulid
 from thread_factory.utils.interfaces.disposable import IDisposable
 from typing import Optional, Callable, Union, Any
 
 
-class General(IDisposable):
+class BaseProfile(IDisposable):
     """
     General Profile
     ---------
@@ -20,24 +19,27 @@ class General(IDisposable):
         "_bound_target"
     ]
 
-    def __init__(self):
+    def __init__(
+            self,
+            thread: threading.Thread,
+            command_center: 'CommandCenter',
+            factory_id: Optional[str] = None
+    ):
         """
-        Initializes a blank profile with default field values.
+        Initializes the Activator, sets up all agentic state, and
+        patches the target thread to make it agentic.
+
+        Args:
+            thread (threading.Thread): The thread instance to upgrade.
+            factory_id (Optional[str]): The unique identifier for the thread.
         """
         super().__init__()
-        self.id: Optional[str] = None
-        self.name: Optional[str] = None
-        self.job: Optional[str] = None
-        self.group: Optional[str] = None
-
-        self._private_inventory = threading.local()
-        self._private_inventory.data = ConcurrentDict()
-        self._public_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
-
-        # Initialize collections for save points, locations, and data transfer functions
-        self.save_points: ConcurrentDict[str, Union[Callable[..., None], "Pack"]] = ConcurrentDict()
-        self.locations: ConcurrentDict[str, Union[Callable[..., None], "Pack"]] = ConcurrentDict()
-        self.data_transfer: ConcurrentDict[str, Union[Callable[..., any], "Pack"]] = ConcurrentDict()
+        self.factory_id = factory_id if factory_id else str(ulid.ULID())
+        self._worker_type = "agentic"
+        self._thread_target = thread
+        self._pool_agent = False # Indicates this worker is part of a dynamic thread pool
+        self._command_center = command_center  # Placeholder for a Command Center reference if needed
+        self._lock = threading.RLock()
 
         self._bound_target: Optional[Union["ActivatedAgent", "Agent"]] = None
 
@@ -47,24 +49,89 @@ class General(IDisposable):
         """
         if self._disposed:
             return
-        self.save_points.dispose()
-        self.save_points = None
-        self.locations.dispose()
-        self.locations = None
-        self.data_transfer.dispose()
-        self.data_transfer = None
-        self._private_inventory.dispose()
-        self._private_inventory = None
-        self._public_inventory.dispose()
-        self._public_inventory = None
-
-        self.id = None
-        self.name = None
-        self.job = None
-        self.group = None
+        self._command_center = None
         self._bound_target = None
+        self._thread_target = None
         self._disposed = True
 
+
+    def __repr__(self) -> str:
+        return f"<ActivatedAgent id={self.factory_id} thread={repr(self._thread_target)}>"
+
+    def __str__(self) -> str:
+        return f"ActivatedAgent<{self.factory_id}>"
+
+    @staticmethod
+    def is_agent(thread: threading.Thread) -> bool:
+        """
+        Checks if a thread has already been activated as an agent.
+
+        This is done by checking for the `_worker_type` attribute on the thread.
+
+        Args:
+            thread (threading.Thread): The thread to check.
+
+        Returns:
+            bool: True if the thread is an agent, False otherwise.
+        """
+        return getattr(thread, '_worker_type', None) == 'agentic'
+
+    def get_factory_id(self) -> str:
+        """
+        Retrieves the unique factory ID assigned to this agent.
+
+        Returns:
+            str: The agent's unique string identifier.
+        """
+        return self.factory_id
+
+    def bind_to_inventory_by_id(self, factory_id: str, key: str, value: Any):
+        """
+        Binds a value to the private inventory of another agent, identified by its ID.
+
+        This requires the `factory` to be set during initialization.
+
+        Args:
+            factory_id (str): The ID of the target agent.
+            key (str): The key to store the data under in the target's inventory.
+            value (Any): The value to store.
+        """
+        worker = self._resolve_worker_by_id(factory_id)
+        if worker and hasattr(worker, 'bind_to_inventory'):
+            worker.bind_to_inventory(key, value)
+
+    def get_from_inventory_by_id(self, factory_id: str, key: str, default=None) -> Any:
+        """
+        Retrieves a value from the private inventory of another agent by its ID.
+
+        This requires the `factory` to be set during initialization.
+
+        Args:
+            factory_id (str): The ID of the target agent.
+            key (str): The key of the item to retrieve.
+            default (Any, optional): The value to return if not found.
+
+        Returns:
+            Any: The retrieved value or the default.
+        """
+        worker = self._resolve_worker_by_id(factory_id)
+        if worker and hasattr(worker, 'get_from_inventory'):
+            return worker.get_from_inventory(key, default)
+        return default
+
+    def _resolve_worker_by_id(self, factory_id: str) -> Optional[threading.Thread]:
+        """
+        Internal helper to find another agent thread via the managing factory.
+
+        Args:
+            factory_id (str): The ID of the agent to find.
+
+        Returns:
+            Optional[threading.Thread]: The thread object if found, otherwise None.
+        """
+        if self._command_center:
+            return self._command_center.get_agent_by_id(factory_id)
+        return None
 
     def bind_to(self, obj: Union["ActivatedAgent", "Agent"]):
         """
@@ -88,43 +155,6 @@ class General(IDisposable):
 
         self._bound_target = obj
 
-    def _patch_thread(self):
-        """
-        Internal method to patch the target thread with agentic methods and properties.
-        """
-        methods_to_patch = ['get_factory_id',
-            'bind_to_inventory_by_id', 'get_from_inventory_by_id',
-            'dispose'
-        ]
-        for method_name in methods_to_patch:
-            setattr(self._thread_target, method_name, getattr(self, method_name))
-        setattr(self._thread_target, 'factory_id', self.factory_id)
-        setattr(self._thread_target, '_worker_type', self._worker_type)
-        setattr(self._thread_target, '_pool_agent', self._pool_agent)
-        setattr(self._thread_target, '_command_center', self._command_center)
-        setattr(self._thread_target, '_profile', self._profile)
-
-
-    def _unpatch_thread(self):
-        """
-        Internal method to remove all patched methods and properties from
-        the target thread during disposal.
-        """
-        methods_to_unpatch = [
-            'get_factory_id',
-            'bind_to_inventory_by_id', 'get_from_inventory_by_id',
-            'dispose', 'factory_id', '_worker_type',
-            '_pool_agent', '_command_center', '_profile',
-            'profile' # <--- ADD THIS LINE to unpatch the profile
-        ]
-        for method_name in methods_to_unpatch:
-            if hasattr(self._thread_target, method_name):
-                try:
-                    delattr(self._thread_target, method_name)
-                except AttributeError:
-                    pass
-
-
     def unbind(self):
         """
         Unbind the profile from its current agent.
@@ -137,154 +167,3 @@ class General(IDisposable):
         Indicates whether this profile is bound to a valid agent.
         """
         return self._bound_target is not None
-
-    def register_data_transfer(self, name: str, fn: Union[Callable[..., Any], Pack]):
-        """
-        Registers a named callable function for data processing tasks.
-
-        Args:
-            name (str): The unique name for the data transfer function.
-            fn (Union[Callable[..., Any], Pack]): The function to register.
-
-        Raises:
-            TypeError: If the provided function is an async coroutine.
-        """
-        if fn:
-            fn = Pack.bundle(fn)
-        self.data_transfer[name] = fn
-
-    def get_data_transfer_dict(self) -> ConcurrentDict[str, Union[Callable[..., Any], Pack]]:
-        """
-        Retrieves a copy of all registered data transfer functions.
-
-        Returns:
-            ConcurrentDict[str, Union[Callable[..., Any], Pack]]: A dictionary of transfer functions.
-        """
-        return self.data_transfer.copy()
-
-    def execute_transfer(self, name: str) -> Any:
-        """
-        Executes a previously registered data transfer function by its name.
-
-        Args:
-            name (str): The name of the data transfer function to execute.
-
-        Returns:
-            Any: The result returned by the executed function.
-
-        Raises:
-            KeyError: If no function is registered with the given name.
-        """
-        if name not in self.data_transfer:
-            raise KeyError(f"No data_transfer entry named '{name}'")
-        return self.data_transfer[name]()
-
-    def register_save_point(self, name: str, fn: Union[Callable[..., None], Pack]):
-        """
-        Registers a named callable as a "save point" for checkpointing execution flow.
-
-        Args:
-            name (str): The unique name for the save point.
-            fn (Union[Callable[..., None], Pack]): The function representing the save point.
-
-        Raises:
-            TypeError: If the provided function is an async coroutine.
-        """
-        if fn:
-            fn = Pack.bundle(fn)
-        self.save_points[name] = fn
-
-    def get_save_points_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
-        """
-        Retrieves a copy of all registered save point functions.
-
-        Returns:
-            ConcurrentDict[str, Union[Callable[..., None], Pack]]: A dictionary of save points.
-        """
-        return self.save_points.copy()
-
-    def register_location(self, name: str, fn: Union[Callable[..., None], Pack]):
-        """
-        Registers a named callable as a distinct "location" or execution zone.
-
-        Args:
-            name (str): The unique name for the location.
-            fn (Union[Callable[..., None], Pack]): The function defining the location's behavior.
-
-        Raises:
-            TypeError: If the provided function is an async coroutine.
-        """
-        if fn:
-            fn = Pack.bundle(fn)
-        self.locations[name] = fn
-
-    def get_locations_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
-        """
-        Retrieves a copy of all registered location functions.
-
-        Returns:
-            ConcurrentDict[str, Union[Callable[..., None], Pack]]: A dictionary of locations.
-        """
-        return self.locations.copy()
-
-
-    def bind_to_inventory(self, key: str, value: Any):
-        """
-        Binds a key-value pair to the agent's private, thread-local inventory.
-
-        This data is only accessible to this specific agent's thread.
-
-        Args:
-            key (str): The key to store the data under.
-            value (Any): The value to store.
-        """
-        self._private_inventory.data[key] = value
-
-    def get_from_inventory(self, key: str, default=None) -> Any:
-        """
-        Retrieves a value from the agent's private, thread-local inventory.
-
-        Args:
-            key (str): The key of the item to retrieve.
-            default (Any, optional): The value to return if the key is not found.
-
-        Returns:
-            Any: The retrieved value, or the default if not found.
-        """
-        return self._private_inventory.data.get(key, default)
-
-    def set_shared_inventory_item(self, key: str, value: Any):
-        """
-        Sets a key-value pair in the shared inventory, accessible by all agents.
-
-        Args:
-            key (str): The key to store the data under.
-            value (Any): The value to store.
-        """
-        self._public_inventory[key] = value
-
-    def get_shared_inventory_item(self, key: str, default: Any = None) -> Any:
-        """
-        Retrieves a value from the shared inventory.
-
-        Args:
-            key (str): The key of the item to retrieve.
-            default (Any, optional): The value to return if the key is not found.
-
-        Returns:
-            Any: The retrieved value, or the default if not found.
-        """
-        return self._public_inventory.get(key, default)
-
-    def get_shared_inventory(self) -> ConcurrentDict[str, Any]:
-        """
-        Retrieves a copy of the entire shared inventory dictionary.
-
-        Returns:
-            ConcurrentDict[str, Any]: A copy of the shared inventory.
-        """
-        return self._public_inventory.copy()
-
-
-    def __repr__(self) -> str:
-        return f"<Profile name={self.name} job={self.job} group={self.group} id={self.id} bound={self.is_bound}>"
