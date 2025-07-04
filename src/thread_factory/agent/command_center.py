@@ -1,12 +1,14 @@
 import threading
 from typing import Optional, List, Callable, Any, Union
 from concurrent.futures import ThreadPoolExecutor, Future
-from synchronization.primitives.test_signal_latch import IDisposable
-from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.agent.identity.activator import ActivatedAgent
+from thread_factory.agent.identity.profiles.general import General
+from thread_factory.agent.identity.profile_builder import ProfileBuilder
+from thread_factory.utils.coordination.package import Pack
+from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.agent.thread_pool import HelpRequest
-from thread_factory.utils.coordination.package import Pack
 
 
 class CommandCenter(IDisposable):
@@ -19,32 +21,34 @@ class CommandCenter(IDisposable):
     It provides utilities to spawn agent threads, convert threads into agents,
     and dispatch work using a fire-and-forget thread pool mechanism.
 
-    While a dynamic agent pool is planned for the future, the current implementation wraps
-    a `ThreadPoolExecutor` to support basic concurrent execution via `.submit()`.
+    Now supports profile management using the ProfileBuilder system.
 
-    Core Responsibilities:
-    -----------------------
+    Responsibilities:
+    ------------------
     - Create new agent threads (`create_agents`)
-    - Convert threads to agents (`transform_thread`, `transform_current_thread`)
-    - Execute functions as agents in the background (`submit`)
-    - Track live agents (`_active_agents`)
-    - Manage agent lifecycle and cleanup (`shutdown`, `dispose`)
+    - Convert threads into agents (`transform_thread`, `transform_current_thread`)
+    - Submit background work (`submit`)
+    - Track live agents
+    - Manage and bind profiles
+    - Provide user-facing access to profile customization
     """
 
     def __init__(self, max_workers: int = 8):
         """
         Initializes the CommandCenter with an internal thread pool executor and an
-        agent tracking dictionary.
+        agent tracking dictionary. Installs a ProfileBuilder for agent identity.
 
         Args:
             max_workers (int): Maximum number of threads allowed in the background pool.
                                This does not affect manually spawned agents.
         """
         super().__init__()
-        self._active_agents: ConcurrentDict[str, ActivatedAgent] = ConcurrentDict()
-        self.agent_pool: Optional[Any] = None  # Placeholder for future pooled agent support
-        self._offload_pool = ThreadPoolExecutor(max_workers=max_workers)
         self._lock = threading.RLock()
+        self._active_agents: ConcurrentDict[str, ActivatedAgent] = ConcurrentDict()
+        self._offload_pool = ThreadPoolExecutor(max_workers=max_workers)
+        self._profile_builder = ProfileBuilder()
+        self._default_profile_key = "default"
+        self.agent_pool: Optional[Any] = None  # Placeholder for future pooled agent support
 
     def dispose(self):
         """
@@ -86,6 +90,9 @@ class CommandCenter(IDisposable):
                 pass
             self._offload_pool = None
 
+            self._profile_builder.dispose()
+            self._profile_builder = None
+
     def shutdown(self):
         """
         Alias for `.dispose()`. Gracefully disposes all agents and tears down resources.
@@ -96,26 +103,28 @@ class CommandCenter(IDisposable):
         """
         Returns a list of all currently tracked agents.
         It's a snapshot of the active agents at the time of the call.
+
+        Returns:
+            List[ActivatedAgent]: List of live agent threads.
         """
         with self._lock:
             return list(self._active_agents.values())
 
-    def _register_agent(self, thread: threading.Thread, factory_id: Optional[str] = None):
+    def _register_agent(self, thread: threading.Thread, factory_id: Optional[str] = None, profile_key: Optional[str] = None):
         """
         Registers a thread as an ActivatedAgent and stores it in the active agent registry.
+        Binds a profile to it using the provided profile key.
 
         Args:
             thread (threading.Thread): The thread to convert and register.
             factory_id (Optional[str]): Optional agent ID to assign for identification.
-
-        Raises:
-            TypeError: If the resulting thread is not an ActivatedAgent.
+            profile_key (Optional[str]): Profile type to assign (defaults to 'default').
         """
-        with self._lock:
-            agent = ActivatedAgent(thread, factory_id)
-            if not isinstance(agent, ActivatedAgent):
-                raise TypeError("Only ActivatedAgent instances are permitted in CommandCenter.")
-            self._active_agents[agent.factory_id] = agent
+        agent = ActivatedAgent(thread, factory_id)
+        key = profile_key or self._default_profile_key
+        profile = self._profile_builder.create_profile(key)
+        self._profile_builder.attach_profile(profile, agent)
+        self._active_agents[agent.factory_id] = agent
 
     def _unregister_agent(self, thread: threading.Thread):
         """
@@ -129,14 +138,15 @@ class CommandCenter(IDisposable):
             with self._lock:
                 self._active_agents.pop(fid, None)
 
-    def _create_agent_wrapper(self, user_target: Callable[[], Any]) -> Callable[[], None]:
+    def _create_agent_wrapper(self, user_target: Callable[[], Any], profile_key: Optional[str] = None) -> Callable[[], None]:
         """
         Internal wrapper to execute a function as an agent.
 
-        Ensures agent conversion, execution, unregistration, and disposal.
+        Ensures agent conversion, profile binding, execution, unregistration, and disposal.
 
         Args:
             user_target (Callable): User function to run inside the agent.
+            profile_key (Optional[str]): Optional profile type.
 
         Returns:
             Callable[[], None]: Safe function for thread execution.
@@ -144,23 +154,21 @@ class CommandCenter(IDisposable):
         def _execute_and_dispose():
             thread = threading.current_thread()
             if not ActivatedAgent.is_agent(thread):
-                agent = ActivatedAgent(thread)
-                with self._lock:
-                    self._active_agents[agent.factory_id] = agent
+                self._register_agent(thread, profile_key=profile_key)
             try:
                 user_target()
             finally:
                 self._unregister_agent(thread)
                 if hasattr(thread, "dispose"):
                     thread.dispose()
-
         return _execute_and_dispose
 
     def create_agents(
         self,
         count: int,
         target: Union[Callable[..., None], Pack],
-        name_prefix: str = "Agent"
+        name_prefix: str = "Agent",
+        profile_key: Optional[str] = None
     ) -> ConcurrentList[ActivatedAgent]:
         """
         Creates a number of ActivatedAgent threads using a wrapped user target.
@@ -171,6 +179,7 @@ class CommandCenter(IDisposable):
             count (int): Number of agents to create.
             target (Callable): The task function to run in each agent.
             name_prefix (str): Prefix for thread names.
+            profile_key (Optional[str]): Optional profile type.
 
         Returns:
             ConcurrentList[ActivatedAgent]: List of initialized agent threads.
@@ -180,15 +189,18 @@ class CommandCenter(IDisposable):
 
         new_agents = ConcurrentList()
         for i in range(count):
-            wrapped_target = self._create_agent_wrapper(target)
+            wrapped_target = self._create_agent_wrapper(target, profile_key)
             thread = threading.Thread(target=wrapped_target, name=f"{name_prefix}-{i}")
             agent = ActivatedAgent(thread)
+            key = profile_key or self._default_profile_key
+            profile = self._profile_builder.create_profile(key)
+            self._profile_builder.attach_profile(profile, agent)
             with self._lock:
                 self._active_agents[agent.factory_id] = agent
             new_agents.append(agent)
         return new_agents
 
-    def submit(self, target: Optional[Union[Callable[[], Any], Pack]]) -> Future:
+    def submit(self, target: Optional[Union[Callable[[], Any], Pack]], profile_key: Optional[str] = None) -> Future:
         """
         Submit a callable to the internal agent-compatible thread pool.
 
@@ -196,6 +208,7 @@ class CommandCenter(IDisposable):
 
         Args:
             target (Callable | Pack): Task to execute.
+            profile_key (Optional[str]): Optional profile type.
 
         Returns:
             Future: A Future tracking the background task.
@@ -206,9 +219,7 @@ class CommandCenter(IDisposable):
         def agent_wrapper():
             thread = threading.current_thread()
             if not ActivatedAgent.is_agent(thread):
-                agent = ActivatedAgent(thread)
-                with self._lock:
-                    self._active_agents[agent.factory_id] = agent
+                self._register_agent(thread, profile_key=profile_key)
             try:
                 return target()
             finally:
@@ -260,7 +271,8 @@ class CommandCenter(IDisposable):
         self,
         thread: threading.Thread,
         factory_id: Optional[str] = None,
-        raise_on_main: bool = True
+        raise_on_main: bool = True,
+        profile_key: Optional[str] = None
     ) -> bool:
         """
         Transforms a thread into an ActivatedAgent if not already one.
@@ -269,6 +281,7 @@ class CommandCenter(IDisposable):
             thread (threading.Thread): Target thread to transform.
             factory_id (Optional[str]): Optional ID to assign to the agent.
             raise_on_main (bool): If True, disallows transforming the main thread.
+            profile_key (Optional[str]): Profile to bind to the agent.
 
         Returns:
             bool: True if transformation occurred, False if already an agent.
@@ -281,11 +294,7 @@ class CommandCenter(IDisposable):
             raise RuntimeError("Main thread cannot be transformed into an agent.")
         if ActivatedAgent.is_agent(thread):
             return False
-        agent = ActivatedAgent(thread, factory_id)
-        if not isinstance(agent, ActivatedAgent):
-            raise TypeError("Transformation did not yield a valid ActivatedAgent.")
-        with self._lock:
-            self._active_agents[agent.factory_id] = agent
+        self._register_agent(thread, factory_id, profile_key)
         return True
 
     def activate_agents(self, threads: List[threading.Thread]) -> int:
@@ -304,21 +313,55 @@ class CommandCenter(IDisposable):
                 count += 1
         return count
 
-    def _transform_logic(self, thread: threading.Thread, factory_id: Optional[str]) -> bool:
+    # ─────────────────────────────────────────────
+    # Profile Facade Methods
+    # ─────────────────────────────────────────────
+
+    def register_profile(self, name: str, fn: Callable[[General], None]):
         """
-        Internal helper that applies transformation logic.
+        Registers a new profile template via the internal ProfileBuilder.
 
         Args:
-            thread (threading.Thread): Target thread.
-            factory_id (Optional[str]): Optional agent ID.
+            name (str): Symbolic key (e.g., 'scout', 'watcher').
+            fn (Callable): Initialization function for a General profile.
+        """
+        self._profile_builder.register_profile(name, fn)
+
+    def unregister_profile(self, name: str) -> bool:
+        """
+        Unregisters a profile by symbolic name.
+
+        Args:
+            name (str): Profile key to remove.
 
         Returns:
-            bool: True if transformation occurred, False otherwise.
+            bool: True if removed, False otherwise.
         """
-        if ActivatedAgent.is_agent(thread):
-            return False
-        self._register_agent(thread, factory_id)
-        return True
+        return self._profile_builder.unregister_profile(name)
+
+    def list_profiles(self) -> List[str]:
+        """
+        Lists all registered profile names.
+
+        Returns:
+            List[str]: Available symbolic profile keys.
+        """
+        return self._profile_builder.list_profiles()
+
+    def set_default_profile_key(self, name: str):
+        """
+        Changes the default profile key used when no profile is specified.
+
+        Args:
+            name (str): The symbolic name of the profile to set as default.
+
+        Raises:
+            KeyError: If the profile does not exist.
+        """
+        if not self._profile_builder.has_profile(name):
+            raise KeyError(f"Profile '{name}' not found.")
+        self._default_profile_key = name
 
 
+# Shorthand alias
 CC = CommandCenter
