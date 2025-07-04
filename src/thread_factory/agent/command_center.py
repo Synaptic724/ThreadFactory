@@ -13,12 +13,24 @@ class CommandCenter:
     --------------
     A central management unit for agentic thread creation, transformation, and execution.
 
-    This object is responsible for spawning agent threads, wrapping them with lifecycle
-    logic, and offloading tasks to a local thread pool. It serves both as an entry point
-    for quick fire-and-forget execution (`submit`) and as a full system for building
-    deeply integrated agent-based threading structures.
-    """
+    The CommandCenter is the primary interface for managing agent-thread lifecycles in ThreadFactory.
+    It supports spawning pre-configured agentic threads, transforming existing threads into agents,
+    and offloading work for asynchronous execution.
 
+    🔧 Temporary Executor Backend:
+        While a full agent-based dispatch pool is planned, the current implementation wraps
+        a `ThreadPoolExecutor` to provide basic `submit()` functionality. All dispatched
+        threads are automatically converted into agents on execution.
+
+    ✅ Key Responsibilities:
+        - Create agent threads (`create_agents`)
+        - Transform standard threads into agents (`transform_thread`)
+        - Fire-and-forget task dispatch (`submit`)
+        - Placeholder API for cooperative thread-based help (`request_help`)
+
+    This interface is designed to evolve — what begins as a thin wrapper will eventually
+    orchestrate a sophisticated, dynamic agent pool with full lifecycle control and intelligence.
+    """
     def __init__(self, max_workers: int = 8):
         """
         Initializes the CommandCenter, including the internal offload pool and
