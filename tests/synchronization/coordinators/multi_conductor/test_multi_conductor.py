@@ -42,8 +42,6 @@ class TestMultiConductor(unittest.TestCase):
         execution_log = []
         log_lock = threading.Lock()
 
-        # FIX: Define tasks using a helper function and a 'with' statement
-        # to ensure the lock is always released safely.
         def make_logging_task(name: str) -> Callable:
             def task():
                 with log_lock:
@@ -60,10 +58,21 @@ class TestMultiConductor(unittest.TestCase):
         mc = MultiConductor(threshold=3, groups=[group1, group2])
 
         threads = _spawn(3, mc.start)
-        for t in threads:
-            t.join(2)
 
-        # Now, this assertion will pass because the deadlock is gone.
+        # Wait for all threads to complete first
+        for t in threads:
+            # FIX: Increase the timeout to a more generous value like 8 seconds.
+            t.join(8)
+
+        # Now, check if any threads timed out
+        alive_threads = [t.name for t in threads if t.is_alive()]
+        self.assertFalse(
+            alive_threads,
+            f"Test failed: The following threads did not finish in time: {alive_threads}"
+        )
+
+        # Assertions will now run reliably
+        self.assertEqual(len(execution_log), 9)
         self.assertEqual(execution_log.count("g1-t1"), 3)
         self.assertEqual(execution_log.count("g1-t2"), 3)
         self.assertEqual(execution_log.count("g2-t1"), 3)

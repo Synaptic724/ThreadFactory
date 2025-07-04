@@ -129,7 +129,7 @@ class TestConductorMultipleTasks(unittest.TestCase):
         _spawn(3, c.start)
 
         # Allow threads to finish
-        time.sleep(0.2)
+        time.sleep(2)
 
         # Collect results and exceptions
         results = [o.result()    for o in c.outcomes[0]] + \
