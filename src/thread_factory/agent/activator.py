@@ -1,7 +1,7 @@
-import threading
-import ulid
-from typing import Callable, Optional, Any
+import threading, ulid
+from typing import Callable, Optional, Any, Union
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.general_helpers.coroutine_helpers import CoroutineHelpers
 
 class ActivatedAgent:
@@ -33,18 +33,199 @@ class ActivatedAgent:
         # --- Agentic State Initialization ---
         self._lock = threading.RLock()
         # This worker_type is the flag used by is_agent() to identify an activated thread.
+        self._pool_agent = False # Indicates this worker is part of a dynamic thread pool
         self._worker_type = "agentic"
         self._inventory = threading.local()
         self._inventory.data = ConcurrentDict()
         self._shared_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
 
         # --- Data Transfer, Save Points, and Locations ---
-        self._data_transfer: ConcurrentDict[str, Callable[..., Any]] = ConcurrentDict()
-        self._save_points: ConcurrentDict[str, Callable[[], None]] = ConcurrentDict()
-        self._locations: ConcurrentDict[str, Callable[[], None]] = ConcurrentDict()
+        self._data_transfer: ConcurrentDict[str, Union[Callable[..., Any], Pack]] = ConcurrentDict()
+        self._save_points: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
+        self._locations: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
 
         # --- Monkey-Patch the Thread ---
         self._patch_thread()
+
+    def dispose(self):
+        """
+        Performs a comprehensive cleanup of the agent's state and unpatches
+        the thread to prevent memory leaks. This is idempotent.
+        """
+        if self._disposed:
+            return
+        with self._lock:
+            self._unpatch_thread()
+            # Clear all collections to release references
+            try:
+                if self._inventory:
+                    if hasattr(self._inventory, "data"):
+                        self._inventory.data.clear()
+            except AttributeError as e:
+                pass
+            self._shared_inventory.clear()
+            self._data_transfer.clear()
+            self._save_points.clear()
+            self._locations.clear()
+
+            # Nullify references
+            self._thread_target = None
+            self._disposed = True
+
+    def __call__(self) -> "ActivatedAgent":
+        """
+        Returns the current ActivatedAgent instance.
+
+        This allows the object to be used in callable contexts,
+        making it compatible with factory patterns, decorators,
+        or injection systems expecting a callable agent object.
+
+        Returns:
+            ActivatedAgent: This instance.
+        """
+        return self
+
+    def run(self) -> Any:
+        """
+        Directly invokes the wrapped thread's target logic.
+
+        This does not start a new thread; it simply runs the function synchronously
+        in the current thread context. Useful for testing or when overriding agent logic.
+
+        Returns:
+            Any: The result of the target function if it has a return value.
+
+        Raises:
+            RuntimeError: If the thread target is missing or disposed.
+        """
+        if self._disposed or self._thread_target is None:
+            raise RuntimeError("Agent has been disposed or lacks a valid thread target.")
+        return self._thread_target.run()
+
+    @property
+    def native_id(self) -> Optional[int]:
+        """
+        Retrieves the native (OS-level) thread ID, if supported.
+
+        Returns:
+            Optional[int]: The native ID if available, otherwise None.
+        """
+        if self._thread_target:
+            return getattr(self._thread_target, "native_id", None)
+        return None
+
+    def start(self):
+        """
+        Starts the agent's internal thread execution.
+
+        Equivalent to `threading.Thread.start()`. Will raise if already started
+        or if the agent has been disposed.
+
+        Raises:
+            RuntimeError: If thread has already been started or disposed.
+        """
+        if self._disposed or self._thread_target is None:
+            raise RuntimeError("Cannot start a disposed or missing agent thread.")
+        self._thread_target.start()
+
+    def join(self, timeout: Optional[float] = None):
+        """
+        Blocks until the thread finishes execution.
+
+        Args:
+            timeout (Optional[float]): Optional max wait time in seconds.
+
+        Raises:
+            RuntimeError: If the agent has been disposed or lacks a thread target.
+        """
+        if self._disposed or self._thread_target is None:
+            raise RuntimeError("Cannot join a disposed or missing agent thread.")
+        self._thread_target.join(timeout)
+
+    def is_alive(self) -> bool:
+        """
+        Checks whether the underlying thread is still running.
+
+        Returns:
+            bool: True if alive, False otherwise.
+        """
+        return self._thread_target.is_alive() if self._thread_target else False
+
+    @property
+    def name(self) -> str:
+        """
+        Gets the thread's display name.
+
+        Returns:
+            str: The name of the internal thread.
+
+        Raises:
+            RuntimeError: If the thread has been disposed or unset.
+        """
+        if not self._thread_target:
+            raise RuntimeError("Agent thread is not initialized.")
+        return self._thread_target.name
+
+    @name.setter
+    def name(self, value: str):
+        """
+        Sets the thread's display name.
+
+        Args:
+            value (str): The new name to assign.
+
+        Raises:
+            RuntimeError: If the agent is disposed or the thread is not initialized.
+        """
+        if not self._thread_target:
+            raise RuntimeError("Agent thread is not initialized.")
+        self._thread_target.name = value
+
+    @property
+    def ident(self) -> Optional[int]:
+        """
+        Gets the internal thread's Python-level identifier.
+
+        Returns:
+            Optional[int]: Thread ID if started, else None.
+        """
+        return self._thread_target.ident if self._thread_target else None
+
+    @property
+    def daemon(self) -> bool:
+        """
+        Indicates whether this thread is marked as a daemon.
+
+        Returns:
+            bool: True if daemon, False otherwise.
+
+        Raises:
+            RuntimeError: If thread is not initialized.
+        """
+        if not self._thread_target:
+            raise RuntimeError("Agent thread is not initialized.")
+        return self._thread_target.daemon
+
+    @daemon.setter
+    def daemon(self, value: bool):
+        """
+        Sets the daemon status for the thread.
+
+        Args:
+            value (bool): True to mark as daemon, False otherwise.
+
+        Raises:
+            RuntimeError: If the thread is already started or uninitialized.
+        """
+        if not self._thread_target:
+            raise RuntimeError("Agent thread is not initialized.")
+        self._thread_target.daemon = value
+
+    def __repr__(self) -> str:
+        return f"<ActivatedAgent id={self.factory_id} thread={repr(self._thread_target)}>"
+
+    def __str__(self) -> str:
+        return f"ActivatedAgent<{self.factory_id}>"
 
     @staticmethod
     def is_agent(thread: threading.Thread) -> bool:
@@ -159,27 +340,27 @@ class ActivatedAgent:
         """
         return self._shared_inventory.copy()
 
-    def register_data_transfer(self, name: str, fn: Callable[..., Any]):
+    def register_data_transfer(self, name: str, fn: Union[Callable[..., Any], Pack]):
         """
         Registers a named callable function for data processing tasks.
 
         Args:
             name (str): The unique name for the data transfer function.
-            fn (Callable[..., Any]): The function to register.
+            fn (Union[Callable[..., Any], Pack]): The function to register.
 
         Raises:
             TypeError: If the provided function is an async coroutine.
         """
-        if CoroutineHelpers.is_coroutine(fn):
-            raise TypeError(f"Cannot register coroutine '{name}'. Agent runs synchronously.")
+        if fn:
+            fn = Pack.bundle(fn)
         self._data_transfer[name] = fn
 
-    def get_data_transfer_dict(self) -> ConcurrentDict[str, Callable[..., Any]]:
+    def get_data_transfer_dict(self) -> ConcurrentDict[str, Union[Callable[..., Any], Pack]]:
         """
         Retrieves a copy of all registered data transfer functions.
 
         Returns:
-            ConcurrentDict[str, Callable[..., Any]]: A dictionary of transfer functions.
+            ConcurrentDict[str, Union[Callable[..., Any], Pack]]: A dictionary of transfer functions.
         """
         return self._data_transfer.copy()
 
@@ -200,51 +381,51 @@ class ActivatedAgent:
             raise KeyError(f"No data_transfer entry named '{name}'")
         return self._data_transfer[name]()
 
-    def register_save_point(self, name: str, fn: Callable[[], None]):
+    def register_save_point(self, name: str, fn: Union[Callable[..., None], Pack]):
         """
         Registers a named callable as a "save point" for checkpointing execution flow.
 
         Args:
             name (str): The unique name for the save point.
-            fn (Callable[[], None]): The function representing the save point.
+            fn (Union[Callable[..., None], Pack]): The function representing the save point.
 
         Raises:
             TypeError: If the provided function is an async coroutine.
         """
-        if CoroutineHelpers.is_coroutine(fn):
-            raise TypeError(f"Cannot register coroutine '{name}'. Agent runs synchronously.")
+        if fn:
+            fn = Pack.bundle(fn)
         self._save_points[name] = fn
 
-    def get_save_points_dict(self) -> ConcurrentDict[str, Callable[[], None]]:
+    def get_save_points_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
         """
         Retrieves a copy of all registered save point functions.
 
         Returns:
-            ConcurrentDict[str, Callable[[], None]]: A dictionary of save points.
+            ConcurrentDict[str, Union[Callable[..., None], Pack]]: A dictionary of save points.
         """
         return self._save_points.copy()
 
-    def register_location(self, name: str, fn: Callable[[], None]):
+    def register_location(self, name: str, fn: Union[Callable[..., None], Pack]):
         """
         Registers a named callable as a distinct "location" or execution zone.
 
         Args:
             name (str): The unique name for the location.
-            fn (Callable[[], None]): The function defining the location's behavior.
+            fn (Union[Callable[..., None], Pack]): The function defining the location's behavior.
 
         Raises:
             TypeError: If the provided function is an async coroutine.
         """
-        if CoroutineHelpers.is_coroutine(fn):
-            raise TypeError(f"Cannot register coroutine '{name}'. Agent runs synchronously.")
+        if fn:
+            fn = Pack.bundle(fn)
         self._locations[name] = fn
 
-    def get_locations_dict(self) -> ConcurrentDict[str, Callable[[], None]]:
+    def get_locations_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
         """
         Retrieves a copy of all registered location functions.
 
         Returns:
-            ConcurrentDict[str, Callable[[], None]]: A dictionary of locations.
+            ConcurrentDict[str, Union[Callable[..., None], Pack]]: A dictionary of locations.
         """
         return self._locations.copy()
 
@@ -305,23 +486,3 @@ class ActivatedAgent:
             return self.factory.get_worker_by_id(factory_id)
         return None
 
-    def dispose(self):
-        """
-        Performs a comprehensive cleanup of the agent's state and unpatches
-        the thread to prevent memory leaks. This is idempotent.
-        """
-        if self._disposed:
-            return
-        with self._lock:
-            self._unpatch_thread()
-            # Clear all collections to release references
-            if self._inventory:
-                self._inventory.data.clear()
-            self._shared_inventory.clear()
-            self._data_transfer.clear()
-            self._save_points.clear()
-            self._locations.clear()
-
-            # Nullify references
-            self._thread_target = None
-            self._disposed = True

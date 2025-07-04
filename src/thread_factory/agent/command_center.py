@@ -8,6 +8,7 @@ from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.agent.thread_pool import HelpRequest
 from thread_factory.utils.coordination.package import Pack
 
+
 class CommandCenter(IDisposable):
     """
     CommandCenter
@@ -40,20 +41,81 @@ class CommandCenter(IDisposable):
                                This does not affect manually spawned agents.
         """
         super().__init__()
-        self._active_agents: ConcurrentDict[str, threading.Thread] = ConcurrentDict()
+        self._active_agents: ConcurrentDict[str, ActivatedAgent] = ConcurrentDict()
         self.agent_pool: Optional[Any] = None  # Placeholder for future pooled agent support
         self._offload_pool = ThreadPoolExecutor(max_workers=max_workers)
+        self._lock = threading.RLock()
+
+    def dispose(self):
+        """
+        Fully disposes the CommandCenter and all associated agents.
+
+        This method:
+        - Disposes every tracked ActivatedAgent (if it supports `dispose`)
+        - Clears and nullifies the agent registry
+        - Shuts down and nullifies the background thread pool
+        - Resets agent pool and internal fields to prevent memory retention
+
+        Safe to call multiple times (idempotent).
+        """
+        with self._lock:
+            if self._disposed:
+                return
+            self._disposed = True
+            self._active_agents.freeze()
+
+            for agent in list(self._active_agents.values()):
+                if hasattr(agent, "dispose"):
+                    try:
+                        agent.dispose()
+                    except Exception:
+                        pass
+
+            try:
+                self._active_agents.unfreeze()
+                self._active_agents.clear()
+            except Exception:
+                pass
+
+            self._active_agents = None
+            self.agent_pool = None
+
+            try:
+                self._offload_pool.shutdown(wait=True)
+            except Exception:
+                pass
+            self._offload_pool = None
+
+    def shutdown(self):
+        """
+        Alias for `.dispose()`. Gracefully disposes all agents and tears down resources.
+        """
+        self.dispose()
+
+    def get_active_agents(self) -> List[ActivatedAgent]:
+        """
+        Returns a list of all currently tracked agents.
+        It's a snapshot of the active agents at the time of the call.
+        """
+        with self._lock:
+            return list(self._active_agents.values())
 
     def _register_agent(self, thread: threading.Thread, factory_id: Optional[str] = None):
         """
-        Registers a thread as an agent using the AgentActivator.
+        Registers a thread as an ActivatedAgent and stores it in the active agent registry.
 
         Args:
             thread (threading.Thread): The thread to convert and register.
-            factory_id (Optional[str]): Optional ID to assign for agent tracking.
+            factory_id (Optional[str]): Optional agent ID to assign for identification.
+
+        Raises:
+            TypeError: If the resulting thread is not an ActivatedAgent.
         """
-        AgentActivator(thread, factory_id)
-        self._active_agents[thread.factory_id] = thread
+        with self._lock:
+            agent = ActivatedAgent(thread, factory_id)
+            if not isinstance(agent, ActivatedAgent):
+                raise TypeError("Only ActivatedAgent instances are permitted in CommandCenter.")
+            self._active_agents[agent.factory_id] = agent
 
     def _unregister_agent(self, thread: threading.Thread):
         """
@@ -64,86 +126,98 @@ class CommandCenter(IDisposable):
         """
         fid = getattr(thread, "factory_id", None)
         if fid:
-            self._active_agents.pop(fid, None)
+            with self._lock:
+                self._active_agents.pop(fid, None)
 
     def _create_agent_wrapper(self, user_target: Callable[[], Any]) -> Callable[[], None]:
         """
-        Internal helper that wraps a user function with agent lifecycle logic.
+        Internal wrapper to execute a function as an agent.
 
-        Ensures that:
-        - The thread is promoted to an agent (if not already)
-        - The user task executes
-        - The agent is removed and disposed after execution
+        Ensures agent conversion, execution, unregistration, and disposal.
 
         Args:
-            user_target (Callable): The function to be executed by the agent.
+            user_target (Callable): User function to run inside the agent.
 
         Returns:
-            Callable: A safe wrapper with agent transformation and teardown logic.
+            Callable[[], None]: Safe function for thread execution.
         """
         def _execute_and_dispose():
+            thread = threading.current_thread()
+            if not ActivatedAgent.is_agent(thread):
+                agent = ActivatedAgent(thread)
+                with self._lock:
+                    self._active_agents[agent.factory_id] = agent
             try:
-                thread = threading.current_thread()
-                if not AgentActivator.is_agent(thread):
-                    self._register_agent(thread)
                 user_target()
             finally:
-                self._unregister_agent(threading.current_thread())
-                if hasattr(threading.current_thread(), 'dispose'):
-                    threading.current_thread().dispose()
+                self._unregister_agent(thread)
+                if hasattr(thread, "dispose"):
+                    thread.dispose()
+
         return _execute_and_dispose
 
-    def create_agents(self, count: int, target: Callable[[], Any], name_prefix: str = "Agent") -> ConcurrentList[threading.Thread]:
+    def create_agents(
+        self,
+        count: int,
+        target: Union[Callable[..., None], Pack],
+        name_prefix: str = "Agent"
+    ) -> ConcurrentList[ActivatedAgent]:
         """
-        Creates multiple agent threads from a shared target function.
+        Creates a number of ActivatedAgent threads using a wrapped user target.
 
-        Each agent is wrapped with disposal logic and tracked internally.
-        Threads are returned in a non-started state.
+        These threads are not started automatically and are registered for lifecycle tracking.
 
         Args:
-            count (int): Number of agent threads to create.
-            target (Callable): Function to run inside each agent.
-            name_prefix (str): Base name used to name the threads.
+            count (int): Number of agents to create.
+            target (Callable): The task function to run in each agent.
+            name_prefix (str): Prefix for thread names.
 
         Returns:
-            List[threading.Thread]: List of initialized (but not started) agent threads.
+            ConcurrentList[ActivatedAgent]: List of initialized agent threads.
         """
         if target:
             Pack.bundle(target)
 
-        new_threads: ConcurrentList[threading.Thread] = ConcurrentList()
+        new_agents = ConcurrentList()
         for i in range(count):
             wrapped_target = self._create_agent_wrapper(target)
             thread = threading.Thread(target=wrapped_target, name=f"{name_prefix}-{i}")
-            self._register_agent(thread)
-            new_threads.append(thread)
-        return new_threads
+            agent = ActivatedAgent(thread)
+            with self._lock:
+                self._active_agents[agent.factory_id] = agent
+            new_agents.append(agent)
+        return new_agents
 
-    def submit(self, callable: Optional[Union[Callable[[], Any], Pack]]) -> Future:
+    def submit(self, target: Optional[Union[Callable[[], Any], Pack]]) -> Future:
         """
-        Offloads a callable to the internal thread pool for background execution.
+        Submit a callable to the internal agent-compatible thread pool.
 
-        This allows simple fire-and-forget task scheduling. The executing thread
-        is automatically promoted to agent status and cleaned up afterward.
+        This promotes the executing thread to an ActivatedAgent automatically.
 
         Args:
-            callable (Callable or Pack): The task to run in the background.
+            target (Callable | Pack): Task to execute.
 
         Returns:
-            Future: A concurrent Future tracking the task’s result or exception.
+            Future: A Future tracking the background task.
         """
-        if callable:
-            Pack.bundle(callable)
+        if target:
+            Pack.bundle(target)
 
         def agent_wrapper():
             thread = threading.current_thread()
-            if not AgentActivator.is_agent(thread):
-                self._register_agent(thread)
+            if not ActivatedAgent.is_agent(thread):
+                agent = ActivatedAgent(thread)
+                with self._lock:
+                    self._active_agents[agent.factory_id] = agent
             try:
-                return callable()
+                return target()
             finally:
                 self._unregister_agent(thread)
-        return self._offload_pool.submit(agent_wrapper)
+                if hasattr(thread, "dispose"):
+                    thread.dispose()
+
+        with self._lock:
+            return self._offload_pool.submit(agent_wrapper)
 
     def request_help(self, request: HelpRequest):
         """
@@ -166,90 +240,69 @@ class CommandCenter(IDisposable):
 
     def transform_current_thread(self, factory_id: Optional[str] = None) -> bool:
         """
-        Converts the calling thread into an agent thread, if not already.
-
-        Useful for embedding agent behavior into existing threads.
+        Transforms the current thread into an ActivatedAgent.
 
         Args:
-            factory_id (Optional[str]): Optional agent ID to assign.
-
-        Returns:
-            bool: True if transformation occurred, False if already an agent.
-
-        Raises:
-            RuntimeError: If called from the main thread.
-        """
-        thread = threading.current_thread()
-        if thread is threading.main_thread():
-            raise RuntimeError("The main thread cannot be transformed into an agent.")
-        return self._transform_logic(thread, factory_id)
-
-    def transform_thread(self, thread: threading.Thread, factory_id: Optional[str] = None, raise_on_main: bool = True) -> bool:
-        """
-        Converts any thread into an agent thread, if not already.
-
-        Args:
-            thread (threading.Thread): Target thread.
-            factory_id (Optional[str]): Optional ID to assign.
-            raise_on_main (bool): Whether to disallow main-thread transformation.
+            factory_id (Optional[str]): ID to assign to the current thread.
 
         Returns:
             bool: True if transformation succeeded, False if already an agent.
 
         Raises:
-            RuntimeError: If main thread is passed and raise_on_main is True.
+            RuntimeError: If called from the main thread.
+        """
+        current = threading.current_thread()
+        if current is threading.main_thread():
+            raise RuntimeError("Main thread cannot be transformed into an agent.")
+        return self.transform_thread(current, factory_id)
+
+    def transform_thread(
+        self,
+        thread: threading.Thread,
+        factory_id: Optional[str] = None,
+        raise_on_main: bool = True
+    ) -> bool:
+        """
+        Transforms a thread into an ActivatedAgent if not already one.
+
+        Args:
+            thread (threading.Thread): Target thread to transform.
+            factory_id (Optional[str]): Optional ID to assign to the agent.
+            raise_on_main (bool): If True, disallows transforming the main thread.
+
+        Returns:
+            bool: True if transformation occurred, False if already an agent.
+
+        Raises:
+            RuntimeError: If attempting to transform the main thread and raise_on_main is True.
+            TypeError: If transformation failed or resulted in a non-agent.
         """
         if raise_on_main and thread is threading.main_thread():
-            raise RuntimeError("The main thread cannot be transformed into an agent.")
-        return self._transform_logic(thread, factory_id)
+            raise RuntimeError("Main thread cannot be transformed into an agent.")
+        if ActivatedAgent.is_agent(thread):
+            return False
+        agent = ActivatedAgent(thread, factory_id)
+        if not isinstance(agent, ActivatedAgent):
+            raise TypeError("Transformation did not yield a valid ActivatedAgent.")
+        with self._lock:
+            self._active_agents[agent.factory_id] = agent
+        return True
 
     def activate_agents(self, threads: List[threading.Thread]) -> int:
         """
-        Bulk-transforms a group of threads into agents.
+        Batch transforms a list of threads into ActivatedAgents.
 
         Args:
-            threads (List[threading.Thread]): Target threads.
+            threads (List[threading.Thread]): Threads to convert.
 
         Returns:
-            int: Count of successfully activated agents.
+            int: Number of successfully transformed threads.
         """
-        activated_count = 0
+        count = 0
         for thread in threads:
             if self.transform_thread(thread, raise_on_main=False):
-                activated_count += 1
-        return activated_count
-
-    def shutdown(self, wait: bool = True):
-        """
-        Gracefully shuts down the CommandCenter, stopping the thread pool and cleaning up agents.
-
-        All active agents will be disposed if they support `dispose()` and removed from the registry.
-
-        Args:
-            wait (bool): If True, waits for thread pool tasks to complete.
-        """
-        if self._disposed:
-            return
-        self._disposed = True
-
-        # Dispose all known agents
-        for agent in list(self._active_agents.values()):
-            if hasattr(agent, "dispose"):
-                try:
-                    agent.dispose()
-                except Exception:
-                    pass
-
-        self._active_agents.clear()
-        self._offload_pool.shutdown(wait=wait)
-
-    def dispose(self):
-        """
-        Public alias for `shutdown()` with `wait=True`.
-
-        This makes the class compatible with systems that use IDisposable or cleanup hooks.
-        """
-        self.shutdown(wait=True)
+                count += 1
+        return count
 
     def _transform_logic(self, thread: threading.Thread, factory_id: Optional[str]) -> bool:
         """
@@ -262,9 +315,10 @@ class CommandCenter(IDisposable):
         Returns:
             bool: True if transformation occurred, False otherwise.
         """
-        if AgentActivator.is_agent(thread):
+        if ActivatedAgent.is_agent(thread):
             return False
         self._register_agent(thread, factory_id)
         return True
+
 
 CC = CommandCenter

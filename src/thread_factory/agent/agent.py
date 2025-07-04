@@ -1,10 +1,11 @@
-from typing import Callable, Optional, Any
+import threading
+from typing import Callable, Optional, Any, Union
 from thread_factory.runtime.worker.worker.worker import Worker, WorkerState
 from thread_factory.agent.thread_pool.help_request import HelpRequest
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 from thread_factory.utils.general_helpers.coroutine_helpers import CoroutineHelpers
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-import threading
+from thread_factory.utils.coordination.package import Pack
 
 class Agent(Worker):
     """
@@ -42,21 +43,21 @@ class Agent(Worker):
     processes with state, and dynamic task execution in thread-pooled systems.
 
     Attributes:
-        _save_points (dict[str, Callable[[], None]]):
+        _save_points (dict[str, Union[Callable[..., None], Pack]]):
             A private dictionary storing named callable functions. These functions
             represent points in the worker's execution flow that can be returned to,
             serving as "checkpoints" or "resume points" for complex behaviors.
             Each key is a string name, and each value is a parameterless callable.
             Exposed via `get_save_points_dict()`.
 
-        _locations (dict[str, Callable[[], None]]):
+        _locations (dict[str, Union[Callable[..., None], Pack]]):
             A private dictionary storing named callable functions. These functions
             represent distinct "execution zones" or specialized behaviors that the
             worker can dynamically "move into" or invoke.
             Each key is a string name, and each value is a parameterless callable.
             Exposed via `get_locations_dict()`.
 
-        _event_loop (Optional[Callable[[], None]]):
+        _event_loop (Optional[Union[Callable[..., None], Pack]]):
             A private, optional callable that defines the worker's primary
             or "home" execution loop. This function is invoked when the worker's
             `run` method is called, dictating its default behavior. It must be
@@ -88,7 +89,7 @@ class Agent(Worker):
             Accessed via `set_shared_inventory_item()`, `get_shared_inventory_item()`,
             and `get_shared_inventory()`.
 
-        _data_transfer (dict[str, Callable[..., Any]]):
+        _data_transfer (dict[str, Union[Callable[..., Any], Pack]]):
             A private dictionary mapping string names to callable functions.
             These callables are designed to facilitate data movement or processing
             within the worker. They act as named pipelines or transformations
@@ -169,9 +170,9 @@ class Agent(Worker):
 
 
         # --- Behavior Coordination (Private Attributes) ---
-        self._save_points: ConcurrentDict[str, Callable[[], None]] = ConcurrentDict()
-        self._locations: ConcurrentDict[str, Callable[[], None]] = ConcurrentDict()
-        self._event_loop: Optional[Callable[[], None]] = None #Home Location
+        self._save_points: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
+        self._locations: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
+        self._event_loop: Optional[Union[Callable[..., None], Pack]] = None #Home Location
         self._value_work: HelpRequest | None = None
         self._worker_type = "agentic"
         self._return_home = False # Returns to event loop after work completion
@@ -181,8 +182,32 @@ class Agent(Worker):
         self._inventory = threading.local()
         self._inventory.data = ConcurrentDict()
         self._shared_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
-        self._data_transfer: ConcurrentDict[str, Callable[..., Any]] = ConcurrentDict()
+        self._data_transfer: ConcurrentDict[str, Union[Callable[..., Any], Pack]] = ConcurrentDict()
         self._lock = threading.RLock()  # Ensures thread-safe access to shared state
+
+    def dispose(self):
+        """
+        Performs a comprehensive cleanup of the `Agent`'s agentic state
+        and then triggers the disposal process of its base `Worker` class.
+
+        This method ensures that all dynamic behaviors, memory structures, and
+        bound work are properly cleared to prevent resource leaks or unintended
+        side effects upon worker termination or recycling. It's safe to call
+        multiple times.
+        """
+        if self.disposed:
+            return
+        self.dispose_work()
+        if self._save_points is not None:
+            self._save_points.clear()
+        self._save_points = None
+        if self._locations is not None:
+            self._locations.clear()
+        self._locations = None
+        self._event_loop = None
+        self._disposed = True
+        self.state = WorkerState.DISPOSED
+
 
     # --- Core Work Lifecycle Handling ---
     def set_work_state(self, new_state: WorkStatus) -> None:
@@ -370,7 +395,7 @@ class Agent(Worker):
             self._value_work = None
 
     # --- Behavior Routing ---
-    def register_save_point(self, name: str, fn: Callable[[], None]) -> None:
+    def register_save_point(self, name: str, fn: Union[Callable[..., None], Pack]) -> None:
         """
         Registers a callable function as a named "save point".
 
@@ -381,7 +406,7 @@ class Agent(Worker):
 
         Args:
             name (str): A unique string identifier for the save point.
-            fn (Callable[[], None]): A parameterless callable function that
+            fn (Union[Callable[..., None], Pack]): A parameterless callable function that
                                      encapsulates the behavior associated with this
                                      save point.
 
@@ -390,11 +415,11 @@ class Agent(Worker):
                        is not designed to `await` coroutines directly in its synchronous
                        execution loop.
         """
-        if CoroutineHelpers.is_coroutine(fn):
-            raise TypeError(f"Cannot register coroutine function '{name}' as a save point. Agent runs synchronously.")
+        if fn:
+            fn = Pack.bundle(fn)
         self._save_points[name] = fn
 
-    def get_save_points_dict(self) -> ConcurrentDict[str, Callable[[], None]]:
+    def get_save_points_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
         """
         Retrieves a copy of the dictionary of registered save points.
 
@@ -402,13 +427,13 @@ class Agent(Worker):
         functions that represent checkpoints for the worker's execution.
 
         Returns:
-            dict[str, Callable[[], None]]: A dictionary where keys are save point names
+            dict[str, Union[Callable[..., None], Pack]]: A dictionary where keys are save point names
                                            and values are the associated callable functions.
                                            Returns a shallow copy to prevent external modification.
         """
         return self._save_points.copy()
 
-    def register_location(self, name: str, fn: Callable[[], None]) -> None:
+    def register_location(self, name: str, fn: Union[Callable[..., None], Pack]) -> None:
         """
         Registers a callable function as a named "location" or execution zone.
 
@@ -427,11 +452,11 @@ class Agent(Worker):
                        is not designed to `await` coroutines directly in its synchronous
                        execution loop.
         """
-        if CoroutineHelpers.is_coroutine(fn):
-            raise TypeError(f"Cannot register coroutine function '{name}' as a location. Agent runs synchronously.")
+        if fn:
+            fn = Pack.bundle(fn)
         self._locations[name] = fn
 
-    def get_locations_dict(self) -> ConcurrentDict[str, Callable[[], None]]:
+    def get_locations_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
         """
         Retrieves a copy of the dictionary of registered locations.
 
@@ -439,13 +464,13 @@ class Agent(Worker):
         functions that represent distinct execution zones or behaviors for the worker.
 
         Returns:
-            dict[str, Callable[[], None]]: A dictionary where keys are location names
+            dict[str, Union[Callable[..., None], Pack]]: A dictionary where keys are location names
                                            and values are the associated callable functions.
                                            Returns a shallow copy to prevent external modification.
         """
         return self._locations.copy()
 
-    def set_home(self, fn: Callable[[], None]) -> None:
+    def set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
         """
         Sets the primary, default execution loop or "home behavior" for the worker.
 
@@ -454,7 +479,7 @@ class Agent(Worker):
         executes unless explicitly directed otherwise.
 
         Args:
-            fn (Callable[[], None]): A parameterless callable function that
+            fn (Union[Callable[..., None], Pack]): A parameterless callable function that
                                      represents the worker's main operational loop.
                                      This function will be executed repeatedly
                                      (or once, if designed that way) by the worker thread.
@@ -464,8 +489,8 @@ class Agent(Worker):
                        is not designed to `await` coroutines directly in its synchronous
                        execution loop.
         """
-        if CoroutineHelpers.is_coroutine(fn):
-            raise TypeError("Cannot set a coroutine function as home. Agent runs synchronously.")
+        if fn:
+            fn = Pack.bundle(fn)
         self._event_loop = fn
 
     def run(self):
@@ -575,7 +600,7 @@ class Agent(Worker):
         """
         return self._shared_inventory
 
-    def register_data_transfer(self, name: str, fn: Callable[..., Any]) -> None:
+    def register_data_transfer(self, name: str, fn: Union[Callable[..., Any], Pack]) -> None:
         """
         Registers a callable function for data transfer operations.
 
@@ -584,22 +609,22 @@ class Agent(Worker):
 
         Args:
             name (str): The unique name for the data transfer function.
-            fn (Callable[..., Any]): The callable function to register. It should
+            fn (Union[Callable[..., Any], Pack]): The callable function to register. It should
                                      typically be parameterless for use with `execute_transfer`.
 
         Raises:
             TypeError: If the provided `fn` is a coroutine function.
         """
-        if CoroutineHelpers.is_coroutine(fn):
-            raise TypeError(f"Cannot register coroutine function '{name}' for data transfer. Agent runs synchronously.")
+        if fn:
+            fn = Pack.bundle(fn)
         self._data_transfer[name] = fn
 
-    def get_data_transfer_dict(self) -> ConcurrentDict[str, Callable[..., Any]]:
+    def get_data_transfer_dict(self) -> ConcurrentDict[str, Union[Callable[..., Any], Pack]]:
         """
         Retrieves a copy of the dictionary of registered data transfer functions.
 
         Returns:
-            dict[str, Callable[..., Any]]: A dictionary where keys are transfer names
+            dict[str, Union[Callable[..., Any], Pack]]: A dictionary where keys are transfer names
                                            and values are the associated callable functions.
                                            Returns a shallow copy to prevent external modification.
         """
@@ -747,30 +772,6 @@ class Agent(Worker):
         if self.factory and hasattr(self.factory, "get_worker_by_id"):
             return self.factory.get_worker_by_id(factory_id)
         return None
-
-    # --- Disposal ---
-    def dispose(self):
-        """
-        Performs a comprehensive cleanup of the `Agent`'s agentic state
-        and then triggers the disposal process of its base `Worker` class.
-
-        This method ensures that all dynamic behaviors, memory structures, and
-        bound work are properly cleared to prevent resource leaks or unintended
-        side effects upon worker termination or recycling. It's safe to call
-        multiple times.
-        """
-        if self.disposed:
-            return
-        self.dispose_work()
-        if self._save_points is not None:
-            self._save_points.clear()
-        self._save_points = None
-        if self._locations is not None:
-            self._locations.clear()
-        self._locations = None
-        self._event_loop = None
-        self._disposed = True
-        self.state = WorkerState.DISPOSED
 
     def __repr__(self):
         """
