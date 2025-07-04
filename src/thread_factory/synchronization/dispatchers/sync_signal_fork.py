@@ -140,7 +140,7 @@ class SyncSignalFork(IDisposable):
         # ----------------- immutable config ----------------- #
         self._id: str = str(ulid.ULID())
         self._manual_release: bool = bool(manual_release)
-        self._callback: Optional[ConcurrentList[Union[Callable[..., None], Pack]]] = Pack.bundle(callback) if callback else None
+        self._callback: Optional[Union[Callable[..., None], Pack]] = Pack.bundle(callback) if callback else None
         self._controller = controller
         self._signal_callback: Union[Callable[..., None], Pack] = Pack.bundle(signal_callback) if signal_callback else None
 
@@ -460,7 +460,6 @@ class SyncSignalFork(IDisposable):
         Raises:
             RuntimeError: If called on a disposed instance.
         """
-
         if self._disposed:
             raise RuntimeError("Cannot reset a disposed SyncSignalFork.")
 
@@ -477,5 +476,9 @@ class SyncSignalFork(IDisposable):
             self._timed_out = False
 
         self._threading_event.clear()
+
         if self._scout:
-            self._scout.reset()
+            self._scout.exit_monitor()
+            # Wake any blocked scout monitors from previous run
+            with self._scout._condition:
+                self._scout._condition.notify_all()

@@ -319,25 +319,54 @@ class TestSyncSignalFork(unittest.TestCase):
         fork.dispose()
 
     def test_timeout_then_reset_then_manual_success(self):
+        """
+        Ensures that a fork which times out can be reset and used again successfully.
+        Verifies:
+        • First thread hits timeout.
+        • Second round executes callables properly after reset and manual release.
+        """
         fork = SyncSignalFork(2,
                               [(1, dummy_func_factory("M1", self.log)),
                                (1, dummy_func_factory("M2", self.log))],
-                              timeout_duration=0.05, manual_release=True)
-        threading.Thread(target=thread_use_fork,
-                         args=(fork, self.log, "T"), daemon=True).start()
-        time.sleep(0.15)
+                              timeout_duration=0.05,
+                              manual_release=True)
+
+        # First thread should timeout (only one thread joins)
+        t_timeout = threading.Thread(target=thread_use_fork,
+                                     args=(fork, self.log, "T"),
+                                     daemon=True)
+        t_timeout.start()
+        t_timeout.join(timeout=1)
         self.assertTrue(fork._timed_out)
+        self.assertTrue(any("timed out" in msg for msg in self.log))
+
+        # Reset the fork after timeout
         fork.reset()
-        time.sleep(0.5)  # give time for reset to take effect
-        t1 = threading.Thread(target=thread_use_fork, args=(fork, self.log, "A"))
-        t2 = threading.Thread(target=thread_use_fork, args=(fork, self.log, "B"))
-        t1.start();
+        self.log.clear()
+
+        # Spawn two threads to fill slots and block (manual release required)
+        t1 = threading.Thread(target=thread_use_fork, args=(fork, self.log, "M1"))
+        t2 = threading.Thread(target=thread_use_fork, args=(fork, self.log, "M2"))
+        t1.start()
         t2.start()
-        time.sleep(0.15)  # Ensure threads are up and running
+
+        # Wait briefly to ensure they are blocked
+        time.sleep(0.1)
+        self.assertNotIn("M1", self.log)
+        self.assertNotIn("M2", self.log)
+
+        # Manual release
         fork.release()
+
+        # Wait for threads to finish
         t1.join(timeout=5)
         t2.join(timeout=5)
+        self.assertFalse(t1.is_alive(), "Thread A did not complete.")
+        self.assertFalse(t2.is_alive(), "Thread B did not complete.")
 
+        # Assert callables executed after manual release
+        self.assertEqual(self.log.count("M1"), 1)
+        self.assertEqual(self.log.count("M2"), 1)
 
     def test_nested_forks(self):
         inner_calls = [(2, dummy_func_factory("INNER", self.log))]
