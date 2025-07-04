@@ -136,12 +136,17 @@ class TestForkAndSyncFork(unittest.TestCase):
     # CORRECTED SyncFork Tests (Respecting threshold < tasks constraint)
     # -------------------------------------------------------------------------
 
-    def test_sync_fork_distribution_fewer_workers(self):
-        num_workers = 3
-        num_tasks = 5  # Must be > num_workers for SyncFork
+    def test_sync_fork_distribution_more_workers(self):
+        """
+        Tests SyncFork distribution where there are more workers than tasks.
+        """
+        num_workers = 7
+        num_tasks = 5
+
         tasks = [self.make_logging_task(f"sync_task_{i}") for i in range(num_tasks)]
         group = Group(name="sync_group", tasks=tasks, multiple_outcomes_per_task=True)
 
+        # This setup is now valid because you moved the eligibility check
         mc = MultiConductor(
             threshold=num_workers,
             groups=[group],
@@ -153,15 +158,34 @@ class TestForkAndSyncFork(unittest.TestCase):
         threads = _spawn(num_workers, mc.start)
         for t in threads: t.join(timeout=3)
 
-        # 3 workers will be distributed among 5 tasks. First 3 tasks run once.
-        self.assertEqual(len(self.execution_log), num_workers)
-        self.assertCountEqual(self.execution_log, ["sync_task_0", "sync_task_1", "sync_task_2"])
-        self.assertNotIn("sync_task_3", self.execution_log)
-        self.assertNotIn("sync_task_4", self.execution_log)
+        # --- CORRECTED ASSERTIONS ---
 
-    def test_sync_fork_raises_error_if_threshold_equals_tasks(self):
-        num_workers = 5
+        # 1. The total number of executions should equal the number of workers.
+        self.assertEqual(len(self.execution_log), num_workers)
+
+        # 2. Check the exact distribution of tasks.
+        # 7 workers / 5 tasks = 1 execution each, with 2 workers remaining.
+        # The first 2 tasks get the remainder, so they run twice.
+        expected_counts = {
+            'sync_task_0': 2,
+            'sync_task_1': 2,
+            'sync_task_2': 1,
+            'sync_task_3': 1,
+            'sync_task_4': 1
+        }
+
+        # Use collections.Counter to verify the counts precisely.
+        self.assertDictEqual(Counter(self.execution_log), expected_counts)
+
+    def test_sync_fork_raises_error_if_threshold_is_less_than_tasks(self):
+        """
+        Tests that the conductor raises a RuntimeError if the SyncFork
+        eligibility check (workers < tasks) fails.
+        """
+        # This is the actual failure condition for your check.
+        num_workers = 4
         num_tasks = 5
+
         tasks = [self.make_logging_task(f"task_{i}") for i in range(num_tasks)]
         group = Group(name="fail_group", tasks=tasks, multiple_outcomes_per_task=True)
 
@@ -173,18 +197,16 @@ class TestForkAndSyncFork(unittest.TestCase):
         )
         self.addCleanup(mc.dispose)
 
-        # FIX: The eligibility check happens inside start(), so we call it
-        # and expect the specific RuntimeError from that check.
-        with self.assertRaisesRegex(RuntimeError, "SyncFork cannot be used"):
-            mc.start()
-
+        # The check correctly fails when 4 < 5.
+        with self.assertRaisesRegex(RuntimeError, "More workers are required"):
+            mc.enable()
     # -------------------------------------------------------------------------
     # CORRECTED Edge Case Tests
     # -------------------------------------------------------------------------
     def test_fork_with_empty_group(self):
         """
-        Tests that the conductor raises a RuntimeError if it's started with
-        a group that contains no tasks.
+        Tests that the conductor raises a ValueError when it tries to
+        create a Fork for a group with no tasks.
         """
         num_workers = 3
         group = Group(name="empty_group", tasks=[])  # Group with no tasks
@@ -196,9 +218,10 @@ class TestForkAndSyncFork(unittest.TestCase):
         )
         self.addCleanup(mc.dispose)
 
-        # FIX: Call _execute_operations() directly to bypass the blocking
-        # start() barrier and test the internal guard clause.
-        with self.assertRaisesRegex(RuntimeError, "MultiConductor has no groups with tasks"):
+        # FIX: The conductor now raises a ValueError when _execute_operations is called.
+        # We test for this specific error and message.
+        with self.assertRaisesRegex(ValueError, "Cannot create Fork processor for a group with no tasks"):
             mc._execute_operations()
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

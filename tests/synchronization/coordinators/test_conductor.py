@@ -8,6 +8,9 @@ import time
 import unittest
 import logging
 from typing import List, Any, Dict, Union, Optional
+
+import ulid
+
 from thread_factory.synchronization.coordinators.conductor import Conductor
 from thread_factory.synchronization.controllers.signal_controller import SignalController
 from thread_factory.utils.coordination.outcome import Outcome
@@ -286,13 +289,7 @@ class TestConductor(unittest.TestCase):
         c.dispose()
 
     def test_callback_exception_is_handled_without_crashing(self):
-        """
-        Verify that an exception in the user-provided callback does not
-        crash the Conductor's execution loop.
-        """
-
-        class CallbackError(Exception):
-            pass
+        class CallbackError(Exception): pass
 
         task_completed = threading.Event()
 
@@ -300,13 +297,11 @@ class TestConductor(unittest.TestCase):
             raise CallbackError("Callback failed!")
 
         def simple_task():
-            # Set this event so we know the task ran successfully.
             task_completed.set()
             return "done"
 
-        # Set up the conductor with the faulty callback.
-        # We need a SignalController to see the logged error.
         controller = SignalController()
+        controller._logger = logging.getLogger(f"controller-{ulid.ULID()}")
         c = Conductor(
             threshold=1,
             tasks=simple_task,
@@ -314,21 +309,22 @@ class TestConductor(unittest.TestCase):
             controller=controller
         )
 
-        # Use assertLogs to capture logging output and verify the error was logged.
         with self.assertLogs(controller._logger, level='ERROR') as cm:
             thread = _spawn(1, c.start)[0]
-            thread.join(1)
+            thread.join(timeout=5)
+            self.assertFalse(thread.is_alive(), "Conductor thread did not terminate.")
 
-            # Verify the error message from the callback was logged.
-            self.assertIn("Error in Conductor callback", cm.output[0])
-            self.assertIn("CallbackError: Callback failed!", cm.output[0])
+            time.sleep(0.05)  # Ensure logs are flushed
 
-        # Most importantly, assert that the main task still completed.
-        self.assertTrue(task_completed.is_set(), "Task should complete even if callback fails.")
+            self.assertTrue(any("Error in Conductor callback" in line for line in cm.output))
+            self.assertTrue(any("CallbackError: Callback failed!" in line for line in cm.output))
+
+        self.assertTrue(task_completed.is_set())
         self.assertEqual(c.results, ["done"])
 
         c.dispose()
         controller.dispose()
+
     # 4 ─ release() has no effect if threshold not yet met
     def test_release_before_threshold_is_noop(self):
         c = Conductor(threshold=2, manual_release=True)

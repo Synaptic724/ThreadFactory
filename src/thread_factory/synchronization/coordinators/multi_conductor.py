@@ -185,11 +185,6 @@ class MultiConductor(IDisposable):
             try: self._controller.register(self)
             except Exception: pass
 
-        if self._distributed_execution and self._sync_distributed_execution:
-            raise ValueError("Cannot set both concurrent_execution and parallel_execution to True. Choose one.")
-        if self._sync_distributed_execution:
-            self._check_if_eligible_for_sync_fork()
-
     def dispose(self):
         """
         Disposes of the MultiConductor and all associated resources.
@@ -243,31 +238,24 @@ class MultiConductor(IDisposable):
             self.groups.clear()
             self.outcomes.clear()
 
+    # This is your intended global check, now slightly more Pythonic.
     def _check_if_eligible_for_sync_fork(self) -> bool:
-        """
-        Check if the current thread is eligible to use SyncFork.
+        if not self.groups:
+            return True # No groups to check, so it's valid.
 
-        This method is used to ensure that the current thread is not already
-        blocked by another SyncFork instance or has not exceeded its usage cap.
-        """
-        counter = 0
+        # Find the size of the largest group.
+        max_task_size = max(len(group.tasks) for group in self.groups) if self.groups else 0
 
-        for group in self.groups:
-            counter += len(group)
-
-        if self._threshold >= counter:
+        # Enforce your rule: workers must be >= tasks for the largest group.
+        if self._threshold < max_task_size:
             raise RuntimeError(
-                f"MultiConductor threshold ({self._threshold}) does not match the total number of tasks "
-                f"({counter}) across all groups. SyncFork cannot be used as it requires a consistent number of tasks "
-                "to worker ratio 1:1.  Please adjust your workload and use less callables with queues or use a Fork instead."
+                f"MultiConductor threshold ({self._threshold}) is less than the largest group size ({max_task_size}). "
+                "More workers are required to run this SyncFork stage."
             )
 
         if not self._multiple_outcomes_per_task:
             raise RuntimeError(
-                "SyncFork requires multiple outcomes per task to be enabled. "
-                "Please set 'multiple_outcomes_per_task=True' when initializing the MultiConductor."
-                "This operation is threadsafe and will not cause any issues. You have more workers than tasks and"
-                " therefore either reduce your worker count or increase the number of tasks per group."
+                "SyncFork requires 'multiple_outcomes_per_task=True' to be enabled."
             )
         return True
 
@@ -325,6 +313,10 @@ class MultiConductor(IDisposable):
         call to `start()`), no more groups can be added or removed.
         """
         self._enabled = True
+        if self._distributed_execution and self._sync_distributed_execution:
+            raise ValueError("Cannot set both concurrent_execution and parallel_execution to True. Choose one.")
+        if self._sync_distributed_execution:
+            self._check_if_eligible_for_sync_fork()
 
     def start(self, timeout: float = None) -> None:
         """
@@ -427,7 +419,7 @@ class MultiConductor(IDisposable):
         # Prepare data for worker distribution: use lists for usage_cap to allow modification
         fork_units_config: list[list[Union[int, Pack]]] = []  # Type hint for list of lists
 
-        print(f"Creating {'SyncFork' if sync else 'Fork'} for group '{group.name}' with {number_of_tasks} tasks.")
+        #print(f"Creating {'SyncFork' if sync else 'Fork'} for group '{group.name}' with {number_of_tasks} tasks.")
         # Initialize each task with an initial usage_cap of 0
         for task_index, task in enumerate(group.tasks):
             #print(f"Adding task {task_index} to fork units config for group '{group.name}', {task.__name__}")
@@ -443,7 +435,7 @@ class MultiConductor(IDisposable):
             fork_units_config[current_task_index][0] += 1
             # Move to the next task in a circular fashion
             current_task_index = (current_task_index + 1) % number_of_tasks
-            print(current_task_index, "current_task_index")
+            #print(current_task_index, "current_task_index")
 
         # Convert the list-based config to tuple-based for the Fork/SyncFork constructor
         final_fork_callables = [(cap, fn) for cap, fn in fork_units_config]
