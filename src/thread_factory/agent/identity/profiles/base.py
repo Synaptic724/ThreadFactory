@@ -20,12 +20,7 @@ class BaseProfile(IDisposable, IProfile):
         "_bound_target"
     ]
 
-    def __init__(
-            self,
-            thread: threading.Thread = None,
-            command_center: 'CommandCenter' = None,
-            factory_id: Optional[str] = None
-    ):
+    def __init__(self):
         """
         Initializes the Activator, sets up all agentic state, and
         patches the target thread to make it agentic.
@@ -35,11 +30,11 @@ class BaseProfile(IDisposable, IProfile):
             factory_id (Optional[str]): The unique identifier for the thread.
         """
         super().__init__()
-        self.factory_id = factory_id if factory_id else str(ulid.ULID())
+        self.factory_id = str(ulid.ULID())
         self._worker_type = "agentic"
-        self._thread_target = thread
+        self._thread_target = None
         self._pool_agent = False # Indicates this worker is part of a dynamic thread pool
-        self._command_center = command_center  # Placeholder for a Command Center reference if needed
+        self._command_center = None  # Placeholder for a Command Center reference if needed
         self._lock = threading.RLock()
 
         self._bound_target: Optional[Union["ActivatedAgent", "Agent"]] = None

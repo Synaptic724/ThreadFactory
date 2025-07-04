@@ -21,16 +21,11 @@ class General(IDisposable, BaseProfile, IProfile):
         "_bound_target"
     ]
 
-    def __init__(
-            self,
-            thread: threading.Thread = None,
-            command_center: 'CommandCenter' = None,
-            factory_id: Optional[str] = None
-    ):
+    def __init__(self):
         """
         Initializes a blank profile with default field values.
         """
-        super().__init__(thread, command_center, factory_id)
+        super().__init__()
         self.id: Optional[str] = None
         self.name: Optional[str] = None
         self.job: Optional[str] = None
