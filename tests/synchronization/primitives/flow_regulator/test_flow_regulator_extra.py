@@ -19,7 +19,7 @@ import unittest
 from time import perf_counter
 
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
-from thread_factory.agent.agent import Agent
+from thread_factory.agent.thread_pool.agent import Agent
 
 
 # --------------------------------------------------------------------------- #

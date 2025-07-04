@@ -2,8 +2,10 @@ import threading, ulid
 from typing import Callable, Optional, Any, Union
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
+from thread_factory.utils.interfaces.disposable import IDisposable
 
-class ActivatedAgent:
+
+class ActivatedAgent(IDisposable):
     """
     Dresses a standard threading.Thread with agentic features.
 
@@ -25,23 +27,32 @@ class ActivatedAgent:
             thread (threading.Thread): The thread instance to upgrade.
             factory_id (Optional[str]): The unique identifier for the thread.
         """
+        super().__init__()
+        # --- Default Factory --- #
         self._thread_target = thread
         self.factory_id = factory_id if factory_id else str(ulid.ULID())
-        self._disposed = False
-
-        # --- Agentic State Initialization ---
         self._lock = threading.RLock()
-        # This worker_type is the flag used by is_agent() to identify an activated thread.
         self._pool_agent = False # Indicates this worker is part of a dynamic thread pool
         self._worker_type = "agentic"
         self._inventory = threading.local()
         self._inventory.data = ConcurrentDict()
         self._shared_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
+        # --- Profiles --- #
 
-        # --- Data Transfer, Save Points, and Locations ---
-        self._data_transfer: ConcurrentDict[str, Union[Callable[..., Any], Pack]] = ConcurrentDict()
-        self._save_points: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
-        self._locations: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
+
+
+
+        # --- Activities --- #
+
+
+
+
+
+        # --- Agentic State Initialization ---
+
+
+
+
 
         # --- Agent Communication Protocol Mappings --- #
         # Placeholder for future communication protocols or mappings

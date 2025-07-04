@@ -291,7 +291,7 @@ class AgentPool(IDisposable):
         """
         Creates workers and starts them.
         """
-        from thread_factory.agent.agent import Agent
+        from thread_factory.agent.thread_pool.agent import Agent
         for worker_id in range(len(self.worker_pool), len(self.worker_pool) + num_workers):
             worker = Agent()
             self.worker_pool.append(worker)

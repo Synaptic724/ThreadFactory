@@ -7,7 +7,7 @@ from thread_factory import ConcurrentDict
 from thread_factory.runtime import WorkerState
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus
 from thread_factory.agent.thread_pool.help_request import HelpRequest
-from thread_factory.agent.agent import Agent
+from thread_factory.agent.thread_pool.agent import Agent
 from thread_factory.utils.coordination.package import Pack
 
 

@@ -1,7 +1,6 @@
-import unittest, threading, time
-from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-from thread_factory.agent.command_center import CommandCenter, CC
-from thread_factory.agent.activator import ActivatedAgent
+import unittest, threading
+from thread_factory.agent.command_center import CC
+from thread_factory.agent.identity.activator import ActivatedAgent
 from thread_factory.agent.thread_pool import HelpRequest
 
 

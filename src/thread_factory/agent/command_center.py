@@ -3,7 +3,7 @@ from typing import Optional, List, Callable, Any, Union
 from concurrent.futures import ThreadPoolExecutor, Future
 from synchronization.primitives.test_signal_latch import IDisposable
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.agent.activator import ActivatedAgent
+from thread_factory.agent.identity.activator import ActivatedAgent
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.agent.thread_pool import HelpRequest
 from thread_factory.utils.coordination.package import Pack

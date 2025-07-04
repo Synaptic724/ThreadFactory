@@ -3,7 +3,6 @@ from typing import Callable, Optional, Any, Union
 from thread_factory.runtime.worker.worker.worker import Worker, WorkerState
 from thread_factory.agent.thread_pool.help_request import HelpRequest
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
-from thread_factory.utils.general_helpers.coroutine_helpers import CoroutineHelpers
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 
@@ -166,24 +165,28 @@ class Agent(Worker):
             **kwargs: Arbitrary keyword arguments passed to the base `Worker` constructor.
         """
         super().__init__(*args, **kwargs)
-
-
-
-        # --- Behavior Coordination (Private Attributes) ---
-        self._save_points: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
-        self._locations: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
-        self._event_loop: Optional[Union[Callable[..., None], Pack]] = None #Home Location
-        self._value_work: HelpRequest | None = None
+        # --- Default Factory --- #
         self._worker_type = "agentic"
         self._return_home = False # Returns to event loop after work completion
         self._pool_agent = True # Indicates this worker is part of a dynamic thread pool
-
-        # --- Agentic Memory (Inventory) (Private Attributes) ---
         self._inventory = threading.local()
         self._inventory.data = ConcurrentDict()
+        self._lock = threading.RLock()  # Ensures thread-safe access to shared state
+
+        # --- Agentic Profile data (Public Attributes) --- #
         self._shared_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
         self._data_transfer: ConcurrentDict[str, Union[Callable[..., Any], Pack]] = ConcurrentDict()
-        self._lock = threading.RLock()  # Ensures thread-safe access to shared state
+        self._save_points: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
+        self._locations: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
+        self._event_loop: Optional[Union[Callable[..., None], Pack]] = None  # Home Location
+        self._value_work: HelpRequest | None = None
+
+
+        # --- Behavior Coordination (Private Attributes) ---
+
+
+
+        # --- Agentic Memory (Inventory) (Private Attributes) ---
 
         # --- Agent Communication Protocol Mappings --- #
         # Placeholder for future communication protocols or mappings

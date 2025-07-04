@@ -1,7 +1,7 @@
 import threading
 import time
 import unittest
-from thread_factory.agent.activator import ActivatedAgent
+from thread_factory.agent.identity.activator import ActivatedAgent
 
 
 # A mock class to simulate a thread pool or factory that can track workers by ID.
