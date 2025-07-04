@@ -427,10 +427,12 @@ class MultiConductor(IDisposable):
         # Prepare data for worker distribution: use lists for usage_cap to allow modification
         fork_units_config: list[list[Union[int, Pack]]] = []  # Type hint for list of lists
 
+        print(f"Creating {'SyncFork' if sync else 'Fork'} for group '{group.name}' with {number_of_tasks} tasks.")
         # Initialize each task with an initial usage_cap of 0
         for task_index, task in enumerate(group.tasks):
+            #print(f"Adding task {task_index} to fork units config for group '{group.name}', {task.__name__}")
             # ***CRITICAL FIX: Append a LIST here, NOT a tuple***
-            fork_units_config.append([0, Pack(self._execute_operation, task, group, task_index)])
+            fork_units_config.append([0, Pack(self._execute_operation, task=task, group=group, task_index=task_index)])
 
         # Initialize counter to 0 for standard round-robin distribution
         current_task_index: int = 0
@@ -441,6 +443,7 @@ class MultiConductor(IDisposable):
             fork_units_config[current_task_index][0] += 1
             # Move to the next task in a circular fashion
             current_task_index = (current_task_index + 1) % number_of_tasks
+            print(current_task_index, "current_task_index")
 
         # Convert the list-based config to tuple-based for the Fork/SyncFork constructor
         final_fork_callables = [(cap, fn) for cap, fn in fork_units_config]
@@ -449,7 +452,7 @@ class MultiConductor(IDisposable):
         if sync:
             return SyncFork(number_of_tasks, final_fork_callables)
         else:
-            return Fork(number_of_tasks, final_fork_callables, rotate_selectors=False)
+            return Fork(number_of_tasks, final_fork_callables)
 
     def _calculate_fork_processor(self, group: Group) -> Optional[Fork, SyncFork]:
         """
@@ -470,8 +473,10 @@ class MultiConductor(IDisposable):
         """
         for group in self.groups:
             if self._broken or self._disposed: break
-            if not self._create_fork:
-                self._fork_processor = self._calculate_fork_processor(group)
+            with self._lock:
+                if not self._create_fork:
+                    self._fork_processor = self._calculate_fork_processor(group)
+                    self._create_fork = True
             self._fork_processor.use_fork()
             self._internal_threshold_barrier.wait()
             self._create_fork = False

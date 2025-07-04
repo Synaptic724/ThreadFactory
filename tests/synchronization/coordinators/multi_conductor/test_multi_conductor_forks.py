@@ -51,18 +51,37 @@ class TestForkAndSyncFork(unittest.TestCase):
     # -------------------------------------------------------------------------
 
     def test_fork_1_to_1_distribution(self):
+        """IMPROVED FOR DEBUGGING: Checks for hidden exceptions."""
         num_workers = 5
         num_tasks = 5
+
+        # Set your logger to DEBUG level to see everything
+        logging.getLogger().setLevel(logging.DEBUG)
+
         tasks = [self.make_logging_task(f"task_{i}") for i in range(num_tasks)]
         group = Group(name="dist_group", tasks=tasks)
+
         mc = MultiConductor(threshold=num_workers, groups=[group], distributed_execution=True)
         self.addCleanup(mc.dispose)
 
         threads = _spawn(num_workers, mc.start)
-        for t in threads: t.join(timeout=3)
+        for t in threads:
+            t.join(timeout=3)
 
-        self.assertEqual(len(self.execution_log), num_tasks)
-        self.assertCountEqual(self.execution_log, [f"task_{i}" for i in range(num_tasks)])
+        # --- THE FIX IS HERE ---
+        # Instead of just checking the log, first check if any exceptions were
+        # silently caught by the MultiConductor.
+        if mc.exceptions:
+            self.fail(
+                f"Test failed because {len(mc.exceptions)} exceptions were caught "
+                f"by the conductor. The first one was: \n{repr(mc.exceptions[0])}"
+            )
+        # --- END OF FIX ---
+
+        self.assertEqual(len(self.execution_log), num_tasks,
+                         "Execution log does not have the expected number of tasks.")
+        self.assertCountEqual(self.execution_log, [f"task_{i}" for i in range(num_tasks)],
+                              "Not all tasks were executed exactly once in Fork mode.")
         self.assertCountEqual(mc.results, [f"task_{i}_result" for i in range(num_tasks)])
 
     def test_fork_uneven_distribution_more_workers(self):
