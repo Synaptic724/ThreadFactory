@@ -1,6 +1,4 @@
-import functools
-import threading
-import warnings
+import functools, threading, warnings
 from copy import deepcopy
 from typing import (
     Any,

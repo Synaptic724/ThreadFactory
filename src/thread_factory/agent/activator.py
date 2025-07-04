@@ -4,7 +4,7 @@ from typing import Callable, Optional, Any
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.general_helpers.coroutine_helpers import CoroutineHelpers
 
-class AgentActivator:
+class ActivatedAgent:
     """
     Dresses a standard threading.Thread with agentic features.
 

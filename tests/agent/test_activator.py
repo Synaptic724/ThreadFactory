@@ -1,7 +1,7 @@
 import threading
 import time
 import unittest
-from thread_factory.agent.activator import AgentActivator
+from thread_factory.agent.activator import ActivatedAgent
 
 
 # A mock class to simulate a thread pool or factory that can track workers by ID.
@@ -15,8 +15,8 @@ class MockFactory:
     def get_worker_by_id(self, factory_id):
         return self.workers.get(factory_id)
 
-class TestAgentActivator(unittest.TestCase):
-    """Test suite for the AgentActivator class."""
+class TestActivatedAgent(unittest.TestCase):
+    """Test suite for the ActivatedAgent class."""
 
 
     def setUp(self):
@@ -27,10 +27,10 @@ class TestAgentActivator(unittest.TestCase):
 
     def test_idempotent_activation(self):
         """Ensure re-activating an already agentic thread does not break."""
-        AgentActivator(self.thread)
-        AgentActivator(self.thread)  # Should not double-patch or crash
+        ActivatedAgent(self.thread)
+        ActivatedAgent(self.thread)  # Should not double-patch or crash
 
-        self.assertTrue(AgentActivator.is_agent(self.thread))
+        self.assertTrue(ActivatedAgent.is_agent(self.thread))
 
     def test_inter_agent_communication_via_shared_inventory(self):
         """Verify one agent can receive data placed in its shared inventory."""
@@ -45,7 +45,7 @@ class TestAgentActivator(unittest.TestCase):
         agent_b_thread = threading.Thread(target=agent_b_target)
 
         # Activate the thread as an agent BEFORE starting
-        activator_b = AgentActivator(agent_b_thread, factory_id="agent_B")
+        activator_b = ActivatedAgent(agent_b_thread, factory_id="agent_B")
 
         # Place a value into the shared inventory (before thread starts)
         activator_b.set_shared_inventory_item("message", "hello_from_outside")
@@ -91,8 +91,8 @@ class TestAgentActivator(unittest.TestCase):
         thread_a = threading.Thread(target=target_a)
         thread_b = threading.Thread(target=target_b)
 
-        AgentActivator(thread_a)
-        AgentActivator(thread_b)
+        ActivatedAgent(thread_a)
+        ActivatedAgent(thread_b)
 
         thread_a.start()
         thread_b.start()
@@ -105,7 +105,7 @@ class TestAgentActivator(unittest.TestCase):
     def test_shared_inventory_concurrency(self):
         """Test for race conditions when multiple threads write to one agent's shared inventory."""
         main_agent_thread = threading.Thread()
-        AgentActivator(main_agent_thread)
+        ActivatedAgent(main_agent_thread)
 
         writer_threads = []
         num_writers = 10
@@ -136,8 +136,8 @@ class TestAgentActivator(unittest.TestCase):
         thread_a = threading.Thread()
         thread_b = threading.Thread()
 
-        activator_a = AgentActivator(thread_a, factory_id="A")
-        activator_b = AgentActivator(thread_b, factory_id="B")
+        activator_a = ActivatedAgent(thread_a, factory_id="A")
+        activator_b = ActivatedAgent(thread_b, factory_id="B")
 
         activator_a.factory = factory
         activator_b.factory = factory
@@ -152,7 +152,7 @@ class TestAgentActivator(unittest.TestCase):
 
     def test_recursive_inventory_access(self):
         """Ensure reentrant inventory access doesn't deadlock or fail."""
-        AgentActivator(self.thread)
+        ActivatedAgent(self.thread)
 
         def recursive_fn(depth=3):
             if depth == 0:
@@ -164,7 +164,7 @@ class TestAgentActivator(unittest.TestCase):
 
     def test_transfer_function_error_propagation(self):
         """Ensure exceptions inside transfer functions bubble up."""
-        AgentActivator(self.thread)
+        ActivatedAgent(self.thread)
 
         def broken_fn():
             raise RuntimeError("Boom")
@@ -178,8 +178,8 @@ class TestAgentActivator(unittest.TestCase):
         """Make sure thread-local inventory is not shared across threads."""
         thread_a = threading.Thread()
         thread_b = threading.Thread()
-        AgentActivator(thread_a)
-        AgentActivator(thread_b)
+        ActivatedAgent(thread_a)
+        ActivatedAgent(thread_b)
 
         thread_a.bind_to_inventory("x", "a_value")
         self.assertIsNone(thread_b.get_from_inventory("x"))
@@ -197,14 +197,14 @@ class TestAgentActivator(unittest.TestCase):
             'get_from_inventory_by_id', 'dispose'
         }
 
-        AgentActivator(self.thread)
+        ActivatedAgent(self.thread)
         missing = [m for m in expected if not hasattr(self.thread, m)]
 
         self.assertEqual(missing, [], f"Missing patched methods: {missing}")
 
     def test_shared_inventory_copy_isolation(self):
         """Ensure get_shared_inventory() returns a copy, not the original."""
-        AgentActivator(self.thread)
+        ActivatedAgent(self.thread)
 
         self.thread.set_shared_inventory_item("key", 123)
         shared = self.thread.get_shared_inventory()
@@ -216,7 +216,7 @@ class TestAgentActivator(unittest.TestCase):
     def test_massive_shared_inventory_concurrency(self):
         """Hammer shared inventory with high concurrency to flush out race issues."""
         thread = threading.Thread()
-        AgentActivator(thread)
+        ActivatedAgent(thread)
 
         def hammer():
             for i in range(1000):
@@ -238,17 +238,17 @@ class TestAgentActivator(unittest.TestCase):
 
     def test_activation_and_is_agent(self):
         """Verify that a thread is correctly identified as an agent after activation."""
-        self.assertFalse(AgentActivator.is_agent(self.thread), "Thread should not be an agent initially.")
+        self.assertFalse(ActivatedAgent.is_agent(self.thread), "Thread should not be an agent initially.")
 
-        activator = AgentActivator(self.thread, factory_id="test_agent_01")
+        activator = ActivatedAgent(self.thread, factory_id="test_agent_01")
 
-        self.assertTrue(AgentActivator.is_agent(self.thread), "Thread should be an agent after activation.")
+        self.assertTrue(ActivatedAgent.is_agent(self.thread), "Thread should be an agent after activation.")
         self.assertEqual(self.thread.factory_id, "test_agent_01")
         self.assertEqual(self.thread._worker_type, "agentic")
 
     def test_inventory_management(self):
         """Test that a thread can bind to and retrieve from its own private inventory."""
-        AgentActivator(self.thread)
+        ActivatedAgent(self.thread)
 
         def target_with_internal_assertion():
             agent = threading.current_thread()
@@ -279,7 +279,7 @@ class TestAgentActivator(unittest.TestCase):
 
     def test_behavior_routing(self):
         """Test registration and retrieval of locations and save points."""
-        AgentActivator(self.thread)
+        ActivatedAgent(self.thread)
 
         def my_location():
             self.results['location_called'] = True
@@ -305,7 +305,7 @@ class TestAgentActivator(unittest.TestCase):
 
     def test_data_transfer(self):
         """Test registration and execution of data transfer functions."""
-        AgentActivator(self.thread)
+        ActivatedAgent(self.thread)
 
         def get_status():
             return "system_ok"
@@ -320,8 +320,8 @@ class TestAgentActivator(unittest.TestCase):
 
     def test_disposal(self):
         """Verify that dispose() cleans up the agent and unpatches the thread."""
-        activator = AgentActivator(self.thread)
-        self.assertTrue(AgentActivator.is_agent(self.thread))
+        activator = ActivatedAgent(self.thread)
+        self.assertTrue(ActivatedAgent.is_agent(self.thread))
         self.assertTrue(hasattr(self.thread, 'bind_to_inventory'))
 
         # Add some data to ensure it gets cleared
@@ -332,7 +332,7 @@ class TestAgentActivator(unittest.TestCase):
 
         self.thread.dispose()
 
-        self.assertFalse(AgentActivator.is_agent(self.thread), "Thread should not be an agent after disposal.")
+        self.assertFalse(ActivatedAgent.is_agent(self.thread), "Thread should not be an agent after disposal.")
         self.assertFalse(hasattr(self.thread, 'bind_to_inventory'), "Patched methods should be removed after disposal.")
         self.assertFalse(hasattr(self.thread, 'factory_id'), "Patched attributes should be removed.")
 
@@ -344,17 +344,17 @@ class TestAgentActivator(unittest.TestCase):
     def test_id_generation(self):
         """Test automatic and manual factory_id assignment."""
         # Automatic ID
-        activator1 = AgentActivator(threading.Thread())
+        activator1 = ActivatedAgent(threading.Thread())
         self.assertIsInstance(activator1.factory_id, str)
         self.assertTrue(len(activator1.factory_id) > 0)
 
         # Manual ID
-        activator2 = AgentActivator(threading.Thread(), factory_id="custom-id-123")
+        activator2 = ActivatedAgent(threading.Thread(), factory_id="custom-id-123")
         self.assertEqual(activator2.factory_id, "custom-id-123")
 
     def test_async_function_rejection(self):
         """Ensure async functions cannot be registered."""
-        AgentActivator(self.thread)
+        ActivatedAgent(self.thread)
 
         async def my_async_func():
             pass

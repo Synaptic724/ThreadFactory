@@ -1,12 +1,14 @@
 import threading
 from typing import Optional, List, Callable, Any, Union
 from concurrent.futures import ThreadPoolExecutor, Future
-from thread_factory.agent.activator import AgentActivator
+from synchronization.primitives.test_signal_latch import IDisposable
+from thread_factory.concurrency.concurrent_list import ConcurrentList
+from thread_factory.agent.activator import ActivatedAgent
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.agent.thread_pool import HelpRequest
 from thread_factory.utils.coordination.package import Pack
 
-class CommandCenter:
+class CommandCenter(IDisposable):
     """
     CommandCenter
     --------------
@@ -37,10 +39,10 @@ class CommandCenter:
             max_workers (int): Maximum number of threads allowed in the background pool.
                                This does not affect manually spawned agents.
         """
+        super().__init__()
         self._active_agents: ConcurrentDict[str, threading.Thread] = ConcurrentDict()
         self.agent_pool: Optional[Any] = None  # Placeholder for future pooled agent support
         self._offload_pool = ThreadPoolExecutor(max_workers=max_workers)
-        self._disposed: bool = False
 
     def _register_agent(self, thread: threading.Thread, factory_id: Optional[str] = None):
         """
@@ -91,7 +93,7 @@ class CommandCenter:
                     threading.current_thread().dispose()
         return _execute_and_dispose
 
-    def create_agents(self, count: int, target: Callable[[], Any], name_prefix: str = "Agent") -> List[threading.Thread]:
+    def create_agents(self, count: int, target: Callable[[], Any], name_prefix: str = "Agent") -> ConcurrentList[threading.Thread]:
         """
         Creates multiple agent threads from a shared target function.
 
@@ -106,7 +108,10 @@ class CommandCenter:
         Returns:
             List[threading.Thread]: List of initialized (but not started) agent threads.
         """
-        new_threads: List[threading.Thread] = []
+        if target:
+            Pack.bundle(target)
+
+        new_threads: ConcurrentList[threading.Thread] = ConcurrentList()
         for i in range(count):
             wrapped_target = self._create_agent_wrapper(target)
             thread = threading.Thread(target=wrapped_target, name=f"{name_prefix}-{i}")
@@ -127,6 +132,9 @@ class CommandCenter:
         Returns:
             Future: A concurrent Future tracking the task’s result or exception.
         """
+        if callable:
+            Pack.bundle(callable)
+
         def agent_wrapper():
             thread = threading.current_thread()
             if not AgentActivator.is_agent(thread):
