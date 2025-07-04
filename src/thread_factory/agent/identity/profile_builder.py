@@ -1,12 +1,13 @@
 import threading
 from typing import Callable, Union, List, Type, Set
-
 from thread_factory.agent import ActivatedAgent
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.agent.identity.profiles.general import General  # Your default Profile class
-import inspect
+
+class BaseProfile:
+    pass
 
 
 class ProfileBuilder(IDisposable):
