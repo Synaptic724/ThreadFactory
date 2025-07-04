@@ -2,9 +2,10 @@ import threading
 import ulid
 from thread_factory.utils.interfaces.disposable import IDisposable
 from typing import Optional, Callable, Union, Any
+from thread_factory.utils.interfaces.iprofile import IProfile
 
 
-class BaseProfile(IDisposable):
+class BaseProfile(IDisposable, IProfile):
     """
     General Profile
     ---------
@@ -21,8 +22,8 @@ class BaseProfile(IDisposable):
 
     def __init__(
             self,
-            thread: threading.Thread,
-            command_center: 'CommandCenter',
+            thread: threading.Thread = None,
+            command_center: 'CommandCenter' = None,
             factory_id: Optional[str] = None
     ):
         """
@@ -54,6 +55,34 @@ class BaseProfile(IDisposable):
         self._thread_target = None
         self._disposed = True
 
+    def get_name(self) -> str:
+        """
+        Retrieves the name of the agent.
+
+        Returns:
+            str: The name of the agent.
+        """
+        return "This is a BaseProfile, and thus is nameless."
+
+    def get_description(self) -> str:
+        """
+        Retrieves a description of the agent.
+
+        Returns:
+            str: A description of the agent.
+        """
+        return "This is a BaseProfile, it's purpose is to provide a base for agent profiles."
+
+    def bind_defaults(self, target: threading.Thread, command_center: 'CommandCenter') -> None:
+        """
+        Bind default values to the profile.
+
+        Args:
+            target (threading.Thread): The thread to bind defaults to.
+            command_center (CommandCenter): The command center for managing agents.
+        """
+        self._thread_target = target
+        self._command_center = command_center
 
     def __repr__(self) -> str:
         return f"<ActivatedAgent id={self.factory_id} thread={repr(self._thread_target)}>"

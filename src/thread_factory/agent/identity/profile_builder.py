@@ -5,9 +5,9 @@ from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.agent.identity.profiles.general import General  # Your default Profile class
+from thread_factory.agent.identity.profiles.base import BaseProfile  # Your default Profile class
+from thread_factory.utils.interfaces.iprofile import IProfile
 
-class BaseProfile:
-    pass
 
 
 class ProfileBuilder(IDisposable):
@@ -58,30 +58,26 @@ class ProfileBuilder(IDisposable):
         if self._registered:
             return
 
-        def default_profile(profile: General):
-            profile.name = "UnnamedAgent"
-            profile.job = "generic"
-            profile.group = "default"
-            profile.data_transfer.clear()
-            profile.save_points.clear()
-            profile.locations.clear()
-
-        self.register_profile("default", default_profile)
+        self.register_profile("default", lambda: General())
         self._registered = True
 
-    def register_profile(self, name: str, fn: Callable[[General], None]) -> None:
+    def register_profile(self, name: str, fn: Callable[[], IProfile]) -> None:
         """
-        Register a profile initializer under a symbolic name.
+        Register a profile constructor under a symbolic name.
 
         Args:
             name (str): Profile name (e.g. 'scout', 'guardian').
-            fn (Callable): Callable that configures a General profile.
+            fn (Callable): Callable that returns a fresh General instance.
 
         Raises:
             ValueError: If name is empty or function is not callable.
         """
         if not name or not callable(fn):
             raise ValueError("Profile name must be a non-empty string and fn must be callable.")
+        if name not in self._registry:
+            self._check_for_collision(fn)
+        else:
+            raise ValueError(f"Profile '{name}' is already registered.")
         self._registry[name] = Pack.bundle(fn)
 
     def unregister_profile(self, name: str) -> bool:
@@ -105,9 +101,15 @@ class ProfileBuilder(IDisposable):
         """
         return name in self._registry
 
-    def apply_profile(self, name: str, profile: General) -> None:
+    def get_profile(self, name: str) -> IProfile:
         """
-        Apply a registered profile to a General object.
+        Returns a fresh profile instance based on the registered factory.
+
+        Args:
+            name (str): Profile name.
+
+        Returns:
+            IProfile: A newly created profile instance.
 
         Raises:
             KeyError: If the profile is not registered.
@@ -115,23 +117,9 @@ class ProfileBuilder(IDisposable):
         fn = self._registry.get(name)
         if not fn:
             raise KeyError(f"No profile registered under '{name}'")
-        fn(profile)
-
-    def apply_defaults(self, profile: General) -> None:
-        """
-        Apply the symbolic 'default' profile.
-        """
-        self.apply_profile("default", profile)
-
-    def create_profile(self, profile_type: str = "default") -> General:
-        """
-        Create a new General profile and apply the selected type.
-
-        Returns:
-            General: A fully configured profile.
-        """
-        profile = General()
-        self.apply_profile(profile_type, profile)
+        profile = fn()
+        if not isinstance(profile, IProfile):
+            raise TypeError(f"Profile '{name}' did not return an IProfile instance.")
         return profile
 
     def attach_profile(self, profile: General, target: Union["ActivatedAgent", "Agent"]) -> None:
@@ -149,14 +137,41 @@ class ProfileBuilder(IDisposable):
         """
         profile.unbind()
 
+    def _check_for_collision(self, fn: Callable[[], IProfile]) -> None:
+        """
+        Verifies that the class returned by the factory does not expose any
+        public methods or attributes that conflict with reserved names.
+
+        Args:
+            fn (Callable[[], IProfile]): Profile constructor.
+
+        Raises:
+            ValueError: If any method or attribute name collides.
+        """
+        try:
+            profile_class = fn().__class__
+        except Exception as e:
+            raise ValueError(f"Unable to instantiate profile for collision check: {e}")
+
+        class_members = ProfileBuilder.get_public_class_members(profile_class)
+        conflicts = class_members.intersection(self._collision_check)
+
+        if conflicts:
+            raise ValueError(
+                f"Profile '{profile_class.__name__}' has name collisions with reserved agent attributes: "
+                f"{', '.join(sorted(conflicts))}"
+            )
+
     def _create_colision_checker(self) -> None:
         """
         Initializes a collision checker to ensure unique profile names.
         """
         thread_class_data = ProfileBuilder.get_public_class_members(threading.Thread)
         activator_class_data = ProfileBuilder.get_public_class_members(ActivatedAgent)
-        self._collision_check = thread_class_data.union(activator_class_data)
+        base_profile_class_data = ProfileBuilder.get_public_class_members(BaseProfile)
+        self._collision_check = thread_class_data.union(activator_class_data).union(base_profile_class_data)
 
+    @staticmethod
     def get_public_class_members(cls: Type) -> Set[str]:
         """
         Scans a given class reference to pull out the names of its public

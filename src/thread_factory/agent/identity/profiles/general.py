@@ -1,12 +1,12 @@
-import threading
+import threading, ulid
 from thread_factory.agent.identity.profiles.base import BaseProfile
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 from typing import Optional, Callable, Union, Any
+from thread_factory.utils.interfaces.iprofile import IProfile
 
-
-class General(IDisposable, BaseProfile):
+class General(IDisposable, BaseProfile, IProfile):
     """
     General Profile
     ---------
@@ -23,8 +23,8 @@ class General(IDisposable, BaseProfile):
 
     def __init__(
             self,
-            thread: threading.Thread,
-            command_center: 'CommandCenter',
+            thread: threading.Thread = None,
+            command_center: 'CommandCenter' = None,
             factory_id: Optional[str] = None
     ):
         """
@@ -44,6 +44,8 @@ class General(IDisposable, BaseProfile):
         self.save_points: ConcurrentDict[str, Union[Callable[..., None], "Pack"]] = ConcurrentDict()
         self.locations: ConcurrentDict[str, Union[Callable[..., None], "Pack"]] = ConcurrentDict()
         self.data_transfer: ConcurrentDict[str, Union[Callable[..., any], "Pack"]] = ConcurrentDict()
+
+        self.set_general_profile()
 
     def dispose(self):
         """
@@ -69,6 +71,39 @@ class General(IDisposable, BaseProfile):
         super().dispose()
 
 
+    def bind_defaults(self, thread: threading.Thread, command_center: 'CommandCenter' = None,
+                      id = None, name: str = None, job: str = None, group: str = None):
+        """
+        Binds the default profile to the provided thread and command center.
+
+        Args:
+            thread (threading.Thread): The thread to bind the profile to.
+            command_center (CommandCenter, optional): The command center for coordination.
+            factory_id (Optional[str]): Unique identifier for the thread.
+        """
+        super().bind_defaults(thread, command_center)
+        self.id = id if id else str(ulid.ULID())
+        self.name = name if name else "UnnamedAgent"
+        self.job = job if job else "generic"
+        self.group = group if group else "default"
+
+    def get_name(self) -> str:
+        """
+        Retrieves the name of the agent.
+
+        Returns:
+            str: The name of the agent.
+        """
+        return self.name if self.name else "UnnamedAgent"
+
+    def get_description(self) -> str:
+        """
+        Retrieves a description of the agent.
+
+        Returns:
+            str: A description of the agent.
+        """
+        return f"Agent {self.get_name()} with job '{self.job}' in group '{self.group}'"
 
     def register_data_transfer(self, name: str, fn: Union[Callable[..., Any], Pack]):
         """
