@@ -1,8 +1,9 @@
 import ulid
-from typing import Callable, Dict, Any, Optional
+from typing import Callable, Dict, Any, Optional, Union
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.agent.activity.activity import Activity
 from thread_factory.agent.activity.activity_builder import ActivityBuilder
+from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 
@@ -92,7 +93,7 @@ class ActivityController(IDisposable):
         return self._activity
 
     @property
-    def metadata(self) -> Dict[str, Any]:
+    def metadata(self) -> ConcurrentDict[str, Any]:
         """
         Returns:
             Dict[str, Any]: A shallow copy of all controller metadata.
@@ -150,14 +151,16 @@ class ActivityController(IDisposable):
         self._actions[name] = value
         self._activity.add_activity(name, value)
 
-    def register_callback(self, name: str, callback: Callable[[], None]) -> None:
+    def register_callback(self, name: str, callback: Union[Callable[..., None], Pack]) -> None:
         """
         Registers a named callback function that can be triggered externally.
 
         Args:
             name (str): The identifier (e.g., 'cancel', 'pause').
-            callback (Callable[[], None]): The function to call.
+            callback (Union[Callable[..., None], Pack]): The function to call.
         """
+        if callback:
+            callback = Pack.bundle(callback)
         self._callbacks[name] = callback
 
     def run_callback(self, name: str) -> bool:

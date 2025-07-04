@@ -8,6 +8,7 @@ from thread_factory.runtime import WorkerState
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus
 from thread_factory.agent.thread_pool.help_request import HelpRequest
 from thread_factory.agent.agent import Agent
+from thread_factory.utils.coordination.package import Pack
 
 
 # Define a simple async function for testing coroutine checks
@@ -54,7 +55,7 @@ class TestAgent(unittest.TestCase):
     def test_register_save_point_coroutine_raises_type_error(self):
         """Test that registering a coroutine function as a save point raises TypeError."""
         save_point_name = "async_checkpoint"
-        with self.assertRaisesRegex(TypeError, "Cannot register coroutine function 'async_checkpoint' as a save point"):
+        with self.assertRaisesRegex(TypeError, "Coroutine functions are not supported: async_test_func"):
             self.worker.register_save_point(save_point_name, async_test_func)
         self.assertNotIn(save_point_name, self.worker.get_save_points_dict())
 
@@ -82,7 +83,7 @@ class TestAgent(unittest.TestCase):
     def test_register_location_coroutine_raises_type_error(self):
         """Test that registering a coroutine function as a location raises TypeError."""
         location_name = "async_location"
-        with self.assertRaisesRegex(TypeError, "Cannot register coroutine function 'async_location' as a location"):
+        with self.assertRaisesRegex(TypeError, "Coroutine functions are not supported: async_test_func"):
             self.worker.register_location(location_name, async_test_func)
         self.assertNotIn(location_name, self.worker.get_locations_dict())
 
@@ -98,11 +99,12 @@ class TestAgent(unittest.TestCase):
         """Test setting the home function with a synchronous callable."""
         home_func = Mock()
         self.worker.set_home(home_func)
-        self.assertEqual(self.worker._event_loop, home_func)
+        self.assertTrue(isinstance(self.worker._event_loop, Pack))
+
 
     def test_set_home_coroutine_raises_type_error(self):
         """Test that setting a coroutine function as home raises TypeError."""
-        with self.assertRaisesRegex(TypeError, "Cannot set a coroutine function as home"):
+        with self.assertRaisesRegex(TypeError, "Coroutine functions are not supported: async_test_func"):
             self.worker.set_home(async_test_func)
         self.assertIsNone(self.worker._event_loop) # Should not set it
 
@@ -391,7 +393,7 @@ class TestAgent(unittest.TestCase):
     def test_register_data_transfer_coroutine_raises_type_error(self):
         """Test that registering a coroutine function for data transfer raises TypeError."""
         transfer_name = "async_transfer"
-        with self.assertRaisesRegex(TypeError, "Cannot register coroutine function 'async_transfer' for data transfer"):
+        with self.assertRaisesRegex(TypeError, "Coroutine functions are not supported: async_test_func"):
             self.worker.register_data_transfer(transfer_name, async_test_func)
         self.assertNotIn(transfer_name, self.worker._data_transfer)
 

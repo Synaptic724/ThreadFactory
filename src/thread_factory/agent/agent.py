@@ -185,6 +185,12 @@ class Agent(Worker):
         self._data_transfer: ConcurrentDict[str, Union[Callable[..., Any], Pack]] = ConcurrentDict()
         self._lock = threading.RLock()  # Ensures thread-safe access to shared state
 
+        # --- Agent Communication Protocol Mappings --- #
+        # Placeholder for future communication protocols or mappings
+
+        # --- Machine Learning Model integration --- #
+        # Placeholder for future ML model integration or bindings
+
     def dispose(self):
         """
         Performs a comprehensive cleanup of the `Agent`'s agentic state

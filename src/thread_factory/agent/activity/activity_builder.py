@@ -1,5 +1,6 @@
 from typing import Callable, Dict
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 
@@ -52,6 +53,8 @@ class ActivityBuilder(IDisposable):
             name (str): The profile name.
             fn (Callable): A function that wires up controller+token behavior.
         """
+        if fn:
+            fn = Pack.bundle(fn)
         self._registry[name] = fn
 
     def apply_profile(self, name: str, controller: "ActivityController") -> None:

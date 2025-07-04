@@ -1,8 +1,8 @@
-import threading
+import threading, ulid
 from copy import deepcopy
-import ulid
 from typing import Callable, Optional, Any, Dict, Union
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 
@@ -70,14 +70,18 @@ class Activity(IDisposable):
         """
         return deepcopy(self._metadata)
 
-    def add_activity(self, name: str, action: Union[Callable[..., Any], bool, Any]) -> None:
+    def add_activity(self, name: str, action: Union[Union[Callable[..., None], Pack]
+                , bool, Any]) -> None:
         """
         Adds or updates a named action or flag.
 
         Args:
             name (str): The identifier for this action (e.g., 'cancel_requested').
-            action (Callable | bool | Any): The action or flag to store.
+            action (Union[Callable[..., None], Pack]
+                         | bool | Any): The action or flag to store.
         """
+        if isinstance(action, Callable):
+            action = Pack(action)
         self._actions[name] = action
 
     def get_activity(self, name: str) -> Optional[Union[Callable[..., Any], bool, Any]]:

@@ -2,7 +2,6 @@ import threading, ulid
 from typing import Callable, Optional, Any, Union
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
-from thread_factory.utils.general_helpers.coroutine_helpers import CoroutineHelpers
 
 class ActivatedAgent:
     """
@@ -43,6 +42,12 @@ class ActivatedAgent:
         self._data_transfer: ConcurrentDict[str, Union[Callable[..., Any], Pack]] = ConcurrentDict()
         self._save_points: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
         self._locations: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
+
+        # --- Agent Communication Protocol Mappings --- #
+        # Placeholder for future communication protocols or mappings
+
+        # --- Machine Learning Model integration --- #
+        # Placeholder for future ML model integration or bindings
 
         # --- Monkey-Patch the Thread ---
         self._patch_thread()

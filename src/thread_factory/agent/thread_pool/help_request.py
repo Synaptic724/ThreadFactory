@@ -88,17 +88,19 @@ class HelpRequest(IDisposable):
             - `_disposed`: Flag to indicate whether the object has been disposed of to prevent further interaction.
         """
         super().__init__()
-        self._work_state = WorkStatus.PENDING  # Initial state is pending
+        self._work_state: WorkStatus = WorkStatus.PENDING  # Initial state is pending
         self._lock = threading.RLock()  # Thread-safe locking for state changes
 
         # Create an internal Record for this task, initialized with task details
-        self.record = Record(
+        self.record: Record = Record(
             task_id=ULID(),
             status=self._work_state,  # Corrected from work_status to status
             timestamp_creation_time=datetime.now()
         )
 
         # Store the callable to be executed (the actual work function)
+        if work_callable:
+            work_callable = Pack(work_callable)
         self._work_callable = work_callable
         self._return_to_pool = False
         self._check_work()
