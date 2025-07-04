@@ -8,7 +8,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-# 🧵 ThreadFactory v1.4.8 – Massive Concurrency Upgrade
+# 🧵 ThreadFactory v1.5.0 – Massive Concurrency Upgrade
 
 ThreadFactory now introduces a modular concurrency stack built from first principles.  
 This release splits the system into high-performance primitives, orchestrators, dispatchers, sync types, and agentic thread tools.
@@ -69,9 +69,9 @@ This object can natively connect to a `SignalController` for lifecycle managemen
 Reusable group synchronizer. Executes tasks after a threshold is met. Supports timeout and failure states.
 This object can natively connect to a `SignalController` for lifecycle management.
 
-### 🧠 `MultiConductor`
-Manages multiple `Group` objects with per-group thresholds. Executes per-group tasks and performs global release.
-This object can natively connect to a `SignalController` for lifecycle management.
+### 🧠 `MultiConductor`  
+Manages multiple `Group` objects with per-group tasks and a global thread threshold. Supports lock-step execution, distributed forked execution (`Fork`), and synchronized forked execution (`SyncFork`). 
+Each task can produce multiple outcomes. Reusable across cycles and fully controllable via a `SignalController`.
 
 ### 🔍 `Scout`
 Predicate-based monitor. One thread blocks while evaluating a predicate with timeout and success/failure callbacks.
@@ -89,6 +89,10 @@ Allows up to `N` threads to execute a pre-bound callable pipeline. Captures resu
 
 ### 🔧 `Fork`
 Thread dispatcher that assigns callables based on usage caps. Ensures each callable executes a fixed number of times. Good for simple routing or round-robin-like workloads.
+
+### 🚦 `SignalFork`  
+Thread dispatcher that routes threads to callables with usage caps. Executes immediately on arrival. Triggers a callback and notifies a controller when all slots are consumed.
+This object can natively connect to a `SignalController` for lifecycle management.
 
 ### 🔄 `SyncFork`
 Dispatcher that coordinates N threads into callable groups. All callables execute simultaneously once all slots are filled. Supports timeouts and reuse.

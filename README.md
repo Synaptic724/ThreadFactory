@@ -159,14 +159,15 @@ ThreadFactory goes beyond collections, offering finely engineered synchronizatio
 * 🔔 `TransitCondition`: A **minimalist wait/notify condition** where callbacks execute within the waiting thread, ensuring lightweight and FIFO-safe signaling.
 * 🛑 `SignalLatch`: A **latch with observer signaling support**, capable of notifying a controller before blocking. It natively connects to a `SignalController` for streamlined lifecycle management.
 * 🔒 `Latch`: A classic **reusable latch** that, once opened, permanently releases all waiting threads until explicitly reset.
-
+* 
 ### ⚡ Coordinators & Barriers – `thread_factory.synchronization.orchestrators`
 
 * 🎯 `TransitBarrier`: A **reusable barrier** for sophisticated threshold coordination, with the option to execute a callable once all threads arrive.
 * 🚦 `SignalBarrier`: A **reusable, signal-based barrier** that supports thresholds, timeouts, and failure states, natively connecting to a `SignalController` for integrated lifecycle management.
 * ⏰ `ClockBarrier`: A **barrier with a global timeout** that breaks and raises an exception if all threads don't arrive within the specified duration. It natively connects to a `SignalController`.
 * 🚦 `Conductor`: A **reusable group synchronizer** that executes tasks after a threshold is met, supporting timeouts and failure states. This object also natively connects to a `SignalController`.
-* 🧠 `MultiConductor`: Manages **multiple `Group` objects** with per-group thresholds, executing per-group tasks and performing global releases. It natively connects to a `SignalController` for comprehensive coordination.
+* 🧠 `MultiConductor`: A **multi-group execution coordinator** that manages multiple `Group` objects with a global thread threshold. Supports synchronized execution, `Fork`-based distributed dispatch, and `SyncFork`-based barrier coordination. 
+                       Each task can produce multiple outcomes. Fully reusable and natively integrated with a `SignalController`.
 * 🔍 `Scout`: A **predicate-based monitor** where a single thread blocks while evaluating a custom predicate, complete with timeout, success, and failure callbacks.
 
 ### 🚉 Execution Gates – `thread_factory.synchronization.execution`
@@ -178,6 +179,7 @@ ThreadFactory goes beyond collections, offering finely engineered synchronizatio
 * 🔧 `Fork`: A **thread dispatcher** that assigns callables based on usage caps, ensuring each executes a fixed number of times for simple routing.
 * 🔄 `SyncFork`: A **dispatcher that coordinates `N` threads** into callable groups, where all callables execute simultaneously once slots are filled. It supports timeouts and reuse.
 * 🔄 `SyncSignalFork`: Similar to `SyncFork`, but with the added ability to **execute a callable as a signal**. This object natively connects to a `SignalController` for enhanced integration.
+* 🚦 `SignalFork`: A **non-blocking dispatcher** that routes threads to callables immediately upon arrival. Triggers a one-time callback and controller notification once all slots are consumed.
 
 ### 🎮 Central Controllers – `thread_factory.synchronization.controller`
 
@@ -214,15 +216,16 @@ ThreadFactory provides a powerful collection of **parallel programming utilities
 
 ---
 
-## ⏱️ Timing Utilities – `thread_factory.utils.timing`
+## ⏱️ Utilities – `thread_factory.utils`
 
-ThreadFactory includes precise **Timing Utilities** for orchestration, diagnostics, and monitoring your concurrent applications.
+ThreadFactory includes precise **utility tools** for orchestration, diagnostics, and thread-safe execution in concurrent applications.
 
-* ⏲️ `AutoResetTimer`: A **self-resetting timer** that automatically expires and restarts, ideal for retry loops, cooldown mechanisms, debounce filters, and heartbeat monitoring.
-* 🕰️ `Stopwatch`: A **high-resolution, nanosecond-accurate profiler** built with `time.perf_counter_ns()` for ultra-low overhead. Use it to precisely measure critical path latency, thread execution time, and pinpoint performance bottlenecks.
+* ⏲️ `AutoResetTimer`: A **self-resetting timer** that automatically expires and restarts — perfect for retry loops, cooldowns, debounce filters, and heartbeat monitoring.
+* 🕰️ `Stopwatch`: A **high-resolution, nanosecond-accurate profiler** built on `time.perf_counter_ns()` — ideal for measuring critical path latency, thread timing, and pinpointing performance bottlenecks.
+* 📦 `Package`: A **thread-safe, delegate-style callable wrapper** that stores arguments, supports currying and composition, and enables introspectable call chaining. Perfect for orchestration tools like `Conductor`, `Fork`, and `SyncFork`.
+
 
 ---
-
 
 ## 📖 Documentation
 
