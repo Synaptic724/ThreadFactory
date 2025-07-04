@@ -50,20 +50,12 @@ class ActivatedAgent(IDisposable):
         if self._disposed:
             return
         with self._lock:
+            self._profile.unpatch_thread(self._thread_target)
             self._unpatch_thread()
             # Clear all collections to release references
-            try:
-                if self._inventory:
-                    if hasattr(self._inventory, "data"):
-                        self._inventory.data.clear()
-            except AttributeError as e:
-                pass
-            if hasattr(self, "profile"):
-                self.profile.dispose()
-
-            # Clear shared inventory as well
-            if self._public_inventory:  # Add this line
-                self._private_inventory.dispose()  # And this line
+            if self._profile:
+                self._profile.dispose()
+                self._profile = None
 
             # Nullify references
             self._thread_target = None
@@ -74,10 +66,7 @@ class ActivatedAgent(IDisposable):
         """
         Internal method to patch the target thread with agentic methods and properties.
         """
-        methods_to_patch = [
-            'bind_to_inventory', 'get_from_inventory',
-            'set_shared_inventory_item', 'get_shared_inventory_item',
-            'get_shared_inventory', 'get_factory_id',
+        methods_to_patch = ['get_factory_id',
             'bind_to_inventory_by_id', 'get_from_inventory_by_id',
             'dispose'
         ]
@@ -85,7 +74,9 @@ class ActivatedAgent(IDisposable):
             setattr(self._thread_target, method_name, getattr(self, method_name))
         setattr(self._thread_target, 'factory_id', self.factory_id)
         setattr(self._thread_target, '_worker_type', self._worker_type)
-
+        setattr(self._thread_target, '_pool_agent', self._pool_agent)
+        setattr(self._thread_target, '_command_center', self._command_center)
+        setattr(self._thread_target, '_profile', self._profile)
 
 
     def _unpatch_thread(self):
@@ -94,11 +85,10 @@ class ActivatedAgent(IDisposable):
         the target thread during disposal.
         """
         methods_to_unpatch = [
-            'bind_to_inventory', 'get_from_inventory',
-            'set_shared_inventory_item', 'get_shared_inventory_item',
-            'get_shared_inventory', 'get_factory_id',
+            'get_factory_id',
             'bind_to_inventory_by_id', 'get_from_inventory_by_id',
             'dispose', 'factory_id', '_worker_type',
+            '_pool_agent', '_command_center', '_profile',
             'profile' # <--- ADD THIS LINE to unpatch the profile
         ]
         for method_name in methods_to_unpatch:
@@ -107,6 +97,64 @@ class ActivatedAgent(IDisposable):
                     delattr(self._thread_target, method_name)
                 except AttributeError:
                     pass
+
+
+    def get_factory_id(self) -> str:
+        """
+        Retrieves the unique factory ID assigned to this agent.
+
+        Returns:
+            str: The agent's unique string identifier.
+        """
+        return self.factory_id
+
+    def bind_to_inventory_by_id(self, factory_id: str, key: str, value: Any):
+        """
+        Binds a value to the private inventory of another agent, identified by its ID.
+
+        This requires the `factory` to be set during initialization.
+
+        Args:
+            factory_id (str): The ID of the target agent.
+            key (str): The key to store the data under in the target's inventory.
+            value (Any): The value to store.
+        """
+        worker = self._resolve_worker_by_id(factory_id)
+        if worker and hasattr(worker, 'bind_to_inventory'):
+            worker.bind_to_inventory(key, value)
+
+    def get_from_inventory_by_id(self, factory_id: str, key: str, default=None) -> Any:
+        """
+        Retrieves a value from the private inventory of another agent by its ID.
+
+        This requires the `factory` to be set during initialization.
+
+        Args:
+            factory_id (str): The ID of the target agent.
+            key (str): The key of the item to retrieve.
+            default (Any, optional): The value to return if not found.
+
+        Returns:
+            Any: The retrieved value or the default.
+        """
+        worker = self._resolve_worker_by_id(factory_id)
+        if worker and hasattr(worker, 'get_from_inventory'):
+            return worker.get_from_inventory(key, default)
+        return default
+
+    def _resolve_worker_by_id(self, factory_id: str) -> Optional[threading.Thread]:
+        """
+        Internal helper to find another agent thread via the managing factory.
+
+        Args:
+            factory_id (str): The ID of the agent to find.
+
+        Returns:
+            Optional[threading.Thread]: The thread object if found, otherwise None.
+        """
+        if self._command_center:
+            return self._command_center.get_agent_by_id(factory_id)
+        return None
 
 
     def __call__(self) -> "ActivatedAgent":
@@ -278,61 +326,3 @@ class ActivatedAgent(IDisposable):
             bool: True if the thread is an agent, False otherwise.
         """
         return getattr(thread, '_worker_type', None) == 'agentic'
-
-    def get_factory_id(self) -> str:
-        """
-        Retrieves the unique factory ID assigned to this agent.
-
-        Returns:
-            str: The agent's unique string identifier.
-        """
-        return self.factory_id
-
-    def bind_to_inventory_by_id(self, factory_id: str, key: str, value: Any):
-        """
-        Binds a value to the private inventory of another agent, identified by its ID.
-
-        This requires the `factory` to be set during initialization.
-
-        Args:
-            factory_id (str): The ID of the target agent.
-            key (str): The key to store the data under in the target's inventory.
-            value (Any): The value to store.
-        """
-        worker = self._resolve_worker_by_id(factory_id)
-        if worker and hasattr(worker, 'bind_to_inventory'):
-            worker.bind_to_inventory(key, value)
-
-    def get_from_inventory_by_id(self, factory_id: str, key: str, default=None) -> Any:
-        """
-        Retrieves a value from the private inventory of another agent by its ID.
-
-        This requires the `factory` to be set during initialization.
-
-        Args:
-            factory_id (str): The ID of the target agent.
-            key (str): The key of the item to retrieve.
-            default (Any, optional): The value to return if not found.
-
-        Returns:
-            Any: The retrieved value or the default.
-        """
-        worker = self._resolve_worker_by_id(factory_id)
-        if worker and hasattr(worker, 'get_from_inventory'):
-            return worker.get_from_inventory(key, default)
-        return default
-
-    def _resolve_worker_by_id(self, factory_id: str) -> Optional[threading.Thread]:
-        """
-        Internal helper to find another agent thread via the managing factory.
-
-        Args:
-            factory_id (str): The ID of the agent to find.
-
-        Returns:
-            Optional[threading.Thread]: The thread object if found, otherwise None.
-        """
-        if self._command_center:
-            return self._command_center.get_agent_by_id(factory_id)
-        return None
-

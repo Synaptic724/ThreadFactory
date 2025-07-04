@@ -41,6 +41,31 @@ class General(IDisposable):
 
         self._bound_target: Optional[Union["ActivatedAgent", "Agent"]] = None
 
+    def dispose(self):
+        """
+        Dispose of internal state and clear all references.
+        """
+        if self._disposed:
+            return
+        self.save_points.dispose()
+        self.save_points = None
+        self.locations.dispose()
+        self.locations = None
+        self.data_transfer.dispose()
+        self.data_transfer = None
+        self._private_inventory.dispose()
+        self._private_inventory = None
+        self._public_inventory.dispose()
+        self._public_inventory = None
+
+        self.id = None
+        self.name = None
+        self.job = None
+        self.group = None
+        self._bound_target = None
+        self._disposed = True
+
+
     def bind_to(self, obj: Union["ActivatedAgent", "Agent"]):
         """
         Bind this profile to a supported agent.
@@ -63,6 +88,43 @@ class General(IDisposable):
 
         self._bound_target = obj
 
+    def _patch_thread(self):
+        """
+        Internal method to patch the target thread with agentic methods and properties.
+        """
+        methods_to_patch = ['get_factory_id',
+            'bind_to_inventory_by_id', 'get_from_inventory_by_id',
+            'dispose'
+        ]
+        for method_name in methods_to_patch:
+            setattr(self._thread_target, method_name, getattr(self, method_name))
+        setattr(self._thread_target, 'factory_id', self.factory_id)
+        setattr(self._thread_target, '_worker_type', self._worker_type)
+        setattr(self._thread_target, '_pool_agent', self._pool_agent)
+        setattr(self._thread_target, '_command_center', self._command_center)
+        setattr(self._thread_target, '_profile', self._profile)
+
+
+    def _unpatch_thread(self):
+        """
+        Internal method to remove all patched methods and properties from
+        the target thread during disposal.
+        """
+        methods_to_unpatch = [
+            'get_factory_id',
+            'bind_to_inventory_by_id', 'get_from_inventory_by_id',
+            'dispose', 'factory_id', '_worker_type',
+            '_pool_agent', '_command_center', '_profile',
+            'profile' # <--- ADD THIS LINE to unpatch the profile
+        ]
+        for method_name in methods_to_unpatch:
+            if hasattr(self._thread_target, method_name):
+                try:
+                    delattr(self._thread_target, method_name)
+                except AttributeError:
+                    pass
+
+
     def unbind(self):
         """
         Unbind the profile from its current agent.
@@ -75,24 +137,6 @@ class General(IDisposable):
         Indicates whether this profile is bound to a valid agent.
         """
         return self._bound_target is not None
-
-    def dispose(self):
-        """
-        Dispose of internal state and clear all references.
-        """
-        if self._disposed:
-            return
-        self.save_points.dispose()
-        self.locations.dispose()
-        self.data_transfer.dispose()
-
-        self.id = None
-        self.name = None
-        self.job = None
-        self.group = None
-        self._bound_target = None
-        self._disposed = True
-
 
     def register_data_transfer(self, name: str, fn: Union[Callable[..., Any], Pack]):
         """

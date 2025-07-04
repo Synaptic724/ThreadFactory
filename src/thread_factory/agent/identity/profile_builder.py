@@ -1,8 +1,13 @@
-from typing import Callable, Union, List
+import threading
+from typing import Callable, Union, List, Type, Set
+
+from thread_factory.agent import ActivatedAgent
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.agent.identity.profiles.general import General  # Your default Profile class
+import inspect
+
 
 class ProfileBuilder(IDisposable):
     """
@@ -29,6 +34,8 @@ class ProfileBuilder(IDisposable):
         """
         super().__init__()
         self._registry: ConcurrentDict[str, Union[Callable[..., None], Pack]] = ConcurrentDict()
+        self._collision_check = set()
+        self._create_colision_checker()
         self._registered = False
         self._register_defaults()
 
@@ -140,3 +147,34 @@ class ProfileBuilder(IDisposable):
         Unbind a profile from any agent.
         """
         profile.unbind()
+
+    def _create_colision_checker(self) -> None:
+        """
+        Initializes a collision checker to ensure unique profile names.
+        """
+        thread_class_data = ProfileBuilder.get_public_class_members(threading.Thread)
+        activator_class_data = ProfileBuilder.get_public_class_members(ActivatedAgent)
+        self._collision_check = thread_class_data.union(activator_class_data)
+
+    def get_public_class_members(cls: Type) -> Set[str]:
+        """
+        Scans a given class reference to pull out the names of its public
+        (non-dunder) fields and methods.
+
+        Args:
+            cls (Type): The class object to inspect.
+
+        Returns:
+            Set[str]: A sorted list of public member names.
+        """
+        public_members = set()
+
+        # Inspect the provided class
+        for name in dir(cls):
+            # Filter out dunder methods unless they are explicitly considered public interfaces
+            # (like __call__, __repr__, __str__).
+            if not name.startswith('__') or \
+               (name.startswith('__') and name.endswith('__') and name in ['__call__', '__repr__', '__str__']):
+                public_members.add(name)
+
+        return public_members
