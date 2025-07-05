@@ -1,73 +1,118 @@
-from typing import Callable, Any
-from thread_factory import ConcurrentDict
-from thread_factory.agent.activity.job import JobActivity
-from thread_factory.utils.coordination.package import Pack
+from typing import Callable, Any, Type, Optional
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+# Assuming BaseActivity and JobActivity are correctly imported or defined elsewhere
+from thread_factory.agent.activity.base import BaseActivity
+from thread_factory.agent.activity.job import JobActivity # Ensure this import is correct based on your structure
 from thread_factory.utils.interfaces.disposable import IDisposable
-
 
 class ActivityBuilder(IDisposable):
     """
-    Profile registry and builder for behavior injection. Now includes a profile
-    for the concrete JobActivity class.
+    A central registry and builder for creating instances of various controllable
+    activity classes within the ThreadFactory framework.
+
+    This class allows for the dynamic registration and instantiation of
+    `BaseActivity` subclasses by a symbolic name, promoting a decoupled
+    and extensible architecture. It manages a collection of registered activity
+    types, enabling users to request the creation of a specific activity
+    without directly importing and instantiating its class.
+
+    It implements `IDisposable` to ensure proper cleanup of its internal registry.
     """
     __slots__ = IDisposable.__slots__ + ["_registry", "_registered"]
 
     def __init__(self):
-        """Initialize a fresh profile builder with built-in defaults."""
+        """
+        Initializes a new instance of the ActivityBuilder.
+
+        A fresh builder is created with an empty internal registry for activity
+        classes. It then automatically registers any built-in default activity
+        types (e.g., `JobActivity`) to make them readily available.
+        """
         super().__init__()
-        self._registry: ConcurrentDict[str, Callable[[Any], None]] = ConcurrentDict()
+        # Registry now stores activity classes (constructors)
+        self._registry: ConcurrentDict[str, Type[BaseActivity]] = ConcurrentDict()
         self._registered = False
         self._register_defaults()
 
     def dispose(self) -> None:
-        """Dispose of the activity builder, clearing the registry."""
+        """
+        Disposes of the ActivityBuilder, releasing its managed resources.
+
+        This method implements the `IDisposable` contract. It ensures that
+        the internal `_registry` (a `ConcurrentDict`) is properly disposed of,
+        clearing any references to registered activity classes. It also resets
+        the internal state of the builder.
+
+        This operation is idempotent; calling it multiple times will have no
+        further effect after the first call.
+        """
         if self._disposed:
             return
         if self._registry:
+            # Dispose the ConcurrentDict to ensure its resources are also freed
             self._registry.dispose()
-            self._registry = None
+            # The _registry reference itself doesn't strictly need to be set to None
+            # as it's already disposed and will be garbage collected when the builder is.
         self._registered = False
+        # Call the parent's dispose method to ensure proper cleanup of IDisposable's state
+        super().dispose()
 
     def _register_defaults(self) -> None:
-        """Internal helper to register built-in profiles. Only runs once."""
+        """
+        Internal helper method to register the default, built-in activity classes.
+
+        This method is called during the `ActivityBuilder`'s initialization to
+        populate its registry with commonly used activity types (e.g., `JobActivity`).
+        It is designed to run only once to prevent redundant registrations.
+        """
         if self._registered:
             return
-        # This profile is now deprecated in favor of the more specific one.
-        # self.register_profile("cancellation", self._cancellation_profile)
-        self.register_profile("job_cancellation", self._job_cancellation_profile)
+        self.register_activity_class("job_activity", JobActivity)  # Register the class directly
         self._registered = True
 
-    def register_profile(self, name: str, fn: Callable[[Any], None]) -> None:
+    def register_activity_class(self, name: str, activity_class: Type[BaseActivity]) -> None:
         """
-        Register a new profile builder function.
-        Args:
-            name (str): The profile name.
-            fn (Callable): A function that wires up activity behavior.
-        """
-        if fn:
-            fn = Pack.bundle(fn)
-        self._registry[name] = fn
+        Registers a new activity class (its constructor) under a given name.
 
-    def apply_profile(self, name: str, activity: Any) -> None:
-        """
-        Apply a registered profile to a given activity.
-        Args:
-            name (str): The profile to apply.
-            activity (Any): The target activity instance.
-        """
-        fn = self._registry.get(name)
-        if fn:
-            fn(activity)
+        This allows the `build_activity` method to instantiate activities
+        of this type by name.
 
-    def _job_cancellation_profile(self, activity: JobActivity) -> None:
+        Args:
+            name (str): The unique name or alias for this activity type.
+            activity_class (Type[BaseActivity]): The concrete `BaseActivity` subclass
+                                                 (its constructor) to register.
+        Raises:
+            TypeError: If the provided `activity_class` is not a subclass of BaseActivity.
         """
-        A profile specifically for JobActivity that wires up its cancel method.
-        Note: This is now redundant since the cancel logic is built into the
-        JobActivity itself, but is kept to show how a builder would configure
-        a concrete activity. In a real system, a profile might add more
-        complex behaviors or metadata.
+        if not issubclass(activity_class, BaseActivity):
+            raise TypeError(f"Registered class '{activity_class.__name__}' must be a subclass of BaseActivity.")
+        self._registry[name] = activity_class
+
+    def build_activity(self, name: str, **kwargs: Any) -> Optional[BaseActivity]:
         """
-        # In this improved design, the JobActivity already has a `cancel` method.
-        # A builder's role would be to *configure* it or add *additional* callbacks.
-        # For this example, we'll just log that the profile was applied.
-        activity._logger.info(f"Job cancellation profile applied to '{activity.id}'.")
+        Builds and returns a new activity instance based on a registered activity class.
+
+        The `kwargs` provided to this method will be directly passed to the
+        constructor of the registered activity class.
+
+        Args:
+            name (str): The name or alias of the activity type to build.
+            **kwargs: Arbitrary keyword arguments to be passed to the
+                      constructor of the activity class.
+
+        Returns:
+            Optional[BaseActivity]: An instantiated activity object if the
+                                    `name` is registered; otherwise, `None`.
+        Raises:
+            TypeError: If the registered class cannot be instantiated with the
+                       provided keyword arguments.
+        """
+        activity_class = self._registry.get(name)
+        if activity_class:
+            try:
+                # Instantiate the activity directly with provided kwargs
+                return activity_class(**kwargs)
+            except TypeError as e:
+                raise TypeError(f"Failed to build activity '{name}'. "
+                                f"Constructor of '{activity_class.__name__}' received invalid arguments: {e}")
+        return None
