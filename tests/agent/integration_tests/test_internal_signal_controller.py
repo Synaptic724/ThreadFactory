@@ -3,6 +3,8 @@ import logging
 from unittest.mock import MagicMock, patch
 from thread_factory.agent.command_center import CommandCenter
 from thread_factory.synchronization.controllers.signal_controller import SignalController
+from thread_factory.agent.identity.types.agent import Agent
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 
 # Suppress logging output during tests for a cleaner console
 logging.disable(logging.CRITICAL)
@@ -146,6 +148,112 @@ class TestCommandCenterSignalManagement(unittest.TestCase):
         # Check that each internal controller's dispose method was called
         mock_controller_1.dispose.assert_called_once()
         mock_controller_2.dispose.assert_called_once()
+
+
+class TestCommandCenterControllerWrappers(unittest.TestCase):
+    """
+    Test suite for the wrapper methods on CommandCenter that proxy calls
+    to its internal SignalControllers.
+    """
+
+    def setUp(self):
+        with patch('thread_factory.agent.identity.agent_builder.AgentBuilder'):
+            self.cc = CommandCenter()
+
+        self.mock_controller = MagicMock(spec=SignalController)
+        self.controller_name = "mission_bus"
+        self.cc.add_signal_controller(self.controller_name, controller=self.mock_controller)
+
+    def tearDown(self):
+        if self.cc and not self.cc._disposed:
+            self.cc.dispose()
+
+    def test_invoke_on_controller_proxies_call(self):
+        """
+        Test that invoke_on_controller correctly calls invoke on the target controller.
+        """
+        self.cc.invoke_on_controller(self.controller_name, 'obj_123', 'open', 'arg1', kwarg='val')
+        self.mock_controller.invoke.assert_called_once_with('obj_123', 'open', 'arg1', kwarg='val')
+
+    def test_subscribe_to_event_proxies_call(self):
+        """
+        Test that subscribe_to_event correctly calls subscribe on the target controller.
+        """
+        callback = lambda: None
+        self.cc.subscribe_to_event(self.controller_name, 'obj_123', 'EVENT_FIRED', callback)
+        self.mock_controller.subscribe.assert_called_once_with('obj_123', 'EVENT_FIRED', callback)
+
+    def test_add_hook_to_controller_proxies_call(self):
+        """
+        Test that add_hook_to_controller correctly calls the right hook method.
+        """
+        pre_hook = lambda: "pre"
+        post_hook = lambda: "post"
+
+        self.cc.add_hook_to_controller(self.controller_name, 'pre_invoke', pre_hook)
+        self.mock_controller.add_pre_invoke_hook.assert_called_once_with(pre_hook)
+
+        self.cc.add_hook_to_controller(self.controller_name, 'post_invoke', post_hook)
+        self.mock_controller.add_post_invoke_hook.assert_called_once_with(post_hook)
+
+    def test_list_objects_on_controller_proxies_call(self):
+        """
+        Test that list_objects_on_controller correctly calls list_objects on the target controller.
+        """
+        self.mock_controller.list_objects.return_value = ["obj1", "obj2"]
+        result = self.cc.list_objects_on_controller(self.controller_name, name_filter="filter")
+
+        self.mock_controller.list_objects.assert_called_once_with("filter")
+        self.assertEqual(result, ["obj1", "obj2"])
+
+    def test_get_waiting_objects_on_controller_proxies_call(self):
+        """
+        Test that get_waiting_objects_on_controller correctly calls get_waiting_objects.
+        """
+        self.mock_controller.get_waiting_objects.return_value = ["waiter1"]
+        result = self.cc.get_waiting_objects_on_controller(self.controller_name)
+
+        self.mock_controller.get_waiting_objects.assert_called_once()
+        self.assertEqual(result, ["waiter1"])
+
+    def test_wrappers_raise_on_non_existent_controller(self):
+        """
+        Test that all wrapper methods raise ValueError for a non-existent controller name.
+        """
+        bad_name = "non_existent_bus"
+        with self.assertRaises(ValueError):
+            self.cc.invoke_on_controller(bad_name, 'id', 'cmd')
+        with self.assertRaises(ValueError):
+            self.cc.subscribe_to_event(bad_name, 'id', 'event', lambda: None)
+        with self.assertRaises(ValueError):
+            self.cc.add_hook_to_controller(bad_name, 'pre_invoke', lambda: None)
+        with self.assertRaises(ValueError):
+            self.cc.list_objects_on_controller(bad_name)
+        with self.assertRaises(ValueError):
+            self.cc.get_waiting_objects_on_controller(bad_name)
+
+    def test_add_hook_to_controller_invalid_type_raises_error(self):
+        """
+        Test that an invalid hook_type raises a ValueError.
+        """
+        with self.assertRaises(ValueError):
+            self.cc.add_hook_to_controller(self.controller_name, 'invalid_hook_type', lambda: None)
+
+    def test_wrappers_raise_after_dispose(self):
+        """
+        Test that wrapper methods raise RuntimeError if called after the CommandCenter is disposed.
+        """
+        cc = self.cc
+        controller_name = self.controller_name
+
+        # Dispose the command center
+        cc.dispose()
+
+        # Verify that calling a wrapper method now raises an error
+        with self.assertRaises(RuntimeError):
+            cc.invoke_on_controller(controller_name, 'id', 'cmd')
+        with self.assertRaises(RuntimeError):
+            cc.add_signal_controller("another_bus")
 
 
 if __name__ == '__main__':

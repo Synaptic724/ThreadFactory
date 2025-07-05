@@ -115,13 +115,22 @@ class CommandCenter(IDisposable):
         terminating the CommandCenter.
         """
         self.dispose()
-#endregion Destructor
+
+    def _check_disposed(self):
+        """
+        Internal helper to raise a RuntimeError if the instance is disposed.
+        """
+        if self._disposed:
+            raise RuntimeError(f"CommandCenter '{self.id}' has been disposed.")
+
+    #endregion Destructor
 #region Controller Contract
     def set_external_controller(self, controller: SignalController, logger: Optional[logging.Logger] = None):
         """
         Sets an external SignalController to manage this CommandCenter.
         This allows the CommandCenter to be controlled remotely.
         """
+        self._check_disposed()
         if self._external_signal_controller:
             raise RuntimeError("External SignalController is already set.")
         if not isinstance(controller, SignalController):
@@ -146,6 +155,7 @@ class CommandCenter(IDisposable):
         contract for registration with a SignalController. This exposes the
         core public functions of the CommandCenter as callable commands.
         """
+        self._check_disposed()
         return {
             "name": "command_center",
             "commands": ConcurrentDict({
@@ -167,13 +177,13 @@ class CommandCenter(IDisposable):
         Helper to send notifications to the external signal controller if it exists.
         This allows the CommandCenter to be observable.
         """
+        self._check_disposed()
         if self._external_signal_controller and not self._external_signal_controller._disposed:
             try:
                 self._external_signal_controller.notify(self.id, event_type, data)
             except Exception as e:
                 self._logger.error(f"Error notifying external SignalController: {e}", exc_info=True)
 #endregion Controller Contract
-
 #region Agent Management
     def create_agent(
             self,
@@ -195,6 +205,7 @@ class CommandCenter(IDisposable):
         Returns:
             Agent: The created agent instance.
         """
+        self._check_disposed()
         agent = self._create_and_register_agent(template_name, *args, **kwargs)
         if target:
             agent.set_target(target)
@@ -227,6 +238,7 @@ class CommandCenter(IDisposable):
         Warnings:
             Will warn if the global worker cap is reached mid-creation.
         """
+        self._check_disposed()
         new_agents = ConcurrentList()
         for i in range(count):
             try:
@@ -283,6 +295,7 @@ class CommandCenter(IDisposable):
         Raises:
             ValueError: If amount is not a positive integer.
         """
+        self._check_disposed()
         if not isinstance(amount, int) or amount < 1:
             raise ValueError("Amount must be a positive integer.")
         with self._lock:
@@ -300,10 +313,11 @@ class CommandCenter(IDisposable):
             ValueError: If amount is not a positive integer.
             RuntimeError: If the decrease would result in fewer slots than active agents.
         """
+        self._check_disposed()
         if not isinstance(amount, int) or amount < 1:
             raise ValueError("Amount must be a positive integer.")
         with self._lock:
-            if self._worker_count > self._max_workers - amount:
+            if self._worker_count.get() > self._max_workers - amount:
                 raise RuntimeError("Cannot decrease below current active worker count.")
             self._max_workers -= amount
             self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': self._max_workers})
@@ -327,7 +341,7 @@ class CommandCenter(IDisposable):
         if self._disposed:
             raise RuntimeError("CommandCenter is disposed.")
 
-        if self._worker_count >= self._max_workers:
+        if self._worker_count.get() >= self._max_workers:
             self._notify('WORKER_CAP_REACHED', {'max_workers': self._max_workers})
             raise RuntimeError(f"Cannot create agent. Worker cap of {self._max_workers} reached.")
 
@@ -362,6 +376,7 @@ class CommandCenter(IDisposable):
         Returns:
             bool: True if removed successfully, False if not found.
         """
+        self._check_disposed()
         was_unregistered = self._builder.unregister_template(name)
         if was_unregistered:
             self._notify('TEMPLATE_UNREGISTERED', {'template_name': name})
@@ -374,6 +389,7 @@ class CommandCenter(IDisposable):
         Returns:
             List[str]: A list of symbolic template names.
         """
+        self._check_disposed()
         return self._builder.list_templates()
 
     def get_active_agents(self) -> List[Agent]:
@@ -401,7 +417,6 @@ class CommandCenter(IDisposable):
             return None
         return self._active_agents.get(factory_id)
 #endregion Agent Management
-
 #region SignalController Management
     def add_signal_controller(self, name: str, controller: Optional[SignalController] = None) -> SignalController:
         """
@@ -420,6 +435,7 @@ class CommandCenter(IDisposable):
         Raises:
             ValueError: If a SignalController with the same name already exists.
         """
+        self._check_disposed()
         with self._lock:
             if name in self._signal_controllers:
                 raise ValueError(f"A SignalController with the name '{name}' already exists.")
@@ -441,6 +457,7 @@ class CommandCenter(IDisposable):
         Returns:
             bool: True if the controller was found and removed, False otherwise.
         """
+        self._check_disposed()
         with self._lock:
             if name not in self._signal_controllers:
                 self._logger.warning(f"Attempted to remove non-existent SignalController: '{name}'")
@@ -465,6 +482,7 @@ class CommandCenter(IDisposable):
         Returns:
             Optional[SignalController]: The SignalController instance, or None if not found.
         """
+        self._check_disposed()
         return self._signal_controllers.get(name)
 
     def list_signal_controllers(self) -> List[str]:
@@ -474,8 +492,118 @@ class CommandCenter(IDisposable):
         Returns:
             List[str]: A list of SignalController names.
         """
+        self._check_disposed()
         if not self._signal_controllers:
             return []
         return list(self._signal_controllers.keys())
+
+    def invoke_on_controller(self, controller_name: str, object_id: str, command: str, *args, **kwargs) -> Any:
+        """
+        Invokes a command on an object registered with a specific internal SignalController.
+
+        This acts as a proxy, allowing remote command execution on any managed bus.
+
+        Args:
+            controller_name (str): The name of the internal SignalController to use.
+            object_id (str): The ID of the target object on that controller.
+            command (str): The name of the command to execute (e.g., 'open', 'reset').
+            *args: Positional arguments to pass to the command.
+            **kwargs: Keyword arguments to pass to the command.
+
+        Returns:
+            Any: The result from the invoked command.
+
+        Raises:
+            ValueError: If no controller with the given name exists.
+        """
+        self._check_disposed()
+        controller = self.get_signal_controller(controller_name)
+        if not controller:
+            raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter.")
+        return controller.invoke(object_id, command, *args, **kwargs)
+
+    def subscribe_to_event(self, controller_name: str, object_id: str, event_type: str, callback: Callable):
+        """
+        Subscribes a callback to an event on a specific object managed by an internal SignalController.
+
+        Args:
+            controller_name (str): The name of the communication bus to listen on.
+            object_id (str): The ID of the object emitting the event.
+            event_type (str): The name of the event to subscribe to (e.g., 'THRESHOLD_MET').
+            callback (Callable): The function to call when the event occurs.
+
+        Raises:
+            ValueError: If no controller with the given name exists.
+        """
+        self._check_disposed()
+        controller = self.get_signal_controller(controller_name)
+        if not controller:
+            raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter.")
+        controller.subscribe(object_id, event_type, callback)
+
+    def add_hook_to_controller(self, controller_name: str, hook_type: str, callback: Callable):
+        """
+        Attaches a pre- or post-invocation hook to an internal SignalController for auditing
+        or performance monitoring.
+
+        Args:
+            controller_name (str): The name of the controller to attach the hook to.
+            hook_type (str): The type of hook, must be either 'pre_invoke' or 'post_invoke'.
+            callback (Callable): The hook function to add.
+
+        Raises:
+            ValueError: If the controller name is not found or the hook_type is invalid.
+        """
+        self._check_disposed()
+        controller = self.get_signal_controller(controller_name)
+        if not controller:
+            raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter.")
+
+        if hook_type == 'pre_invoke':
+            controller.add_pre_invoke_hook(callback)
+        elif hook_type == 'post_invoke':
+            controller.add_post_invoke_hook(callback)
+        else:
+            raise ValueError("hook_type must be either 'pre_invoke' or 'post_invoke'.")
+
+    def list_objects_on_controller(self, controller_name: str, name_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Gets a list of all objects currently registered on a specific internal SignalController.
+
+        Args:
+            controller_name (str): The name of the controller to query.
+            name_filter (Optional[str]): An optional filter to only list objects with a specific name.
+
+        Returns:
+            List[Dict[str, Any]]: A list of object details.
+
+        Raises:
+            ValueError: If no controller with the given name exists.
+        """
+        self._check_disposed()
+        controller = self.get_signal_controller(controller_name)
+        if not controller:
+            raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter.")
+        return controller.list_objects(name_filter)
+
+    def get_waiting_objects_on_controller(self, controller_name: str) -> List[str]:
+        """
+        Gets a list of object IDs that are currently in a "waiting" state on a specific
+        internal SignalController.
+
+        Args:
+            controller_name (str): The name of the controller to query.
+
+        Returns:
+            List[str]: A list of object IDs in a waiting state.
+
+        Raises:
+            ValueError: If no controller with the given name exists.
+        """
+        self._check_disposed()
+        controller = self.get_signal_controller(controller_name)
+        if not controller:
+            raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter.")
+        return controller.get_waiting_objects()
 #endregion SignalController Management
 #endregion CommandCenter
