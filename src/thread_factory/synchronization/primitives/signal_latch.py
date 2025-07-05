@@ -1,8 +1,7 @@
 import threading
 import ulid
 from typing import Callable, Optional, Any, Dict, Union
-
-from thread_factory.synchronization import SignalController
+from thread_factory.synchronization.controllers.signal_controller import SignalController
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.package import Pack

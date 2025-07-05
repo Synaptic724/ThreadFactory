@@ -2,7 +2,7 @@ import threading, warnings, logging, ulid
 from typing import Optional, List, Callable, Any, Union, Dict
 from thread_factory.agent.identity.agent_builder import AgentBuilder
 from thread_factory.agent.identity.types.agent import Agent
-from thread_factory.synchronization import SignalController
+from thread_factory.synchronization.controllers.signal_controller import SignalController
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.concurrency.concurrent_list import ConcurrentList
