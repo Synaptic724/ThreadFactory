@@ -92,9 +92,9 @@ class General(Agent):
 
         # Initialize General-specific routing registries as ConcurrentDicts.
         # Assuming ConcurrentDict is IDisposable and needs to be initialized.
-        self.save_points = ConcurrentDict()
-        self.locations = ConcurrentDict()
-        self.data_transfer = ConcurrentDict()
+        self.save_points = None
+        self.locations = None
+        self.data_transfer = None
 
         # Call the parent Agent's __init__ method.
         # Pass all necessary arguments that Agent's __init__ expects.

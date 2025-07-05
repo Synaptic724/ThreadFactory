@@ -226,7 +226,6 @@ class Agent(Worker):
         finally:
             # Ensure agent is disposed properly even after an exception
             self.dispose()
-            self.death_event.set()
 
     def deploy(self):
         """
