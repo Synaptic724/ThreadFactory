@@ -116,8 +116,25 @@ class CommandCenter(IDisposable):
         """
         self.dispose()
 #endregion Destructor
-
 #region Controller Contract
+    def set_external_controller(self, controller: SignalController, logger: Optional[logging.Logger] = None):
+        """
+        Sets an external SignalController to manage this CommandCenter.
+        This allows the CommandCenter to be controlled remotely.
+        """
+        if self._external_signal_controller:
+            raise RuntimeError("External SignalController is already set.")
+        if not isinstance(controller, SignalController):
+            raise TypeError("Expected a SignalController instance.")
+        if logger:
+            self._logger = logger
+        self._external_signal_controller = controller
+        try:
+            self._external_signal_controller.register(self)
+            self._logger.info(f"CommandCenter '{self.id}' registered with external SignalController.")
+        except Exception as e:
+            self._logger.warning(f"Failed to register CommandCenter with external SignalController: {e}", exc_info=True)
+
     @property
     def id(self) -> str:
         """The unique identifier for this CommandCenter instance."""

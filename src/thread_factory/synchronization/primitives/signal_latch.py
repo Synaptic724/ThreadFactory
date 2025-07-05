@@ -1,6 +1,8 @@
 import threading
 import ulid
 from typing import Callable, Optional, Any, Dict, Union
+
+from thread_factory.synchronization import SignalController
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.package import Pack
@@ -103,12 +105,26 @@ class SignalLatch(IDisposable):
         if self._controller:
             try:
                 self._controller.register(self)
-            except Exception:       # noqa: BLE001 – controller is optional
+            except Exception:
                 pass
 
     # ──────────────────────────────────────────────────────────────────
     # Controller contract helpers
     # ──────────────────────────────────────────────────────────────────
+    def set_external_controller(self, controller: 'SignalController'):
+        """
+        Sets an external SignalController to manage this CommandCenter.
+        This allows the CommandCenter to be controlled remotely.
+        """
+        if not isinstance(controller, SignalController):
+            raise TypeError("Expected a SignalController instance.")
+        self._controller = controller
+        if self._controller:
+            try:
+                self._controller.register(self)
+            except Exception:
+                pass
+
     @property
     def id(self) -> str:  # noqa: D401
         """

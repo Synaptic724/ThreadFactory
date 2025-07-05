@@ -164,13 +164,11 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         Set up a CommandCenter with a mocked external SignalController.
         """
         self.mock_external_controller = MagicMock(spec=SignalController)
-        # FIX: Explicitly set the _disposed attribute on the mock to False
-        # to ensure the _notify helper method in CommandCenter can execute.
         self.mock_external_controller._disposed = False
 
         # Patch the AgentBuilder to avoid dependency issues during CC initialization
         with patch('thread_factory.agent.identity.agent_builder.AgentBuilder'):
-            self.cc = CommandCenter(
+            self.cc_with_controller = CommandCenter(
                 external_signal_controller=self.mock_external_controller
             )
 
@@ -178,35 +176,67 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         """
         Clean up by disposing of the CommandCenter instance after each test.
         """
-        if self.cc and not self.cc._disposed:
-            self.cc.dispose()
+        if self.cc_with_controller and not self.cc_with_controller._disposed:
+            self.cc_with_controller.dispose()
 
     def test_init_registers_with_external_controller(self):
         """
         Test that CommandCenter registers itself with the external controller on init.
         """
-        self.mock_external_controller.register.assert_called_once_with(self.cc)
+        self.mock_external_controller.register.assert_called_once_with(self.cc_with_controller)
 
     def test_dispose_unregisters_from_external_controller(self):
         """
         Test that CommandCenter unregisters itself on dispose.
         """
-        cc_id = self.cc.id
-        self.cc.dispose()
+        cc_id = self.cc_with_controller.id
+        self.cc_with_controller.dispose()
         self.mock_external_controller.unregister.assert_called_once_with(cc_id, dispose_object=False)
+
+    def test_set_external_controller_attaches_successfully(self):
+        """
+        Test attaching an external controller after initialization.
+        """
+        with patch('thread_factory.agent.identity.agent_builder.AgentBuilder'):
+            cc_without_controller = CommandCenter()
+
+        new_mock_controller = MagicMock(spec=SignalController)
+        cc_without_controller.set_external_controller(new_mock_controller)
+
+        new_mock_controller.register.assert_called_once_with(cc_without_controller)
+        self.assertIs(cc_without_controller._external_signal_controller, new_mock_controller)
+        cc_without_controller.dispose()
+
+    def test_set_external_controller_raises_if_already_set(self):
+        """
+        Test that calling set_external_controller raises a RuntimeError if a controller is already set.
+        """
+        another_mock_controller = MagicMock(spec=SignalController)
+        with self.assertRaises(RuntimeError):
+            self.cc_with_controller.set_external_controller(another_mock_controller)
+
+    def test_set_external_controller_raises_on_invalid_type(self):
+        """
+        Test that calling set_external_controller with a non-SignalController object raises a TypeError.
+        """
+        with patch('thread_factory.agent.identity.agent_builder.AgentBuilder'):
+            cc_without_controller = CommandCenter()
+
+        with self.assertRaises(TypeError):
+            cc_without_controller.set_external_controller(object())
+
+        cc_without_controller.dispose()
 
     def test_get_object_details_returns_valid_contract(self):
         """
         Test that _get_object_details returns the correct structure for registration.
         """
-        details = self.cc._get_object_details()
+        details = self.cc_with_controller._get_object_details()
         self.assertIn("name", details)
         self.assertEqual(details["name"], "command_center")
         self.assertIn("commands", details)
         self.assertIsInstance(details["commands"], (dict, ConcurrentDict))
-        # FIX: Use assertEqual for bound methods as `is` checks for object identity,
-        # which can fail even if the methods are functionally the same.
-        self.assertEqual(details["commands"]["create_agent"], self.cc.create_agent)
+        self.assertEqual(details["commands"]["create_agent"], self.cc_with_controller.create_agent)
 
     @patch('thread_factory.agent.identity.agent_builder.AgentBuilder.create_agent')
     def test_notify_on_agent_created(self, mock_create_agent):
@@ -218,13 +248,13 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         mock_agent.name = "test_template"
         mock_create_agent.return_value = mock_agent
 
-        self.cc.register_template("test_template", MagicMock())
+        self.cc_with_controller.register_template("test_template", MagicMock())
         self.mock_external_controller.notify.reset_mock()
 
-        self.cc.create_agent("test_template")
+        self.cc_with_controller.create_agent("test_template")
 
         self.mock_external_controller.notify.assert_called_with(
-            self.cc.id,
+            self.cc_with_controller.id,
             'AGENT_CREATED',
             {'agent_id': 'agent_123', 'template_name': 'test_template'}
         )
@@ -238,15 +268,15 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         mock_agent.factory_id = "agent_123"
         mock_create_agent.return_value = mock_agent
 
-        self.cc.register_template("test_template", MagicMock())
-        agent = self.cc.create_agent("test_template")
+        self.cc_with_controller.register_template("test_template", MagicMock())
+        agent = self.cc_with_controller.create_agent("test_template")
 
         self.mock_external_controller.notify.reset_mock()
 
-        self.cc._unregister_agent(agent)
+        self.cc_with_controller._unregister_agent(agent)
 
         self.mock_external_controller.notify.assert_called_with(
-            self.cc.id,
+            self.cc_with_controller.id,
             'AGENT_UNREGISTERED',
             {'agent_id': 'agent_123'}
         )
@@ -255,18 +285,18 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         """
         Test that CONFIG_CHANGED event is notified when max_workers is changed.
         """
-        initial_workers = self.cc._max_workers
-        self.cc.increase_max_workers(5)
+        initial_workers = self.cc_with_controller._max_workers
+        self.cc_with_controller.increase_max_workers(5)
 
         self.mock_external_controller.notify.assert_called_with(
-            self.cc.id,
+            self.cc_with_controller.id,
             'CONFIG_CHANGED',
             {'setting': 'max_workers', 'new_value': initial_workers + 5}
         )
 
-        self.cc.decrease_max_workers(2)
+        self.cc_with_controller.decrease_max_workers(2)
         self.mock_external_controller.notify.assert_called_with(
-            self.cc.id,
+            self.cc_with_controller.id,
             'CONFIG_CHANGED',
             {'setting': 'max_workers', 'new_value': initial_workers + 3}
         )
@@ -276,14 +306,14 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         """
         Test that WORKER_CAP_REACHED event is notified.
         """
-        self.cc._max_workers = 0
-        self.cc.register_template("test", MagicMock())
+        self.cc_with_controller._max_workers = 0
+        self.cc_with_controller.register_template("test", MagicMock())
 
         with self.assertRaises(RuntimeError):
-            self.cc.create_agent("test")
+            self.cc_with_controller.create_agent("test")
 
         self.mock_external_controller.notify.assert_called_with(
-            self.cc.id,
+            self.cc_with_controller.id,
             'WORKER_CAP_REACHED',
             {'max_workers': 0}
         )
@@ -292,16 +322,16 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         """
         Test notifications for template registration and unregistration.
         """
-        self.cc.register_template("new_template", MagicMock())
+        self.cc_with_controller.register_template("new_template", MagicMock())
         self.mock_external_controller.notify.assert_called_with(
-            self.cc.id,
+            self.cc_with_controller.id,
             'TEMPLATE_REGISTERED',
             {'template_name': 'new_template'}
         )
 
-        self.cc.unregister_template("new_template")
+        self.cc_with_controller.unregister_template("new_template")
         self.mock_external_controller.notify.assert_called_with(
-            self.cc.id,
+            self.cc_with_controller.id,
             'TEMPLATE_UNREGISTERED',
             {'template_name': 'new_template'}
         )
@@ -310,16 +340,16 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         """
         Test notifications for internal signal controller management.
         """
-        self.cc.add_signal_controller("internal_bus")
+        self.cc_with_controller.add_signal_controller("internal_bus")
         self.mock_external_controller.notify.assert_called_with(
-            self.cc.id,
+            self.cc_with_controller.id,
             'SIGNAL_CONTROLLER_ADDED',
             {'controller_name': 'internal_bus'}
         )
 
-        self.cc.remove_signal_controller("internal_bus")
+        self.cc_with_controller.remove_signal_controller("internal_bus")
         self.mock_external_controller.notify.assert_called_with(
-            self.cc.id,
+            self.cc_with_controller.id,
             'SIGNAL_CONTROLLER_REMOVED',
             {'controller_name': 'internal_bus'}
         )
