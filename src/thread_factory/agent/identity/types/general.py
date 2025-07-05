@@ -55,9 +55,9 @@ class General(Agent):
         self.group: Optional[str] = group
 
         # Initialize collections for save points, locations, and data transfer functions
-        self.save_points: ConcurrentDict[str, Union[Callable[..., None], "Pack"]] = ConcurrentDict()
-        self.locations: ConcurrentDict[str, Union[Callable[..., None], "Pack"]] = ConcurrentDict()
-        self.data_transfer: ConcurrentDict[str, Union[Callable[..., Any], "Pack"]] = ConcurrentDict()
+        self.save_points: Optional[ConcurrentDict[str, Union[Callable[..., None], "Pack"]]] = None
+        self.locations: Optional[ConcurrentDict[str, Union[Callable[..., None], "Pack"]]] = None
+        self.data_transfer: Optional[ConcurrentDict[str, Union[Callable[..., Any], "Pack"]]] = None
 
     def dispose(self):
         """
@@ -109,7 +109,10 @@ class General(Agent):
             name (str): The unique name to assign to the data transfer function.
             fn (Union[Callable[..., Any], Pack]): The callable function or `Pack` to register.
         """
-        self.data_transfer[name] = Pack.bundle(fn) if fn else None
+        if self.data_transfer:
+            self.data_transfer[name] = Pack.bundle(fn) if fn else None
+        else:
+            self.data_transfer = ConcurrentDict({name: Pack.bundle(fn) if fn else None})
 
     def get_data_transfer_dict(self) -> ConcurrentDict[str, Union[Callable[..., Any], Pack]]:
         """
@@ -119,6 +122,8 @@ class General(Agent):
             ConcurrentDict[str, Union[Callable[..., Any], Pack]]: A shallow copy of the
                 data transfer dictionary.
         """
+        if self.data_transfer is None:
+            return ConcurrentDict()
         return self.data_transfer.copy()
 
     def execute_transfer(self, name: str) -> Any:
@@ -148,7 +153,10 @@ class General(Agent):
             fn (Union[Callable[..., None], Pack]): The callable function or `Pack`
                 representing the save point's logic.
         """
-        self.save_points[name] = Pack.bundle(fn) if fn else None
+        if self.save_points is None:
+            self.save_points = ConcurrentDict({name : Pack.bundle(fn) if fn else None})
+        else:
+            self.save_points[name] = Pack.bundle(fn) if fn else None
 
     def get_save_points_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
         """
@@ -158,6 +166,8 @@ class General(Agent):
             ConcurrentDict[str, Union[Callable[..., None], Pack]]: A shallow copy of
                 the save points dictionary.
         """
+        if self.save_points is None:
+            return ConcurrentDict()
         return self.save_points.copy()
 
     def register_location(self, name: str, fn: Union[Callable[..., None], Pack]):
@@ -170,7 +180,10 @@ class General(Agent):
             fn (Union[Callable[..., None], Pack]): The callable function or `Pack`
                 defining the location's behavior.
         """
-        self.locations[name] = Pack.bundle(fn) if fn else None
+        if self.locations is None:
+            self.locations = ConcurrentDict({name: Pack.bundle(fn) if fn else None})
+        else:
+            self.locations[name] = Pack.bundle(fn) if fn else None
 
     def get_locations_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
         """
@@ -180,6 +193,8 @@ class General(Agent):
             ConcurrentDict[str, Union[Callable[..., None], Pack]]: A shallow copy of
                 the locations dictionary.
         """
+        if self.locations is None:
+            return ConcurrentDict()
         return self.locations.copy()
 
     def __repr__(self) -> str:

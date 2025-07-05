@@ -5,10 +5,9 @@ from thread_factory.agent.thread_pool.help_request import HelpRequest
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
-from thread_factory.utils.interfaces.disposable import IDisposable
 
 
-class Agent(Worker, IDisposable):
+class Agent(Worker):
     """
     Agent
     ---------
@@ -61,7 +60,6 @@ class Agent(Worker, IDisposable):
         """
         # --- Initialize Base Classes ---
         super().__init__(*args, **kwargs)  # For Worker
-        IDisposable.__init__(self)  # For IDisposable
         if target and (isinstance(target, Callable) or isinstance(target, Pack)):
             self._target = Pack.bundle(target)
         elif target is not None:
@@ -88,6 +86,53 @@ class Agent(Worker, IDisposable):
         self._private_inventory.data = ConcurrentDict()
         self._public_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
 
+    # --- Framework Integration & Identity ---
+    @property
+    def factory_id(self) -> str:
+        """
+        Returns the unique factory ID of this agent instance.
+
+        Returns:
+            str: The unique ULID identifier.
+        """
+        return self._factory_id
+
+    def get_name(self) -> str:
+        """
+        Retrieves the name of the agent profile.
+
+        Returns:
+            str: A string indicating this is a base profile.
+        """
+        return "This is a BaseProfile, and thus is nameless until specialized."
+
+    def get_description(self) -> str:
+        """
+        Retrieves a description of the agent profile.
+
+        Returns:
+            str: A string describing the purpose of the base profile.
+        """
+        return "This is a BaseProfile, its purpose is to provide a base for agent profiles."
+
+    def __repr__(self) -> str:
+        """
+        Provides a developer-friendly string representation of the agent.
+
+        Returns:
+            str: A string showing the agent's ID and current state.
+        """
+        return f"<AgenticProfile id={self.factory_id} state={self.state.name}>"
+
+    def __str__(self) -> str:
+        """
+        Provides a user-friendly string representation of the agent.
+
+        Returns:
+            str: A string showing the agent's type and ID.
+        """
+        return f"AgenticProfile<{self.factory_id}>"
+
     def dispose(self):
         """
         Performs a comprehensive cleanup of the agent's state, clears
@@ -98,22 +143,30 @@ class Agent(Worker, IDisposable):
             return
 
         # Dispose agent-specific resources
-        self.dispose_work()
-        if hasattr(self, '_private_inventory') and self._private_inventory:
-            self._private_inventory.data.dispose()
-            self._private_inventory = None
-        if hasattr(self, '_public_inventory') and self._public_inventory:
-            self._public_inventory.dispose()
-            self._public_inventory = None
+        self._dispose_work()
+        self._private_inventory.data.dispose()
+        self._private_inventory = None
+        self._public_inventory.dispose()
+        self._public_inventory = None
 
         self._event_loop = None
         self._command_center = None
 
         super().dispose()  # Call parent dispose if it exists
-        self.state = WorkerState.DISPOSED
-        self._disposed = True
 
-    def set_work_state(self, new_state: WorkStatus) -> None:
+    def _dispose_work(self) -> None:
+        """
+        Disposes of the `HelpRequest` currently bound to this worker and
+        detaches it, clearing the reference.
+
+        This is typically called when a work item is no longer needed or after
+        its completion/failure, allowing for resource cleanup.
+        """
+        if self._value_work:
+            self._value_work.dispose()
+            self._value_work = None
+
+    def _set_work_state(self, new_state: WorkStatus) -> None:
         """
         Sets the status of the `HelpRequest` currently bound to this agent.
 
@@ -123,7 +176,7 @@ class Agent(Worker, IDisposable):
         if self._value_work:
             self._value_work.set_state(new_state)
 
-    def get_work_state(self) -> Optional[WorkStatus]:
+    def _get_work_state(self) -> Optional[WorkStatus]:
         """
         Retrieves the current status of the `HelpRequest` bound to this agent.
 
@@ -135,7 +188,7 @@ class Agent(Worker, IDisposable):
             return self._value_work.get_state()
         return None
 
-    def get_value_work(self) -> Optional[HelpRequest]:
+    def _get_value_work(self) -> Optional[HelpRequest]:
         """
         Retrieves the `HelpRequest` instance currently bound to this agent.
 
@@ -145,7 +198,7 @@ class Agent(Worker, IDisposable):
         """
         return self._value_work
 
-    def set_value_work(self, help_request: HelpRequest) -> None:
+    def _set_value_work(self, help_request: HelpRequest) -> None:
         """
         Binds a `HelpRequest` instance to this agent.
 
@@ -154,32 +207,32 @@ class Agent(Worker, IDisposable):
         """
         self._value_work = help_request
 
-    def mark_work_in_progress(self) -> None:
+    def _mark_work_in_progress(self) -> None:
         """Convenience method to mark the bound work as 'in progress'."""
         if self._value_work:
             self._value_work.mark_in_progress()
 
-    def mark_work_completed(self) -> None:
+    def _mark_work_completed(self) -> None:
         """Convenience method to mark the bound work as 'completed'."""
         if self._value_work:
             self._value_work.mark_completed()
 
-    def mark_work_failed(self) -> None:
+    def _mark_work_failed(self) -> None:
         """Convenience method to mark the bound work as 'failed'."""
         if self._value_work:
             self._value_work.mark_failed()
 
-    def mark_work_cancelled(self) -> None:
+    def _mark_work_cancelled(self) -> None:
         """Convenience method to mark the bound work as 'cancelled'."""
         if self._value_work:
             self._value_work.mark_cancelled()
 
-    def reset_work(self) -> None:
+    def _reset_work(self) -> None:
         """Resets the bound `HelpRequest` to its initial 'pending' state."""
         if self._value_work:
             self._value_work.reset()
 
-    def get_work_record(self) -> Optional[Record]:
+    def _get_work_record(self) -> Optional[Record]:
         """
         Retrieves the `Record` object from the bound `HelpRequest`.
 
@@ -190,24 +243,18 @@ class Agent(Worker, IDisposable):
             return self._value_work.get_record()
         return None
 
-    def acquire_and_run_work(self):
+    def _acquire_and_run_work(self):
         """Initiates the execution of the `HelpRequest` bound to this agent."""
         if self._value_work:
             self._value_work.acquire_work()
 
-    def cancel_bound_job(self):
+    def _cancel_bound_job(self):
         """Cancels the job associated with the bound `HelpRequest`."""
         if self._value_work:
             self._value_work.cancel_job()
 
-    def dispose_work(self) -> None:
-        """Disposes of the bound `HelpRequest` and detaches it from the agent."""
-        if self._value_work:
-            self._value_work.dispose()
-            self._value_work = None
-
     # --- Behavior Routing & Execution ---
-    def should_return_home(self) -> bool:
+    def _should_return_home(self) -> bool:
         """
         Checks if the agent is configured to return to its home event loop.
 
@@ -222,7 +269,7 @@ class Agent(Worker, IDisposable):
                 raise RuntimeError("Cannot check return home status after agent is disposed.")
             return self._return_home
 
-    def set_return_home(self, return_home: bool) -> None:
+    def _set_return_home(self, return_home: bool) -> None:
         """
         Sets whether the agent should return to its home event loop.
 
@@ -290,7 +337,7 @@ class Agent(Worker, IDisposable):
             return worker.get_from_inventory(key, default)
         return default
 
-    def set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
+    def _set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
         """
         Sets the primary, default execution loop or "home behavior" for the agent.
 
@@ -355,50 +402,3 @@ class Agent(Worker, IDisposable):
             raise PermissionError(
                 f"[Access Denied] Caller factory_id={current_id} does not match expected={expected}"
             )
-
-    # --- Framework Integration & Identity ---
-    @property
-    def factory_id(self) -> str:
-        """
-        Returns the unique factory ID of this agent instance.
-
-        Returns:
-            str: The unique ULID identifier.
-        """
-        return self._factory_id
-
-    def get_name(self) -> str:
-        """
-        Retrieves the name of the agent profile.
-
-        Returns:
-            str: A string indicating this is a base profile.
-        """
-        return "This is a BaseProfile, and thus is nameless until specialized."
-
-    def get_description(self) -> str:
-        """
-        Retrieves a description of the agent profile.
-
-        Returns:
-            str: A string describing the purpose of the base profile.
-        """
-        return "This is a BaseProfile, its purpose is to provide a base for agent profiles."
-
-    def __repr__(self) -> str:
-        """
-        Provides a developer-friendly string representation of the agent.
-
-        Returns:
-            str: A string showing the agent's ID and current state.
-        """
-        return f"<AgenticProfile id={self.factory_id} state={self.state.name}>"
-
-    def __str__(self) -> str:
-        """
-        Provides a user-friendly string representation of the agent.
-
-        Returns:
-            str: A string showing the agent's type and ID.
-        """
-        return f"AgenticProfile<{self.factory_id}>"
