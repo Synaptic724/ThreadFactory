@@ -286,7 +286,7 @@ class CommandCenter(IDisposable):
         if not isinstance(amount, int) or amount < 1:
             raise ValueError("Amount must be a positive integer.")
         with self._lock:
-            if self._worker_count.value > self._max_workers - amount:
+            if self._worker_count > self._max_workers - amount:
                 raise RuntimeError("Cannot decrease below current active worker count.")
             self._max_workers -= amount
             self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': self._max_workers})
@@ -310,7 +310,7 @@ class CommandCenter(IDisposable):
         if self._disposed:
             raise RuntimeError("CommandCenter is disposed.")
 
-        if self._worker_count.get() >= self._max_workers:
+        if self._worker_count >= self._max_workers:
             self._notify('WORKER_CAP_REACHED', {'max_workers': self._max_workers})
             raise RuntimeError(f"Cannot create agent. Worker cap of {self._max_workers} reached.")
 

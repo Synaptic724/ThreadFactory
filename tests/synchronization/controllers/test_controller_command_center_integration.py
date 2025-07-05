@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 from thread_factory.agent.command_center import CommandCenter
 from thread_factory.synchronization import SignalController
 from thread_factory.agent.identity.types.agent import Agent
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 
 # Suppress logging output during tests for a cleaner console
 logging.disable(logging.CRITICAL)
@@ -163,6 +164,10 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         Set up a CommandCenter with a mocked external SignalController.
         """
         self.mock_external_controller = MagicMock(spec=SignalController)
+        # FIX: Explicitly set the _disposed attribute on the mock to False
+        # to ensure the _notify helper method in CommandCenter can execute.
+        self.mock_external_controller._disposed = False
+
         # Patch the AgentBuilder to avoid dependency issues during CC initialization
         with patch('thread_factory.agent.identity.agent_builder.AgentBuilder'):
             self.cc = CommandCenter(
@@ -198,26 +203,27 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         self.assertIn("name", details)
         self.assertEqual(details["name"], "command_center")
         self.assertIn("commands", details)
-        self.assertIsInstance(details["commands"], dict)
-        # Check if a key command is correctly mapped
-        self.assertIs(details["commands"]["create_agent"], self.cc.create_agent)
+        self.assertIsInstance(details["commands"], (dict, ConcurrentDict))
+        # FIX: Use assertEqual for bound methods as `is` checks for object identity,
+        # which can fail even if the methods are functionally the same.
+        self.assertEqual(details["commands"]["create_agent"], self.cc.create_agent)
 
     @patch('thread_factory.agent.identity.agent_builder.AgentBuilder.create_agent')
     def test_notify_on_agent_created(self, mock_create_agent):
         """
         Test that AGENT_CREATED event is notified.
         """
-        # We need a mock agent that has the necessary attributes
         mock_agent = MagicMock(spec=Agent)
         mock_agent.factory_id = "agent_123"
-        # The agent's name property is used in the notification
-        type(mock_agent).name = "test_template"
+        mock_agent.name = "test_template"
         mock_create_agent.return_value = mock_agent
 
         self.cc.register_template("test_template", MagicMock())
-        agent = self.cc.create_agent("test_template")
+        self.mock_external_controller.notify.reset_mock()
 
-        self.mock_external_controller.notify.assert_any_call(
+        self.cc.create_agent("test_template")
+
+        self.mock_external_controller.notify.assert_called_with(
             self.cc.id,
             'AGENT_CREATED',
             {'agent_id': 'agent_123', 'template_name': 'test_template'}
@@ -235,10 +241,8 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         self.cc.register_template("test_template", MagicMock())
         agent = self.cc.create_agent("test_template")
 
-        # Reset mock to ignore notifications from creation
         self.mock_external_controller.notify.reset_mock()
 
-        # Directly call the internal method that should trigger the notification
         self.cc._unregister_agent(agent)
 
         self.mock_external_controller.notify.assert_called_with(
