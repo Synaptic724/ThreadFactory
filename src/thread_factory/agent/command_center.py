@@ -1,5 +1,5 @@
-import threading, warnings, logging
-from typing import Optional, List, Callable, Any, Union
+import threading, warnings, logging, ulid
+from typing import Optional, List, Callable, Any, Union, Dict
 from thread_factory.agent.identity.agent_builder import AgentBuilder
 from thread_factory.agent.identity.types.agent import Agent
 from thread_factory.synchronization import SignalController
@@ -16,23 +16,22 @@ class CommandCenter(IDisposable):
     ----------------
     A central orchestration unit responsible for managing agent thread lifecycles,
     enforcing global worker limits, creating agents from predefined templates,
-    and managing SignalControllers for communication and eventing.
+    and managing its own SignalControllers. It can also be registered with an
+    external SignalController to be managed remotely.
     """
 
-    def __init__(self, max_workers: int = 8, logger: Optional[logging.Logger] = None):
+    def __init__(self,
+                 max_workers: int = 8,
+                 logger: Optional[logging.Logger] = None,
+                 external_signal_controller: Optional[SignalController] = None):
         """
-        Initializes the CommandCenter with a worker cap and internal registries.
+        Initializes the CommandCenter.
 
         Args:
             max_workers (int): Maximum number of concurrent agents allowed to exist.
             logger (Optional[logging.Logger]): A logger instance.
-        """
-        super().__init__()
-        """
-        Initializes the CommandCenter with a worker cap and internal registries.
-
-        Args:
-            max_workers (int): Maximum number of concurrent agents allowed to exist.
+            external_signal_controller (Optional[SignalController]): An external controller
+                to register with, allowing this CommandCenter to be controlled remotely.
         """
         super().__init__()
         if max_workers < 1 or not isinstance(max_workers, int):
@@ -40,40 +39,66 @@ class CommandCenter(IDisposable):
 
         self._logger = logger or logging.getLogger(__name__)
         self._lock = threading.RLock()
+
+        # --- Core Components ---
         self._active_agents: ConcurrentDict[str, Agent] = ConcurrentDict()
         self._builder = AgentBuilder()
         self._worker_count = SyncInt(0)
         self._max_workers = max_workers
-
-        # --- New: Registry for SignalControllers ---
         self._signal_controllers: ConcurrentDict[str, SignalController] = ConcurrentDict()
+
+        # --- External Controller Integration ---
+        self._id: str = str(ulid.ULID())
+        self._external_signal_controller = external_signal_controller
+        if self._external_signal_controller:
+            try:
+                self._external_signal_controller.register(self)
+                self._logger.info(f"CommandCenter '{self.id}' registered with external SignalController.")
+            except Exception as e:
+                self._logger.warning(f"Failed to register CommandCenter with external SignalController: {e}", exc_info=True)
+
 
 #region Destructor
     def dispose(self):
         """
         Disposes the CommandCenter and all resources it manages, including all
-        agents and SignalControllers.
+        agents and SignalControllers. This is a terminal and idempotent operation.
         """
         with self._lock:
             if self._disposed:
                 return
             self._disposed = True
 
-            self._logger.info("Disposing CommandCenter...")
+            self._logger.info(f"Disposing CommandCenter '{self.id}'...")
 
-            # --- New: Dispose all managed SignalControllers ---
+            # --- Unregister from external controller first ---
+            if self._external_signal_controller:
+                try:
+                    # Set dispose_object=False as we are already disposing.
+                    self._external_signal_controller.unregister(self.id, dispose_object=False)
+                    self._logger.info(f"Unregistered CommandCenter '{self.id}' from external SignalController.")
+                except Exception as e:
+                    self._logger.warning(f"Failed to unregister CommandCenter from external SignalController: {e}", exc_info=True)
+
+            # --- Dispose internal SignalControllers ---
             if self._signal_controllers:
                 for controller_name, controller in list(self._signal_controllers.items()):
-                    self._logger.debug(f"Disposing SignalController: {controller_name}")
+                    self._logger.debug(f"Disposing internal SignalController: {controller_name}")
                     try:
                         controller.dispose()
                     except Exception as e:
-                        self._logger.error(f"Error disposing SignalController '{controller_name}': {e}", exc_info=True)
+                        self._logger.error(f"Error disposing internal SignalController '{controller_name}': {e}", exc_info=True)
                 self._signal_controllers.dispose()
                 self._signal_controllers = None
 
+            # --- Dispose Agents ---
             if self._active_agents:
-                # ... (existing agent disposal logic)
+                for agent in list(self._active_agents.values()):
+                    try:
+                        if hasattr(agent, "dispose") and callable(agent.dispose):
+                            agent.dispose()
+                    except Exception:
+                        pass
                 self._active_agents.clear()
                 self._active_agents = None
 
@@ -82,18 +107,57 @@ class CommandCenter(IDisposable):
             except Exception:
                 pass
 
-            self._logger.info("CommandCenter disposed.")
+            self._logger.info(f"CommandCenter '{self.id}' disposed.")
 
     def shutdown(self):
         """
-        Alias for `.dispose()`.
-
-        Provides semantic clarity when intentionally terminating the CommandCenter.
+        Alias for .dispose(). Provides semantic clarity when intentionally
+        terminating the CommandCenter.
         """
         self.dispose()
 #endregion Destructor
+
+#region Controller Contract
+    @property
+    def id(self) -> str:
+        """The unique identifier for this CommandCenter instance."""
+        return self._id
+
+    def _get_object_details(self) -> Dict[str, Any]:
+        """
+        Returns a dictionary of metadata about this object, fulfilling the
+        contract for registration with a SignalController. This exposes the
+        core public functions of the CommandCenter as callable commands.
+        """
+        return {
+            "name": "command_center",
+            "commands": ConcurrentDict({
+                'create_agent': self.create_agent,
+                'create_agents': self.create_agents,
+                'submit': self.submit,
+                'list_templates': self.list_templates,
+                'get_active_agents': self.get_active_agents,
+                'increase_max_workers': self.increase_max_workers,
+                'decrease_max_workers': self.decrease_max_workers,
+                'add_signal_controller': self.add_signal_controller,
+                'remove_signal_controller': self.remove_signal_controller,
+                'list_signal_controllers': self.list_signal_controllers
+            }),
+        }
+
+    def _notify(self, event_type: str, data: Optional[Dict[str, Any]] = None):
+        """
+        Helper to send notifications to the external signal controller if it exists.
+        This allows the CommandCenter to be observable.
+        """
+        if self._external_signal_controller and not self._external_signal_controller._disposed:
+            try:
+                self._external_signal_controller.notify(self.id, event_type, data)
+            except Exception as e:
+                self._logger.error(f"Error notifying external SignalController: {e}", exc_info=True)
+#endregion Controller Contract
+
 #region Agent Management
-#region Agent Creation and Management
     def create_agent(
             self,
             template_name: str,
@@ -115,13 +179,10 @@ class CommandCenter(IDisposable):
             Agent: The created agent instance.
         """
         agent = self._create_and_register_agent(template_name, *args, **kwargs)
-
         if target:
             agent.set_target(target)
-
         if define_home:
             agent.set_home(define_home)
-
         return agent
 
     def create_agents(
@@ -179,30 +240,21 @@ class CommandCenter(IDisposable):
         agent = self.create_agent(template_name, define_home=target, *args, **kwargs)
         agent.start()
 
-
     def _register_agent(self, agent: Agent):
-        """
-        Internal helper to register an agent in the active list.
-
-        Args:
-            agent (Agent): The agent to register.
-        """
+        """Internal helper to register an agent in the active list."""
         if not self._disposed and agent:
             with self._lock:
                 self._worker_count.increment()
                 self._active_agents[agent.factory_id] = agent
+                self._notify('AGENT_CREATED', {'agent_id': agent.factory_id, 'template_name': agent.name})
 
     def _unregister_agent(self, agent: Agent):
-        """
-        Internal helper to unregister and forget an agent.
-
-        Args:
-            agent (Agent): The agent to remove from tracking.
-        """
+        """Internal helper to unregister and forget an agent."""
         if not self._disposed and agent:
             with self._lock:
-                self._active_agents.pop(agent.factory_id, None)
-                self._worker_count.decrement()
+                if self._active_agents.pop(agent.factory_id, None):
+                    self._worker_count.decrement()
+                    self._notify('AGENT_UNREGISTERED', {'agent_id': agent.factory_id})
 
     def increase_max_workers(self, amount: int = 1):
         """
@@ -218,6 +270,7 @@ class CommandCenter(IDisposable):
             raise ValueError("Amount must be a positive integer.")
         with self._lock:
             self._max_workers += amount
+            self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': self._max_workers})
 
     def decrease_max_workers(self, amount: int = 1):
         """
@@ -236,6 +289,7 @@ class CommandCenter(IDisposable):
             if self._worker_count.value > self._max_workers - amount:
                 raise RuntimeError("Cannot decrease below current active worker count.")
             self._max_workers -= amount
+            self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': self._max_workers})
 
     def _create_and_register_agent(self, template_name: str, *args, **kwargs) -> Agent:
         """
@@ -257,17 +311,17 @@ class CommandCenter(IDisposable):
             raise RuntimeError("CommandCenter is disposed.")
 
         if self._worker_count.get() >= self._max_workers:
+            self._notify('WORKER_CAP_REACHED', {'max_workers': self._max_workers})
             raise RuntimeError(f"Cannot create agent. Worker cap of {self._max_workers} reached.")
 
         try:
-            # First, try to create the agent without incrementing worker count
             kwargs["command_center"] = self
             agent = self._builder.create_agent(template_name, *args, **kwargs)
             self._register_agent(agent)
             return agent
         except Exception as e:
             raise RuntimeError(f"Agent creation failed: {str(e)}") from e
-#endregion Agent Creation and Management
+
     def register_template(self, name: str, factory_fn: Union[Callable[..., Agent], Pack]):
         """
         Registers a new agent creation template.
@@ -279,7 +333,8 @@ class CommandCenter(IDisposable):
         if self._disposed:
             raise RuntimeError("Cannot register templates after CommandCenter is disposed.")
         self._builder.register_template(name, factory_fn)
-#region Agent Template Management
+        self._notify('TEMPLATE_REGISTERED', {'template_name': name})
+
     def unregister_template(self, name: str) -> bool:
         """
         Removes a previously registered agent template.
@@ -290,7 +345,10 @@ class CommandCenter(IDisposable):
         Returns:
             bool: True if removed successfully, False if not found.
         """
-        return self._builder.unregister_template(name)
+        was_unregistered = self._builder.unregister_template(name)
+        if was_unregistered:
+            self._notify('TEMPLATE_UNREGISTERED', {'template_name': name})
+        return was_unregistered
 
     def list_templates(self) -> List[str]:
         """
@@ -325,13 +383,14 @@ class CommandCenter(IDisposable):
         if self._disposed or not factory_id:
             return None
         return self._active_agents.get(factory_id)
-#endregion Agent Template Management
 #endregion Agent Management
-#region SignalController Management
 
+#region SignalController Management
     def add_signal_controller(self, name: str, controller: Optional[SignalController] = None) -> SignalController:
         """
-        Adds a new SignalController to the CommandCenter's management.
+        Adds a new SignalController to the CommandCenter's management. If an existing
+        controller instance is not provided, a new one is created. This allows the
+        CommandCenter to manage multiple, named communication buses.
 
         Args:
             name (str): A unique name to identify this SignalController.
@@ -347,10 +406,10 @@ class CommandCenter(IDisposable):
         with self._lock:
             if name in self._signal_controllers:
                 raise ValueError(f"A SignalController with the name '{name}' already exists.")
-
             new_controller = controller or SignalController(logger=self._logger)
             self._signal_controllers[name] = new_controller
             self._logger.info(f"Added SignalController: '{name}'")
+            self._notify('SIGNAL_CONTROLLER_ADDED', {'controller_name': name})
             return new_controller
 
     def remove_signal_controller(self, name: str, dispose: bool = True) -> bool:
@@ -369,16 +428,14 @@ class CommandCenter(IDisposable):
             if name not in self._signal_controllers:
                 self._logger.warning(f"Attempted to remove non-existent SignalController: '{name}'")
                 return False
-
             controller = self._signal_controllers.pop(name)
             self._logger.info(f"Removed SignalController: '{name}'")
-
+            self._notify('SIGNAL_CONTROLLER_REMOVED', {'controller_name': name})
             if dispose and controller:
                 try:
                     controller.dispose()
                 except Exception as e:
                     self._logger.error(f"Error disposing removed SignalController '{name}': {e}", exc_info=True)
-
             return True
 
     def get_signal_controller(self, name: str) -> Optional[SignalController]:
@@ -403,7 +460,5 @@ class CommandCenter(IDisposable):
         if not self._signal_controllers:
             return []
         return list(self._signal_controllers.keys())
-
 #endregion SignalController Management
-CC = CommandCenter
 #endregion CommandCenter
