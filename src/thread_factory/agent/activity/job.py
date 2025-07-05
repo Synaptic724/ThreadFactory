@@ -4,9 +4,13 @@ from typing import Any, Callable, Dict, Optional, List, Union
 from thread_factory.synchronization.controllers.signal_controller import SignalController
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.agent.activity.base import BaseActivity
+from thread_factory.utils.interfaces.disposable import IDisposable
+
 
 class JobStatus(Enum):
-    """Defines the lifecycle status of a Job."""
+    """
+    Defines the lifecycle status of a Job.
+    """
     PENDING = auto()
     RUNNING = auto()
     PAUSED = auto()
@@ -15,7 +19,7 @@ class JobStatus(Enum):
     CANCELLED = auto()
 
 
-class JobActivity(BaseActivity):
+class JobActivity(BaseActivity, IDisposable):
     """
     A concrete implementation of BaseActivity for managing generic, controllable jobs.
 
@@ -36,11 +40,50 @@ class JobActivity(BaseActivity):
         super().__init__(signal_controller=signal_controller, logger=logger, job_id=job_id, task_id=task_id, **kwargs)
 
         # Job-specific state
+        self.job_id: str = job_id  # Unique identifier for the job
+        self.task_id: str = task_id  # Identifier for the task being executed
         self._status: JobStatus = JobStatus.PENDING
         self._progress: float = 0.0
         self._job_current_count: float = 0.0
         self._job_total: float = 0.0
         self._job_result: Any = None
+
+    def dispose(self):
+        """
+        Disposes the JobActivity instance.
+
+        This method cleans up internal job-specific state, including:
+        - Resetting job progress and result fields
+        - Clearing status and task IDs
+        - Releasing any job-specific metadata (if added later)
+        - Emitting a final disposal log
+
+        Then it defers to the BaseActivity's dispose method to complete the standard
+        unregistration and signal controller cleanup.
+
+        This method is thread-safe and idempotent.
+        """
+        if self._disposed:
+            self._logger.debug(f"JobActivity '{self.id}' already disposed.")
+            return
+
+        with self._lock:
+            if self._disposed:
+                return
+
+            self._logger.info(f"Disposing JobActivity '{self.id}'.")
+
+            # Clear job-specific state
+            self._progress = 0.0
+            self._job_current_count = 0.0
+            self._job_total = 0.0
+            self._job_result = None
+            self._status = JobStatus.CANCELLED  # Final state
+            self.job_id = None
+            self.task_id = None
+
+            # Delegate to BaseActivity / IDisposable cleanup
+            super().dispose()
 
     # --- Overriding the contract to add more commands ---
 

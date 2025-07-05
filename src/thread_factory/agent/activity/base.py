@@ -1,5 +1,4 @@
 import threading, ulid, logging, time
-from enum import Enum, auto
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, List
 from thread_factory.synchronization.controllers.signal_controller import SignalController
@@ -83,8 +82,10 @@ class BaseActivity(IDisposable, ABC):
                         exc_info=True)
 
             # Clear internal collections
-            self._registered_agents.clear()
-            self._metadata.clear()
+            self._registered_agents.dispose()
+            self._registered_agents = None
+            self._metadata.dispose()
+            self._metadata = None
 
             # Nullify references to external objects to aid garbage collection
             self._signal_controller = None

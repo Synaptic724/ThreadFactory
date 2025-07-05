@@ -78,7 +78,6 @@ class Agent(Worker, IDisposable):
         self._worker_type: str = "agentic"
         self._pool_agent: bool = True
         self._return_home: bool = False
-        self._lock = threading.RLock()
 
         # --- Behavior & Execution ---
         self._event_loop: Optional[Pack] = None
@@ -109,7 +108,7 @@ class Agent(Worker, IDisposable):
         self._event_loop = None
 
         super().dispose()  # Call parent dispose if it exists
-
+#region Generic Agent System Methods
     def _unregister(self) -> None:
         """
         Unregisters the agent from the command center, if applicable.
@@ -239,7 +238,8 @@ class Agent(Worker, IDisposable):
             str: A string showing the agent's type and ID.
         """
         return f"AgenticProfile<{self.factory_id}>"
-
+#endregion
+#region Queue Pool Management Methods
     def _set_work_state(self, new_state: WorkStatus) -> None:
         """
         Sets the status of the `HelpRequest` currently bound to this agent.
@@ -340,8 +340,8 @@ class Agent(Worker, IDisposable):
         """
         if self._value_work:
             self._value_work.cancel_job()
-
-    # --- Behavior Routing & Execution ---
+#endregion
+#region Agentic Behavior Control Methods
     def should_return_home(self) -> bool:
         """
         Checks if the agent is configured to return to its home event loop.
@@ -473,3 +473,4 @@ class Agent(Worker, IDisposable):
         """
         self._validate_caller()  # Validate caller using the existing method
         self._private_inventory[key] = value
+#endregion

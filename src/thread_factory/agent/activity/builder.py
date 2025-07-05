@@ -1,6 +1,5 @@
 from typing import Callable, Any, Type, Optional
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-# Assuming BaseActivity and JobActivity are correctly imported or defined elsewhere
 from thread_factory.agent.activity.base import BaseActivity
 from thread_factory.agent.activity.job import JobActivity # Ensure this import is correct based on your structure
 from thread_factory.utils.interfaces.disposable import IDisposable
@@ -49,13 +48,12 @@ class ActivityBuilder(IDisposable):
         if self._disposed:
             return
         if self._registry:
+            self._disposed = True  # Set disposed state before disposing resources
             # Dispose the ConcurrentDict to ensure its resources are also freed
             self._registry.dispose()
             # The _registry reference itself doesn't strictly need to be set to None
             # as it's already disposed and will be garbage collected when the builder is.
         self._registered = False
-        # Call the parent's dispose method to ensure proper cleanup of IDisposable's state
-        super().dispose()
 
     def _register_defaults(self) -> None:
         """
@@ -107,6 +105,7 @@ class ActivityBuilder(IDisposable):
             TypeError: If the registered class cannot be instantiated with the
                        provided keyword arguments.
         """
+        self._check_disposed()  # Ensure the builder is not disposed before proceeding
         activity_class = self._registry.get(name)
         if activity_class:
             try:
@@ -116,3 +115,11 @@ class ActivityBuilder(IDisposable):
                 raise TypeError(f"Failed to build activity '{name}'. "
                                 f"Constructor of '{activity_class.__name__}' received invalid arguments: {e}")
         return None
+
+
+    def _check_disposed(self):
+        """
+        Internal helper to raise a RuntimeError if the instance is disposed.
+        """
+        if self._disposed:
+            raise RuntimeError(f"Activity Builder has been disposed.")
