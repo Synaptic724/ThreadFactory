@@ -49,18 +49,23 @@ class CommandCenter(IDisposable):
         with self._lock:
             if self._disposed:
                 return
+
             self._disposed = True
 
-            for agent in list(self._active_agents.values()):
-                if hasattr(agent, "dispose") and callable(agent.dispose):
-                    agent.dispose()
+            if self._active_agents:
+                for agent in list(self._active_agents.values()):
+                    try:
+                        if hasattr(agent, "dispose") and callable(agent.dispose):
+                            agent.dispose()
+                    except Exception:
+                        pass
+                self._active_agents.clear()
+                self._active_agents = None
 
-            self._active_agents.clear()
-            self._active_agents = None
-
-            if self._builder:
+            try:
                 self._builder.dispose()
-                self._builder = None
+            except Exception:
+                pass  # builder remains intact even after failed disposal
 
     def shutdown(self):
         """
@@ -98,9 +103,9 @@ class CommandCenter(IDisposable):
             agent = self._builder.create_agent(template_name, *args, **kwargs)
             self._register_agent(agent)
             return agent
-        except Exception:
+        except Exception as e:
             self._worker_count.decrement()
-            raise
+            raise RuntimeError(f"Agent creation failed: {e}") from e
 
     def create_agent(
         self,
@@ -203,6 +208,8 @@ class CommandCenter(IDisposable):
             name (str): Symbolic name of the template.
             factory_fn (Callable | Pack): Factory function or Pack object used to construct the agent.
         """
+        if self._disposed:
+            raise RuntimeError("Cannot register templates after CommandCenter is disposed.")
         self._builder.register_template(name, factory_fn)
 
     def unregister_template(self, name: str) -> bool:
@@ -270,3 +277,6 @@ class CommandCenter(IDisposable):
         """
         if not self._disposed and agent:
             self._active_agents.pop(agent.factory_id, None)
+
+
+CC = CommandCenter

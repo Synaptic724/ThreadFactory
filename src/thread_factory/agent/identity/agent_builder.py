@@ -28,8 +28,9 @@ class AgentBuilder(IDisposable):
         """
         if self._disposed:
             return
-        self._registry.dispose()
-        self._registry = None
+        if self._registry:
+            self._registry.dispose()
+            self._registry = None
 
     def _register_default_template(self) -> None:
         """
@@ -102,7 +103,7 @@ class AgentBuilder(IDisposable):
             raise KeyError(f"No agent template registered under the name '{name}'")
 
         # Apply argument overrides — Pack handles merging
-        override_pack = factory_pack.override_args(*args, **kwargs)
+        override_pack =  factory_pack.curry(*args, **kwargs)
 
         agent_instance = override_pack()
 

@@ -85,6 +85,57 @@ class TestAgentBuilder(unittest.TestCase):
         self.assertEqual(agent.get_name(), "Override")
         agent.dispose()
 
+    def test_template_remains_unchanged_after_override(self):
+        def factory(command_center, public_name="Base"):
+            return General(command_center, public_name=public_name)
+
+        self.builder.register_template("preserve_test", Pack(factory))
+        _ = self.builder.create_agent("preserve_test", command_center=self.mock_cc, public_name="Override")
+        # Create again and verify the original default remains
+        agent2 = self.builder.create_agent("preserve_test", command_center=self.mock_cc)
+        self.assertEqual(agent2.get_name(), "Base")
+        agent2.dispose()
+
+    def test_create_agent_accepts_valid_agent_thread(self):
+        class MockAgent(Agent):
+            def __init__(self, **kwargs): super().__init__(command_center=kwargs["command_center"])
+
+        self.builder.register_template("mock_thread", Pack(lambda **kwargs: MockAgent(**kwargs)))
+        agent = self.builder.create_agent("mock_thread", command_center=self.mock_cc)
+        self.assertIsInstance(agent, Agent)
+        agent.dispose()
+
+    def test_register_after_dispose_silent_fail(self):
+        self.builder.dispose()
+        try:
+            self.builder.register_template("ghost", Pack(lambda **kwargs: General(**kwargs)))
+        except TypeError:
+            pass  # acceptable, we allow hard crash here
+        except Exception as e:
+            self.fail(f"Should not crash with unexpected exception: {e}")
+
+    def test_frozen_pack_raises_on_mutation(self):
+        def factory(cc, role="Base"): return General(cc, job_title=role)
+
+        pack = Pack(factory, role="Unchangeable")
+        pack.freeze()
+        self.builder.register_template("frozen", pack)
+        with self.assertRaises(RuntimeError):
+            # simulate override attempt by curry, which does not mutate but just to simulate locking
+            frozen_pack = pack.bind(role="Hack")  # Should raise
+
+    def test_override_with_invalid_kwargs_fails_cleanly(self):
+        def factory(cc): return General(cc)
+
+        self.builder.register_template("bad_override", Pack(factory))
+        with self.assertRaises(TypeError):
+            self.builder.create_agent("bad_override", command_center=self.mock_cc, not_a_real_arg="wat")
+
+    def test_register_after_dispose_does_nothing(self):
+        self.builder.dispose()
+        with self.assertRaises(TypeError):
+            self.builder.register_template("ghost", Pack(lambda **kwargs: General(**kwargs)))
+
     def test_registry_isolated_between_instances(self):
         other = AgentBuilder()
         other.register_template("isolated", Pack(lambda x: General(x)))
@@ -103,11 +154,14 @@ class TestAgentBuilder(unittest.TestCase):
             self.builder.create_agent("bad", command_center=self.mock_cc)
 
     def test_override_args_functionality(self):
-        def factory(cc, public_name=None): return General(cc, public_name=public_name)
-        self.builder.register_template("override_test", Pack(factory, kwargs={"public_name": "Base"}))
+        def factory(command_center, public_name=None):
+            return General(command_center, public_name=public_name)
+
+        self.builder.register_template("override_test", Pack(factory, public_name="Base"))
         agent = self.builder.create_agent("override_test", command_center=self.mock_cc, public_name="New")
         self.assertEqual(agent.get_name(), "New")
         agent.dispose()
+
 
 if __name__ == "__main__":
     unittest.main()

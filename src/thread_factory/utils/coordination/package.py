@@ -358,6 +358,27 @@ class Package(IDisposable):
 
         return result
 
+    def bind_args(self, *new_args: Any) -> Package:
+        """
+        Mutably replace the positional arguments of this Package.
+
+        Args:
+            *new_args: New positional arguments to replace the current ones.
+
+        Returns:
+            self
+
+        Raises:
+            RuntimeError: If the package is frozen.
+        """
+        with self._lock:
+            if self._frozen:
+                raise RuntimeError("Package is frozen.")
+            self._args.clear()
+            self._args.extend(new_args)
+            self._signature_cache = None
+            return self
+
     def bind(self, **new_kwargs: Any) -> Package:
         """
         Mutably add or update keyword arguments.
@@ -377,6 +398,31 @@ class Package(IDisposable):
                     raise RuntimeError("Package is frozen.")
                 self._kwargs.update(new_kwargs)
                 self._signature_cache = None
+            return self
+
+    def override(self, *args: Any, **kwargs: Any) -> Package:
+        """
+        Mutably override both args and kwargs.
+        WARNING: This modifies the original Package!
+
+        Args:
+            *args: Positional arguments to set.
+            **kwargs: Keyword arguments to merge.
+
+        Returns:
+            self
+
+        Raises:
+            RuntimeError: If the package is frozen.
+        """
+        with self._lock:
+            if self._frozen:
+                raise RuntimeError("Package is frozen.")
+            self._args.clear()
+            self._args.extend(args)
+            self._kwargs.clear()
+            self._kwargs.update(kwargs)
+            self._signature_cache = None
             return self
 
     def curry(self, *args: Any, **kwargs: Any) -> Package:
