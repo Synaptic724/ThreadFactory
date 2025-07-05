@@ -7,9 +7,10 @@ from thread_factory.agent.thread_pool.help_request import HelpRequest
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
+from thread_factory.utils.interfaces.disposable import IDisposable
 
 
-class Agent(Worker):
+class Agent(Worker, IDisposable):
     """
     Agent
     ---------
@@ -84,11 +85,114 @@ class Agent(Worker):
         self._value_work: Optional[HelpRequest] = None
 
         # --- Memory & State ---
-        self._private_inventory = threading.local()
-        self._private_inventory.data = ConcurrentDict()
-        self._public_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
+        self._private_inventory = ConcurrentDict()
+        self.public_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
+        # Default agentic behavior for pool-bound workers
+        self.state = WorkerState.STARTING
 
-    # --- Framework Integration & Identity ---
+    def dispose(self):
+        """
+        Performs a comprehensive cleanup of the agent's state, clears
+        all references, and then triggers the disposal process of its base class.
+        This is safe to call multiple times.
+        """
+        if self._disposed:
+            return
+
+        self._unregister()
+        # Dispose agent-specific resources
+        self._dispose_work()
+        self._private_inventory.dispose()
+        self._private_inventory = None
+        self.public_inventory.dispose()
+        self.public_inventory = None
+        self._event_loop = None
+
+        super().dispose()  # Call parent dispose if it exists
+
+    def _unregister(self) -> None:
+        """
+        Unregisters the agent from the command center, if applicable.
+        This is typically called when the agent is no longer needed or is being disposed.
+        """
+        if self._command_center:
+            self._command_center._unregister_agent(self)
+            self._command_center = None
+
+    def _dispose_work(self) -> None:
+        """
+        Disposes of the `HelpRequest` currently bound to this worker and
+        detaches it, clearing the reference.
+
+        This is typically called when a work item is no longer needed or after
+        its completion/failure, allowing for resource cleanup.
+        """
+        if self._value_work:
+            self._value_work.dispose()
+            self._value_work = None
+
+    def set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
+        """
+        Sets the primary, default execution loop or "home behavior" for the agent.
+
+        This function defines the agent's main operational loop, which is executed
+        when `run()` is called for a pool-bound agent.
+
+        Args:
+            fn (Union[Callable[..., None], Pack]): A parameterless callable or `Pack`
+                that represents the agent's main execution loop.
+        """
+        self._event_loop = Pack.bundle(fn) if fn else None
+
+    def run(self):
+        """
+        Main execution entry point for the agentic thread.
+
+        - If `self._pool_agent` is `True`, this thread executes the agentic event
+          loop set via `set_home()`. This is the standard behavior for agents
+          within a dynamic thread pool.
+        - Otherwise, it falls back to the standard `threading.Thread.run()`
+          behavior, executing the `_target` function if provided. This supports
+          standalone thread logic outside the pool framework.
+
+        Raises:
+            RuntimeError: If the agent is a pool agent but `_event_loop` has not
+                been set, or if it is a standalone agent but no `_target` is defined.
+        """
+        with self._lock:
+            if self._disposed:
+                raise RuntimeError("Cannot activate a disposed agent.")
+            self.state = WorkerState.ACTIVE
+
+        try:
+            if self._target:
+                return super().run()
+
+            if self._event_loop:
+                self._event_loop()
+        except Exception as e:
+            # Optionally, log the exception if needed
+            pass
+        finally:
+            # Ensure agent is disposed properly even after an exception
+            self.dispose()
+            self.death_event.set()
+
+    def deploy(self):
+        """
+        Deploys the agent by starting its thread. This method is typically called
+        by the `CommandCenter` or similar orchestrator to activate the agent.
+
+        Raises:
+            RuntimeError: If the agent has been disposed or if it is already running.
+        """
+        with self._lock:
+            if self._disposed:
+                raise RuntimeError("Cannot deploy a disposed agent.")
+            if self.is_alive():
+                raise RuntimeError("Agent is already running.")
+        self.run()
+
     def set_target(self, target: Union[Callable[..., Any], Pack]) -> None:
         """
         This method sets the target function or `Pack` for the agent.
@@ -136,39 +240,6 @@ class Agent(Worker):
         """
         return f"AgenticProfile<{self.factory_id}>"
 
-    def dispose(self):
-        """
-        Performs a comprehensive cleanup of the agent's state, clears
-        all references, and then triggers the disposal process of its base class.
-        This is safe to call multiple times.
-        """
-        if self._disposed:
-            return
-
-        # Dispose agent-specific resources
-        self._dispose_work()
-        self._private_inventory.data.dispose()
-        self._private_inventory = None
-        self._public_inventory.dispose()
-        self._public_inventory = None
-
-        self._event_loop = None
-        self._command_center = None
-
-        super().dispose()  # Call parent dispose if it exists
-
-    def _dispose_work(self) -> None:
-        """
-        Disposes of the `HelpRequest` currently bound to this worker and
-        detaches it, clearing the reference.
-
-        This is typically called when a work item is no longer needed or after
-        its completion/failure, allowing for resource cleanup.
-        """
-        if self._value_work:
-            self._value_work.dispose()
-            self._value_work = None
-
     def _set_work_state(self, new_state: WorkStatus) -> None:
         """
         Sets the status of the `HelpRequest` currently bound to this agent.
@@ -211,27 +282,37 @@ class Agent(Worker):
         self._value_work = help_request
 
     def _mark_work_in_progress(self) -> None:
-        """Convenience method to mark the bound work as 'in progress'."""
+        """
+        Convenience method to mark the bound work as 'in progress'.
+        """
         if self._value_work:
             self._value_work.mark_in_progress()
 
     def _mark_work_completed(self) -> None:
-        """Convenience method to mark the bound work as 'completed'."""
+        """
+        Convenience method to mark the bound work as 'completed'.
+        """
         if self._value_work:
             self._value_work.mark_completed()
 
     def _mark_work_failed(self) -> None:
-        """Convenience method to mark the bound work as 'failed'."""
+        """
+        Convenience method to mark the bound work as 'failed'.
+        """
         if self._value_work:
             self._value_work.mark_failed()
 
     def _mark_work_cancelled(self) -> None:
-        """Convenience method to mark the bound work as 'cancelled'."""
+        """
+        Convenience method to mark the bound work as 'cancelled'.
+        """
         if self._value_work:
             self._value_work.mark_cancelled()
 
     def _reset_work(self) -> None:
-        """Resets the bound `HelpRequest` to its initial 'pending' state."""
+        """
+        Resets the bound `HelpRequest` to its initial 'pending' state.
+        """
         if self._value_work:
             self._value_work.reset()
 
@@ -247,12 +328,16 @@ class Agent(Worker):
         return None
 
     def _acquire_and_run_work(self):
-        """Initiates the execution of the `HelpRequest` bound to this agent."""
+        """
+        Initiates the execution of the `HelpRequest` bound to this agent.
+        """
         if self._value_work:
             self._value_work.acquire_work()
 
     def _cancel_bound_job(self):
-        """Cancels the job associated with the bound `HelpRequest`."""
+        """
+        Cancels the job associated with the bound `HelpRequest`.
+        """
         if self._value_work:
             self._value_work.cancel_job()
 
@@ -299,17 +384,20 @@ class Agent(Worker):
 
         Returns:
             Optional['AgenticBase']: The resolved agent instance, or `None` if not found.
+
+        Raises:
+            ValueError: If no agent with the given `factory_id` is found.
         """
         if self._command_center and hasattr(self._command_center, "get_agent_by_id"):
-            return self._command_center.get_agent_by_id(factory_id)
-        # Fallback for pool-based resolution
-        if self.factory and hasattr(self.factory, "get_worker_by_id"):
-            return self.factory.get_worker_by_id(factory_id)
-        return None
+            agent = self._command_center.get_agent_by_id(factory_id)
+            if agent is None:
+                raise ValueError(f"No agent found with factory_id: {factory_id}")
+            return agent
+        raise ValueError(f"Command center is not available or does not support get_agent_by_id.")
 
     def bind_to_inventory_by_id(self, factory_id: str, key: str, value: Any):
         """
-        Binds a value to the private inventory of another agent, identified by its ID.
+        Binds a value to the public inventory of another agent, identified by its ID.
 
         Args:
             factory_id (str): The unique ID of the target agent.
@@ -317,13 +405,13 @@ class Agent(Worker):
             value (Any): The data to be stored.
         """
         worker = self._resolve_worker_by_id(factory_id)
-        if worker and hasattr(worker, 'bind_to_inventory'):
-            # Assuming the target worker has a 'bind_to_inventory' method
-            worker.bind_to_inventory(key, value)
+        if worker and hasattr(worker, 'public_inventory'):
+            # Use public inventory instead of private inventory
+            worker.public_inventory[key] = value
 
     def get_from_inventory_by_id(self, factory_id: str, key: str, default=None) -> Any:
         """
-        Retrieves a value from the private inventory of another agent by its ID.
+        Retrieves a value from the public inventory of another agent by its ID.
 
         Args:
             factory_id (str): The unique ID of the target agent.
@@ -335,72 +423,53 @@ class Agent(Worker):
             Any: The value from the target agent's inventory, or the default value.
         """
         worker = self._resolve_worker_by_id(factory_id)
-        if worker and hasattr(worker, 'get_from_inventory'):
-            # Assuming the target worker has a 'get_from_inventory' method
-            return worker.get_from_inventory(key, default)
+        if worker and hasattr(worker, 'public_inventory'):
+            # Access public inventory instead of private inventory
+            return worker.public_inventory.get(key, default)
         return default
 
-    def set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
-        """
-        Sets the primary, default execution loop or "home behavior" for the agent.
-
-        This function defines the agent's main operational loop, which is executed
-        when `run()` is called for a pool-bound agent.
-
-        Args:
-            fn (Union[Callable[..., None], Pack]): A parameterless callable or `Pack`
-                that represents the agent's main execution loop.
-        """
-        self._event_loop = Pack.bundle(fn) if fn else None
-
-    def run(self):
-        """
-        Main execution entry point for the agentic thread.
-
-        - If `self._pool_agent` is `True`, this thread executes the agentic event
-          loop set via `set_home()`. This is the standard behavior for agents
-          within a dynamic thread pool.
-        - Otherwise, it falls back to the standard `threading.Thread.run()`
-          behavior, executing the `_target` function if provided. This supports
-          standalone thread logic outside the pool framework.
-
-        Raises:
-            RuntimeError: If the agent is a pool agent but `_event_loop` has not
-                been set, or if it is a standalone agent but no `_target` is defined.
-        """
-        if not self._pool_agent:
-            if self._target:
-                return super().run()  # Executes the _target via Worker's run
-            else:
-                raise RuntimeError("No event loop or target function set for standalone thread.")
-
-        # Default agentic behavior for pool-bound workers
-        self.state = WorkerState.STARTING
-
-        if self._event_loop is None:
-            raise RuntimeError(f"[Worker {self.factory_id}] No home() set before thread start.")
-
-        self._event_loop()
-        self.death_event.set()
-
-    def _validate_caller(self, factory_id: Optional[str] = None) -> None:
+    def _validate_caller(self) -> None:
         """
         Internal method to validate the `factory_id` of the calling thread.
 
-        This can be used as a security measure to ensure that certain methods are
-        only called by authorized threads.
-
-        Args:
-            factory_id (Optional[str]): The expected `factory_id`. If `None`, this
-                agent's own `factory_id` is used for the check.
+        Compares the `factory_id` of the calling thread with the agent's own `factory_id`
+        to ensure that the correct thread is accessing or modifying the agent's data.
 
         Raises:
             PermissionError: If the calling thread's `factory_id` does not match
-                the expected ID.
+                the agent's `factory_id`.
         """
-        expected = factory_id or self.factory_id
         current_id = getattr(threading.current_thread(), "factory_id", None)
-        if current_id != expected:
+
+        # Compare the calling thread's factory_id with the agent's factory_id
+        if current_id != self.factory_id:
             raise PermissionError(
-                f"[Access Denied] Caller factory_id={current_id} does not match expected={expected}"
+                f"[Access Denied] Caller factory_id={current_id} does not match agent's factory_id={self.factory_id}"
             )
+
+    def get_from_private_inventory(self, key: str, default=None) -> Any:
+        """
+        Retrieves a value from the private inventory of this agent, only if the calling thread has the
+        correct `factory_id`.
+
+        Args:
+            key (str): The key of the item to retrieve.
+            default (Any, optional): The value to return if the key is not found. Defaults to None.
+
+        Returns:
+            Any: The value from the inventory, or the default value if not found.
+        """
+        self._validate_caller()  # Validate caller using the existing method
+        return self._private_inventory.get(key, default)
+
+    def put_in_private_inventory(self, key: str, value: Any) -> None:
+        """
+        Puts a value in the private inventory of this agent, only if the calling thread has the
+        correct `factory_id`.
+
+        Args:
+            key (str): The key under which to store the value.
+            value (Any): The value to store in the inventory.
+        """
+        self._validate_caller()  # Validate caller using the existing method
+        self._private_inventory[key] = value

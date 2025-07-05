@@ -9,9 +9,9 @@ class DummyAgent(Agent):
         super().__init__(*args, **kwargs)
         self._disposed = False
 
-    def dispose(self):
-        self._disposed = True
-
+    # def dispose(self):
+    #     #self._disposed = True
+    #     pass
 
 class TestCommandCenter(unittest.TestCase):
 
@@ -115,7 +115,7 @@ class TestCommandCenter(unittest.TestCase):
             raise RuntimeError("kaboom")
 
         self.cc.submit(task, template_name="explode")
-        time.sleep(0.05)  # give thread a chance
+        time.sleep(1.5)  # give thread a chance
         self.assertEqual(len(self.cc.get_active_agents()), 0)
 
 

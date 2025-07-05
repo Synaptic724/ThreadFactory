@@ -49,7 +49,6 @@ class CommandCenter(IDisposable):
         with self._lock:
             if self._disposed:
                 return
-
             self._disposed = True
 
             if self._active_agents:
@@ -57,6 +56,7 @@ class CommandCenter(IDisposable):
                     try:
                         if hasattr(agent, "dispose") and callable(agent.dispose):
                             agent.dispose()
+                        self._worker_count.decrement()
                     except Exception:
                         pass
                 self._active_agents.clear()
@@ -65,7 +65,7 @@ class CommandCenter(IDisposable):
             try:
                 self._builder.dispose()
             except Exception:
-                pass  # builder remains intact even after failed disposal
+                pass
 
     def shutdown(self):
         """
@@ -74,6 +74,64 @@ class CommandCenter(IDisposable):
         Provides semantic clarity when intentionally terminating the CommandCenter.
         """
         self.dispose()
+
+
+    def _register_agent(self, agent: Agent):
+        """
+        Internal helper to register an agent in the active list.
+
+        Args:
+            agent (Agent): The agent to register.
+        """
+        if not self._disposed and agent:
+            with self._lock:
+                self._worker_count.increment()
+                self._active_agents[agent.factory_id] = agent
+
+    def _unregister_agent(self, agent: Agent):
+        """
+        Internal helper to unregister and forget an agent.
+
+        Args:
+            agent (Agent): The agent to remove from tracking.
+        """
+        if not self._disposed and agent:
+            with self._lock:
+                self._active_agents.pop(agent.factory_id, None)
+                self._worker_count.decrement()
+
+    def increase_max_workers(self, amount: int = 1):
+        """
+        Increases the maximum allowed concurrent agents.
+
+        Args:
+            amount (int): The number of additional workers to allow (must be positive).
+
+        Raises:
+            ValueError: If amount is not a positive integer.
+        """
+        if not isinstance(amount, int) or amount < 1:
+            raise ValueError("Amount must be a positive integer.")
+        with self._lock:
+            self._max_workers += amount
+
+    def decrease_max_workers(self, amount: int = 1):
+        """
+        Decreases the maximum allowed concurrent agents.
+
+        Args:
+            amount (int): The number of workers to remove from the cap (must be positive).
+
+        Raises:
+            ValueError: If amount is not a positive integer.
+            RuntimeError: If the decrease would result in fewer slots than active agents.
+        """
+        if not isinstance(amount, int) or amount < 1:
+            raise ValueError("Amount must be a positive integer.")
+        with self._lock:
+            if self._worker_count.value > self._max_workers - amount:
+                raise RuntimeError("Cannot decrease below current active worker count.")
+            self._max_workers -= amount
 
     def _create_and_register_agent(self, template_name: str, *args, **kwargs) -> Agent:
         """
@@ -94,33 +152,31 @@ class CommandCenter(IDisposable):
         if self._disposed:
             raise RuntimeError("CommandCenter is disposed.")
 
-        if self._worker_count.increment() > self._max_workers:
-            self._worker_count.decrement()
+        if self._worker_count.get() >= self._max_workers:
             raise RuntimeError(f"Cannot create agent. Worker cap of {self._max_workers} reached.")
 
         try:
+            # First, try to create the agent without incrementing worker count
             kwargs["command_center"] = self
             agent = self._builder.create_agent(template_name, *args, **kwargs)
             self._register_agent(agent)
             return agent
         except Exception as e:
-            self._worker_count.decrement()
-            raise RuntimeError(f"Agent creation failed: {e}") from e
+            raise RuntimeError(f"Agent creation failed: {str(e)}") from e
 
     def create_agent(
-        self,
-        template_name: str,
-        define_home: Optional[Union[Callable[..., None], Pack]] = None,
-        target: Optional[Union[Callable[..., None], Pack]] = None,
-        *args, **kwargs
+            self,
+            template_name: str,
+            define_home: Optional[Union[Callable[..., None], Pack]] = None,
+            target: Optional[Union[Callable[..., None], Pack]] = None,
+            *args, **kwargs
     ) -> Agent:
         """
         Creates a single agent from a registered template with optional task control hooks.
 
         Args:
             template_name (str): The name of the registered agent template.
-            define_home (Callable | Pack, optional): A function representing the agent's long-lived
-                internal loop (wrapped with cleanup).
+            define_home (Callable | Pack, optional): A function representing the agent's long-lived event loop.
             target (Callable | Pack, optional): A one-time task to run before the main loop.
             *args: Positional overrides passed to the template factory.
             **kwargs: Keyword overrides passed to the template factory.
@@ -131,18 +187,11 @@ class CommandCenter(IDisposable):
         agent = self._create_and_register_agent(template_name, *args, **kwargs)
 
         if target:
-            target = Pack.bundle(target)
-            agent.set_home(target)
+            agent.set_target(target)
 
-        def home_with_cleanup():
-            try:
-                if define_home:
-                    Pack.bundle(define_home)()
-            finally:
-                self._unregister_agent(agent)
-                self._worker_count.decrement()
+        if define_home:
+            agent.set_home(define_home)
 
-        agent.set_home(home_with_cleanup)
         return agent
 
     def create_agents(
@@ -257,26 +306,5 @@ class CommandCenter(IDisposable):
         if self._disposed or not factory_id:
             return None
         return self._active_agents.get(factory_id)
-
-    def _register_agent(self, agent: Agent):
-        """
-        Internal helper to register an agent in the active list.
-
-        Args:
-            agent (Agent): The agent to register.
-        """
-        if not self._disposed and agent:
-            self._active_agents[agent.factory_id] = agent
-
-    def _unregister_agent(self, agent: Agent):
-        """
-        Internal helper to unregister and forget an agent.
-
-        Args:
-            agent (Agent): The agent to remove from tracking.
-        """
-        if not self._disposed and agent:
-            self._active_agents.pop(agent.factory_id, None)
-
 
 CC = CommandCenter
