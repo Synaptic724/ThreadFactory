@@ -134,6 +134,43 @@ class BaseActivity(IDisposable, ABC):
         })
     # --- Agent Management ---
 
+    def _get_agent_details(self) -> Optional[Agent]:
+        """
+        Retrieves the Agent instance currently registered and associated with the calling thread.
+
+        This internal method checks if the current thread has a `factory_id` attribute
+        (implying it's an agent-managed thread) and, if so, attempts to find the
+        corresponding `Agent` object that has been registered with this activity.
+        It's useful for the activity to determine which specific agent is currently
+        interacting with it.
+
+        Returns:
+            Optional[Agent]: The `Agent` instance if one is found for the current
+                             thread and is registered with this activity, otherwise `None`.
+        """
+        current_id = getattr(threading.current_thread(), "factory_id", None)
+        return self._registered_agents.get(current_id, None)
+
+    def _get_agent_id(self) -> Optional[str]:
+        """
+        Retrieves the unique factory ID of the Agent currently associated with the calling thread.
+
+        This method acts as a convenient way for the activity to identify which agent
+        is performing an action. It looks for a `factory_id` on the current thread
+        and confirms if that agent is registered with this activity. If no such agent
+        is found or registered, it returns `None`.
+
+        Returns:
+            Optional[str]: The `factory_id` (string) of the currently associated and
+                           registered agent, or `None` if no agent is found or registered.
+        """
+        current_id = getattr(threading.current_thread(), "factory_id", None)
+        if current_id in self._registered_agents:
+            return current_id
+        else:
+            self._logger.debug(f"No agent registered for Activity '{self.id}' with factory ID '{current_id}'.")
+            return None
+
     def register_agent(self, agent: Agent):
         """
         Assigns an agent to this activity, making it aware of the agent.

@@ -71,6 +71,7 @@ class JobActivity(BaseActivity):
         })
         details["name"] = "JobActivity"
         return details
+
     # --- Lifecycle & Control Methods ---
 
     def cancel(self):
@@ -222,12 +223,13 @@ class JobActivity(BaseActivity):
         """
         with self._lock:
             try:
+                agent_id = self._get_agent_id()
                 new_status = JobStatus[status_str.upper()]
                 if self._status != new_status:
                     self._logger.info(
                         f"JobActivity '{self.id}' status changed from {self._status.name} to {new_status.name}.")
                     self._status = new_status
-                    self._notify("STATUS_CHANGED", {"status": self._status.name})
+                    self._notify("STATUS_CHANGED", {"status": self._status.name, "agent_id": agent_id})
             except KeyError:
                 raise ValueError(
                     f"Invalid job status string: '{status_str}'. Must be one of {[s.name for s in JobStatus]}.")
@@ -281,9 +283,24 @@ class JobActivity(BaseActivity):
             # Calculate the percentage and store it in _progress for get_progress()
             current_percentage = (self._job_current_count / self._job_total) * 100.0
             self._progress = current_percentage  # This now stores the 0.0-100.0 percentage
-
+            agent_id = self._get_agent_id()
             self._logger.debug(
                 f"JobActivity '{self.id}' progress updated: {self._job_current_count}/{self._job_total} ({self._progress:.2f}%).")
             self._notify("PROGRESS_UPDATE", {"current_count": self._job_current_count,
                                              "total_count": self._job_total,
-                                             "percentage": self._progress})
+                                             "percentage": self._progress,
+                                             "agent_id": agent_id})
+
+    def cancellation_confirmed(self):
+        """
+        Handles the confirmation of a cancellation request from an agent.
+
+        This method is called when an agent confirms that it has received
+        a cancellation request for this job activity. It updates the job's
+        status to `JobStatus.CANCELLED` and logs the confirmation.
+        """
+        self.set_status("CANCELLED")
+        agent = self._get_agent_id()
+        self._notify("CANCELLATION_CONFIRMED", {"status": self._status.name,
+                                                "agent_id": agent})
+        self._logger.info(f"Cancellation request received from agent {agent} for JobActivity '{self.id}'.")
