@@ -18,7 +18,7 @@ class BaseProfile(IDisposable, IProfile):
         "id", "name", "job", "group",
         "save_points", "locations", "data_transfer",
         "_bound_target", "_thread_target", "_command_center",
-        "_worker_type", "_pool_agent", "_activator", "_lock", "factory_id",
+        "_worker_type", "_pool_agent", "_activator", "_lock", "_factory_id",
     ]
 
     def __init__(self):
@@ -31,7 +31,7 @@ class BaseProfile(IDisposable, IProfile):
             factory_id (Optional[str]): The unique identifier for the thread.
         """
         super().__init__()
-        self.factory_id = str(ulid.ULID())
+        self._factory_id = str(ulid.ULID())
         self._worker_type = "agentic"
         self._thread_target = None
         self._pool_agent = False # Indicates this worker is part of a dynamic thread pool
@@ -88,29 +88,10 @@ class BaseProfile(IDisposable, IProfile):
     def __str__(self) -> str:
         return f"AgentActivator<{self.factory_id}>"
 
-    @staticmethod
-    def is_agent(thread: threading.Thread) -> bool:
-        """
-        Checks if a thread has already been activated as an agent.
+    @property
+    def factory_id(self):
+        return self._factory_id
 
-        This is done by checking for the `_worker_type` attribute on the thread.
-
-        Args:
-            thread (threading.Thread): The thread to check.
-
-        Returns:
-            bool: True if the thread is an agent, False otherwise.
-        """
-        return getattr(thread, '_worker_type', None) == 'agentic'
-
-    def get_factory_id(self) -> str:
-        """
-        Retrieves the unique factory ID assigned to this agent.
-
-        Returns:
-            str: The agent's unique string identifier.
-        """
-        return self.factory_id
 
     def bind_to_inventory_by_id(self, factory_id: str, key: str, value: Any):
         """

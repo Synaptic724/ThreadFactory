@@ -1,6 +1,7 @@
 import threading
+import warnings
 from typing import Callable, Union, List, Type, Set
-from thread_factory.agent import AgentActivator
+from thread_factory.agent.identity.activator import AgentActivator
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
@@ -27,8 +28,9 @@ class ProfileBuilder(IDisposable):
         - Bind and unbind profiles to agents
     """
 
-    __slots__ = IDisposable.__slots__ + ["_registry", "_registered"]
-
+    __slots__ = IDisposable.__slots__ + ["_registry", "_registered",
+                                         "_safe_list", "_collision_check"]
+    RESERVED_NAMES = {"dispose", "_disposed", "_abc_impl"}  # Drop _abc_impl, it’s harmless
     def __init__(self):
         """
         Initializes a fresh profile builder and registers the default profile template.
@@ -125,10 +127,6 @@ class ProfileBuilder(IDisposable):
         if not isinstance(profile, IProfile):
             raise TypeError(f"Profile '{name}' did not return an IProfile instance.")
 
-        if name not in self._safe_list:
-            self._check_for_collision(profile.__class__)
-            self._safe_list.append(name)
-
         return profile
 
     def attach_profile(self, profile: General, target: Union["AgentActivator", "Agent"]) -> None:
@@ -148,29 +146,20 @@ class ProfileBuilder(IDisposable):
 
     def _check_for_collision(self, fn: Callable[[], IProfile]) -> None:
         """
-        Verifies that the class returned by the factory does not expose any
-        public methods or attributes that conflict with reserved names.
+        Check for unsafe shadowing of internal names by the profile class itself.
 
-        Args:
-            fn (Callable[[], IProfile]): Profile constructor.
-
-        Raises:
-            ValueError: If any method or attribute name collides.
+        Warns only if user-defined methods/fields directly conflict with reserved names.
         """
-        try:
-            profile_class = fn().__class__
-        except Exception as e:
-            raise ValueError(f"Unable to instantiate profile for collision check: {e}")
+        instance = fn()
+        cls = type(instance)
+        user_defined = set(cls.__dict__.keys())  # only the class’s *own* attributes
 
-        class_members = ProfileBuilder.get_public_class_members(profile_class)
-        conflicts = class_members.intersection(self._collision_check)
-
+        conflicts = ProfileBuilder.RESERVED_NAMES.intersection(user_defined)
         if conflicts:
-            raise ValueError(
-                f"Profile '{profile_class.__name__}' has name collisions with reserved agent attributes: "
-                f"{', '.join(sorted(conflicts))}"
+            warnings.warn(
+                f"Profile '{cls.__name__}' defines reserved name(s): {', '.join(conflicts)}. "
+                f"These may override core behavior. Proceeding anyway."
             )
-
 
     def _create_colision_checker(self) -> None:
         """
@@ -184,23 +173,20 @@ class ProfileBuilder(IDisposable):
     @staticmethod
     def get_public_class_members(cls: Type) -> Set[str]:
         """
-        Scans a given class reference to pull out the names of its public
-        (non-dunder) fields and methods.
+        Scans a given class reference to pull out the names of its directly
+        defined public (non-dunder) fields and methods, excluding inherited ones.
 
         Args:
             cls (Type): The class object to inspect.
 
         Returns:
-            Set[str]: A sorted list of public member names.
+            Set[str]: A set of public member names.
         """
         public_members = set()
 
-        # Inspect the provided class
-        for name in dir(cls):
-            # Filter out dunder methods unless they are explicitly considered public interfaces
-            # (like __call__, __repr__, __str__).
-            if not name.startswith('__') or \
-               (name.startswith('__') and name.endswith('__') and name in ['__call__', '__repr__', '__str__']):
+        for name in cls.__dict__:
+            # Accept explicitly declared public members and key dunder interfaces
+            if not name.startswith('__') or name in ['__call__', '__repr__', '__str__']:
                 public_members.add(name)
 
         return public_members

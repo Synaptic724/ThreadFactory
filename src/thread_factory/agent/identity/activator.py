@@ -1,5 +1,5 @@
 import threading
-from typing import Any, Dict, List
+from typing import Any, List
 from thread_factory.utils.interfaces.disposable import IDisposable
 
 
@@ -21,14 +21,14 @@ class AgentActivator(IDisposable):
 
         Args:
             profile (Any): A class or callable that returns a profile instance.
-                           The profile must implement `unpatch_thread(obj)` and optionally `dispose()`.
+                           The profile may implement `dispose()`.
             target (Any): The object to upgrade (e.g., a thread instance).
         """
         super().__init__()
         self._lock = threading.RLock()
-        self._target: threading.Thread = target  # The object being patched
-        self._profile = profile  # Create profile instance
-        self._patched_fields: List[str] = []  # Track what we add so we can clean it later
+        self._target: threading.Thread = target
+        self._profile = profile
+        self._patched_fields: List[str] = []
 
     def dispose(self):
         """
@@ -40,65 +40,65 @@ class AgentActivator(IDisposable):
         if self._disposed:
             return
         with self._lock:
-            if self._profile:
-                self._profile.unpatch_thread(self._target)  # Profile-level cleanup
-                self._profile.dispose()
-                self._profile = None
+            if self._profile and hasattr(self._profile, "dispose"):
+                try:
+                    self._profile.dispose()
+                except Exception:
+                    pass
+            self._profile = None
             self._unpatch()
             self._target = None
             self._patched_fields.clear()
             self._disposed = True
 
+    @staticmethod
+    def is_agent(thread: threading.Thread) -> bool:
+        """
+        Checks if a thread has already been activated as an agent.
+
+        Args:
+            thread (threading.Thread): The thread to check.
+
+        Returns:
+            bool: True if the thread is an agent, False otherwise.
+        """
+        return getattr(thread, '_worker_type', None) == 'agentic'
+
     def _patch(self):
         """
         Automatically patches public methods and fields from the profile
         into the target object.
-
-        This method skips private/dunder attributes and avoids overriding
-        any pre-existing attributes on the target. All patched field names
-        are recorded for safe removal during unpatching.
         """
         for attr_name in dir(self._profile):
             if attr_name.startswith("_"):
-                continue  # Skip private or dunder methods/fields
+                continue
             if hasattr(self._target, attr_name):
-                continue  # Avoid overwriting existing attributes
+                continue
 
             attr = getattr(self._profile, attr_name)
             setattr(self._target, attr_name, attr)
             self._patched_fields.append(attr_name)
 
-        # Always patch 'profile' so the target can access its identity context
         setattr(self._target, "profile", self._profile)
         self._patched_fields.append("profile")
 
     def _unpatch(self):
         """
         Removes all attributes that were dynamically patched onto the target.
-
-        Any AttributeError during removal is safely ignored to allow robust cleanup.
         """
         for name in self._patched_fields:
             if hasattr(self._target, name):
                 try:
                     delattr(self._target, name)
                 except AttributeError:
-                    pass  # Already gone or wasn't allowed to be removed
+                    pass
 
     def __call__(self) -> "AgentActivator":
-        """
-        Allows the agent to be called like a function and return itself.
-
-        This enables compatibility with factory or decorator patterns.
-        """
         return self
 
     def run(self) -> Any:
         """
         Executes the wrapped target’s `run()` method if it has one.
-
-        This allows direct access to the target’s run logic, which is
-        especially useful for synchronous execution during testing.
 
         Returns:
             Any: Result from the target’s `run()` method.

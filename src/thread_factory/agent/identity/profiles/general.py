@@ -6,7 +6,7 @@ from thread_factory.utils.interfaces.disposable import IDisposable
 from typing import Optional, Callable, Union, Any
 from thread_factory.utils.interfaces.iprofile import IProfile
 
-class General(IDisposable, BaseProfile, IProfile):
+class General(BaseProfile, IProfile):
     """
     General Profile
     ---------

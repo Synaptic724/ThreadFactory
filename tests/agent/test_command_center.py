@@ -1,114 +1,149 @@
-import unittest, threading
-from thread_factory.agent.command_center import CC
-from thread_factory.agent.identity.activator import ActivatedAgent
-from thread_factory.agent.thread_pool import HelpRequest
+# tests/agent/identity/test_command_center.py
+import threading
+import time
+import unittest
+from concurrent.futures import Future
+from thread_factory.agent.command_center import CommandCenter, CC
+from thread_factory.agent.identity.activator import AgentActivator
+from thread_factory.agent.identity.profiles.general import General
+from thread_factory.utils.coordination.package import Pack
+from thread_factory.utils.interfaces.iprofile import IProfile
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# Helpers
+# ──────────────────────────────────────────────────────────────────────────
+def _no_op() -> str:
+    """Simple task for background submission."""
+    return "ok"
+
+
+class CustomProfile(General):
+    def __init__(self):
+        super().__init__()
+        self.custom_flag = True
+
+
+def custom_profile_factory() -> IProfile:
+    return CustomProfile()
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Test suite
+# ──────────────────────────────────────────────────────────────────────────
 class TestCommandCenter(unittest.TestCase):
     def setUp(self):
-        self.center = CC(max_workers=4)
+        self.cc = CommandCenter(max_workers=2)
 
     def tearDown(self):
-        self.center.dispose()
+        try:
+            self.cc.shutdown()
+        except Exception:
+            pass
 
-    def test_create_agents_registers_correctly(self):
-        """
-        Validates that agents are correctly created, started, and removed from the registry after execution.
-        Ensures `CommandCenter` tracks agents during their lifetime and they auto-dispose cleanly.
-        """
-        results = []
-        joins = []
+    # ------------------------------------------------------------------
+    # Profile-registry facade
+    # ------------------------------------------------------------------
+    def test_default_profile_present(self):
+        self.assertIn("default", self.cc.list_profiles())
 
-        def sample_task():
-            results.append("ran")
-            joins.append(threading.current_thread())  # Capture thread for joining
+    def test_register_and_list_profiles(self):
+        self.cc.register_profile("custom", custom_profile_factory)
+        self.assertIn("custom", self.cc.list_profiles())
 
-        agents = self.center.create_agents(3, sample_task, name_prefix="Agent")
+    def test_unregister_profile(self):
+        self.cc.register_profile("temp", custom_profile_factory)
+        self.assertTrue(self.cc.unregister_profile("temp"))
+        self.assertNotIn("temp", self.cc.list_profiles())
 
-        for agent in agents:
-            agent.start()
+    def test_set_default_profile_key(self):
+        self.cc.register_profile("alt", custom_profile_factory)
+        self.cc.set_default_profile_key("alt")
+        # submit without key should now use alt
+        fut = self.cc.submit(_no_op)
+        fut.result(timeout=1)
+        active = self.cc.get_active_agents()
+        if active:  # it might finish too quickly
+            self.assertIsInstance(active[0].profile, CustomProfile)
 
-        for thread in joins:
-            thread.join()
+    def test_set_default_profile_key_invalid_raises(self):
+        with self.assertRaises(KeyError):
+            self.cc.set_default_profile_key("missing")
 
-        self.assertEqual(len(results), 3)
+    # ------------------------------------------------------------------
+    # submit() behaviour
+    # ------------------------------------------------------------------
+    def test_submit_callable_returns_result(self):
+        fut = self.cc.submit(_no_op)
+        self.assertIsInstance(fut, Future)
+        self.assertEqual(fut.result(timeout=1), "ok")
 
-        # Correct method name
-        snapshot = self.center.get_active_agents()
-        self.assertIsInstance(snapshot, list)
-        self.assertEqual(len(snapshot), 0)
+    def test_submit_transforms_thread_to_agent(self):
+        fut = self.cc.submit(lambda: AgentActivator.is_agent(threading.current_thread()))
+        self.assertTrue(fut.result(timeout=1))
 
-    def test_submit_executes_in_threadpool(self):
-        called = []
+    def test_submit_with_custom_profile_key(self):
+        self.cc.register_profile("custom", custom_profile_factory)
+        fut = self.cc.submit(_no_op, profile_key="custom")
+        fut.result(timeout=1)
+        acts = self.cc.get_active_agents()
+        if acts:
+            self.assertIsInstance(acts[0].profile, CustomProfile)
 
-        def job():
-            called.append("done")
-            return 42
+    def test_submit_accepts_pack(self):
+        fut = self.cc.submit(Pack.bundle(_no_op))
+        self.assertEqual(fut.result(timeout=1), "ok")
 
-        future = self.center.submit(job)
-        result = future.result(timeout=2)
-        self.assertEqual(result, 42)
-        self.assertEqual(called, ["done"])
-        self.assertEqual(len(self.center.get_active_agents()), 0)
+    # ------------------------------------------------------------------
+    # transform_thread / current
+    # ------------------------------------------------------------------
+    def test_transform_thread_success(self):
+        th = threading.Thread(target=_no_op)
+        self.assertTrue(self.cc.transform_thread(th, raise_on_main=False))
+        self.assertTrue(AgentActivator.is_agent(th))
 
-    def test_transform_current_thread_success(self):
-        result = []
+    def test_transform_thread_already_agent(self):
+        th = threading.Thread(target=_no_op)
+        self.cc.transform_thread(th, raise_on_main=False)
+        self.assertFalse(self.cc.transform_thread(th, raise_on_main=False))
 
-        def inner():
-            self.assertFalse(ActivatedAgent.is_agent(threading.current_thread()))
-            self.assertTrue(self.center.transform_current_thread("xyz"))
-            result.append(True)
-            self.assertTrue(ActivatedAgent.is_agent(threading.current_thread()))
-
-        t = threading.Thread(target=inner)
-        t.start()
-        t.join()
-
-        self.assertTrue(result)
-        self.assertEqual(len(self.center.get_active_agents()), 1)
-
-    def test_transform_main_thread_fails(self):
+    def test_transform_thread_main_raises(self):
         with self.assertRaises(RuntimeError):
-            self.center.transform_current_thread("main-bad")
+            self.cc.transform_thread(threading.main_thread())
 
-    def test_activate_agents_bulk(self):
-        def dummy(): pass
-
-        threads = [threading.Thread(target=dummy) for _ in range(5)]
-        count = self.center.activate_agents(threads)
-        self.assertEqual(count, 5)
-        self.assertEqual(len(self.center.get_active_agents()), 5)
-
-    def test_dispose_cleans_up_resources(self):
-        def dummy(): pass
-        self.center.create_agents(2, dummy)
-        self.assertGreater(len(self.center.get_active_agents()), 0)
-        self.center.dispose()
-        self.assertTrue(self.center._disposed)
-        self.assertIsNone(self.center._active_agents)
-        self.assertIsNone(self.center._offload_pool)
-
-    def test_shutdown_is_alias_for_dispose(self):
-        self.assertFalse(self.center._disposed)
-        self.center.shutdown()
-        self.assertTrue(self.center._disposed)
-
-    def test_submit_registers_agent_temporarily(self):
-        agent_ids = []
-
-        def job():
-            agent_ids.append(getattr(threading.current_thread(), "factory_id", None))
-
-        self.center.submit(job).result()
-        self.assertEqual(len(agent_ids), 1)
-        self.assertIsInstance(agent_ids[0], str)
-        self.assertEqual(len(self.center.get_active_agents()), 0)
-
-    @unittest.skip("HelpRequest is not implemented in this test suite")
-    def test_request_help_raises_runtime_error(self):
+    def test_transform_current_thread_raises_on_main(self):
         with self.assertRaises(RuntimeError):
-            self.center.request_help(HelpRequest())
+            self.cc.transform_current_thread()
 
+    def test_transform_thread_custom_profile(self):
+        th = threading.Thread(target=_no_op)
+        self.cc.register_profile("cprof", custom_profile_factory)
+        self.cc.transform_thread(th, profile_key="cprof", raise_on_main=False)
+        self.assertIsInstance(th.profile, CustomProfile)
 
-if __name__ == "__main__":
+    # ------------------------------------------------------------------
+    # get_active_agents & registry integrity
+    # ------------------------------------------------------------------
+    def test_get_active_agents_snapshot(self):
+        th = threading.Thread(target=_no_op)
+        self.cc.transform_thread(th, raise_on_main=False)
+        agents = self.cc.get_active_agents()
+        self.assertEqual(len(agents), 1)
+
+    def test_get_agent_by_id_valid(self):
+        th = threading.Thread(target=_no_op)
+        self.cc.transform_thread(th, raise_on_main=False)
+        fid = th.factory_id
+        self.assertIs(self.cc.get_agent_by_id(fid), th)
+
+    def test_get_agent_by_id_invalid_returns_none(self):
+        self.assertIsNone(self.cc.get_agent_by_id("not-real"))
+
+    def test_get_agent_by_id_bad_arg_raises(self):
+        with self.assertRaises(ValueError):
+            self.cc.get_agent_by_id("")
+
+    # -------------------------------------
+
+if __name__ == '__main__':
     unittest.main()

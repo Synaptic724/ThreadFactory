@@ -9,6 +9,7 @@ from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.agent.thread_pool import HelpRequest
+from thread_factory.utils.interfaces.iprofile import IProfile
 
 
 class CommandCenter(IDisposable):
@@ -131,8 +132,7 @@ class CommandCenter(IDisposable):
         Raises:
             ValueError: If the provided thread is already registered or invalid.
         """
-        agent = AgentActivator(thread, factory_id)
-        self._assign_profile(agent, profile_key)
+        agent = self._assign_profile(thread, profile_key)
         self._active_agents[agent.factory_id] = agent
 
     def _unregister_agent(self, thread: threading.Thread):
@@ -147,7 +147,7 @@ class CommandCenter(IDisposable):
             with self._lock:
                 self._active_agents.pop(fid, None)
 
-    def _create_agent_wrapper(self, user_target: Callable[[], Any], profile_key: Optional[str] = None) -> Callable[[], None]:
+    def _create_agent_wrapper(self, user_target: Callable[[], Any], profile_key: Optional[str] = None, *args, **kwargs) -> Callable[[], None]:
         """
         Internal wrapper to execute a function as an agent.
 
@@ -163,7 +163,7 @@ class CommandCenter(IDisposable):
         def _execute_and_dispose():
             thread = threading.current_thread()
             if not AgentActivator.is_agent(thread):
-                self._register_agent(thread, profile_key=profile_key)
+                self._register_agent(thread, profile_key=profile_key, *args, **kwargs)
             try:
                 user_target()
             finally:
@@ -193,7 +193,7 @@ class CommandCenter(IDisposable):
                 return activated_agent._thread_target
             return None
 
-    def _assign_profile(self, agent: AgentActivator, profile_key: Optional[str] = None, *thread_details_args, **thread_details_kwargs ) -> None:
+    def _assign_profile(self, thread: threading.Thread, profile_key: Optional[str] = None, *thread_details_args, **thread_details_kwargs ) -> 'AgentActivator':
         """
         Assigns a profile to the given agent using the profile builder.
 
@@ -203,7 +203,8 @@ class CommandCenter(IDisposable):
         """
         key = profile_key or self._default_profile_key
         profile = self._profile_builder.get_profile(key)
-        profile.bind_essentials(command_center=self, thread=agent._target)
+        agent = AgentActivator(target=thread, profile=profile)
+        profile.bind_essentials(command_center=self, target=agent._target, agent=agent)
         profile.define_defaults(*thread_details_args, **thread_details_kwargs)
         profile.bind_to(agent)
         agent.profile = profile  # Store for convenience and external access
@@ -229,8 +230,7 @@ class CommandCenter(IDisposable):
             thread = threading.current_thread()
 
             if not AgentActivator.is_agent(thread):
-                agent = AgentActivator(thread)
-                self._assign_profile(agent, profile_key, *thread_details_args, **thread_details_kwargs)
+                agent = self._assign_profile(thread, profile_key, *thread_details_args, **thread_details_kwargs)
                 self._active_agents[agent.factory_id] = agent
             try:
                 return target()
@@ -330,7 +330,7 @@ class CommandCenter(IDisposable):
         count: int,
         target: Union[Callable[..., None], Pack],
         name_prefix: str = "Agent",
-        profile_key: Optional[str] = None
+        profile_key: Optional[str] = None, *arg, **kwarg
     ) -> ConcurrentList[AgentActivator]:
         """
         Creates a number of AgentActivator threads using a wrapped user target.
@@ -347,11 +347,11 @@ class CommandCenter(IDisposable):
             ConcurrentList[AgentActivator]: List of initialized agent threads.
         """
         if target:
-            Pack.bundle(target)
+            target = Pack.bundle(target)
 
         new_agents = ConcurrentList()
         for i in range(count):
-            wrapped_target = self._create_agent_wrapper(target, profile_key)
+            wrapped_target = self._create_agent_wrapper(target, profile_key, *arg, **kwarg)
             thread = threading.Thread(target=wrapped_target, name=f"{name_prefix}-{i}")
             agent = AgentActivator(thread)
             self._assign_profile(agent, profile_key)
@@ -364,13 +364,13 @@ class CommandCenter(IDisposable):
     # Profile Facade Methods
     # ─────────────────────────────────────────────
 
-    def register_profile(self, name: str, fn: Callable[[General], None]):
+    def register_profile(self, name: str, fn: Callable[[], IProfile]):
         """
         Registers a new profile template via the internal ProfileBuilder.
 
         Args:
             name (str): Symbolic key (e.g., 'scout', 'watcher').
-            fn (Callable): Initialization function for a General profile.
+            fn (Callable): Initialization function for a IProfile.
         """
         self._profile_builder.register_profile(name, fn)
 
