@@ -40,7 +40,7 @@ class Agent(Worker):
         _public_inventory (ConcurrentDict[str, Any]): A dictionary for storing data that is publicly accessible within the agent's scope.
     """
 
-    def __init__(self, command_center: 'CommandCenter', target: Union[Callable[..., Any], Pack] = None, factory_id: Optional[str | int] = None,
+    def __init__(self, command_center: 'CommandCenter', target: Union[Callable[..., Any], Pack] = None,
                  factory: Any = None, work_queue: Optional[ConcurrentQueue[Work]] = None, *args, **kwargs):
         """
         Initializes the agentic profile, sets up all agentic state, and
@@ -61,7 +61,8 @@ class Agent(Worker):
             TypeError: If the provided `target` is not a `Callable` or `Pack` instance.
         """
         # --- Initialize Base Classes ---
-        super().__init__(command_center, target, factory_id=factory_id, factory=factory, work_queue=work_queue, *args, **kwargs)
+        super().__init__(group=None, target=target, factory=factory,
+                         work_queue=work_queue, *args, **kwargs)
         if target and (isinstance(target, Callable) or isinstance(target, Pack)):
             self._target = Pack.bundle(target)
         elif target is not None:
@@ -70,11 +71,10 @@ class Agent(Worker):
             self._target = None
 
         # --- Identity & Framework Integration ---
-        self._factory_id = str(ulid.ULID())
-        self._command_center = command_center
+        self._command_center: 'CommandCenter' = command_center
 
         # --- Agentic Configuration ---
-        self._worker_type = "agentic"
+        self._worker_type: str = "agentic"
         self._pool_agent: bool = True
         self._return_home: bool = False
         self._lock = threading.RLock()
@@ -89,16 +89,6 @@ class Agent(Worker):
         self._public_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
 
     # --- Framework Integration & Identity ---
-    @property
-    def factory_id(self) -> str:
-        """
-        Returns the unique factory ID of this agent instance.
-
-        Returns:
-            str: The unique ULID identifier.
-        """
-        return self._factory_id
-
     def set_target(self, target: Union[Callable[..., Any], Pack]) -> None:
         """
         This method sets the target function or `Pack` for the agent.
@@ -385,7 +375,6 @@ class Agent(Worker):
                 raise RuntimeError("No event loop or target function set for standalone thread.")
 
         # Default agentic behavior for pool-bound workers
-        self._bind_factory_id()
         self.state = WorkerState.STARTING
 
         if self._event_loop is None:

@@ -1,7 +1,5 @@
-import threading
-import warnings
+import threading, warnings
 from typing import Optional, List, Callable, Any, Union
-
 from thread_factory.agent.identity.agent_builder import AgentBuilder
 from thread_factory.agent.identity.types.agent import Agent
 from thread_factory.utils.coordination.package import Pack
@@ -14,19 +12,22 @@ from thread_factory.concurrency.sync_types.sync_int import SyncInt
 class CommandCenter(IDisposable):
     """
     CommandCenter
-    --------------
-    A central factory and management unit for creating and executing agent threads
-    under a unified worker cap.
-    ...
+    ----------------
+    A central orchestration unit responsible for managing agent thread lifecycles,
+    enforcing global worker limits, and creating agents from predefined templates.
+
+    The CommandCenter allows for:
+    - Creation of agent threads from registered templates
+    - Lifecycle management (disposal and deregistration)
+    - Batch creation, fire-and-forget task launching, and custom behavior hooks
     """
 
     def __init__(self, max_workers: int = 8):
         """
-        Initializes the CommandCenter.
+        Initializes the CommandCenter with a worker cap and internal registries.
 
         Args:
-            max_workers (int): Maximum number of concurrent agents allowed to exist,
-                               regardless of creation method.
+            max_workers (int): Maximum number of concurrent agents allowed to exist.
         """
         super().__init__()
         if max_workers < 1 or not isinstance(max_workers, int):
@@ -40,8 +41,10 @@ class CommandCenter(IDisposable):
 
     def dispose(self):
         """
-        Fully disposes the CommandCenter and all tracked active agents.
-        This is an idempotent operation.
+        Disposes the CommandCenter and all agents it created and registered.
+
+        This is a terminal and idempotent operation. All agents are disposed if they support `.dispose()`,
+        and the internal registries are cleared.
         """
         with self._lock:
             if self._disposed:
@@ -60,13 +63,28 @@ class CommandCenter(IDisposable):
                 self._builder = None
 
     def shutdown(self):
-        """A convenience alias for the .dispose() method."""
+        """
+        Alias for `.dispose()`.
+
+        Provides semantic clarity when intentionally terminating the CommandCenter.
+        """
         self.dispose()
 
     def _create_and_register_agent(self, template_name: str, *args, **kwargs) -> Agent:
         """
-        Internal factory to create, register, and cap an agent.
-        It handles incrementing and checking the worker cap.
+        Internal method to create and register an agent under the global worker cap.
+
+        Args:
+            template_name (str): The symbolic name of the registered agent template.
+            *args: Optional positional overrides for the factory.
+            **kwargs: Optional keyword overrides for the factory.
+
+        Returns:
+            Agent: The newly constructed and registered agent instance.
+
+        Raises:
+            RuntimeError: If the worker cap is exceeded or the CommandCenter is disposed.
+            Exception: Any exceptions raised by the template factory.
         """
         if self._disposed:
             raise RuntimeError("CommandCenter is disposed.")
@@ -76,7 +94,7 @@ class CommandCenter(IDisposable):
             raise RuntimeError(f"Cannot create agent. Worker cap of {self._max_workers} reached.")
 
         try:
-            kwargs['command_center'] = self
+            kwargs["command_center"] = self
             agent = self._builder.create_agent(template_name, *args, **kwargs)
             self._register_agent(agent)
             return agent
@@ -84,50 +102,68 @@ class CommandCenter(IDisposable):
             self._worker_count.decrement()
             raise
 
-    def create_agent(self, template_name: str, define_home: Union[Callable[[...], None], Pack] = None,
-                     target: Union[Callable[[...], None], Pack] = None, *args, **kwargs) -> Agent:
+    def create_agent(
+        self,
+        template_name: str,
+        define_home: Optional[Union[Callable[..., None], Pack]] = None,
+        target: Optional[Union[Callable[..., None], Pack]] = None,
+        *args, **kwargs
+    ) -> Agent:
         """
-        Creates a single, dedicated agent, respecting the global worker cap.
-
-        This method returns the agent instance to you for manual control. The agent's
-        native `run()` method will be the execution entry point.
+        Creates a single agent from a registered template with optional task control hooks.
 
         Args:
-            template_name (str): The name of the template to use.
-            target (Callable | Pack, optional): The task to execute in the background.
-            define_home (Callable | Pack, optional): The target function that will become
-                the agent's main event loop.
-            *args, **kwargs: Runtime arguments for the template's factory.
+            template_name (str): The name of the registered agent template.
+            define_home (Callable | Pack, optional): A function representing the agent's long-lived
+                internal loop (wrapped with cleanup).
+            target (Callable | Pack, optional): A one-time task to run before the main loop.
+            *args: Positional overrides passed to the template factory.
+            **kwargs: Keyword overrides passed to the template factory.
 
         Returns:
-            Agent: A newly created, configured agent instance.
+            Agent: The created agent instance.
         """
         agent = self._create_and_register_agent(template_name, *args, **kwargs)
-        if target and (isinstance(target, Callable) or isinstance(target, Pack)):
+
+        if target:
             target = Pack.bundle(target)
             agent.set_home(target)
-        # This wrapper contains our cleanup logic.
+
         def home_with_cleanup():
             try:
-                # Execute the original home function if it was provided.
                 if define_home:
-                    # Unpack if necessary
-                    (Pack.bundle(define_home))()
+                    Pack.bundle(define_home)()
             finally:
                 self._unregister_agent(agent)
                 self._worker_count.decrement()
 
-        # We set our wrapper as the agent's event loop.
-        # The agent's own .run() method will call this.
         agent.set_home(home_with_cleanup)
-
         return agent
 
-    def create_agents(self, count: int, template_name: str, target: Union[Callable[[...], None], Pack] = None,
-                      define_home: Union[Callable[[...], None], Pack] = None, *args, **kwargs) -> ConcurrentList[Agent]:
+    def create_agents(
+        self,
+        count: int,
+        template_name: str,
+        target: Optional[Union[Callable[..., None], Pack]] = None,
+        define_home: Optional[Union[Callable[..., None], Pack]] = None,
+        *args, **kwargs
+    ) -> ConcurrentList[Agent]:
         """
-        Creates a batch of agent threads, respecting the global worker cap.
-        ...
+        Creates a batch of agents using the same template and optional execution logic.
+
+        Args:
+            count (int): Number of agents to create.
+            template_name (str): Template to use for agent construction.
+            target (Callable | Pack, optional): One-time task to execute inside each agent.
+            define_home (Callable | Pack, optional): Loop function to run as main logic.
+            *args: Positional overrides for the factory.
+            **kwargs: Keyword overrides for the factory.
+
+        Returns:
+            ConcurrentList[Agent]: The list of successfully created agents.
+
+        Warnings:
+            Will warn if the global worker cap is reached mid-creation.
         """
         new_agents = ConcurrentList()
         for i in range(count):
@@ -135,53 +171,102 @@ class CommandCenter(IDisposable):
                 agent = self.create_agent(template_name, define_home=define_home, target=target, *args, **kwargs)
                 new_agents.append(agent)
             except RuntimeError:
-                warnings.warn(
-                    f"Worker cap reached. Created {i} of {count} requested agents.",
-                    UserWarning
-                )
+                warnings.warn(f"Worker cap reached. Created {i} of {count} requested agents.", UserWarning)
                 break
         return new_agents
 
-    def submit(self, target: Union[Callable[[...], Any], Pack], template_name: str = "default", *args, **kwargs) -> None:
+    def submit(
+        self,
+        target: Union[Callable[..., Any], Pack],
+        template_name: str = "default",
+        *args, **kwargs
+    ) -> None:
         """
-        Submits a fire-and-forget task on a new agent, respecting the global worker cap.
+        Submits a fire-and-forget task using an ephemeral agent.
 
-        This method creates an agent, sets its task, starts it immediately, and returns nothing.
-        The agent's native `run()` method is the execution entry point.
+        The agent is immediately started, runs the task, and is automatically cleaned up.
 
         Args:
-            target (Callable | Pack): The task to execute in the background.
-            template_name (str, optional): The template for the agent.
-            *args, **kwargs: Runtime arguments for the template factory.
+            target (Callable | Pack): The task to run inside the agent.
+            template_name (str, optional): Template to use (defaults to 'default').
+            *args: Positional overrides passed to the agent template.
+            **kwargs: Keyword overrides passed to the agent template.
         """
-        # We now use create_agent to handle creation and capping.
-        # We pass the user's target in the 'define_home' parameter.
-        agent = self.create_agent(template_name, target=target, *args, **kwargs)
+        agent = self.create_agent(template_name, define_home=target, *args, **kwargs)
         agent.start()
 
-    # --- Other methods remain the same ---
+    def register_template(self, name: str, factory_fn: Union[Callable[..., Agent], Pack]):
+        """
+        Registers a new agent creation template.
 
-    def get_active_agents(self) -> List[Agent]:
-        if self._disposed: return []
-        return list(self._active_agents.values())
-
-    def get_agent_by_id(self, factory_id: str) -> Optional[Agent]:
-        if self._disposed or not factory_id: return None
-        return self._active_agents.get(factory_id)
-
-    def _register_agent(self, agent: Agent):
-        if self._disposed or not agent: return
-        self._active_agents[agent.factory_id] = agent
-
-    def _unregister_agent(self, agent: Agent):
-        if self._disposed or not agent: return
-        self._active_agents.pop(agent.factory_id, None)
-
-    def register_template(self, name: str, factory_fn: Callable[..., Agent], *args, **kwargs):
-        self._builder.register_template(name, factory_fn, *args, **kwargs)
+        Args:
+            name (str): Symbolic name of the template.
+            factory_fn (Callable | Pack): Factory function or Pack object used to construct the agent.
+        """
+        self._builder.register_template(name, factory_fn)
 
     def unregister_template(self, name: str) -> bool:
+        """
+        Removes a previously registered agent template.
+
+        Args:
+            name (str): Symbolic name of the template to remove.
+
+        Returns:
+            bool: True if removed successfully, False if not found.
+        """
         return self._builder.unregister_template(name)
 
     def list_templates(self) -> List[str]:
+        """
+        Lists all registered agent templates.
+
+        Returns:
+            List[str]: A list of symbolic template names.
+        """
         return self._builder.list_templates()
+
+    def get_active_agents(self) -> List[Agent]:
+        """
+        Returns all currently active agents managed by this CommandCenter.
+
+        Returns:
+            List[Agent]: A list of active agent instances.
+        """
+        if self._disposed:
+            return []
+        return list(self._active_agents.values())
+
+    def get_agent_by_id(self, factory_id: str) -> Optional[Agent]:
+        """
+        Retrieves an agent by its factory-assigned ID.
+
+        Args:
+            factory_id (str): The ULID or unique string used to identify the agent.
+
+        Returns:
+            Optional[Agent]: The matching agent, or None if not found or disposed.
+        """
+        if self._disposed or not factory_id:
+            return None
+        return self._active_agents.get(factory_id)
+
+    def _register_agent(self, agent: Agent):
+        """
+        Internal helper to register an agent in the active list.
+
+        Args:
+            agent (Agent): The agent to register.
+        """
+        if not self._disposed and agent:
+            self._active_agents[agent.factory_id] = agent
+
+    def _unregister_agent(self, agent: Agent):
+        """
+        Internal helper to unregister and forget an agent.
+
+        Args:
+            agent (Agent): The agent to remove from tracking.
+        """
+        if not self._disposed and agent:
+            self._active_agents.pop(agent.factory_id, None)

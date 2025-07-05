@@ -35,8 +35,8 @@ class Worker(threading.Thread, IDisposable):
     """
 
     def __init__(self, group=None, target=None, name=None,
-                 args=(), kwargs=None, *, factory_id: Optional[str | int] = None,
-                 factory: Any = None, work_queue: Optional[ConcurrentQueue[Work]] = None):
+                 args=(), kwargs=None, *, factory: Any = None,
+                 work_queue: Optional[ConcurrentQueue[Work]] = None):
         """
         Initializes a Worker thread with tracking capabilities for work performance metrics.
         """
@@ -44,7 +44,7 @@ class Worker(threading.Thread, IDisposable):
         IDisposable.__init__(self) # No need to call if IDisposable is just an interface
 
         self.factory = factory
-        self.factory_id = factory_id if factory_id else str(ulid.ULID())
+        self.factory_id = str(ulid.ULID())
 
         # State management
         self.state = WorkerState.CREATED
@@ -65,20 +65,12 @@ class Worker(threading.Thread, IDisposable):
         self.work_queue: Optional[ConcurrentQueue[Work]] = work_queue
         self._last_hourly_reset: datetime = datetime.now() # Tracks when the current hourly bucket started
 
-    def _bind_factory_id(self):
-        """Binds the factory ID to the current thread for traceability."""
-        if not hasattr(threading.current_thread(), 'factory_id'):
-            setattr(threading.current_thread(), 'factory_id', self.factory_id)
-        else:
-            threading.current_thread().factory_id = self.factory_id
-
 
     def run(self):
         """
         Main thread entry point (called by `start()`).
         Handles continuous task loop from queue.
         """
-        self._bind_factory_id()
         self.state = WorkerState.STARTING
 
         try:

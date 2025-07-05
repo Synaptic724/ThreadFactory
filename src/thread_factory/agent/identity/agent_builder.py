@@ -34,19 +34,19 @@ class AgentBuilder(IDisposable):
     def _register_default_template(self) -> None:
         """
         Registers a symbolic 'default' agent template using the General class.
-        Note: The factory lambda requires a `command_center` to be passed in,
-        which the user must provide when creating the agent.
         """
         self.register_template(
             "default",
-            lambda command_center: General(
-                command_center=command_center,
-                name="Default Agent",
-                job="General Purpose"
+            Pack(
+                lambda command_center: General(
+                    command_center=command_center,
+                    public_name="Default Agent",
+                    job_title="General Purpose"
+                )
             )
         )
 
-    def register_template(self, name: str, factory_fn: Callable[..., Agent], *args, **kwargs) -> None:
+    def register_template(self, name: str, factory_fn: Pack) -> None:
         """
         Registers an agent factory function under a symbolic name.
         ...
@@ -57,7 +57,7 @@ class AgentBuilder(IDisposable):
         if name in self._registry:
             raise ValueError(f"An agent template with the name '{name}' is already registered.")
 
-        self._registry[name] = Pack.bundle(factory_fn, *args, **kwargs)
+        self._registry[name] = Pack.bundle(factory_fn)
 
     def unregister_template(self, name: str) -> bool:
         """
@@ -83,16 +83,33 @@ class AgentBuilder(IDisposable):
     def create_agent(self, name: str, *args, **kwargs) -> Agent:
         """
         Creates a fresh agent instance from a registered template.
-        ...
+        Allows override of arguments at runtime while respecting the original template.
+
+        Args:
+            name (str): The name of the registered template.
+            *args: Positional arguments to override.
+            **kwargs: Keyword arguments to override.
+
+        Returns:
+            Agent: A new agent instance.
+
+        Raises:
+            KeyError: If the template is not registered.
+            TypeError: If the created object is not a valid Agent.
         """
         factory_pack = self._registry.get(name)
         if not factory_pack:
             raise KeyError(f"No agent template registered under the name '{name}'")
 
-        agent_instance = factory_pack(*args, **kwargs)
+        # Apply argument overrides — Pack handles merging
+        override_pack = factory_pack.override_args(*args, **kwargs)
+
+        agent_instance = override_pack()
 
         if not isinstance(agent_instance, threading.Thread) or not isinstance(agent_instance, Agent):
-            raise TypeError(f"Factory for template '{name}' did not return a valid Agent instance. "
-                            f"Got {type(agent_instance).__name__}.")
+            raise TypeError(
+                f"Factory for template '{name}' did not return a valid Agent instance. "
+                f"Got {type(agent_instance).__name__}."
+            )
 
         return agent_instance

@@ -32,32 +32,37 @@ class General(Agent):
         data_transfer (ConcurrentDict): A dictionary storing named callable functions for data processing and transfer tasks.
     """
 
-    def __init__(self, command_center: 'CommandCenter', target: Union[Callable[..., Any], Pack] = None,
-                 public_id: str = None, public_name: str = None, job_title: str = None, activity_group: str = None, *args, **kwargs):
+    def __init__(self, command_center: 'CommandCenter', target: Pack = None,
+                 public_id: str = None, public_name: str = None,
+                 job_title: str = None, activity_group: str = None,
+                 *args, **kwargs):
         """
         Initializes a General profile with specific identity attributes and collections
         for dynamic behavior registration.
 
         Args:
-            command_center ('CommandCenter'): A reference to the central coordinating entity.
-            target (Union[Callable[..., Any], Pack], optional): The target function for standalone execution. Defaults to None.
-            public_id (str, optional): A unique identifier for this agent. Defaults to None.
-            name (str, optional): The name of this agent. Defaults to None.
-            job (str, optional): The job description for this agent. Defaults to None.
-            group (str, optional): The group this agent belongs to. Defaults to None.
-            *args: Arbitrary positional arguments passed to the base `AgenticBase` constructor.
-            **kwargs: Arbitrary keyword arguments passed to the base `AgenticBase` constructor.
+            command_center ('CommandCenter'): The central coordination unit.
+            target (Union[Callable[..., Any], Pack], optional): The task this agent runs.
+            public_id (str, optional): The public identifier for this agent.
+            public_name (str, optional): The public-facing name for this agent.
+            job_title (str, optional): A descriptor for the agent's job function.
+            activity_group (str, optional): A group this agent is logically assigned to.
+            *args: Positional arguments passed to base constructor.
+            **kwargs: Keyword arguments passed to base constructor.
         """
-        super().__init__(command_center, target, *args, **kwargs)
-        self.public_id: Optional[str] = public_id
-        self.public_name: Optional[str] = public_name
-        self.job_title: Optional[str] = job_title
-        self.activity_group: Optional[str] = activity_group
+        # Extract identity values directly from kwargs (in case user passed them there)
+        self.public_id: Optional[str] = public_id or kwargs.pop("public_id", None)
+        self.public_name: Optional[str] = public_name or kwargs.pop("public_name", None)
+        self.job_title: Optional[str] = job_title or kwargs.pop("job_title", None)
+        self.activity_group: Optional[str] = activity_group or kwargs.pop("activity_group", None)
 
-        # Initialize collections for save points, locations, and data transfer functions
-        self.save_points: Optional[ConcurrentDict[str, Union[Callable[..., None], "Pack"]]] = None
-        self.locations: Optional[ConcurrentDict[str, Union[Callable[..., None], "Pack"]]] = None
-        self.data_transfer: Optional[ConcurrentDict[str, Union[Callable[..., Any], "Pack"]]] = None
+        # Setup routing registries
+        self.save_points = None
+        self.locations = None
+        self.data_transfer = None
+
+        # Only now call super with clean args
+        super().__init__(command_center, target, *args, **kwargs)
 
     def dispose(self):
         """
@@ -89,7 +94,7 @@ class General(Agent):
         Returns:
             str: The agent's name, or "UnnamedAgent" if the name is not specified.
         """
-        return self.name if self.name else "UnnamedAgent"
+        return self.public_name if self.public_name else "UnnamedAgent"
 
     def get_description(self) -> str:
         """
@@ -98,7 +103,17 @@ class General(Agent):
         Returns:
             str: A descriptive string summarizing the agent's identity.
         """
-        return f"Agent {self.get_name()} with job '{self.job}' in group '{self.group}'"
+        return f"Agent {self.get_name()} with job '{self.job_title}' in group '{self.activity_group}'"
+
+    def __repr__(self) -> str:
+        """
+        Provides a developer-friendly string representation of the General profile,
+        showing its specific identity attributes.
+
+        Returns:
+            str: A string detailing the agent's name, job, group, and ID.
+        """
+        return self.get_description()
 
     def register_data_transfer(self, name: str, fn: Union[Callable[..., Any], Pack]):
         """
@@ -109,6 +124,8 @@ class General(Agent):
             name (str): The unique name to assign to the data transfer function.
             fn (Union[Callable[..., Any], Pack]): The callable function or `Pack` to register.
         """
+        if self._disposed:
+            raise RuntimeError("Cannot register data transfer on a disposed agent.")
         if self.data_transfer:
             self.data_transfer[name] = Pack.bundle(fn) if fn else None
         else:
@@ -153,6 +170,8 @@ class General(Agent):
             fn (Union[Callable[..., None], Pack]): The callable function or `Pack`
                 representing the save point's logic.
         """
+        if self._disposed:
+            raise RuntimeError("Cannot register save point on a disposed agent.")
         if self.save_points is None:
             self.save_points = ConcurrentDict({name : Pack.bundle(fn) if fn else None})
         else:
@@ -180,6 +199,8 @@ class General(Agent):
             fn (Union[Callable[..., None], Pack]): The callable function or `Pack`
                 defining the location's behavior.
         """
+        if self._disposed:
+            raise RuntimeError("Cannot register location on a disposed agent.")
         if self.locations is None:
             self.locations = ConcurrentDict({name: Pack.bundle(fn) if fn else None})
         else:
@@ -196,13 +217,3 @@ class General(Agent):
         if self.locations is None:
             return ConcurrentDict()
         return self.locations.copy()
-
-    def __repr__(self) -> str:
-        """
-        Provides a developer-friendly string representation of the General profile,
-        showing its specific identity attributes.
-
-        Returns:
-            str: A string detailing the agent's name, job, group, and ID.
-        """
-        return f"<Profile name={self.name} job={self.job} group={self.group} id={self.public_id}>"
