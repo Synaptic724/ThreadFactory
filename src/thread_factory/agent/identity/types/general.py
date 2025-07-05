@@ -73,7 +73,6 @@ class General(Agent):
         if self._disposed:
             return
 
-        print("Disposed General profile")
         # Dispose of collections specific to the General profile
         if self.save_points:
             self.save_points.dispose()

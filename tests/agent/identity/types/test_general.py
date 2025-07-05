@@ -1,17 +1,21 @@
 import unittest
-from argparse import ArgumentError
 from unittest.mock import MagicMock
 from thread_factory.agent.identity.types.general import General
 from thread_factory.utils.coordination.package import Pack
-
-
-class DummyCommandCenter:
-    pass
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 
 
 class TestGeneralAgent(unittest.TestCase):
     def setUp(self):
-        self.cmd = DummyCommandCenter()
+        """
+        Set up the test case.
+
+        FIX: Replaced the inadequate `DummyCommandCenter` with `MagicMock`.
+        `MagicMock` can dynamically respond to any method call, including the
+        `_unregister_agent` call that happens during the agent's dispose cycle,
+        which was the source of the errors.
+        """
+        self.cmd = MagicMock()
         self.agent = General(
             command_center=self.cmd,
             public_id="test-001",
@@ -21,7 +25,13 @@ class TestGeneralAgent(unittest.TestCase):
         )
 
     def tearDown(self):
-        self.agent.dispose()
+        """
+        Clean up after each test.
+        This will now execute without error because the mocked command center
+        can handle the dispose call chain.
+        """
+        if self.agent and not self.agent._disposed:
+            self.agent.dispose()
 
     def test_identity_properties_set(self):
         self.assertEqual(self.agent.public_id, "test-001")
@@ -47,7 +57,6 @@ class TestGeneralAgent(unittest.TestCase):
         self.agent.register_data_transfer("greet", Pack.bundle(lambda: "yo"))
         result = self.agent.execute_transfer("greet")
         self.assertEqual(result, "yo")
-
 
     def test_get_data_transfer_dict_returns_copy(self):
         self.agent.register_data_transfer("x", lambda: 123)
@@ -88,7 +97,7 @@ class TestGeneralAgent(unittest.TestCase):
     def test_dispose_is_idempotent(self):
         self.agent.dispose()
         try:
-            self.agent.dispose()
+            self.agent.dispose()  # Call a second time
         except Exception as e:
             self.fail(f"Dispose raised error on second call: {e}")
 
@@ -96,17 +105,17 @@ class TestGeneralAgent(unittest.TestCase):
         self.assertIn("TestAgent", repr(self.agent))
         self.assertIn("AgenticProfile", str(self.agent))
 
-import unittest
-from unittest.mock import Mock
-from thread_factory.agent.identity.types.general import General
-from thread_factory.utils.coordination.package import Pack
-from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-
 
 class TestGeneralAdditional(unittest.TestCase):
 
     def setUp(self):
-        self.mock_command_center = Mock()
+        """
+        Set up the test case.
+
+        FIX: The original used `Mock()`, which was correct. Switched to
+        `MagicMock()` for consistency with the other test class.
+        """
+        self.mock_command_center = MagicMock()
         self.agent = General(
             command_center=self.mock_command_center,
             public_id="id-001",
@@ -116,11 +125,12 @@ class TestGeneralAdditional(unittest.TestCase):
         )
 
     def tearDown(self):
-        self.agent.dispose()
+        if self.agent and not self.agent._disposed:
+            self.agent.dispose()
 
     def test_double_dispose(self):
         self.agent.dispose()
-        self.agent.dispose()  # Should not raise
+        self.agent.dispose()  # Should not raise an error
         self.assertTrue(self.agent._disposed)
 
     def test_register_save_point_after_dispose_raises(self):
@@ -211,4 +221,4 @@ class TestGeneralAdditional(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(argv=['first-arg-is-ignored'], exit=False)

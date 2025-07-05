@@ -93,6 +93,60 @@ class SignalController(IDisposable):
         self._hooks['pre_invoke'] = ConcurrentList()  # List to store pre-invocation callbacks.
         self._hooks['post_invoke'] = ConcurrentList() # List to store post-invocation callbacks.
 
+    def dispose(self) -> None:
+        """
+        Dispose of all registered objects and the controller itself.
+
+        This method iterates through all registered objects and attempts to call their
+        `dispose()` method (if available and implemented). It then cleans up all
+        internal data structures to release resources and marks the controller as disposed.
+        Subsequent operations on a disposed controller may behave unexpectedly or raise errors.
+        This method is idempotent and thread-safe.
+        """
+        # Check if already disposed to prevent redundant operations
+        if self._disposed:
+            self._logger.debug("SignalController already disposed. Skipping dispose operation.")
+            return
+
+        with self._outer_lock:
+            # Double-check inside the lock to prevent race conditions during the initial check
+            if self._disposed:
+                return
+
+            self._logger.info("SignalController disposing...")
+            self._logger.debug(f"Attempting to dispose {len(self._registry)} registered objects manually.")
+
+            # Iterate over a copy of items to avoid issues if registry is modified during iteration
+            for obj_id, data in list(self._registry.items()):
+                try:
+                    # Attempt to dispose of the individual object instance
+                    if hasattr(data["instance"], "dispose") and callable(data["instance"].dispose):
+                        data["instance"].dispose()
+                        self.notify(obj_id, "DISPOSED_BY_CONTROLLER")
+                except Exception as e:
+                    self._logger.error(f"Error while disposing object '{obj_id}' during controller dispose: {e}",
+                                       exc_info=True)
+
+            # Dispose of internal ConcurrentDicts to release their underlying resources
+            if self._registry: # Check if it's not None from a previous dispose (for idempotency)
+                self._registry.dispose()
+            if self._active_waits:
+                self._active_waits.dispose()
+            if self._subscribers:
+                self._subscribers.dispose()
+            if self._hooks:
+                self._hooks.dispose()
+
+            # Clear references to allow garbage collection
+            self._registry = None
+            self._active_waits = None
+            self._subscribers = None
+            self._hooks = None # Also clear hooks to prevent use after dispose
+
+            # Mark the controller as disposed
+            self._disposed = True
+            self._logger.info("SignalController disposed.")
+
     # -------------------------------------------
     # Hook Registration
     # -------------------------------------------
@@ -223,60 +277,6 @@ class SignalController(IDisposable):
     # -------------------------------------------
     # Lifecycle Management
     # -------------------------------------------
-
-    def dispose(self) -> None:
-        """
-        Dispose of all registered objects and the controller itself.
-
-        This method iterates through all registered objects and attempts to call their
-        `dispose()` method (if available and implemented). It then cleans up all
-        internal data structures to release resources and marks the controller as disposed.
-        Subsequent operations on a disposed controller may behave unexpectedly or raise errors.
-        This method is idempotent and thread-safe.
-        """
-        # Check if already disposed to prevent redundant operations
-        if self._disposed:
-            self._logger.debug("SignalController already disposed. Skipping dispose operation.")
-            return
-
-        with self._outer_lock:
-            # Double-check inside the lock to prevent race conditions during the initial check
-            if self._disposed:
-                return
-
-            self._logger.info("SignalController disposing...")
-            self._logger.debug(f"Attempting to dispose {len(self._registry)} registered objects manually.")
-
-            # Iterate over a copy of items to avoid issues if registry is modified during iteration
-            for obj_id, data in list(self._registry.items()):
-                try:
-                    # Attempt to dispose of the individual object instance
-                    if hasattr(data["instance"], "dispose") and callable(data["instance"].dispose):
-                        data["instance"].dispose()
-                        self.notify(obj_id, "DISPOSED_BY_CONTROLLER")
-                except Exception as e:
-                    self._logger.error(f"Error while disposing object '{obj_id}' during controller dispose: {e}",
-                                       exc_info=True)
-
-            # Dispose of internal ConcurrentDicts to release their underlying resources
-            if self._registry: # Check if it's not None from a previous dispose (for idempotency)
-                self._registry.dispose()
-            if self._active_waits:
-                self._active_waits.dispose()
-            if self._subscribers:
-                self._subscribers.dispose()
-            if self._hooks:
-                self._hooks.dispose()
-
-            # Clear references to allow garbage collection
-            self._registry = None
-            self._active_waits = None
-            self._subscribers = None
-            self._hooks = None # Also clear hooks to prevent use after dispose
-
-            # Mark the controller as disposed
-            self._disposed = True
-            self._logger.info("SignalController disposed.")
 
     def register(self, registrant: Any):
         """
