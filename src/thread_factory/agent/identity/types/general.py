@@ -1,12 +1,12 @@
 import threading, ulid
+from thread_factory.agent.identity.types.agentic_base import AgenticBase
 from thread_factory.agent.identity.types.base import BaseProfile
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 from typing import Optional, Callable, Union, Any
-from thread_factory.utils.interfaces.iprofile import IProfile
 
-class General(BaseProfile, IProfile):
+class General(AgenticBase):
     """
     General Profile
     ---------
@@ -14,19 +14,17 @@ class General(BaseProfile, IProfile):
 
     This object may only be bound to an ActivatedAgent or Agent instance.
     """
-    def __init__(self):
+
+    def __init__(self, command_center: 'CommandCenter', target: Union[Callable[..., Any], Pack] = None,
+                 id: str = None, name: str = None, job: str = None, group: str = None, *args, **kwargs):
         """
         Initializes a blank profile with default field values.
         """
-        super().__init__()
-        self.id: Optional[str] = None
-        self.name: Optional[str] = None
-        self.job: Optional[str] = None
-        self.group: Optional[str] = None
-
-        self._private_inventory = threading.local()
-        self._private_inventory.data = ConcurrentDict()
-        self._public_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
+        super().__init__(command_center, target, *args, *kwargs)
+        self.id: Optional[str] = id
+        self.name: Optional[str] = name
+        self.job: Optional[str] = job
+        self.group: Optional[str] = group
 
         # Initialize collections for save points, locations, and data transfer functions
         self.save_points: ConcurrentDict[str, Union[Callable[..., None], "Pack"]] = ConcurrentDict()
@@ -45,52 +43,12 @@ class General(BaseProfile, IProfile):
         self.locations = None
         self.data_transfer.dispose()
         self.data_transfer = None
-        self._private_inventory.dispose()
-        self._private_inventory = None
-        self._public_inventory.dispose()
-        self._public_inventory = None
 
-        self.id = None
-        self.name = None
-        self.job = None
-        self.group = None
+        self.id: Optional[str] = None
+        self.name: Optional[str] = None
+        self.job: Optional[str] = None
+        self.group: Optional[str] = None
         super().dispose()
-
-    def bind_defaults(self, id = None, name: str = None, job: str = None, group: str = None):
-        """
-        Binds the default profile to the provided thread and command center.
-
-        Args:
-            thread (threading.Thread): The thread to bind the profile to.
-            command_center (CommandCenter, optional): The command center for coordination.
-            factory_id (Optional[str]): Unique identifier for the thread.
-        """
-        self.id = id if id else str(ulid.ULID())
-        self.name = name if name else "UnnamedAgent"
-        self.job = job if job else "generic"
-        self.group = group if group else "default"
-
-    def define_defaults(self, *args, **kwargs):
-        """
-        Defines the profile with provided arguments.
-
-        Supports both positional and keyword arguments for flexibility.
-        Positional order: (id, name, job, group)
-
-        Args:
-            *args: Optional positional arguments in the order:
-                   id, name, job, group
-            **kwargs: Named arguments for any of: id, name, job, group
-        """
-        id_ = kwargs.get("id", args[0] if len(args) > 0 else None)
-        name = kwargs.get("name", args[1] if len(args) > 1 else None)
-        job = kwargs.get("job", args[2] if len(args) > 2 else None)
-        group = kwargs.get("group", args[3] if len(args) > 3 else None)
-
-        self.id = id_ if id_ else str(ulid.ULID())
-        self.name = name if name else "UnnamedAgent"
-        self.job = job if job else "generic"
-        self.group = group if group else "default"
 
     def get_name(self) -> str:
         """
@@ -200,63 +158,22 @@ class General(BaseProfile, IProfile):
         return self.locations.copy()
 
 
-    def bind_to_inventory(self, key: str, value: Any):
-        """
-        Binds a key-value pair to the agent's private, thread-local inventory.
-
-        This data is only accessible to this specific agent's thread.
-
-        Args:
-            key (str): The key to store the data under.
-            value (Any): The value to store.
-        """
-        self._private_inventory.data[key] = value
-
-    def get_from_inventory(self, key: str, default=None) -> Any:
-        """
-        Retrieves a value from the agent's private, thread-local inventory.
-
-        Args:
-            key (str): The key of the item to retrieve.
-            default (Any, optional): The value to return if the key is not found.
-
-        Returns:
-            Any: The retrieved value, or the default if not found.
-        """
-        return self._private_inventory.data.get(key, default)
-
-    def set_shared_inventory_item(self, key: str, value: Any):
-        """
-        Sets a key-value pair in the shared inventory, accessible by all agents.
-
-        Args:
-            key (str): The key to store the data under.
-            value (Any): The value to store.
-        """
-        self._public_inventory[key] = value
-
-    def get_shared_inventory_item(self, key: str, default: Any = None) -> Any:
-        """
-        Retrieves a value from the shared inventory.
-
-        Args:
-            key (str): The key of the item to retrieve.
-            default (Any, optional): The value to return if the key is not found.
-
-        Returns:
-            Any: The retrieved value, or the default if not found.
-        """
-        return self._public_inventory.get(key, default)
-
-    def get_shared_inventory(self) -> ConcurrentDict[str, Any]:
-        """
-        Retrieves a copy of the entire shared inventory dictionary.
-
-        Returns:
-            ConcurrentDict[str, Any]: A copy of the shared inventory.
-        """
-        return self._public_inventory.copy()
-
 
     def __repr__(self) -> str:
         return f"<Profile name={self.name} job={self.job} group={self.group} id={self.id}>"
+
+
+    def set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
+        self._event_loop = Pack.bundle(fn) if fn else fn
+
+
+    def _validate_caller(self, factory_id: Optional[str] = None) -> None:
+        expected = factory_id or self.factory_id
+        current_id = getattr(threading.current_thread(), "factory_id", None)
+        if current_id != expected:
+            raise PermissionError(
+                f"[Access Denied] Caller factory_id={current_id} does not match expected={expected}"
+            )
+
+    def __str__(self) -> str:
+        return f"AgenticProfile<{self.factory_id}>"

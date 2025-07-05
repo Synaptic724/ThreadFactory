@@ -7,7 +7,6 @@ from thread_factory.runtime.orchestrator.monitoring.records.records import WorkS
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.utils.interfaces.iprofile import IProfile
 
 
 class AgenticBase(Worker):
@@ -22,7 +21,7 @@ class AgenticBase(Worker):
     to create specialized agent types.
     """
 
-    def __init__(self, command_center: 'CommandCenter', *args, **kwargs):
+    def __init__(self, command_center: 'CommandCenter', target: Union[Callable[..., Any], Pack] = None,  *args, **kwargs):
         """
         Initializes the agentic profile, sets up all agentic state, and
         prepares the thread for execution. It extends the base `Worker`
@@ -36,31 +35,28 @@ class AgenticBase(Worker):
         # --- Initialize Base Classes ---
         super().__init__(*args, **kwargs) # For Worker
         IDisposable.__init__(self)        # For IDisposable
+        if isinstance(target, Callable) or isinstance(target, Pack):
+            self._target = Pack.bundle(target) if target else None
+        else:
+            raise TypeError("Target must be a Callable or Pack instance.")
 
         # --- Identity & Framework Integration (from original BaseProfile) ---
         self._factory_id = str(ulid.ULID())
-        self._bound_target = None
-        self._thread_target = self # The thread is this instance
         self._command_center = command_center
 
         # --- Agentic Configuration (from Agent) ---
         self._worker_type = "agentic"
-        self._pool_agent = True  # Indicates this worker is part of a dynamic thread pool
-        self._return_home = False # Returns to event loop after work completion
+        self._pool_agent: bool = True  # Indicates this worker is part of a dynamic thread pool
+        self._return_home: bool = False # Returns to event loop after work completion
         self._lock = threading.RLock()
 
         # --- Behavior & Execution (from Agent) ---
         self._event_loop: Optional[Union[Callable[..., None], Pack]] = None
         self._value_work: Optional[HelpRequest] = None
-        self._save_points = ConcurrentDict()
-        self._locations = ConcurrentDict()
-        self._data_transfer = ConcurrentDict()
-
         # --- Memory & State (from Agent) ---
-        self._inventory = threading.local()
-        self._inventory.data = ConcurrentDict()
-        self._shared_inventory = ConcurrentDict()
-
+        self._private_inventory = threading.local()
+        self._private_inventory.data = ConcurrentDict()
+        self._public_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
 
     def dispose(self):
         """
@@ -72,20 +68,13 @@ class AgenticBase(Worker):
 
         # Dispose agent-specific resources
         self.dispose_work()
-        if self._save_points:
-            self._save_points.clear()
-        if self._locations:
-            self._locations.clear()
-        if self._data_transfer:
-            self._data_transfer.clear()
+        self._private_inventory.dispose()
+        self._private_inventory = None
+        self._public_inventory.dispose()
+        self._public_inventory = None
 
-        self._save_points = None
-        self._locations = None
-        self._data_transfer = None
         self._event_loop = None
         self._command_center = None
-        self._thread_target = None
-        self._bound_target = None
 
         self._disposed = True
         self.state = WorkerState.DISPOSED
@@ -157,17 +146,25 @@ class AgenticBase(Worker):
                 raise RuntimeError("Cannot set return home after worker is disposed.")
             self._return_home = return_home
 
-    def register_save_point(self, name: str, fn: Union[Callable[..., None], Pack]) -> None:
-        self._save_points[name] = Pack.bundle(fn) if fn else fn
+    def _resolve_worker_by_id(self, factory_id: str) -> Optional['BaseProfile']:
+        if self._command_center:
+            return self._command_center.get_agent_by_id(factory_id)
+        # Fallback for pool-based resolution
+        if self.factory and hasattr(self.factory, "get_worker_by_id"):
+            return self.factory.get_worker_by_id(factory_id)
+        return None
 
-    def get_save_points_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
-        return self._save_points.copy()
+    def bind_to_inventory_by_id(self, factory_id: str, key: str, value: Any):
+        worker = self._resolve_worker_by_id(factory_id)
+        if worker and hasattr(worker, 'bind_to_inventory'):
+            worker.bind_to_inventory(key, value)
 
-    def register_location(self, name: str, fn: Union[Callable[..., None], Pack]) -> None:
-        self._locations[name] = Pack.bundle(fn) if fn else fn
+    def get_from_inventory_by_id(self, factory_id: str, key: str, default=None) -> Any:
+        worker = self._resolve_worker_by_id(factory_id)
+        if worker and hasattr(worker, 'get_from_inventory'):
+            return worker.get_from_inventory(key, default)
+        return default
 
-    def get_locations_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
-        return self._locations.copy()
 
     def set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
         self._event_loop = Pack.bundle(fn) if fn else fn
@@ -196,38 +193,6 @@ class AgenticBase(Worker):
         self._event_loop()
         self.death_event.set()
 
-    # --- Inventory Management ---
-    def bind_to_inventory(self, key: str, value: Any, factory_id: Optional[str] = None, enforce_id: bool = False):
-        if enforce_id:
-            self._validate_caller(factory_id)
-        self._inventory.data[key] = value
-
-    def get_from_inventory(self, key: str, default=None, factory_id: Optional[str] = None, enforce_id: bool = False) -> Any:
-        if enforce_id:
-            self._validate_caller(factory_id)
-        return self._inventory.data.get(key, default)
-
-    def set_shared_inventory_item(self, key: str, value: Any) -> None:
-        self._shared_inventory[key] = value
-
-    def get_shared_inventory_item(self, key: str, default: Any = None) -> Any:
-        return self._shared_inventory.get(key, default)
-
-    def get_shared_inventory(self) -> ConcurrentDict[str, Any]:
-        return self._shared_inventory
-
-    def register_data_transfer(self, name: str, fn: Union[Callable[..., Any], Pack]) -> None:
-        self._data_transfer[name] = Pack.bundle(fn) if fn else fn
-
-    def get_data_transfer_dict(self) -> ConcurrentDict[str, Union[Callable[..., Any], Pack]]:
-        return self._data_transfer.copy()
-
-    def execute_transfer(self, name: str, factory_id: Optional[str] = None, enforce_id: bool = False) -> Any:
-        if enforce_id:
-            self._validate_caller(factory_id)
-        if name not in self._data_transfer:
-            raise KeyError(f"No data_transfer entry named '{name}'")
-        return self._data_transfer[name]()
 
     def _validate_caller(self, factory_id: Optional[str] = None) -> None:
         expected = factory_id or self.factory_id
@@ -248,25 +213,6 @@ class AgenticBase(Worker):
     def get_description(self) -> str:
         return "This is a BaseProfile, its purpose is to provide a base for agent profiles."
 
-
-    def _resolve_worker_by_id(self, factory_id: str) -> Optional['BaseProfile']:
-        if self._command_center:
-            return self._command_center.get_agent_by_id(factory_id)
-        # Fallback for pool-based resolution
-        if self.factory and hasattr(self.factory, "get_worker_by_id"):
-            return self.factory.get_worker_by_id(factory_id)
-        return None
-
-    def bind_to_inventory_by_id(self, factory_id: str, key: str, value: Any):
-        worker = self._resolve_worker_by_id(factory_id)
-        if worker and hasattr(worker, 'bind_to_inventory'):
-            worker.bind_to_inventory(key, value)
-
-    def get_from_inventory_by_id(self, factory_id: str, key: str, default=None) -> Any:
-        worker = self._resolve_worker_by_id(factory_id)
-        if worker and hasattr(worker, 'get_from_inventory'):
-            return worker.get_from_inventory(key, default)
-        return default
 
     def __repr__(self) -> str:
         return f"<AgenticProfile id={self.factory_id} state={self.state.name}>"
