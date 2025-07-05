@@ -156,6 +156,12 @@ class General(Agent):
         Raises:
             KeyError: If no function is registered with the given name.
         """
+        if self._disposed:
+            raise RuntimeError("Cannot execute data transfer on a disposed agent.")
+
+        if self.data_transfer is None:
+            raise KeyError("No data transfer functions registered.")
+
         if name not in self.data_transfer:
             raise KeyError(f"No data_transfer entry named '{name}'")
         return self.data_transfer[name]()

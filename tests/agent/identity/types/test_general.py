@@ -1,4 +1,5 @@
 import unittest
+from argparse import ArgumentError
 from unittest.mock import MagicMock
 from thread_factory.agent.identity.types.general import General
 from thread_factory.utils.coordination.package import Pack
@@ -94,6 +95,119 @@ class TestGeneralAgent(unittest.TestCase):
     def test_repr_and_str_consistency(self):
         self.assertIn("TestAgent", repr(self.agent))
         self.assertIn("AgenticProfile", str(self.agent))
+
+import unittest
+from unittest.mock import Mock
+from thread_factory.agent.identity.types.general import General
+from thread_factory.utils.coordination.package import Pack
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+
+
+class TestGeneralAdditional(unittest.TestCase):
+
+    def setUp(self):
+        self.mock_command_center = Mock()
+        self.agent = General(
+            command_center=self.mock_command_center,
+            public_id="id-001",
+            public_name="TestAgent",
+            job_title="Testing",
+            activity_group="UnitTests"
+        )
+
+    def tearDown(self):
+        self.agent.dispose()
+
+    def test_double_dispose(self):
+        self.agent.dispose()
+        self.agent.dispose()  # Should not raise
+        self.assertTrue(self.agent._disposed)
+
+    def test_register_save_point_after_dispose_raises(self):
+        self.agent.dispose()
+        with self.assertRaises(RuntimeError):
+            self.agent.register_save_point("save", lambda: None)
+
+    def test_register_location_after_dispose_raises(self):
+        self.agent.dispose()
+        with self.assertRaises(RuntimeError):
+            self.agent.register_location("loc", lambda: None)
+
+    def test_register_data_transfer_after_dispose_raises(self):
+        self.agent.dispose()
+        with self.assertRaises(RuntimeError):
+            self.agent.register_data_transfer("transfer", lambda: None)
+
+    def test_save_points_copy_empty_if_none(self):
+        self.agent.save_points = None
+        copy = self.agent.get_save_points_dict()
+        self.assertIsInstance(copy, ConcurrentDict)
+        self.assertEqual(len(copy), 0)
+
+    def test_locations_copy_empty_if_none(self):
+        self.agent.locations = None
+        copy = self.agent.get_locations_dict()
+        self.assertIsInstance(copy, ConcurrentDict)
+        self.assertEqual(len(copy), 0)
+
+    def test_data_transfer_copy_empty_if_none(self):
+        self.agent.data_transfer = None
+        copy = self.agent.get_data_transfer_dict()
+        self.assertIsInstance(copy, ConcurrentDict)
+        self.assertEqual(len(copy), 0)
+
+    def test_register_and_copy_all(self):
+        self.agent.register_save_point("sp", lambda: None)
+        self.agent.register_location("loc", lambda: None)
+        self.agent.register_data_transfer("dt", lambda: 123)
+        self.assertIn("sp", self.agent.get_save_points_dict())
+        self.assertIn("loc", self.agent.get_locations_dict())
+        self.assertIn("dt", self.agent.get_data_transfer_dict())
+
+    def test_execute_transfer_success(self):
+        self.agent.register_data_transfer("echo", lambda: "pong")
+        result = self.agent.execute_transfer("echo")
+        self.assertEqual(result, "pong")
+
+    def test_execute_transfer_missing_raises(self):
+        with self.assertRaises(KeyError):
+            self.agent.execute_transfer("missing")
+
+    def test_register_callable_vs_pack(self):
+        self.agent.register_location("raw", lambda: "a")
+        self.agent.register_location("pack", Pack.bundle(lambda: "b"))
+        locs = self.agent.get_locations_dict()
+        self.assertIn("raw", locs)
+        self.assertIn("pack", locs)
+        self.assertTrue(callable(locs["raw"]))
+        self.assertTrue(callable(locs["pack"]))
+
+    def test_multiple_registrations_survive(self):
+        self.agent.register_save_point("a", lambda: 1)
+        self.agent.register_save_point("b", lambda: 2)
+        self.agent.register_location("a", lambda: 3)
+        self.agent.register_location("b", lambda: 4)
+        self.agent.register_data_transfer("a", lambda: 5)
+        self.agent.register_data_transfer("b", lambda: 6)
+        self.assertEqual(len(self.agent.get_save_points_dict()), 2)
+        self.assertEqual(len(self.agent.get_locations_dict()), 2)
+        self.assertEqual(len(self.agent.get_data_transfer_dict()), 2)
+
+    def test_dispose_and_safe_dict_return(self):
+        self.agent.register_location("loc", lambda: 1)
+        self.agent.dispose()
+        locs = self.agent.get_locations_dict()
+        self.assertIsInstance(locs, ConcurrentDict)
+        self.assertEqual(len(locs), 0)
+
+    def test_repr_contains_name(self):
+        text = repr(self.agent)
+        self.assertIn("TestAgent", text)
+
+    def test_get_name_returns_default(self):
+        agent = General(command_center=self.mock_command_center)
+        self.assertEqual(agent.get_name(), "UnnamedAgent")
+        agent.dispose()
 
 
 if __name__ == "__main__":

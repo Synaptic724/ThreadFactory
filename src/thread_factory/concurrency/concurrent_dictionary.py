@@ -306,26 +306,11 @@ class ConcurrentDict(Generic[_K, _V], IDisposable):
         """
         Remove the specified key and return its value.
         If the key is not found, return default if given, otherwise raise KeyError.
-
-        Args:
-            key (_K): The key to pop.
-            default (_V, optional): The value to return if key is missing.
-
-        Returns:
-            _V: The popped value.
-
-        Raises:
-            KeyError: If the key is missing and no default was provided.
         """
         if self._freeze:
             raise TypeError("Cannot modify a frozen ConcurrentDict.")
         with self._lock:
-            try:
-                return self._dict.pop(key)
-            except KeyError:
-                if default is not None:
-                    return default
-                raise
+            return self._dict.pop(key, default)
 
     def popitem(self) -> Tuple[_K, _V]:
         """
