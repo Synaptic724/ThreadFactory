@@ -1,18 +1,15 @@
 import threading, inspect, warnings
 from typing import Callable, Union, List, Type, Set
-from thread_factory.agent.identity.activator import AgentActivator
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.agent.identity.types.general import General  # Your default Profile class
-from thread_factory.agent.identity.types.base import BaseProfile  # Your default Profile class
-from thread_factory.utils.interfaces.iprofile import IProfile
+from thread_factory.agent.identity.types.agent import Agent  # Your default Profile class
 
 
-
-class ProfileBuilder(IDisposable):
+class AgentBuilder(IDisposable):
     """
-    ProfileBuilder
+    AgentBuilder
     ----------------
     A manifest builder for agent identity and execution context.
 
@@ -63,7 +60,7 @@ class ProfileBuilder(IDisposable):
         self.register_profile("default", lambda: General())
         self._registered = True
 
-    def register_profile(self, name: str, fn: Callable[[], IProfile], *args, **kwargs) -> None:
+    def register_profile(self, name: str, fn: Callable[[], Agent], *args, **kwargs) -> None:
         """
         Register a profile constructor under a symbolic name.
 
@@ -103,7 +100,7 @@ class ProfileBuilder(IDisposable):
         """
         return name in self._registry
 
-    def get_profile(self, name: str) -> IProfile:
+    def get_profile(self, name: str) -> Agent:
         """
         Returns a fresh profile instance based on the registered factory.
 
@@ -123,7 +120,7 @@ class ProfileBuilder(IDisposable):
         # Only instantiate once
         profile = fn()
 
-        if not isinstance(profile, IProfile):
+        if not isinstance(profile, Agent):
             raise TypeError(f"Profile '{name}' did not return an IProfile instance.")
 
         return profile
@@ -143,7 +140,7 @@ class ProfileBuilder(IDisposable):
         """
         profile.unbind()
 
-    def _check_for_collision(self, fn: Callable[[], IProfile]) -> None:
+    def _check_for_collision(self, fn: Callable[[], Agent]) -> None:
         instance = fn()
         cls = type(instance)
         public_members = ProfileBuilder.get_safe_profile_members(cls)

@@ -1,27 +1,55 @@
-import threading, ulid
-from thread_factory.agent.identity.types.agentic_base import AgenticBase
-from thread_factory.agent.identity.types.base import BaseProfile
+from thread_factory.agent.identity.types.agent import Agent
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
-from thread_factory.utils.interfaces.disposable import IDisposable
 from typing import Optional, Callable, Union, Any
 
-class General(AgenticBase):
+class General(Agent):
     """
     General Profile
     ---------
-    A lightweight container for agent identity and execution structure.
+    A specialized agent profile that extends `AgenticBase` to provide a concrete
+    implementation for a general-purpose agent. It introduces specific identity
+    attributes and mechanisms for dynamic behavior routing through "locations,"
+    "save points," and "data transfers."
 
-    This object may only be bound to an ActivatedAgent or Agent instance.
+    This class is designed to be a versatile, ready-to-use agent profile that
+    can be configured with a name, job, and group, and can have its behavior
+    dynamically defined at runtime by registering callable functions.
+
+    Key Features:
+    - **Specific Identity**: Adds `id`, `name`, `job`, and `group` attributes for more detailed agent identification.
+    - **Location-Based Behavior Routing**: Implements `locations` and `save_points` to define distinct, invokable execution zones and checkpoints.
+    - **Callable-Based Data Pipelines**: A `data_transfer` mechanism allows for registering and executing functions to handle data processing tasks.
+    - **Inherits Core Agentic Functionality**: Builds upon all the features of `AgenticBase`, including work management, state tracking, and private/public inventories.
+
+    Attributes:
+        public_id (Optional[str]): A user-defined identifier for the agent.
+        name (Optional[str]): A user-defined name for the agent.
+        job (Optional[str]): A description of the agent's primary function or role.
+        group (Optional[str]): The group or team this agent belongs to.
+        save_points (ConcurrentDict): A dictionary storing named callable "save points" for checkpointing execution flow.
+        locations (ConcurrentDict): A dictionary storing named callable "locations" representing distinct execution zones.
+        data_transfer (ConcurrentDict): A dictionary storing named callable functions for data processing and transfer tasks.
     """
 
     def __init__(self, command_center: 'CommandCenter', target: Union[Callable[..., Any], Pack] = None,
-                 id: str = None, name: str = None, job: str = None, group: str = None, *args, **kwargs):
+                 public_id: str = None, name: str = None, job: str = None, group: str = None, *args, **kwargs):
         """
-        Initializes a blank profile with default field values.
+        Initializes a General profile with specific identity attributes and collections
+        for dynamic behavior registration.
+
+        Args:
+            command_center ('CommandCenter'): A reference to the central coordinating entity.
+            target (Union[Callable[..., Any], Pack], optional): The target function for standalone execution. Defaults to None.
+            public_id (str, optional): A unique identifier for this agent. Defaults to None.
+            name (str, optional): The name of this agent. Defaults to None.
+            job (str, optional): The job description for this agent. Defaults to None.
+            group (str, optional): The group this agent belongs to. Defaults to None.
+            *args: Arbitrary positional arguments passed to the base `AgenticBase` constructor.
+            **kwargs: Arbitrary keyword arguments passed to the base `AgenticBase` constructor.
         """
-        super().__init__(command_center, target, *args, *kwargs)
-        self.id: Optional[str] = id
+        super().__init__(command_center, target, *args, **kwargs)
+        self.public_id: Optional[str] = public_id
         self.name: Optional[str] = name
         self.job: Optional[str] = job
         self.group: Optional[str] = group
@@ -29,66 +57,67 @@ class General(AgenticBase):
         # Initialize collections for save points, locations, and data transfer functions
         self.save_points: ConcurrentDict[str, Union[Callable[..., None], "Pack"]] = ConcurrentDict()
         self.locations: ConcurrentDict[str, Union[Callable[..., None], "Pack"]] = ConcurrentDict()
-        self.data_transfer: ConcurrentDict[str, Union[Callable[..., any], "Pack"]] = ConcurrentDict()
+        self.data_transfer: ConcurrentDict[str, Union[Callable[..., Any], "Pack"]] = ConcurrentDict()
 
     def dispose(self):
         """
-        Dispose of internal state and clear all references.
+        Performs a comprehensive cleanup of the General profile's state,
+        disposing of all registered behaviors and identity attributes before
+        calling the base class's dispose method.
         """
         if self._disposed:
             return
-        self.save_points.dispose()
-        self.save_points = None
-        self.locations.dispose()
-        self.locations = None
-        self.data_transfer.dispose()
-        self.data_transfer = None
 
-        self.id: Optional[str] = None
-        self.name: Optional[str] = None
-        self.job: Optional[str] = None
-        self.group: Optional[str] = None
+        # Dispose of collections specific to the General profile
+        if self.save_points:
+            self.save_points.dispose()
+            self.save_points = None
+        if self.locations:
+            self.locations.dispose()
+            self.locations = None
+        if self.data_transfer:
+            self.data_transfer.dispose()
+            self.data_transfer = None
+
+        # Call the dispose method of the parent class
         super().dispose()
 
     def get_name(self) -> str:
         """
-        Retrieves the name of the agent.
+        Retrieves the name of the agent, providing a default if not set.
 
         Returns:
-            str: The name of the agent.
+            str: The agent's name, or "UnnamedAgent" if the name is not specified.
         """
         return self.name if self.name else "UnnamedAgent"
 
     def get_description(self) -> str:
         """
-        Retrieves a description of the agent.
+        Retrieves a formatted description of the agent, including its name, job, and group.
 
         Returns:
-            str: A description of the agent.
+            str: A descriptive string summarizing the agent's identity.
         """
         return f"Agent {self.get_name()} with job '{self.job}' in group '{self.group}'"
 
     def register_data_transfer(self, name: str, fn: Union[Callable[..., Any], Pack]):
         """
-        Registers a named callable function for data processing tasks.
+        Registers a named callable function for data processing or movement tasks.
+        These functions can be invoked by name using `execute_transfer`.
 
         Args:
-            name (str): The unique name for the data transfer function.
-            fn (Union[Callable[..., Any], Pack]): The function to register.
-
-        Raises:
-            TypeError: If the provided function is an async coroutine.
+            name (str): The unique name to assign to the data transfer function.
+            fn (Union[Callable[..., Any], Pack]): The callable function or `Pack` to register.
         """
-        if fn:
-            fn = Pack.bundle(fn)
-        self.data_transfer[name] = fn
+        self.data_transfer[name] = Pack.bundle(fn) if fn else None
 
     def get_data_transfer_dict(self) -> ConcurrentDict[str, Union[Callable[..., Any], Pack]]:
         """
-        Retrieves a copy of all registered data transfer functions.
+        Retrieves a copy of the dictionary containing all registered data transfer functions.
 
         Returns:
-            ConcurrentDict[str, Union[Callable[..., Any], Pack]]: A dictionary of transfer functions.
+            ConcurrentDict[str, Union[Callable[..., Any], Pack]]: A shallow copy of the
+                data transfer dictionary.
         """
         return self.data_transfer.copy()
 
@@ -112,68 +141,53 @@ class General(AgenticBase):
     def register_save_point(self, name: str, fn: Union[Callable[..., None], Pack]):
         """
         Registers a named callable as a "save point" for checkpointing execution flow.
+        This allows the agent to return to a specific point in its logic.
 
         Args:
             name (str): The unique name for the save point.
-            fn (Union[Callable[..., None], Pack]): The function representing the save point.
-
-        Raises:
-            TypeError: If the provided function is an async coroutine.
+            fn (Union[Callable[..., None], Pack]): The callable function or `Pack`
+                representing the save point's logic.
         """
-        if fn:
-            fn = Pack.bundle(fn)
-        self.save_points[name] = fn
+        self.save_points[name] = Pack.bundle(fn) if fn else None
 
     def get_save_points_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
         """
-        Retrieves a copy of all registered save point functions.
+        Retrieves a copy of the dictionary of all registered save point functions.
 
         Returns:
-            ConcurrentDict[str, Union[Callable[..., None], Pack]]: A dictionary of save points.
+            ConcurrentDict[str, Union[Callable[..., None], Pack]]: A shallow copy of
+                the save points dictionary.
         """
         return self.save_points.copy()
 
     def register_location(self, name: str, fn: Union[Callable[..., None], Pack]):
         """
         Registers a named callable as a distinct "location" or execution zone.
+        This allows the agent to dynamically switch between different behaviors.
 
         Args:
             name (str): The unique name for the location.
-            fn (Union[Callable[..., None], Pack]): The function defining the location's behavior.
-
-        Raises:
-            TypeError: If the provided function is an async coroutine.
+            fn (Union[Callable[..., None], Pack]): The callable function or `Pack`
+                defining the location's behavior.
         """
-        if fn:
-            fn = Pack.bundle(fn)
-        self.locations[name] = fn
+        self.locations[name] = Pack.bundle(fn) if fn else None
 
     def get_locations_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
         """
-        Retrieves a copy of all registered location functions.
+        Retrieves a copy of the dictionary of all registered location functions.
 
         Returns:
-            ConcurrentDict[str, Union[Callable[..., None], Pack]]: A dictionary of locations.
+            ConcurrentDict[str, Union[Callable[..., None], Pack]]: A shallow copy of
+                the locations dictionary.
         """
         return self.locations.copy()
 
-
-
     def __repr__(self) -> str:
-        return f"<Profile name={self.name} job={self.job} group={self.group} id={self.id}>"
+        """
+        Provides a developer-friendly string representation of the General profile,
+        showing its specific identity attributes.
 
-
-    def set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
-        self._event_loop = Pack.bundle(fn) if fn else fn
-
-
-    def _validate_caller(self, factory_id: Optional[str] = None) -> None:
-        expected = factory_id or self.factory_id
-        current_id = getattr(threading.current_thread(), "factory_id", None)
-        if current_id != expected:
-            raise PermissionError(
-                f"[Access Denied] Caller factory_id={current_id} does not match expected={expected}"
-            )
-
-    def __str__(self) -> str:
-        return f"AgenticProfile<{self.factory_id}>"
+        Returns:
+            str: A string detailing the agent's name, job, group, and ID.
+        """
+        return f"<Profile name={self.name} job={self.job} group={self.group} id={self.public_id}>"
