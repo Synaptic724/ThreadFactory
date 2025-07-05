@@ -33,7 +33,7 @@ class General(Agent):
     """
 
     def __init__(self, command_center: 'CommandCenter', target: Union[Callable[..., Any], Pack] = None,
-                 public_id: str = None, name: str = None, job: str = None, group: str = None, *args, **kwargs):
+                 public_id: str = None, public_name: str = None, job_title: str = None, activity_group: str = None, *args, **kwargs):
         """
         Initializes a General profile with specific identity attributes and collections
         for dynamic behavior registration.
@@ -50,9 +50,9 @@ class General(Agent):
         """
         super().__init__(command_center, target, *args, **kwargs)
         self.public_id: Optional[str] = public_id
-        self.name: Optional[str] = name
-        self.job: Optional[str] = job
-        self.group: Optional[str] = group
+        self.public_name: Optional[str] = public_name
+        self.job_title: Optional[str] = job_title
+        self.activity_group: Optional[str] = activity_group
 
         # Initialize collections for save points, locations, and data transfer functions
         self.save_points: Optional[ConcurrentDict[str, Union[Callable[..., None], "Pack"]]] = None

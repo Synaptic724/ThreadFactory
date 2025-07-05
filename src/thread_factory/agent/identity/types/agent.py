@@ -1,5 +1,7 @@
 import threading, ulid
 from typing import Optional, Callable, Union, Any
+from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
+from thread_factory.runtime.factory.operations.work.work import Work
 from thread_factory.runtime.worker.worker.worker import Worker, WorkerState
 from thread_factory.agent.thread_pool.help_request import HelpRequest
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
@@ -38,8 +40,8 @@ class Agent(Worker):
         _public_inventory (ConcurrentDict[str, Any]): A dictionary for storing data that is publicly accessible within the agent's scope.
     """
 
-    def __init__(self, command_center: 'CommandCenter', target: Union[Callable[..., Any], Pack] = None, *args,
-                 **kwargs):
+    def __init__(self, command_center: 'CommandCenter', target: Union[Callable[..., Any], Pack] = None, factory_id: Optional[str | int] = None,
+                 factory: Any = None, work_queue: Optional[ConcurrentQueue[Work]] = None, *args, **kwargs):
         """
         Initializes the agentic profile, sets up all agentic state, and
         prepares the thread for execution. It extends the base `Worker`
@@ -59,7 +61,7 @@ class Agent(Worker):
             TypeError: If the provided `target` is not a `Callable` or `Pack` instance.
         """
         # --- Initialize Base Classes ---
-        super().__init__(*args, **kwargs)  # For Worker
+        super().__init__(command_center, target, factory_id=factory_id, factory=factory, work_queue=work_queue, *args, **kwargs)
         if target and (isinstance(target, Callable) or isinstance(target, Pack)):
             self._target = Pack.bundle(target)
         elif target is not None:
@@ -96,6 +98,17 @@ class Agent(Worker):
             str: The unique ULID identifier.
         """
         return self._factory_id
+
+    def set_target(self, target: Union[Callable[..., Any], Pack]) -> None:
+        """
+        This method sets the target function or `Pack` for the agent.
+        """
+        if target and (isinstance(target, Callable) or isinstance(target, Pack)):
+            self._target = Pack.bundle(target)
+        elif target is not None:
+            raise TypeError("Target must be a Callable or Pack instance.")
+        else:
+            self._target = None
 
     def get_name(self) -> str:
         """
@@ -254,7 +267,7 @@ class Agent(Worker):
             self._value_work.cancel_job()
 
     # --- Behavior Routing & Execution ---
-    def _should_return_home(self) -> bool:
+    def should_return_home(self) -> bool:
         """
         Checks if the agent is configured to return to its home event loop.
 
@@ -269,7 +282,7 @@ class Agent(Worker):
                 raise RuntimeError("Cannot check return home status after agent is disposed.")
             return self._return_home
 
-    def _set_return_home(self, return_home: bool) -> None:
+    def set_return_home(self, return_home: bool) -> None:
         """
         Sets whether the agent should return to its home event loop.
 
@@ -337,7 +350,7 @@ class Agent(Worker):
             return worker.get_from_inventory(key, default)
         return default
 
-    def _set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
+    def set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
         """
         Sets the primary, default execution loop or "home behavior" for the agent.
 

@@ -121,7 +121,7 @@ class SignalFork(IDisposable):
 
     def __init__(self,
                  number_of_forks: int,
-                 callables: List[Tuple[int, Union[Callable, Pack]]],
+                 callables: List[Tuple[int, Union[Callable[..., None], Pack]]],
                  *,  # Force subsequent args to be keyword-only
                  rotate_selectors: bool = False,
                  selector_step: int = 1,
