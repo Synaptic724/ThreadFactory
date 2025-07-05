@@ -1,7 +1,4 @@
-import threading
-import ulid
-import logging
-import time
+import threading, ulid, logging, time
 from enum import Enum, auto
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, List
@@ -47,18 +44,87 @@ class BaseActivity(IDisposable, ABC):
             except Exception as e:
                 self._logger.warning(f"Failed to auto-register BaseActivity '{self.id}': {e}", exc_info=True)
 
+    def dispose(self):
+        """
+        Cleans up the activity's resources and marks it as disposed.
+
+        This method implements the `IDisposable` contract. It ensures that
+        the activity's resources are properly released, preventing resource leaks.
+        Specifically, it:
+        1. Sets the `_disposed` flag to True to prevent multiple disposal calls.
+        2. Unregisters the activity from the `SignalController` if one is attached.
+           The `dispose_object=False` argument indicates that the SignalController
+           should not attempt to dispose of *this* object again.
+        3. Clears the internal `_registered_agents` and `_metadata` collections.
+        4. Nullifies the reference to the `_signal_controller`.
+
+        This operation is thread-safe and idempotent. After disposal, the activity
+        should not be used.
+        """
+        if self._disposed:
+            self._logger.debug(f"Activity '{self.id}' is already disposed.")
+            return
+        with self._lock:
+            # Re-check _disposed flag inside the lock in case of race condition
+            if self._disposed:
+                return
+
+            self._disposed = True
+            self._logger.info(f"Disposing Activity '{self.id}'.")
+
+            if self._signal_controller:
+                try:
+                    # Unregister from controller without causing a recursive dispose call
+                    self._signal_controller.unregister(self.id, dispose_object=False)
+                    self._logger.debug(f"Activity '{self.id}' unregistered from SignalController.")
+                except Exception as e:
+                    self._logger.warning(
+                        f"Error unregistering Activity '{self.id}' from SignalController during disposal: {e}",
+                        exc_info=True)
+
+            # Clear internal collections
+            self._registered_agents.clear()
+            self._metadata.clear()
+
+            # Nullify references to external objects to aid garbage collection
+            self._signal_controller = None
+            self._logger.debug(f"Activity '{self.id}' disposal complete.")
+
     # --- SignalController Contract ---
 
     @property
     def id(self) -> str:
-        """The unique identifier for this Activity instance."""
+        """
+        The unique identifier for this Activity instance.
+
+        This property provides read-only access to the ULID (Universally Unique Lexicographically Sortable Identifier)
+        assigned to the activity upon its creation. This ID is used by the `SignalController`
+        and other components to uniquely reference this specific activity.
+
+        Returns:
+            str: The unique identifier string for this activity.
+        """
         return self._id
 
     def _get_object_details(self) -> ConcurrentDict[str, Any]:
         """
-        Returns this activity's metadata and commands to the SignalController.
-        Base implementation exposes only agent management. Subclasses should extend this.
-        """
+        Returns this activity's essential metadata and a list of callable commands.
+
+        This method is a core part of the `BaseActivity` contract with the `SignalController`
+        or any introspection mechanism. It provides a structured way to expose the
+        activity's name and its primary interaction points (commands).
+
+        The base implementation provides the class name and commands for
+        `Youtube` and `get_assigned_agents`. Subclasses are expected to
+        extend this dictionary to include their own specific commands and details,
+        as demonstrated in `JobActivity`.
+
+        Returns:
+            ConcurrentDict[str, Any]: A thread-safe dictionary containing:
+                                      - "name" (str): The name of the activity's class.
+                                      - "commands" (ConcurrentDict[str, Callable]): A dictionary
+                                        mapping command names to their corresponding callable methods.
+            """
         return ConcurrentDict({
             "name": self.__class__.__name__,
             "commands": ConcurrentDict({
@@ -66,51 +132,96 @@ class BaseActivity(IDisposable, ABC):
                 "get_assigned_agents": self.get_assigned_agents
             })
         })
-
     # --- Agent Management ---
 
     def register_agent(self, agent: Agent):
-        """Assigns an agent to this activity. Called by the CommandCenter."""
+        """
+        Assigns an agent to this activity, making it aware of the agent.
+
+        This method is typically called by a controlling entity (e.g., a CommandCenter)
+        to associate a specific `Agent` instance with this activity. The agent is
+        registered using its `factory_id`. If the agent is already registered,
+        this operation has no effect. A "AGENT_ASSIGNED" notification is emitted.
+
+        Args:
+            agent (Agent): The Agent instance to be registered with this activity.
+                           Must have a unique `factory_id`.
+        """
         if agent and agent.factory_id not in self._registered_agents:
             self._registered_agents[agent.factory_id] = agent
             self._logger.debug(f"Agent '{agent.factory_id}' registered to Activity '{self.id}'.")
             self._notify("AGENT_ASSIGNED", {"agent_id": agent.factory_id})
+        elif agent:
+            self._logger.debug(f"Agent '{agent.factory_id}' is already registered to Activity '{self.id}'.")
 
     def unregister_agent(self, agent: Agent):
-        """Unassigns an agent from this activity."""
+        """
+        Unassigns an agent from this activity.
+
+        This method removes the association of a specific `Agent` instance from
+        this activity. If the agent was successfully unregistered, a
+        "AGENT_UNASSIGNED" notification is emitted. This operation is idempotent;
+        if the agent is not registered, nothing happens.
+
+        Args:
+            agent (Agent): The Agent instance to be unregistered from this activity.
+        """
         if agent and self._registered_agents.pop(agent.factory_id, None):
             self._logger.debug(f"Agent '{agent.factory_id}' unregistered from Activity '{self.id}'.")
             self._notify("AGENT_UNASSIGNED", {"agent_id": agent.factory_id})
+        elif agent:
+            self._logger.debug(f"Agent '{agent.factory_id}' was not registered to Activity '{self.id}'.")
 
     def get_assigned_agents(self) -> ConcurrentList[str]:
-        """Returns a thread-safe list of IDs of all agents currently assigned."""
+        """
+        Returns a thread-safe list of the IDs of all agents currently assigned to this activity.
+
+        This provides a snapshot of the agents actively associated with this activity,
+        useful for monitoring or dispatching tasks to assigned agents.
+
+        Returns:
+            ConcurrentList[str]: A thread-safe list containing the `factory_id`s of
+                                 all currently assigned agents.
+        """
         return ConcurrentList(self._registered_agents.keys())
 
     def get_metadata(self) -> ConcurrentDict[str, Any]:
-        """Returns a thread-safe copy of the activity's metadata."""
+        """
+        Returns a thread-safe copy of the activity's associated metadata.
+
+        The metadata can include any custom key-value pairs passed during
+        the activity's initialization. This method ensures that the returned
+        dictionary is a copy, preventing external modifications from affecting
+        the activity's internal state.
+
+        Returns:
+            ConcurrentDict[str, Any]: A thread-safe copy of the activity's metadata dictionary.
+        """
         return self._metadata.copy()
 
     # --- Private Helpers ---
 
     def _notify(self, event_type: str, data: Optional[Dict[str, Any]] = None):
-        """Helper to safely send notifications to the attached signal controller."""
+        """
+        Helper method to safely send notifications to the attached SignalController.
+
+        This internal method acts as the primary communication channel from the activity
+        to the broader system via the `SignalController`. It checks if a controller
+        is present and not disposed before attempting to send the notification.
+        Errors during notification are logged.
+
+        Args:
+            event_type (str): A string identifying the type of event (e.g., "STATUS_CHANGED", "PROGRESS_UPDATE").
+            data (Optional[Dict[str, Any]]): An optional dictionary containing any
+                                            additional context or data relevant to the event.
+        """
         if self._signal_controller and not self._signal_controller._disposed:
             try:
+                # The SignalController's notify method is expected to handle its own locking
+                # for thread-safe dispatch of notifications.
                 self._signal_controller.notify(self.id, event_type, data)
             except Exception as e:
-                self._logger.error(f"Activity '{self.id}' failed to notify controller: {e}", exc_info=True)
-
-    def dispose(self):
-        """Cleans up the activity's resources."""
-        if self._disposed:
-            return
-        with self._lock:
-            self._disposed = True
-            if self._signal_controller:
-                try:
-                    self._signal_controller.unregister(self.id, dispose_object=False)
-                except Exception:
-                    pass
-            self._registered_agents.clear()
-            self._metadata.clear()
-            self._signal_controller = None
+                # Log the error if notification fails, but don't prevent the activity from functioning.
+                self._logger.error(f"Activity '{self.id}' failed to notify controller for event '{event_type}': {e}",
+                                   exc_info=True)
+        # If signal_controller is None or disposed, notification is silently skipped.
