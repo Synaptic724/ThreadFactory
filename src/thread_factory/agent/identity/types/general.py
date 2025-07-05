@@ -1,5 +1,5 @@
 import threading, ulid
-from thread_factory.agent.identity.profiles.base import BaseProfile
+from thread_factory.agent.identity.types.base import BaseProfile
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable

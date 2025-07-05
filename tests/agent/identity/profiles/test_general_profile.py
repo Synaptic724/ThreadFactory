@@ -1,7 +1,7 @@
 import unittest
-from thread_factory.agent.identity.profile_builder import ProfileBuilder
-from thread_factory.agent.identity.profiles.general import General
-from thread_factory.agent.identity.activator import ActivatedAgent
+from thread_factory.agent.identity.agent_builder import ProfileBuilder
+from thread_factory.agent.identity.types.general import General
+from thread_factory.agent.identity.activator import AgentActivator
 
 
 class ProfileIntegrationTest(unittest.TestCase):
@@ -21,8 +21,8 @@ class ProfileIntegrationTest(unittest.TestCase):
         - Detaching and cleanup
         """
 
-        agent = ActivatedAgent(thread_stub := type("FakeThread", (), {})())
-        profile = self.builder.create_profile()
+        agent = AgentActivator(thread_stub := type("FakeThread", (), {})())
+        profile = self.builder.get_profile("default")
 
         # Verify initial identity
         self.assertEqual(profile.name, "UnnamedAgent")

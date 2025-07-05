@@ -39,8 +39,6 @@ class BaseProfile(IDisposable, IProfile):
         self._activator = None
         self._lock = threading.RLock()
 
-        self._bound_target: Optional[Union["AgentActivator", "Agent"]] = None
-
     def dispose(self):
         """
         Dispose of internal state and clear all references.
@@ -48,7 +46,6 @@ class BaseProfile(IDisposable, IProfile):
         if self._disposed:
             return
         self._command_center = None
-        self._bound_target = None
         self._thread_target = None
         self._disposed = True
 

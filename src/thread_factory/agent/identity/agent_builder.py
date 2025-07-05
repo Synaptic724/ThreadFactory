@@ -1,12 +1,11 @@
-import threading
-import warnings
+import threading, inspect, warnings
 from typing import Callable, Union, List, Type, Set
 from thread_factory.agent.identity.activator import AgentActivator
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.agent.identity.profiles.general import General  # Your default Profile class
-from thread_factory.agent.identity.profiles.base import BaseProfile  # Your default Profile class
+from thread_factory.agent.identity.types.general import General  # Your default Profile class
+from thread_factory.agent.identity.types.base import BaseProfile  # Your default Profile class
 from thread_factory.utils.interfaces.iprofile import IProfile
 
 
@@ -64,7 +63,7 @@ class ProfileBuilder(IDisposable):
         self.register_profile("default", lambda: General())
         self._registered = True
 
-    def register_profile(self, name: str, fn: Callable[[], IProfile]) -> None:
+    def register_profile(self, name: str, fn: Callable[[], IProfile], *args, **kwargs) -> None:
         """
         Register a profile constructor under a symbolic name.
 
@@ -75,13 +74,13 @@ class ProfileBuilder(IDisposable):
         Raises:
             ValueError: If name is empty or function is not callable.
         """
-        if not name or not callable(fn):
+        if not name or not callable(fn,  *args, **kwargs):
             raise ValueError("Profile name must be a non-empty string and fn must be callable.")
         if name not in self._registry:
-            self._check_for_collision(fn)
+            self._check_for_collision(fn,  *args, **kwargs)
         else:
             raise ValueError(f"Profile '{name}' is already registered.")
-        self._registry[name] = Pack.bundle(fn)
+        self._registry[name] = Pack.bundle(fn,  *args, **kwargs)
 
     def unregister_profile(self, name: str) -> bool:
         """
@@ -145,16 +144,11 @@ class ProfileBuilder(IDisposable):
         profile.unbind()
 
     def _check_for_collision(self, fn: Callable[[], IProfile]) -> None:
-        """
-        Check for unsafe shadowing of internal names by the profile class itself.
-
-        Warns only if user-defined methods/fields directly conflict with reserved names.
-        """
         instance = fn()
         cls = type(instance)
-        user_defined = set(cls.__dict__.keys())  # only the class’s *own* attributes
+        public_members = ProfileBuilder.get_safe_profile_members(cls)
 
-        conflicts = ProfileBuilder.RESERVED_NAMES.intersection(user_defined)
+        conflicts = ProfileBuilder.RESERVED_NAMES.intersection(public_members)
         if conflicts:
             warnings.warn(
                 f"Profile '{cls.__name__}' defines reserved name(s): {', '.join(conflicts)}. "
@@ -169,6 +163,23 @@ class ProfileBuilder(IDisposable):
         thread_class_data = ProfileBuilder.get_public_class_members(type(current))
         activator_class_data = ProfileBuilder.get_public_class_members(AgentActivator)
         self._collision_check = thread_class_data.union(activator_class_data)
+
+
+    def get_safe_profile_members(cls: type) -> Set[str]:
+        """
+        Returns a set of all accessible public members on a class, including inherited ones.
+
+        Args:
+            cls (type): The profile class to inspect.
+
+        Returns:
+            Set[str]: Set of all public attribute/method names.
+        """
+        return {
+            name for name, _ in inspect.getmembers(cls)
+            if not name.startswith("__")  # Filter dunders
+        }
+
 
     @staticmethod
     def get_public_class_members(cls: Type) -> Set[str]:

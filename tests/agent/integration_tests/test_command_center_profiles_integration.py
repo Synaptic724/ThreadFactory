@@ -1,7 +1,7 @@
 import unittest
 import threading
 from thread_factory.agent.command_center import CommandCenter
-from thread_factory.agent.identity.profiles.general import General
+from thread_factory.agent.identity.types.general import General
 
 
 class TestCommandCenterProfileIntegration(unittest.TestCase):

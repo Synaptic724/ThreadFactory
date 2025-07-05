@@ -5,7 +5,7 @@ import unittest
 from concurrent.futures import Future
 from thread_factory.agent.command_center import CommandCenter, CC
 from thread_factory.agent.identity.activator import AgentActivator
-from thread_factory.agent.identity.profiles.general import General
+from thread_factory.agent.identity.types.general import General
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.iprofile import IProfile
 

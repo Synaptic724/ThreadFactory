@@ -2,8 +2,8 @@ import threading
 from typing import Optional, List, Callable, Any, Union
 from concurrent.futures import ThreadPoolExecutor, Future
 from thread_factory.agent.identity.activator import AgentActivator
-from thread_factory.agent.identity.profiles.general import General
-from thread_factory.agent.identity.profile_builder import ProfileBuilder
+from thread_factory.agent.identity.types.general import General
+from thread_factory.agent.identity.agent_builder import ProfileBuilder
 from thread_factory.utils.coordination.package import Pack
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.concurrency.concurrent_list import ConcurrentList

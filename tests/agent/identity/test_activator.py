@@ -2,9 +2,9 @@ import threading
 import unittest
 from typing import Any
 from unittest import TestCase
-from thread_factory.agent.identity.profiles.base import BaseProfile
+from thread_factory.agent.identity.types.base import BaseProfile
 from thread_factory.agent.identity.activator import AgentActivator
-from thread_factory.agent.identity.profiles.general import General
+from thread_factory.agent.identity.types.general import General
 
 
 def _no_op() -> None:
