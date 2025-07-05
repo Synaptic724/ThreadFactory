@@ -52,7 +52,7 @@ class Worker(threading.Thread, IDisposable):
     - **Resource Disposal**: Implements `IDisposable` for proper cleanup of resources.
     """
 
-    def __init__(self, group: Optional[threading.ThreadGroup] = None,
+    def __init__(self, group: Optional[threading.Thread] = None,
                  target: Optional[Callable[..., Any]] = None,
                  name: Optional[str] = None,
                  args: tuple = (),
@@ -195,7 +195,7 @@ class Worker(threading.Thread, IDisposable):
 
 
 #region Signal Controller Integration
-    def set_external_controller(self, controller: 'SignalController'):
+    def set_external_controller(self, controller: SignalController):
         """
         Sets an external SignalController to manage or observe this Worker.
 
@@ -492,10 +492,10 @@ class Worker(threading.Thread, IDisposable):
         self._send_records_to_factory()
 
         # Clean up records older than 1 hour from self.records.records (now a dict)
-        self.records.records = {
+        self.records.records = ConcurrentDict({
             k: v for k, v in self.records.records.items()
             if (current_time - v.timestamp_creation_time).total_seconds() < 3600
-        }
+        })
 
         while hours_elapsed >= 1.0:
             self.units_per_hour.append(self.units_per_minute)

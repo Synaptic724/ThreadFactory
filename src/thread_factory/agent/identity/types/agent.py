@@ -1,3 +1,4 @@
+import logging
 import threading, ulid
 from typing import Optional, Callable, Union, Any
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
@@ -6,11 +7,12 @@ from thread_factory.runtime.worker.worker.worker import Worker, WorkerState
 from thread_factory.agent.thread_pool.help_request import HelpRequest
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.synchronization import SignalController
 from thread_factory.utils.coordination.package import Pack
-from thread_factory.utils.interfaces.disposable import IDisposable
 
 
-class Agent(Worker, IDisposable):
+
+class Agent(Worker):
     """
     Agent
     ---------
@@ -41,53 +43,67 @@ class Agent(Worker, IDisposable):
         _public_inventory (ConcurrentDict[str, Any]): A dictionary for storing data that is publicly accessible within the agent's scope.
     """
 
-    def __init__(self, command_center: 'CommandCenter', target: Union[Callable[..., Any], Pack] = None,
-                 factory: Any = None, work_queue: Optional[ConcurrentQueue[Work]] = None, *args, **kwargs):
+    def __init__(self, command_center: 'CommandCenter',
+                 target: Union[Callable[..., Any], 'Pack'] = None, # Make sure 'Pack' is imported or defined
+                 factory: Any = None,
+                 work_queue: Optional[ConcurrentQueue[Work]] = None,
+                 signal_controller: Optional[SignalController] = None, # Explicitly pass this through
+                 logger: Optional[logging.Logger] = None,            # Explicitly pass this through
+                 *args, **kwargs):
         """
-        Initializes the agentic profile, sets up all agentic state, and
-        prepares the thread for execution. It extends the base `Worker`
-        initialization with features for dynamic behavior, stateful operations,
-        and flexible data management.
+        Initializes a new Agent thread instance, extending the Worker's capabilities.
 
         Args:
-            command_center ('CommandCenter'): A reference to the central coordinating entity,
-                such as a thread pool or orchestrator, that can resolve agents by ID.
-            target (Union[Callable[..., Any], Pack], optional): The target function or `Pack`
-                to execute. This is primarily used if the agent is run as a standalone
-                thread (`_pool_agent=False`). Defaults to None.
-            *args: Arbitrary positional arguments passed to the base `Worker` constructor.
-            **kwargs: Arbitrary keyword arguments passed to the base `Worker` constructor.
-
-        Raises:
-            TypeError: If the provided `target` is not a `Callable` or `Pack` instance.
+            command_center (CommandCenter): A reference to the central coordinating
+                CommandCenter, essential for the agent to resolve and interact with
+                other entities in the system.
+            target (Union[Callable, Pack], optional): The callable object or Pack instance
+                that the agent's thread will execute. Defaults to None.
+            factory (Any, optional): A reference to the parent factory or manager.
+                Defaults to None.
+            work_queue (Optional[ConcurrentQueue[Work]], optional): A queue from which
+                the agent continuously dequeues and executes Work units. Defaults to None.
+            signal_controller (Optional[SignalController], optional): An optional
+                SignalController instance for external management and event notification.
+                Defaults to None.
+            logger (Optional[logging.Logger], optional): A custom logger instance for the agent.
+                If None, a default logger will be used. Defaults to None.
+            *args: Positional arguments to be passed to the base `threading.Thread` constructor.
+            **kwargs: Keyword arguments to be passed to the base `threading.Thread` constructor.
+                      These can include `name`, `group`, etc., which are then
+                      forwarded to `super().__init__`.
         """
-        # --- Initialize Base Classes ---
-        super().__init__(group=None, target=target, factory=factory,
-                         work_queue=work_queue, *args, **kwargs)
-        if target and (isinstance(target, Callable) or isinstance(target, Pack)):
-            self._target = Pack.bundle(target)
-        elif target is not None:
-            raise TypeError("Target must be a Callable or Pack instance.")
-        else:
-            self._target = None
+        # Call the Worker (super) class's __init__ method
+        # Pass through all relevant parameters that Worker expects
+        super().__init__(
+            group=kwargs.pop('group', None),  # Extract 'group' from kwargs if present
+            name=kwargs.pop('name', None),    # Extract 'name' from kwargs if present
+            target=target,
+            args=args,
+            kwargs=kwargs, # Pass remaining kwargs to super() if any are left
+            factory=factory,
+            work_queue=work_queue,
+            signal_controller=signal_controller, # This is now explicitly passed from Agent's init
+            logger=logger                        # This is now explicitly passed from Agent's init
+        )
 
-        # --- Identity & Framework Integration ---
+        # Agent-specific initializations
         self._command_center: 'CommandCenter' = command_center
+        if isinstance(target, Pack):
+            self._target = target # This is an agent-specific target, not the thread's main target.
+        else:
+            self._target = Pack.bundle(target) if target else None
 
-        # --- Agentic Configuration ---
-        self._worker_type: str = "agentic"
-        self._pool_agent: bool = True
-        self._return_home: bool = False
 
-        # --- Behavior & Execution ---
-        self._event_loop: Optional[Pack] = None
-        self._value_work: Optional[HelpRequest] = None
+        self._worker_type = "agentic" # Overrides Worker's default "mainpool"
+        self._pool_agent: bool = False # This flag might be set by a pool manager
+        self._return_home: bool = False # Controls behavior after task completion
 
-        # --- Memory & State ---
+        self._event_loop: Optional['Pack'] = None # Example: Pack for the main behavior loop
+        self._value_work: Optional['HelpRequest'] = None # Example: For binding specific work
+
         self._private_inventory = ConcurrentDict()
         self.public_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
-        # Default agentic behavior for pool-bound workers
-        self.state = WorkerState.STARTING
 
     def dispose(self):
         """
@@ -108,6 +124,41 @@ class Agent(Worker, IDisposable):
         self._event_loop = None
 
         super().dispose()  # Call parent dispose if it exists
+
+#region Signal Controller Methods
+    def _get_object_details(self) -> ConcurrentDict[str, Any]:
+        """
+        Extends the base Worker's object details with high-level agent-specific commands and metadata.
+
+        This method is crucial for exposing the Agent's unique capabilities and status
+        to external orchestrators or monitoring systems via the SignalController.
+        It provides a top-down interface for:
+
+        - **Identification**: Retrieving the agent's profile name and description.
+        - **Behavior Configuration**: Setting the agent's primary event loop (`set_home`)
+          and controlling its post-task behavior (`set_return_home`).
+        - **Lifecycle Management**: Initiating the agent's thread execution (`deploy`).
+        - **Work Observation**: Querying the state and ID of any currently bound work.
+        - **Data Inspection**: Providing a snapshot of the agent's public inventory.
+
+        Returns:
+            ConcurrentDict[str, Any]: A dictionary containing the worker's base details
+                augmented with agent-specific commands and metadata.
+        """
+        details = super()._get_object_details()
+
+        details["commands"].update({
+            "get_name": self.get_name,
+            "get_description": self.get_description,
+            "set_home": self.set_home,
+            "set_return_home": self.set_return_home,
+            "get_bound_work_state": self._get_work_state,
+            "get_bound_work_id": lambda: self._value_work.record.task_id if self._value_work else None
+        })
+        details["agent_type"] = self._worker_type
+        return details
+
+#endregion Signal Controller Methods
 #region Generic Agent System Methods
     def _unregister(self) -> None:
         """
