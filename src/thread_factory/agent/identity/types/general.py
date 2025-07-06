@@ -133,6 +133,94 @@ class General(Agent):
         # Call the dispose method of the parent class
         super().dispose()
 
+    def _get_object_details(self) -> ConcurrentDict[str, Any]:
+        """
+        Extends the base Agent's object details with commands and metadata specific to a General profile.
+
+        This method exposes unique General agent capabilities to external orchestrators
+        or monitoring systems via the SignalController. It provides interfaces for:
+
+        - **Identity Retrieval**: Accessing the agent's public_id, public_name,
+          job_title, and activity_group.
+        - **Dynamic Behavior Management**: Registering new 'locations', 'save points',
+          and 'data transfer' functions, and executing data transfers.
+        - **Behavior Inspection**: Retrieving dictionaries of all registered locations,
+          save points, and data transfer functions.
+
+        Returns:
+            ConcurrentDict[str, Any]: A dictionary containing the agent's base details
+                augmented with General profile-specific commands and metadata.
+        """
+        details = super()._get_object_details()
+
+        details["commands"].update({
+            # General identity getters
+            "get_public_id": self.get_public_id,
+            "get_public_name": self.get_public_name,
+            "get_job_title": self.get_job_title,
+            "get_activity_group": self.get_activity_group,
+
+            # Behavior routing management
+            "register_location": self.register_location,
+            "get_locations_dict": self.get_locations_dict,
+            "register_save_point": self.register_save_point,
+            "get_save_points_dict": self.get_save_points_dict,
+            "register_data_transfer": self.register_data_transfer,
+            "execute_transfer": self.execute_transfer,
+            "get_data_transfer_dict": self.get_data_transfer_dict,
+
+            # The get_name and get_description are overridden in General,
+            # so these calls will now reflect the General profile's implementation.
+            "get_name": self.get_name,
+            "get_description": self.get_description
+        })
+        # Override or set agent_type specifically for General if desired
+        details["name"] = self.__class__.__name__
+        return details
+
+#region General-specific Identity Getters
+    def get_public_id(self) -> Optional[str]:
+        """
+        Retrieves the public identifier of this General agent.
+
+        Returns:
+            Optional[str]: The public ID, or None if not set.
+        """
+        with self._lock:
+            return self.public_id
+
+    def get_public_name(self) -> Optional[str]:
+        """
+        Retrieves the public-facing name of this General agent.
+
+        Returns:
+            Optional[str]: The public name, or None if not set.
+        """
+        with self._lock:
+            return self.public_name
+
+    def get_job_title(self) -> Optional[str]:
+        """
+        Retrieves the job title describing this General agent's primary function.
+
+        Returns:
+            Optional[str]: The job title, or None if not set.
+        """
+        with self._lock:
+            return self.job_title
+
+    def get_activity_group(self) -> Optional[str]:
+        """
+        Retrieves the activity group this General agent belongs to.
+
+        Returns:
+            Optional[str]: The activity group, or None if not set.
+        """
+        with self._lock:
+            return self.activity_group
+
+#endregion
+
     def get_name(self) -> str:
         """
         Retrieves the name of the agent, providing a default if not set.

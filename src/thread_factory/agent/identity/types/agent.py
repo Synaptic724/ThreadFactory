@@ -155,7 +155,7 @@ class Agent(Worker):
             "get_bound_work_state": self._get_work_state,
             "get_bound_work_id": lambda: self._value_work.record.task_id if self._value_work else None
         })
-        details["agent_type"] = self._worker_type
+        details["name"] = self.__class__.__name__
         return details
 
 #endregion Signal Controller Methods

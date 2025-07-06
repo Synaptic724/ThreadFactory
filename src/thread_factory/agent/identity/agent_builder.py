@@ -53,8 +53,6 @@ class AgentBuilder(IDisposable):
         """
         if self._disposed:
             return
-        # The base IDisposable dispose method will set _disposed = True
-        super().dispose()
 
         if self._registry:
             self._registry.dispose()
