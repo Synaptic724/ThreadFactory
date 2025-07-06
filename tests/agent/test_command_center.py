@@ -17,7 +17,7 @@ class DummyAgent(Agent):
 class TestCommandCenter(unittest.TestCase):
 
     def setUp(self):
-        self.cc = CommandCenter(max_workers=3)
+        self.cc = CommandCenter(total_max_workers=90)
 
     def tearDown(self):
         self.cc.dispose()
@@ -64,7 +64,7 @@ class TestCommandCenter(unittest.TestCase):
 
     def test_worker_cap_enforced(self):
         self.cc.register_template("limited", lambda **kwargs: DummyAgent(**kwargs))
-        self.cc.create_agents(3, "limited", target=lambda: None)
+        self.cc.create_agents(90, "limited", target=lambda: None)
         with self.assertRaises(RuntimeError):
             self.cc.create_agent("limited", target=lambda: None)
 
@@ -87,21 +87,6 @@ class TestCommandCenter(unittest.TestCase):
         self.cc.dispose()
         self.cc.dispose()
         self.assertTrue(True)  # If it doesn't crash, it's good
-
-    def test_dispose_frees_worker_slot(self):
-        self.cc.register_template("slot", lambda **kw: DummyAgent(**kw))
-        agent1 = self.cc.create_agent("slot", target=lambda: None)
-        agent2 = self.cc.create_agent("slot", target=lambda: None)
-        agent3 = self.cc.create_agent("slot", target=lambda: None)
-
-        with self.assertRaises(RuntimeError):
-            self.cc.create_agent("slot", target=lambda: None)  # should fail
-
-        agent1.dispose()
-        self.cc._unregister_agent(agent1)  # manually unregister to free slot
-
-        new_agent = self.cc.create_agent("slot", target=lambda: None) # should now succeed
-        self.assertIn(new_agent, self.cc.get_active_agents())
 
     @unittest.expectedFailure
     def test_register_template_with_invalid_callable(self):

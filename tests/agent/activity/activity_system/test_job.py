@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
-from thread_factory.agent.activity.job import JobActivity, JobStatus
+from thread_factory.agent.activity.job import JobActivity
+from thread_factory.agent.activity.base import ActivityStatus
 from thread_factory.synchronization.controllers.signal_controller import SignalController
 
 
@@ -23,37 +24,37 @@ class TestJobActivity(unittest.TestCase):
 
     def test_initial_status_is_pending(self):
         """Ensure the job starts in PENDING state."""
-        self.assertEqual(self.activity.get_status(), JobStatus.PENDING)
+        self.assertEqual(self.activity.get_status(), ActivityStatus.PENDING)
 
     def test_cancel_transitions_to_cancelled(self):
         """Test that cancel() updates the status correctly."""
         self.activity.cancel()
-        self.assertEqual(self.activity.get_status(), JobStatus.CANCELLED)
+        self.assertEqual(self.activity.get_status(), ActivityStatus.CANCELLED)
 
     def test_cancel_does_nothing_if_already_completed(self):
         """Cancel is ignored if the job is in a terminal state."""
         self.activity.set_status("COMPLETED")
         self.activity.cancel()
-        self.assertEqual(self.activity.get_status(), JobStatus.COMPLETED)
+        self.assertEqual(self.activity.get_status(), ActivityStatus.COMPLETED)
 
     def test_pause_and_resume_work_correctly(self):
         """Test pause and resume transitions."""
         self.activity.set_status("RUNNING")
         self.activity.pause()
-        self.assertEqual(self.activity.get_status(), JobStatus.PAUSED)
+        self.assertEqual(self.activity.get_status(), ActivityStatus.PAUSED)
 
         self.activity.resume()
-        self.assertEqual(self.activity.get_status(), JobStatus.RUNNING)
+        self.assertEqual(self.activity.get_status(), ActivityStatus.RUNNING)
 
     def test_pause_when_not_running_is_ignored(self):
         """Pause should be ignored if not in RUNNING state."""
         self.activity.pause()
-        self.assertEqual(self.activity.get_status(), JobStatus.PENDING)
+        self.assertEqual(self.activity.get_status(), ActivityStatus.PENDING)
 
     def test_resume_when_not_paused_is_ignored(self):
         """Resume should be ignored if not paused."""
         self.activity.resume()
-        self.assertEqual(self.activity.get_status(), JobStatus.PENDING)
+        self.assertEqual(self.activity.get_status(), ActivityStatus.PENDING)
 
     def test_is_cancellation_requested(self):
         """Ensure the flag returns True only when cancelled."""
@@ -102,7 +103,7 @@ class TestJobActivity(unittest.TestCase):
         self.signal_controller.subscribe(self.activity.id, "CANCELLATION_CONFIRMED", handler)
         self.activity.cancellation_confirmed()
 
-        self.assertEqual(self.activity.get_status(), JobStatus.CANCELLED)
+        self.assertEqual(self.activity.get_status(), ActivityStatus.CANCELLED)
         self.assertTrue(any(evt[0] == "CANCELLATION_CONFIRMED" for evt in events))
 
     def test_report_progress_emits_data(self):
@@ -117,9 +118,9 @@ class TestJobActivity(unittest.TestCase):
         self.assertIn({"foo": "bar"}, events)
 
     def test_set_status_accepts_valid_enum_strings(self):
-        """Ensure set_status works for valid JobStatus strings."""
+        """Ensure set_status works for valid ActivityStatus strings."""
         self.activity.set_status("running")
-        self.assertEqual(self.activity.get_status(), JobStatus.RUNNING)
+        self.assertEqual(self.activity.get_status(), ActivityStatus.RUNNING)
 
     def test_set_status_invalid_string_raises(self):
         """Ensure invalid statuses raise ValueError."""
@@ -144,7 +145,7 @@ class TestJobActivity(unittest.TestCase):
         self.activity.cancel()
         self.activity.dispose()
 
-        self.assertEqual(self.activity.get_status(), JobStatus.CANCELLED)
+        self.assertEqual(self.activity.get_status(), ActivityStatus.DISPOSED)
         self.assertEqual(self.activity.get_progress(), 0.0)
         self.assertEqual(self.activity._job_current_count, 0.0)
         self.assertEqual(self.activity._job_total, 0.0)

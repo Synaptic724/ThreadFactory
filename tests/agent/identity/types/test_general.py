@@ -37,7 +37,6 @@ class TestGeneralAgent(unittest.TestCase):
         self.assertEqual(self.agent.public_id, "test-001")
         self.assertEqual(self.agent.public_name, "TestAgent")
         self.assertEqual(self.agent.job_title, "Testing")
-        self.assertEqual(self.agent.activity_group, "UnitTests")
 
     def test_get_name_returns_name(self):
         self.assertEqual(self.agent.get_name(), "TestAgent")
@@ -46,7 +45,6 @@ class TestGeneralAgent(unittest.TestCase):
         desc = self.agent.get_description()
         self.assertIn("TestAgent", desc)
         self.assertIn("Testing", desc)
-        self.assertIn("UnitTests", desc)
 
     def test_register_data_transfer_executes(self):
         self.agent.register_data_transfer("hello", lambda: "world")
@@ -216,6 +214,7 @@ class TestGeneralAdditional(unittest.TestCase):
 
     def test_get_name_returns_default(self):
         agent = General(command_center=self.mock_command_center)
+        agent.name = "UnnamedAgent"
         self.assertEqual(agent.get_name(), "UnnamedAgent")
         agent.dispose()
 

@@ -1,7 +1,7 @@
 import threading, warnings, logging, ulid
 from typing import Optional, List, Callable, Any, Union, Dict, Type
-from thread_factory.agent import ActivityBuilder
-from thread_factory.agent.activity.base import BaseActivity
+from thread_factory.agent.activity.builder import ActivityBuilder
+from thread_factory.agent.activity.base import BaseActivity, ActivityStatus
 from thread_factory.agent.identity.agent_builder import AgentBuilder
 from thread_factory.agent.identity.types.agent import Agent
 from thread_factory.synchronization.controllers.signal_controller import SignalController
@@ -13,7 +13,72 @@ from thread_factory.concurrency.sync_types.sync_int import SyncInt
 
 #region CommandGroup
 class CommandGroup(IDisposable):
-    def __init__(self,  command_center: 'CommandCenter', group_name: str, max_workers: int, group_type: str = None):
+    """
+    CommandGroup
+    ------------
+    A container object that encapsulates a logical group of agents and activities under a single name,
+    with its own lifecycle limits, registries, and behavior.
+
+    It supports lifecycle operations like start, pause, cancel, deploy, and shutdown across all
+    managed agents and activities. Integrates with the CommandCenter and SignalController for orchestration.
+
+    Parameters:
+    -----------
+    command_center : CommandCenter
+        The orchestrator that owns this group and handles agent/activity creation.
+    group_name : str
+        A unique name for identifying this group within the system.
+    max_workers : int
+        The maximum number of agents allowed to operate simultaneously within this group.
+    group_type : Optional[str]
+        An optional classification for the group (e.g., "ETL", "Modeling", etc.).
+    """
+
+    def __init__(self, command_center: 'CommandCenter', group_name: str, max_workers: int, group_type: str = None):
+        """
+        Initializes a new CommandGroup instance.
+
+        A CommandGroup is a container that manages a coordinated group of agents and activities.
+        It enforces its own maximum worker count (`max_workers`) and provides lifecycle operations
+        and centralized control for orchestration, diagnostics, and shutdown.
+
+        Parameters:
+        -----------
+        command_center : CommandCenter
+            The controlling CommandCenter instance responsible for creating agents and activities.
+            This reference is retained for future delegation of creation or orchestration tasks.
+
+        group_name : str
+            A unique name for this group, used for identification and lookup in higher-level registries.
+
+        max_workers : int
+            The maximum number of concurrent agents that can operate under this group.
+            Acts as an internal quota to prevent overload and manage concurrency.
+
+        group_type : Optional[str]
+            An optional tag or label that classifies this group (e.g., "etl", "analytics", "simulation").
+            Can be used for filtering, scheduling preferences, or display purposes.
+
+        Attributes:
+        -----------
+        id : str
+            A ULID-based unique identifier for this group instance.
+
+        _worker_count : SyncInt
+            A thread-safe counter tracking the number of active agents currently in the group.
+
+        _max_workers : int
+            The ceiling on agent count; enforced via `add_agent()` and respected during orchestration.
+
+        _active_agents : ConcurrentDict[str, Agent]
+            Thread-safe dictionary of all currently registered agents by ID.
+
+        _active_activities : ConcurrentDict[str, BaseActivity]
+            Thread-safe dictionary of all registered activities by ID.
+
+        _signal_controllers : ConcurrentDict[str, SignalController]
+            Registry of all signal controllers used by activities or agents in this group.
+        """
         super().__init__()
         self._lock = threading.RLock()
         self.id = str(ulid.ULID())
@@ -33,8 +98,6 @@ class CommandGroup(IDisposable):
     def dispose(self):
         # Logic to shut down all agents and dispose all activities
         with self._lock:
-            if hasattr(self, '_disposed') and self._disposed:
-                return
             self._disposed = True
             self._command_center = None
 
@@ -61,8 +124,287 @@ class CommandGroup(IDisposable):
                 except Exception as e:
                     logging.error(f"Error disposing Activity '{activity.id}': {e}", exc_info=True)
             self._active_activities.dispose()
-            self._worker_count.dispose()
 
+    # region CommandGroup Methods
+    def add_agent(self, template_name: str = "default", **kwargs) -> Optional[Agent]:
+        """
+        Creates and registers a new agent under this CommandGroup.
+
+        This method respects the group's max worker count, and will refuse to create agents
+        if the limit is reached.
+
+        Parameters:
+        -----------
+        template_name : str
+            The agent template to use when creating the new agent.
+        **kwargs : Any
+            Additional arguments to pass to the CommandCenter's agent creation logic.
+
+        Returns:
+        --------
+        Optional[Agent]
+            The created Agent object, or None if the group is at max capacity.
+        """
+        if self._worker_count >= self._max_workers:
+            logging.warning(f"CommandGroup '{self.name}' has reached its max worker limit of {self._max_workers}.")
+            return None
+
+        # The command_center's create_agent method already handles registration and worker count.
+        # We just need to call it with this group's name.
+        agent = self._command_center.create_agent(
+            template_name=template_name,
+            command_group_name=self.name,
+            **kwargs
+        )
+        return agent
+
+    def add_activity(self, name: str, **kwargs) -> Optional[BaseActivity]:
+        """
+        Creates and registers a new activity under this CommandGroup.
+
+        This delegates to the CommandCenter for the actual creation logic.
+
+        Parameters:
+        -----------
+        name : str
+            The name/type of the activity to create.
+        **kwargs : Any
+            Arguments passed to the CommandCenter’s `create_activity`.
+
+        Returns:
+        --------
+        Optional[BaseActivity]
+            The created activity, or None if creation fails.
+        """
+        # The command_center's create_activity method handles registration.
+        activity = self._command_center.create_activity(
+            name=name,
+            command_group_name=self.name,
+            **kwargs
+        )
+        return activity
+
+    def remove_agent(self, agent_id: str, dispose: bool = True):
+        """
+        Removes an agent from the group’s registry and optionally disposes it.
+
+        Parameters:
+        -----------
+        agent_id : str
+            The ID of the agent to remove.
+        dispose : bool
+            If True, the agent will also be disposed and cleaned up.
+
+        Returns:
+        --------
+        bool
+            True if the agent was found and removed; False otherwise.
+        """
+        agent = self._active_agents.get(agent_id)
+        if agent:
+            # The command_center's _unregister_agent handles decrementing worker count.
+            self._command_center._unregister_agent(agent)
+            if dispose:
+                agent.dispose()
+            return True
+        return False
+
+    def remove_activity(self, activity_id: str, dispose: bool = True):
+        """
+        Removes an activity from the group’s registry and optionally disposes it.
+
+        Parameters:
+        -----------
+        activity_id : str
+            The ID of the activity to remove.
+        dispose : bool
+            If True, the activity will also be disposed.
+
+        Returns:
+        --------
+        bool
+            True if the activity was found and removed; False otherwise.
+        """
+        activity = self._active_activities.pop(activity_id, None)
+        if activity:
+            if dispose:
+                activity.dispose()
+            return True
+        return False
+
+    # endregion
+    # region Lifecycle Control
+    def start_all_activities(self):
+        """
+        Starts all PENDING activities within the group.
+
+        Activities already in a non-pending state are ignored.
+        """
+
+        for activity in list(self._active_activities.values()):
+            if activity.get_status() == ActivityStatus.PENDING:
+                activity.start()
+
+    def deploy_all_agents(self):
+        """
+        Deploys all agents in the group that are not currently alive.
+
+        This allows for a one-shot trigger to wake all agent threads
+        that haven’t started yet.
+        """
+        for agent in list(self._active_agents.values()):
+            try:
+                if not agent.is_alive():
+                    agent.deploy()
+            except Exception as e:
+                logging.error(f"Failed to deploy agent {agent.factory_id} in group {self.name}: {e}")
+
+    def pause_all_activities(self):
+        """
+        Pauses all RUNNING activities in the group.
+
+        Only activities currently in a RUNNING state will be affected.
+        """
+        for activity in list(self._active_activities.values()):
+            if activity.get_status() == ActivityStatus.RUNNING:
+                activity.pause()
+
+    def cancel_all_activities(self):
+        """
+        Cancels all activities that are in a non-terminal state.
+
+        Terminal states include: COMPLETED, FAILED, CANCELLED, DISPOSED.
+        Only activities not in these states will be canceled.
+        """
+
+        terminal_states = {ActivityStatus.COMPLETED, ActivityStatus.FAILED, ActivityStatus.CANCELLED,
+                           ActivityStatus.DISPOSED}
+        for activity in list(self._active_activities.values()):
+            if activity.get_status() not in terminal_states:
+                activity.cancel()
+
+    def shutdown_all_members(self, dispose: bool = True):
+        """
+        Stops all agents and activities in the group, and optionally disposes them.
+
+        This method guarantees group-wide shutdown in a single call.
+
+        Parameters:
+        -----------
+        dispose : bool
+            Whether to dispose of the members after stopping them.
+        """
+        # Shutdown agents first
+        for agent in list(self._active_agents.values()):
+            try:
+                self.remove_agent(agent.factory_id, dispose=dispose)
+            except Exception as e:
+                logging.error(f"Error shutting down Agent '{agent.factory_id}': {e}", exc_info=True)
+
+        # Then shutdown activities
+        for activity in list(self._active_activities.values()):
+            try:
+                self.remove_activity(activity.id, dispose=dispose)
+            except Exception as e:
+                logging.error(f"Error shutting down Activity '{activity.id}': {e}", exc_info=True)
+
+    # endregion
+
+    # region Introspection & Reporting
+
+    def get_status_summary(self) -> Dict[str, int]:
+        """
+        Returns a count of activities grouped by their current status.
+
+        Returns:
+        --------
+        Dict[str, int]
+            A dictionary with status names as keys and their occurrence counts as values.
+        """
+        summary = {status.name: 0 for status in ActivityStatus}
+        for activity in list(self._active_activities.values()):
+            status_name = activity.get_status().name
+            if status_name in summary:
+                summary[status_name] += 1
+        return summary
+
+    def get_worker_utilization(self) -> Dict[str, Union[int, float]]:
+        """
+        Provides a report of worker usage within the group.
+
+        Returns:
+        --------
+        Dict[str, Union[int, float]]
+            Includes 'active' (current count), 'max' (allowed workers), and 'utilization' (percentage).
+        """
+        active = self._worker_count
+        max_w = self._max_workers
+        utilization = (active / max_w * 100) if max_w > 0 else 0
+        return {'active': active, 'max': max_w, 'utilization': utilization}
+
+    def list_agents(self) -> List[str]:
+        """
+        Lists all agent IDs currently active in this group.
+
+        Returns:
+        --------
+        List[str]
+            A list of agent ULID strings.
+        """
+        return list(self._active_agents.keys())
+
+    def list_activities(self) -> List[str]:
+        """
+        Lists all activity IDs currently tracked in this group.
+
+        Returns:
+        --------
+        List[str]
+            A list of activity ULID strings.
+        """
+        return list(self._active_activities.keys())
+
+    # endregion
+
+    # region SignalController Integration
+    # This section is for exposing the group's methods to a SignalController.
+    # It's good practice to keep this for remote management capabilities.
+    def _get_object_details(self) -> ConcurrentDict[str, Any]:
+        """
+        Exposes the CommandGroup's introspectable commands for use by SignalController.
+
+        Returns:
+        --------
+        ConcurrentDict[str, Any]
+            A structured dictionary mapping command names to callable handlers.
+        """
+        return ConcurrentDict({
+            "name": "CommandGroup",
+            "commands": ConcurrentDict({
+                # --- Member Management ---
+                'add_agent': self.add_agent,
+                'add_activity': self.add_activity,
+                'remove_agent': self.remove_agent,
+                'remove_activity': self.remove_activity,
+                'list_agents': self.list_agents,
+                'list_activities': self.list_activities,
+
+                # --- Group Lifecycle Control ---
+                'start_all_activities': self.start_all_activities,
+                'deploy_all_agents': self.deploy_all_agents,
+                'pause_all_activities': self.pause_all_activities,
+                # 'resume_all_activities' would need to be implemented similarly
+                'cancel_all_activities': self.cancel_all_activities,
+                'shutdown_all_members': self.shutdown_all_members,
+
+                # --- Group-Level Reporting ---
+                'get_status_summary': self.get_status_summary,
+                'get_worker_utilization': self.get_worker_utilization,
+            })
+        })
+# endregion
+# endregion
+#endregion
 
 #endregion CommandGroup
 
@@ -70,11 +412,28 @@ class CommandGroup(IDisposable):
 class CommandCenter(IDisposable):
     """
     CommandCenter
-    ----------------
-    A central orchestration unit responsible for managing agent thread lifecycles,
-    enforcing global worker limits, creating agents from predefined templates,
-    and managing its own SignalControllers. It can also be registered with an
-    external SignalController to be managed remotely.
+    --------------
+    A centralized control unit responsible for creating, deploying, and managing agent threads and
+    activities. It enforces both global and per-group worker limits, coordinates SignalController
+    registrations, and acts as the main interface for orchestrating multithreaded workflows.
+
+    Key Responsibilities:
+    ---------------------
+    • Manage all `Agent` instances created under its control.
+    • Enforce a global worker limit (`total_max_workers`) and per-group limits (`group_max_workers`).
+    • Provide lifecycle methods for agent/thread creation, reset, and disposal.
+    • Create and manage CommandGroups for scoping related agents and activities.
+    • Optionally connect to an external `SignalController` for remote management.
+
+    Design Notes:
+    -------------
+    • Fully thread-safe using internal locking and concurrent structures.
+    • Supports disposal of all registered objects and resources.
+    • Acts as the root registry for agents, activities, and SignalControllers.
+    • Integrates threadpool logic (soon to be refactored into a separate main pool and agent pool
+      for more precise control over resource usage).
+    • Compatible with remote orchestration systems via external signal control injection.
+
     """
 
     def __init__(self,
@@ -84,27 +443,42 @@ class CommandCenter(IDisposable):
                  logger: Optional[logging.Logger] = None,
                  external_signal_controller: Optional[SignalController] = None):
         """
-        Initializes the CommandCenter. This object is responsible for managing
-        the lifecycle of agents, enforcing a global worker cap, and providing
-        a centralized interface for creating and managing agents.
-        It can also register with an external SignalController for remote management.
+        Initializes a new CommandCenter instance.
 
-        It currently has a default maximum of 8 concurrent agents, but this can be
-        adjusted using the `increase_max_workers` and `decrease_max_workers` methods.
-        This class is thread-safe and can be used in multithreaded environments.
-        It is also disposable, meaning it can be cleaned up and all resources released
-        when no longer needed.
+        This constructor sets up the internal worker limits, logging, default command group name,
+        and optionally integrates with an external SignalController for remote command dispatch.
 
-        The threadpool integration is built into this object however this will be moved
-        to a normal threadpool in the future.  There will be a main pool
-        that will utilize standard workers and  an agent pool in the future,
-        allowing for more granular control over thread management and resource allocation.
+        Parameters:
+        -----------
+        group_max_workers : int, default=10
+            The preset maximum number of workers that any single CommandGroup can run concurrently.
+            This limit applies per group and is enforced internally by each group.
 
-        Args:
-            max_workers (int): Maximum number of concurrent agents allowed to exist.
-            logger (Optional[logging.Logger]): A logger instance.
-            external_signal_controller (Optional[SignalController]): An external controller
-                to register with, allowing this CommandCenter to be controlled remotely.
+        total_max_workers : int, default=30
+            The preset maximum number of concurrent agents allowed across all groups managed
+            by this CommandCenter. This ensures overall system load is bounded.
+
+        command_group_name : str, default="default"
+            The name of the default command group created when the CommandCenter initializes.
+            Other groups can be created dynamically via public APIs.
+
+        logger : Optional[logging.Logger], default=None
+            An optional logger instance for structured logging. If not provided, internal logs
+            may fallback to `print` or remain silent depending on implementation.
+
+        external_signal_controller : Optional[SignalController], default=None
+            An optional remote SignalController to register this CommandCenter with.
+            This allows it to be invoked or manipulated by external orchestrators.
+
+        Behavior:
+        ---------
+        • Automatically creates a default CommandGroup on initialization.
+        • Registers itself and its components with the SignalController if provided.
+        • Prepares internal registries for agent and activity management.
+
+        Raises:
+        -------
+        None
         """
         super().__init__()
         # --- Core Components ---
@@ -190,76 +564,35 @@ class CommandCenter(IDisposable):
         self._check_disposed()
         total = 0
         for group in self._command_groups.values():
-            total += group._worker_count.value
+            total += group._worker_count
         return total
 
     # Add this method to the CommandCenter class
+    # In the CommandCenter class:
 
     def adjust_global_limit(self, new_global_limit: int):
         """
-        Adjusts the global maximum worker limit and proportionally reduces the
-        limits of individual command groups if necessary.
-
-        This method will not reduce a group's max_workers below its current
-        number of active workers.
+        Adjusts the global maximum worker limit. This method can only be used
+        to increase the total limit. To decrease, individual command group
+        limits must be reduced first using 'decrease_max_workers'.
 
         Args:
             new_global_limit (int): The new desired global maximum for all workers.
 
         Raises:
-            ValueError: If the new limit is less than the current total number
-                        of active workers across all groups.
+            ValueError: If the new limit is less than the current global max limit.
         """
         self._check_disposed()
 
-        # Use the single global lock to ensure a safe, atomic operation
         with self._lock:
-            current_active = self.get_total_active_workers()
-            if new_global_limit < current_active:
+            if new_global_limit < self._total_max_workers:
                 raise ValueError(
-                    f"New limit ({new_global_limit}) cannot be less than the current total active worker count ({current_active}).")
+                    f"New limit ({new_global_limit}) cannot be less than the current global max worker limit ({self._total_max_workers}). "
+                    f"Use 'decrease_max_workers' on individual groups to lower capacity."
+                )
 
             self._total_max_workers = new_global_limit
-
-            # Now, check if we need to reduce the sum of group capacities
-            current_max_sum = self.get_total_max_workers()
-
-            deficit = current_max_sum - new_global_limit
-
-            if deficit <= 0:
-                self._logger.info(
-                    f"Global max workers limit adjusted to {new_global_limit}. No group reduction needed.")
-                return
-
-            self._logger.info(f"Global limit reduced. Need to reclaim {deficit} worker slots from group capacities.")
-
-            # "Greedy" reduction loop: repeatedly remove one slot from the
-            # largest available group until the deficit is gone.
-            while deficit > 0:
-                # Find the best group to take a slot from:
-                # one that is not at its minimum capacity and has the highest max.
-                best_group_to_reduce = None
-                max_so_far = -1
-
-                for group in self._command_groups.values():
-                    # Check if we *can* reduce this group
-                    if group._max_workers > group._worker_count.value:
-                        # Check if it's the best candidate so far
-                        if group._max_workers > max_so_far:
-                            max_so_far = group._max_workers
-                            best_group_to_reduce = group
-
-                if best_group_to_reduce:
-                    best_group_to_reduce._max_workers -= 1
-                    deficit -= 1
-                else:
-                    # This can happen if all groups are at full capacity
-                    # with active workers. We cannot reduce further.
-                    self._logger.warning(
-                        f"Could not reclaim all {deficit} slots as remaining groups are at full utilization.")
-                    break  # Exit the loop
-
-            self._logger.info("Finished redistributing group capacities.")
+            self._logger.info(f"Global max workers limit increased to {new_global_limit}.")
 
     def create_command_group(self, command_group_name: str, max_workers, command_group_type:str = None) -> None:
         """
@@ -401,14 +734,14 @@ class CommandCenter(IDisposable):
 
     def verify_activity(self, activity: BaseActivity, command_group_name: str = "default") -> bool:
         """
-        Verifies if the provided activity is registered in the specified command group.
+        Verifies if the provided activity is existing to a specified command group.
 
         Args:
             activity (BaseActivity): The activity instance to verify.
             command_group_name (str): The name of the command group to check in.
 
         Returns:
-            bool: True if the activity is registered, False otherwise.
+            bool: True if the activity is existing, False otherwise.
         """
         self._check_disposed()
         command = self.get_command_group(command_group_name)
@@ -482,7 +815,7 @@ class CommandCenter(IDisposable):
                 hasattr(activity, attr) for attr in ['perform_activity', 'start']):
             raise TypeError("The provided activity is not a valid JobActivity with the required methods.")
 
-        available_slots = command._max_workers - command._worker_count.value
+        available_slots = command._max_workers - command._worker_count
         if worker_count > available_slots:
             raise RuntimeError(f"Cannot deploy {worker_count} workers. Only {available_slots} slots are available.")
 
@@ -531,6 +864,7 @@ class CommandCenter(IDisposable):
         """
         return self._id
 
+    # In CommandCenter class
     def _get_object_details(self) -> ConcurrentDict[str, Any]:
         """
         Returns a dictionary of metadata about this object, fulfilling the
@@ -541,17 +875,25 @@ class CommandCenter(IDisposable):
         return ConcurrentDict({
             "name": "command_center",
             "commands": ConcurrentDict({
-                'create_agent': self.create_agent,
-                'create_agents': self.create_agents,
-                'submit': self.submit,
-                'list_templates': self.list_templates,
-                'get_active_agents': self.get_active_agents,
-                'increase_max_workers': self.increase_max_workers,
-                'decrease_max_workers': self.decrease_max_workers,
-                'add_signal_controller': self.add_signal_controller,
-                'remove_signal_controller': self.remove_signal_controller,
-                'list_signal_controllers': self.list_signal_controllers,
+                # --- Group Management ---
+                'create_command_group': self.create_command_group,
+                'get_command_group': self.get_command_group,
+                'list_command_groups': lambda: [g.name for g in self._command_groups.values()],
+
+                # --- Global Resource Management ---
+                'get_total_active_workers': self.get_total_active_workers,
+                'get_total_max_workers': self.get_total_max_workers,
+                'adjust_global_limit': self.adjust_global_limit,
+
+                # --- Global Introspection ---
+                'get_all_active_agents': self.get_all_active_agents,
+                'get_command_group_of_agent': self.get_command_group_of_agent,
+
+                # --- Template Management (already have) ---
+                'register_activity_template': self.register_activity_template,
                 'list_activity_templates': self.list_activity_templates,
+                'register_template': self.register_template,
+                'list_templates': self.list_templates
             }),
         })
 
@@ -591,10 +933,10 @@ class CommandCenter(IDisposable):
 
     def create_agent(
             self,
-            command_group_name:str = "default",
             template_name: str = "default",
             define_home: Optional[Union[Callable[..., None], Pack]] = None,
             target: Optional[Union[Callable[..., None], Pack]] = None,
+            command_group_name: str = "default",
             *args, **kwargs
     ) -> Agent:
         """
@@ -624,10 +966,10 @@ class CommandCenter(IDisposable):
     def create_agents(
         self,
         count: int,
-        command_group_name: str = "default",
         template_name: str = "default",
         target: Optional[Union[Callable[..., None], Pack]] = None,
         define_home: Optional[Union[Callable[..., None], Pack]] = None,
+        command_group_name: str = "default",
         *args, **kwargs
     ) -> ConcurrentList[Agent]:
         """
@@ -663,8 +1005,8 @@ class CommandCenter(IDisposable):
         self,
         target: Union[Callable[..., Any], Pack],
         define_home: Optional[Union[Callable[..., None], Pack]] = None,
-        command_group_name: str = "default",
         template_name: str = "default",
+        command_group_name: str = "default",
         *args, **kwargs
     ) -> None:
         """
@@ -689,8 +1031,8 @@ class CommandCenter(IDisposable):
             agents: int,
             target: Union[Callable[..., Any], Pack],
             define_home: Optional[Union[Callable[..., None], Pack]] = None,
-            command_group_name: str = "default",
             template_name: str = "default",
+            command_group_name: str = "default",
             *args, **kwargs
     ) -> None:
         """
@@ -811,7 +1153,7 @@ class CommandCenter(IDisposable):
         command = self.get_command_group(command_group)
 
         if command._worker_count >= command._max_workers:
-            self._notify('WORKER_CAP_REACHED', {'max_workers': command._max_workers, 'command_group': command_group.id} )
+            self._notify('WORKER_CAP_REACHED', {'max_workers': command._max_workers, 'command_group': command.id} )
             raise RuntimeError(f"Cannot create agent. Worker cap of {command._max_workers} reached.")
 
         try:
@@ -960,18 +1302,21 @@ class CommandCenter(IDisposable):
         self._check_disposed()
         with self._lock:
             command = self.get_command_group(command_group_name)
-            if name in self.find_controller_by_name(name, command_group_name):
-                raise ValueError(f"A SignalController with the name '{name}' already exists in command group '{command_group_name}'.")
-            new_controller = controller or SignalController(logger=self._logger)
-            new_controller._group_name = command.name
-            new_controller._group_id = command.id
-            command._signal_controllers[new_controller.id] = new_controller
-            self._logger.info(f"Added SignalController: '{name}'")
-            self._notify('SIGNAL_CONTROLLER_ADDED', {'controller_name': name, 'command_group': command.id, 'command_group_name': command.name})
-            return new_controller
+            existing = self.find_controller_by_name(name, command_group_name)
+            if existing:
+                self._logger.warning(f"SignalController with name '{name}' already exists in command group '{command_group_name}'. Returning existing controller.")
+                return existing
+            else:
+                new_controller = controller or SignalController(controller_name=name, logger=self._logger)
+                new_controller._group_name = command.name
+                new_controller._group_id = command.id
+                command._signal_controllers[new_controller.id] = new_controller
+                self._logger.info(f"Added SignalController: '{name}'")
+                self._notify('SIGNAL_CONTROLLER_ADDED', {'controller_name': name, 'command_group': command.id, 'command_group_name': command.name})
+                return new_controller
 
 
-    def find_controller_by_name(self, name: str, command_group_name: str = "default") -> List[SignalController]:
+    def find_controller_by_name(self, name: str, command_group_name: str = "default") -> Optional[SignalController]:
         """
         Finds a SignalController by its name within the specified command group.
 
@@ -980,7 +1325,7 @@ class CommandCenter(IDisposable):
             command_group_name (str): The name of the command group to search in.
 
         Returns:
-            Optional[SignalController]: The SignalController instance if found, or None if not found.
+            List[SignalController]: The SignalController instance if found, or None if not found.
         """
         self._check_disposed()
         returnlist = []
@@ -989,7 +1334,13 @@ class CommandCenter(IDisposable):
             if controller.name == name:
                 returnlist.append(controller)
 
-        return returnlist if returnlist else None
+        if returnlist:
+            # If multiple controllers with this name exist, raise an error
+            if len(returnlist) > 1:
+                raise ValueError(
+                    f"Multiple SignalControllers with the name '{name}' exist in command group '{command_group_name}'. Please use a unique name.")
+        controller = returnlist[0] if returnlist else None
+        return controller
 
     def remove_signal_controller(self, signal_controller: 'SignalController', dispose: bool = True) -> bool:
         """
@@ -1117,11 +1468,10 @@ class CommandCenter(IDisposable):
         """
         self._check_disposed()
         controller = self.find_controller_by_name(controller_name, command_group_name)
-        if len(controller) > 1:
-            raise ValueError(f"Multiple SignalControllers with the name '{controller_name}' found in command group '{command_group_name}'. Please specify by ID.")
         if not controller:
-            raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter.")
-        return controller[0].invoke(object_id, command, *args, **kwargs)
+            raise ValueError(
+                f"No SignalController with the name '{controller_name}' is managed by this CommandCenter.")
+        return controller.invoke(object_id, command, *args, **kwargs)
 
     def subscribe_to_event(self, controller_name: str, object_id: str, event_type: str, callback: Callable, command_group_name: str = "default"):
         """

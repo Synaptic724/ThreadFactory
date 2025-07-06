@@ -35,7 +35,7 @@ class TestActivityBuilder(unittest.TestCase):
     def test_dispose_clears_registry_and_sets_disposed(self):
         """Test that dispose clears the registry and sets the disposed flag."""
         # Ensure something is in the registry before disposing
-        self.builder.register_activity_class("test_activity", BaseActivity)  # Use real BaseActivity
+        self.builder.register_activity("test_activity", BaseActivity)  # Use real BaseActivity
         self.assertGreater(len(self.builder._registry), 0)
 
         self.builder.dispose()
@@ -64,7 +64,7 @@ class TestActivityBuilder(unittest.TestCase):
                 self.activity_name = activity_name  # Renamed 'name' to 'activity_name' to avoid conflict
                 self._logger = MagicMock()  # Mock logger for real BaseActivity
 
-        self.builder.register_activity_class("custom_test", CustomActivity)
+        self.builder.register_activity("custom_test", CustomActivity)
         self.assertIn("custom_test", self.builder._registry)
         self.assertEqual(self.builder._registry["custom_test"], CustomActivity)
 
@@ -74,7 +74,7 @@ class TestActivityBuilder(unittest.TestCase):
         class NonActivity: pass
 
         with self.assertRaisesRegex(TypeError, "must be a subclass of BaseActivity"):  # Use real BaseActivity
-            self.builder.register_activity_class("invalid_type", NonActivity)
+            self.builder.register_activity("invalid_type", NonActivity)
 
     def test_register_activity_class_overwrites_existing(self):
         """Test that registering a class with an existing name overwrites it."""
@@ -89,10 +89,10 @@ class TestActivityBuilder(unittest.TestCase):
                 super().__init__(**kwargs)
                 self._logger = MagicMock()  # Mock logger for real BaseActivity
 
-        self.builder.register_activity_class("overwrite_me", OriginalActivity)
+        self.builder.register_activity("overwrite_me", OriginalActivity)
         self.assertEqual(self.builder._registry["overwrite_me"], OriginalActivity)
 
-        self.builder.register_activity_class("overwrite_me", NewActivity)
+        self.builder.register_activity("overwrite_me", NewActivity)
         self.assertEqual(self.builder._registry["overwrite_me"], NewActivity)  # Should be overwritten
 
     def test_build_job_activity_success(self):
@@ -172,7 +172,7 @@ class TestActivityBuilder(unittest.TestCase):
                 super().__init__(signal_controller=signal_controller, logger=logger, **kwargs)
                 self.activity_name = activity_name  # Renamed 'name' to 'activity_name'
 
-        self.builder.register_activity_class("my_custom_activity", MyCustomActivity)
+        self.builder.register_activity("my_custom_activity", MyCustomActivity)
         custom_act = self.builder.build_activity(
             "my_custom_activity",
             activity_name="AwesomeAct",  # Pass 'activity_name' here
@@ -196,7 +196,7 @@ class TestActivityBuilder(unittest.TestCase):
 
         # Manually call _register_defaults again
         self.builder._registered = False  # Temporarily reset to allow it to run
-        self.builder.register_activity_class("temp_test", BaseActivity)  # Use real BaseActivity, add something else
+        self.builder.register_activity("temp_test", BaseActivity)  # Use real BaseActivity, add something else
         self.assertEqual(len(self.builder._registry), initial_registry_len + 1)
 
         self.builder._registered = False  # Reset again
@@ -224,7 +224,7 @@ class TestActivityBuilder(unittest.TestCase):
     def test_register_activity_class_with_none_class(self):
         """Test that registering None as an activity class raises TypeError."""
         with self.assertRaisesRegex(TypeError, "issubclass"):
-            self.builder.register_activity_class("none_class", None)
+            self.builder.register_activity("none_class", None)
 
 
 if __name__ == '__main__':

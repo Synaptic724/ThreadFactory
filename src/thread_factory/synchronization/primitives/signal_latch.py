@@ -167,7 +167,7 @@ class SignalLatch(IDisposable):
     # ──────────────────────────────────────────────────────────────────
     # Core latch operations
     # ──────────────────────────────────────────────────────────────────
-    def wait(self, timeout: Optional[float] = None) -> bool:
+    def closed(self, timeout: Optional[float] = None) -> bool:
         """
         Block until :py:meth:`open` is called or *timeout* elapses.
 

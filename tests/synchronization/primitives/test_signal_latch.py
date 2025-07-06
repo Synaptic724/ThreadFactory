@@ -108,7 +108,7 @@ class TestSignalLatch(unittest.TestCase):
         thread_finished = threading.Event()
 
         def worker():
-            latch.wait()
+            latch.closed()
             thread_finished.set()
 
         thread = threading.Thread(target=worker)
@@ -126,7 +126,7 @@ class TestSignalLatch(unittest.TestCase):
         thread_finished = threading.Event()
 
         def worker():
-            latch.wait()
+            latch.closed()
             thread_finished.set()
 
         thread = threading.Thread(target=worker)
@@ -139,7 +139,7 @@ class TestSignalLatch(unittest.TestCase):
         latch = SignalLatch()
         result = [None]
         def worker():
-            result[0] = latch.wait(timeout=0.05)
+            result[0] = latch.closed(timeout=0.05)
         thread = threading.Thread(target=worker)
         thread.start()
         thread.join()
@@ -151,13 +151,13 @@ class TestSignalLatch(unittest.TestCase):
         latch = SignalLatch()
         latch.dispose()
         with self.assertRaisesRegex(RuntimeError, "disposed"):
-            latch.wait()
+            latch.closed()
 
     def test_wait_invokes_signal_callback(self):
         """Test that wait() correctly invokes the standalone signal_callback."""
         latch = SignalLatch(signal_callback=self.mock_signal_callback)
         def worker():
-            latch.wait()
+            latch.closed()
         thread = threading.Thread(target=worker)
         thread.start()
         time.sleep(0.05)
@@ -173,7 +173,7 @@ class TestSignalLatch(unittest.TestCase):
             signal_callback=self.mock_controller.on_wait_starting
         )
         def worker():
-            latch.wait()
+            latch.closed()
         thread = threading.Thread(target=worker)
         thread.start()
         self.assertTrue(self.mock_controller.notification_event.wait(timeout=0.5))
@@ -189,7 +189,7 @@ class TestSignalLatch(unittest.TestCase):
             raise ValueError("Callback error")
         latch = SignalLatch(signal_callback=bad_callback)
         try:
-            latch.wait(timeout=0.01)
+            latch.closed(timeout=0.01)
         except Exception as e:
             self.fail(f"wait() raised an unexpected exception: {e}")
         self.assertFalse(latch.is_open())
@@ -202,7 +202,7 @@ class TestSignalLatch(unittest.TestCase):
         events = [threading.Event() for _ in range(count)]
         for i in range(count):
             def worker(idx=i):
-                latch.wait()
+                latch.closed()
                 events[idx].set()
             t = threading.Thread(target=worker)
             threads.append(t)
@@ -226,7 +226,7 @@ class TestSignalLatch(unittest.TestCase):
         # Verify it blocks again
         thread_finished = threading.Event()
         def worker():
-            latch.wait()
+            latch.closed()
             thread_finished.set()
         thread = threading.Thread(target=worker)
         thread.start()
@@ -240,7 +240,7 @@ class TestSignalLatch(unittest.TestCase):
         latch = SignalLatch()
         thread_finished = threading.Event()
         def worker():
-            latch.wait()
+            latch.closed()
             thread_finished.set()
         thread = threading.Thread(target=worker)
         thread.start()
@@ -268,7 +268,7 @@ class TestSignalLatch(unittest.TestCase):
             controller=self.mock_controller
         )
         latch.open()
-        latch.wait(timeout=0.01)
+        latch.closed(timeout=0.01)
         self.assertFalse(self.mock_signal_callback_called)
 
     def test_race_condition_open_during_wait_call(self):
@@ -280,7 +280,7 @@ class TestSignalLatch(unittest.TestCase):
         def worker():
             ready_to_open.set()
             ready_to_wait.wait(timeout=0.5)
-            latch.wait()
+            latch.closed()
             thread_finished.set()
         thread = threading.Thread(target=worker)
         thread.start()

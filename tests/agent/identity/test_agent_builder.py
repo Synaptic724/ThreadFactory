@@ -128,7 +128,7 @@ class TestAgentBuilder(unittest.TestCase):
         def factory(cc): return General(cc)
 
         self.builder.register_template("bad_override", Pack(factory))
-        with self.assertRaises(TypeError):
+        with self.assertRaises(RuntimeError):
             self.builder.create_agent("bad_override", command_center=self.mock_cc, not_a_real_arg="wat")
 
     def test_register_after_dispose_does_nothing(self):
@@ -150,7 +150,7 @@ class TestAgentBuilder(unittest.TestCase):
         class BadObject:
             def __call__(self): return "not an agent"
         self.builder.register_template("bad", Pack(lambda x: "not an agent"))
-        with self.assertRaises(TypeError):
+        with self.assertRaises(RuntimeError):
             self.builder.create_agent("bad", command_center=self.mock_cc)
 
     def test_override_args_functionality(self):

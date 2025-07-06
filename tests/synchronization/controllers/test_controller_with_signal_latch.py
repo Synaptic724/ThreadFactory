@@ -158,7 +158,7 @@ class TestControllerWithLatch(unittest.TestCase):
         wait_results: List[bool] = []
 
         def waiter():
-            wait_results.append(latch.wait(timeout=1.0))
+            wait_results.append(latch.closed(timeout=1.0))
 
         t = threading.Thread(target=waiter, daemon=True)
         t.start()

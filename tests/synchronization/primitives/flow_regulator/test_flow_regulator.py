@@ -35,7 +35,7 @@ def _set_thread_factory_id(fid: str):       # kept for completeness
 class TestFlowRegulator(unittest.TestCase):
 
     def setUp(self):
-        self.center = CommandCenter(max_workers=80)
+        self.center = CommandCenter(total_max_workers=80)
 
     def tearDown(self):
         self.center.shutdown()

@@ -11,7 +11,7 @@ class TestSimpleLatch(unittest.TestCase):
         result = []
 
         def worker():
-            latch.wait()
+            latch.closed()
             result.append("released")
 
         t = threading.Thread(target=worker)
@@ -28,7 +28,7 @@ class TestSimpleLatch(unittest.TestCase):
         threads = []
 
         def worker(i):
-            latch.wait()
+            latch.closed()
             result.append(f"t{i}")
 
         for i in range(5):
@@ -46,13 +46,13 @@ class TestSimpleLatch(unittest.TestCase):
     def test_reset_blocks_again(self):
         latch = Latch()
         latch.open()
-        self.assertTrue(latch.wait(timeout=0.1))  # should pass immediately
-        latch.reset()
+        self.assertTrue(latch.closed(timeout=0.1))  # should pass immediately
+        latch.close()
 
         result = []
 
         def worker():
-            if latch.wait(timeout=0.2):
+            if latch.closed(timeout=0.2):
                 result.append("released")
 
         t = threading.Thread(target=worker)
@@ -63,7 +63,7 @@ class TestSimpleLatch(unittest.TestCase):
     def test_wait_timeout(self):
         latch = Latch()
         start = time.time()
-        success = latch.wait(timeout=0.2)
+        success = latch.closed(timeout=0.2)
         elapsed = time.time() - start
         self.assertFalse(success)
         self.assertGreaterEqual(elapsed, 0.2)
@@ -73,7 +73,7 @@ class TestSimpleLatch(unittest.TestCase):
         self.assertFalse(latch.is_open())
         latch.open()
         self.assertTrue(latch.is_open())
-        latch.reset()
+        latch.close()
         self.assertFalse(latch.is_open())
 
     def test_multiple_opens_safe(self):
@@ -86,7 +86,7 @@ class TestSimpleLatch(unittest.TestCase):
         latch = Latch()
         latch.open()
         start = time.time()
-        latch.wait()
+        latch.closed()
         elapsed = time.time() - start
         self.assertLess(elapsed, 0.01)
 
@@ -95,7 +95,7 @@ class TestSimpleLatch(unittest.TestCase):
         results = []
 
         def waiter():
-            if latch.wait(timeout=0.5):
+            if latch.closed(timeout=0.5):
                 results.append("released")
 
         threads = [threading.Thread(target=waiter) for _ in range(3)]
@@ -103,7 +103,7 @@ class TestSimpleLatch(unittest.TestCase):
             t.start()
 
         time.sleep(0.1)
-        latch.reset()
+        latch.close()
         latch.open()
 
         for t in threads:

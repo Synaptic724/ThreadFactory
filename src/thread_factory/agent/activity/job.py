@@ -160,8 +160,6 @@ class JobActivity(BaseActivity, IDisposable):
         The work collection is cleared and must be reloaded.
         """
         with self._lock:
-            self._logger.info(f"Resetting JobActivity '{self.id}'.")
-            self.set_status("PENDING")
             self._progress = 0.0
             self._job_current_count = 0.0
             self._job_result = None
@@ -170,11 +168,8 @@ class JobActivity(BaseActivity, IDisposable):
             # Clear the work queue for reloading
             if self._collection:
                 self._collection.clear()
+            super().reset()
 
-            # The job total is implicitly reset because the collection is empty.
-            # A new call to load_work() or re-initialization is required.
-
-            self._notify("JOB_RESET")
 
     # And modify the existing perform_activity method:
 
@@ -248,6 +243,9 @@ class JobActivity(BaseActivity, IDisposable):
             if self.is_cancellation_requested():
                 self._logger.info(f"Cancellation detected for job '{self.id}'. Halting execution.")
                 break
+
+            if self._pause_system:
+                self._pause_event.closed()
 
             # Now it's safe to get the next item
             item = self._collection.dequeue()

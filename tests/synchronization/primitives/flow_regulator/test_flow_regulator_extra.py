@@ -44,7 +44,7 @@ def wait_for_waiters(lock: FlowRegulator, expected: int, timeout: float = 2.0):
 class TestFlowRegulatorExtra(unittest.TestCase):
 
     def setUp(self):
-        self.center = CommandCenter(max_workers=800)
+        self.center = CommandCenter(total_max_workers=800, group_max_workers=800)
 
     def tearDown(self):
         self.center.shutdown()

@@ -41,7 +41,7 @@ class TestFlowRegulatorEdgeCases(unittest.TestCase):
 
 
     def setUp(self):
-        self.center = CommandCenter(max_workers=800)
+        self.center = CommandCenter(total_max_workers=800, group_max_workers=800)
 
     def tearDown(self):
         self.center.shutdown()

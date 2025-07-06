@@ -4,7 +4,7 @@ from thread_factory.utils.interfaces.disposable import IDisposable
 
 class Latch(IDisposable):
     """
-    Latch
+    Latch or Gate
     -----------
     A lightweight synchronization primitive that blocks threads until it is manually opened.
 
@@ -23,11 +23,11 @@ class Latch(IDisposable):
     >>> latch.open()
     """
     __slots__ = IDisposable.__slots__ + ["_open", "_condition", "_id"]
-    def __init__(self):
+    def __init__(self, open: bool = False):
         super().__init__()
 
         self._id = str(ulid.ULID())
-        self._open = False
+        self._open = open
         self._condition = threading.Condition()
 
 
@@ -41,7 +41,7 @@ class Latch(IDisposable):
             self._condition.notify_all()
             self._condition = None
 
-    def wait(self, timeout: float = None) -> bool:
+    def closed(self, timeout: float = None) -> bool:
         """
         Blocks the calling thread until the latch is opened.
         Returns True if the latch is open, False if it timed out.
@@ -64,7 +64,7 @@ class Latch(IDisposable):
             self._open = True
             self._condition.notify_all()
 
-    def reset(self):
+    def close(self):
         """
         Resets the latch to the closed state.
         Threads calling `wait()` after this will block again.
@@ -79,3 +79,5 @@ class Latch(IDisposable):
         with self._condition:
             return self._open
 
+
+Gate = Latch

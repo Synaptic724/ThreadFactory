@@ -1,6 +1,8 @@
 import threading, ulid, logging, time
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, List
+from thread_factory.synchronization.primitives.latch import Gate
+from thread_factory.concurrency.sync_types.sync_bool import SyncBool
 from thread_factory.synchronization.controllers.signal_controller import SignalController
 from thread_factory.agent.identity.types.agent import Agent
 from thread_factory.utils.interfaces.disposable import IDisposable
@@ -52,6 +54,9 @@ class BaseActivity(IDisposable, ABC):
         self._metadata: ConcurrentDict[str, Any] = ConcurrentDict(kwargs)
         self._registered_agents: ConcurrentDict[str, Agent] = ConcurrentDict()
 
+        # Pause Condition
+        self._pause_system = SyncBool(False)  # Flag to indicate if the system is paused
+        self._pause_event = Gate(True)
 
         # Activity Status
         self._status: ActivityStatus = ActivityStatus.PENDING
@@ -107,6 +112,7 @@ class BaseActivity(IDisposable, ABC):
             self._registered_agents = None
             self._metadata.dispose()
             self._metadata = None
+            self._pause_event.dispose()
 
             # Nullify references to external objects to aid garbage collection
             self._signal_controller = None
@@ -158,6 +164,7 @@ class BaseActivity(IDisposable, ABC):
                 "get_status": self.get_status,
                 "deploy_all_agents": self.deploy_all_agents,
                 "start": self.start,
+                "reset": self.reset,
             })
         })
     # --- Agent Management ---
@@ -285,6 +292,20 @@ class BaseActivity(IDisposable, ABC):
 
     #region Activity Control Methods
 
+    def reset(self):
+        """
+        Resets the job to its initial PENDING state, clearing progress and results.
+
+        This allows the job to be re-configured with load_work() and run again.
+        The work collection is cleared and must be reloaded.
+        """
+        with self._lock:
+            self._notify("JOB_RESET")
+            self._logger.info(f"JobActivity '{self.id}' reset to PENDING state.")
+            self._status = ActivityStatus.PENDING
+            self._pause_system = False
+            self._pause_event.open()
+
 
     def cancel(self):
         """
@@ -321,6 +342,8 @@ class BaseActivity(IDisposable, ABC):
             if self._status == ActivityStatus.RUNNING:
                 self._logger.info(f"JobActivity '{self.id}' paused.")
                 self._status = ActivityStatus.PAUSED
+                self._pause_system = True
+                self._pause_event.close()
                 self._notify("STATUS_CHANGED", {"status": self._status.name})
             else:
                 self._logger.debug(
@@ -342,6 +365,7 @@ class BaseActivity(IDisposable, ABC):
                 self._logger.info(f"JobActivity '{self.id}' resumed.")
                 self._status = ActivityStatus.RUNNING
                 self._notify("STATUS_CHANGED", {"status": self._status.name})
+                self._pause_event.open()
             else:
                 self._logger.debug(
                     f"JobActivity '{self.id}' cannot be resumed from current status: {self._status.name}.")
@@ -394,13 +418,13 @@ class BaseActivity(IDisposable, ABC):
         with self._lock:
             return self._status
 
-    @abstractmethod
     def perform_activity(self):
         """
         An agent calls this method to start working on the job's collection.
         The agent will only perform work if the job's status is RUNNING.
         """
-        raise NotImplementedError("Subclasses must implement the perform_activity method.")
+        raise NotImplementedError("This method should be implemented by subclasses to define the activity's logic.")
+
 #endregion Activity Control Methods
     # --- Private Helpers ---
 

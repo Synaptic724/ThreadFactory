@@ -46,7 +46,6 @@ class General(Agent):
                  public_id: Optional[str] = None,
                  public_name: Optional[str] = None,
                  job_title: Optional[str] = None,
-                 activity_group: Optional[str] = None,
                  # Explicitly add Agent-specific optional parameters if General needs to accept them
                  factory: Any = None,
                  work_queue = None,
@@ -236,7 +235,7 @@ class General(Agent):
         Returns:
             str: A descriptive string summarizing the agent's identity.
         """
-        return f"Agent {self.get_name()} with job '{self.job_title}' in group '{self.activity_group}'"
+        return f"Agent {self.get_name()} with job '{self.job_title}' in group."
 
     def __repr__(self) -> str:
         """
