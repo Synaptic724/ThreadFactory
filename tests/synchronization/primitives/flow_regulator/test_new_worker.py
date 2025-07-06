@@ -23,10 +23,9 @@ if __name__ == "__main__":
     center = CommandCenter(max_workers=10)
 
     # Create and start agents with the blocking task
-    for _ in range(5):
+    for _ in range(2):
         center.submit(
-            target=Pack(blocking_task, flow, 2.0),  # hold lock for 2 seconds
-            template_name="default"
+            target=Pack(blocking_task, flow, 2.0)
         )
 
     # Allow time for all to finish

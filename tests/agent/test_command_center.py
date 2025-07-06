@@ -1,3 +1,4 @@
+import threading
 import unittest
 import time
 from thread_factory.agent.command_center import CommandCenter
@@ -33,23 +34,39 @@ class TestCommandCenter(unittest.TestCase):
 
     def test_create_agent_and_dispose(self):
         self.cc.register_template("one", lambda **kwargs: DummyAgent(**kwargs))
-        agent = self.cc.create_agent("one")
+        agent = self.cc.create_agent("one", target=lambda: None)
         self.assertIsInstance(agent, DummyAgent)
         self.assertIn(agent, self.cc.get_active_agents())
         agent.dispose()
 
     def test_create_agents_batch(self):
         self.cc.register_template("multi", lambda **kwargs: DummyAgent(**kwargs))
-        agents = self.cc.create_agents(3, "multi")
+        agents = self.cc.create_agents(3, "multi", target=lambda: None)
         self.assertEqual(len(agents), 3)
         for agent in agents:
             self.assertIn(agent, self.cc.get_active_agents())
 
+    def test_group_submit_runs_tasks(self):
+        results = []
+        lock = threading.Lock()
+
+        def task():
+            with lock:
+                results.append("ok")
+
+        self.cc.register_template("groupie", lambda **kwargs: DummyAgent(**kwargs))
+        self.cc.group_submit(agents=3, target=task, template_name="groupie")
+
+        time.sleep(0.2)  # Let threads run
+
+        self.assertEqual(len(results), 3)
+        self.assertEqual(len(self.cc.get_active_agents()), 0)
+
     def test_worker_cap_enforced(self):
         self.cc.register_template("limited", lambda **kwargs: DummyAgent(**kwargs))
-        self.cc.create_agents(3, "limited")
+        self.cc.create_agents(3, "limited", target=lambda: None)
         with self.assertRaises(RuntimeError):
-            self.cc.create_agent("limited")
+            self.cc.create_agent("limited", target=lambda: None)
 
     def test_double_register_raises(self):
         self.cc.register_template("dupe", lambda **kw: DummyAgent(**kw))
@@ -73,17 +90,17 @@ class TestCommandCenter(unittest.TestCase):
 
     def test_dispose_frees_worker_slot(self):
         self.cc.register_template("slot", lambda **kw: DummyAgent(**kw))
-        agent1 = self.cc.create_agent("slot")
-        agent2 = self.cc.create_agent("slot")
-        agent3 = self.cc.create_agent("slot")
+        agent1 = self.cc.create_agent("slot", target=lambda: None)
+        agent2 = self.cc.create_agent("slot", target=lambda: None)
+        agent3 = self.cc.create_agent("slot", target=lambda: None)
 
         with self.assertRaises(RuntimeError):
-            self.cc.create_agent("slot")  # should fail
+            self.cc.create_agent("slot", target=lambda: None)  # should fail
 
         agent1.dispose()
         self.cc._unregister_agent(agent1)  # manually unregister to free slot
 
-        new_agent = self.cc.create_agent("slot")  # should now succeed
+        new_agent = self.cc.create_agent("slot", target=lambda: None) # should now succeed
         self.assertIn(new_agent, self.cc.get_active_agents())
 
     @unittest.expectedFailure
@@ -97,7 +114,7 @@ class TestCommandCenter(unittest.TestCase):
 
         self.cc.register_template("fail_build", bad_factory)
         with self.assertRaises(RuntimeError) as ctx:
-            self.cc.create_agent("fail_build")
+            self.cc.create_agent("fail_build", target=lambda: None)
         self.assertIn("boom", str(ctx.exception))
 
     def test_template_without_kwargs_fails(self):
@@ -106,7 +123,7 @@ class TestCommandCenter(unittest.TestCase):
 
         self.cc.register_template("bad", bad_template)
         with self.assertRaises(RuntimeError):
-            self.cc.create_agent("bad")
+            self.cc.create_agent("bad", target=lambda: None)
 
     def test_submit_task_with_exception(self):
         self.cc.register_template("explode", lambda **kw: DummyAgent(**kw))
@@ -132,7 +149,7 @@ class TestCommandCenter(unittest.TestCase):
 
     def test_dispose_unregisters_agents(self):
         self.cc.register_template("clean", lambda **kwargs: DummyAgent(**kwargs))
-        agent = self.cc.create_agent("clean")
+        agent = self.cc.create_agent("clean", target=lambda: None)
         agent_id = agent.factory_id
         self.cc.dispose()
         self.assertIsNone(self.cc.get_agent_by_id(agent_id))
@@ -144,7 +161,7 @@ class TestCommandCenter(unittest.TestCase):
 
     def test_get_agent_by_id_returns_correct_agent(self):
         self.cc.register_template("lookup", lambda **kwargs: DummyAgent(**kwargs))
-        agent = self.cc.create_agent("lookup")
+        agent = self.cc.create_agent("lookup", target=lambda: None)
         found = self.cc.get_agent_by_id(agent.factory_id)
         self.assertIs(agent, found)
 

@@ -216,7 +216,7 @@ class Agent(Worker):
 
         try:
             if self._target:
-                return super().run()
+                return self._target()  # Run the target if it's a standalone agent
 
             if self._event_loop:
                 self._event_loop()
@@ -235,12 +235,11 @@ class Agent(Worker):
         Raises:
             RuntimeError: If the agent has been disposed or if it is already running.
         """
-        with self._lock:
-            if self._disposed:
-                raise RuntimeError("Cannot deploy a disposed agent.")
-            if self.is_alive():
-                raise RuntimeError("Agent is already running.")
-        self.run()
+        if self._disposed:
+            raise RuntimeError("Cannot deploy a disposed agent.")
+        if self.is_alive():
+            raise RuntimeError("Agent is already running.")
+        self.start()
 
     def set_target(self, target: Union[Callable[..., Any], Pack]) -> None:
         """

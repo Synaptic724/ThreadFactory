@@ -160,7 +160,9 @@ class CommandCenter(IDisposable):
 
     @property
     def id(self) -> str:
-        """The unique identifier for this CommandCenter instance."""
+        """
+        The unique identifier for this CommandCenter instance.
+        """
         return self._id
 
     def _get_object_details(self) -> Dict[str, Any]:
@@ -197,6 +199,7 @@ class CommandCenter(IDisposable):
                 self._external_signal_controller.notify(self.id, event_type, data)
             except Exception as e:
                 self._logger.error(f"Error notifying external SignalController: {e}", exc_info=True)
+
 #endregion Controller Contract
 #region Agent Management
     def create_agent(
@@ -220,6 +223,8 @@ class CommandCenter(IDisposable):
             Agent: The created agent instance.
         """
         self._check_disposed()
+        if define_home is None and target is None:
+            raise ValueError("At least one of define_home or target must be provided.")
         agent = self._create_and_register_agent(template_name, *args, **kwargs)
         if target:
             agent.set_target(target)
@@ -266,6 +271,7 @@ class CommandCenter(IDisposable):
     def submit(
         self,
         target: Union[Callable[..., Any], Pack],
+        define_home: Optional[Union[Callable[..., None], Pack]] = None,
         template_name: str = "default",
         *args, **kwargs
     ) -> None:
@@ -276,15 +282,51 @@ class CommandCenter(IDisposable):
 
         Args:
             target (Callable | Pack): The task to run inside the agent.
+            define_home (Callable | Pack, optional): A function representing the agent's long-lived event loop.
             template_name (str, optional): Template to use (defaults to 'default').
             *args: Positional overrides passed to the agent template.
             **kwargs: Keyword overrides passed to the agent template.
         """
-        agent = self.create_agent(template_name, define_home=target, *args, **kwargs)
-        agent.start()
+        agent = self.create_agent(template_name, target=target, define_home=define_home,*args, **kwargs)
+        agent.deploy()
+
+    def group_submit(
+            self,
+            agents: int,
+            target: Union[Callable[..., Any], Pack],
+            define_home: Optional[Union[Callable[..., None], Pack]] = None,
+            template_name: str = "default",
+            *args, **kwargs
+    ) -> None:
+        """
+        Submits a fire-and-forget task using an ephemeral agent.
+
+        The agent is immediately started, runs the task, and is automatically cleaned up.
+
+        Args:
+            target (Callable | Pack): The task to run inside the agent.
+            define_home (Callable | Pack, optional): A function representing the agent's long-lived event loop.
+            agents (int): Number of agents to create and run the task in parallel.
+            template_name (str, optional): Template to use (defaults to 'default').
+            *args: Positional overrides passed to the agent template.
+            **kwargs: Keyword overrides passed to the agent template.
+        """
+        if not isinstance(agents, int) or agents < 1:
+            raise ValueError("number_of_agents must be a positive integer.")
+
+        if agents + self._worker_count > self._max_workers:
+            raise RuntimeError(f"Cannot create {agents} agents. Worker cap of {self._max_workers} reached.")
+
+        with self._lock:
+            #Create and start the specified number of agents
+            for _ in range(agents):
+                agent = self.create_agent(template_name, target=target, define_home=define_home, *args, **kwargs)
+                agent.deploy()
 
     def _register_agent(self, agent: Agent):
-        """Internal helper to register an agent in the active list."""
+        """
+        Internal helper to register an agent in the active list.
+        """
         if not self._disposed and agent:
             with self._lock:
                 self._worker_count.increment()
@@ -292,7 +334,9 @@ class CommandCenter(IDisposable):
                 self._notify('AGENT_CREATED', {'agent_id': agent.factory_id, 'template_name': agent.name})
 
     def _unregister_agent(self, agent: Agent):
-        """Internal helper to unregister and forget an agent."""
+        """
+        Internal helper to unregister and forget an agent.
+        """
         if not self._disposed and agent:
             with self._lock:
                 if self._active_agents.pop(agent.factory_id, None):
@@ -331,7 +375,7 @@ class CommandCenter(IDisposable):
         if not isinstance(amount, int) or amount < 1:
             raise ValueError("Amount must be a positive integer.")
         with self._lock:
-            if self._worker_count.get() > self._max_workers - amount:
+            if self._worker_count > self._max_workers - amount:
                 raise RuntimeError("Cannot decrease below current active worker count.")
             self._max_workers -= amount
             self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': self._max_workers})
@@ -355,7 +399,7 @@ class CommandCenter(IDisposable):
         if self._disposed:
             raise RuntimeError("CommandCenter is disposed.")
 
-        if self._worker_count.get() >= self._max_workers:
+        if self._worker_count >= self._max_workers:
             self._notify('WORKER_CAP_REACHED', {'max_workers': self._max_workers})
             raise RuntimeError(f"Cannot create agent. Worker cap of {self._max_workers} reached.")
 
