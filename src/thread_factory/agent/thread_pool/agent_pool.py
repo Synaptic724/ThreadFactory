@@ -1,5 +1,5 @@
 import logging, threading, time
-from typing import Callable
+from typing import Callable, Union
 from ulid import ULID
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 from thread_factory.agent.identity.types.agent import Agent
@@ -46,9 +46,9 @@ class _AgentPoolContainer(IDisposable):
 
         # Track threads either as a simple set (if no tracking) or as a dict mapping to Records
         if ignore_tracking:
-            self._registered_threads: ConcurrentSet[ULID] | ConcurrentDict[ULID, Records] = ConcurrentSet[ULID]()
+            self._registered_threads: Union[ConcurrentSet[ULID], ConcurrentDict[ULID, Records]] = ConcurrentSet[ULID]()
         else:
-            self._registered_threads: ConcurrentSet[ULID] | ConcurrentDict[ULID, Records] = ConcurrentDict[
+            self._registered_threads: Union[ConcurrentSet[ULID], ConcurrentDict[ULID, Records]] = ConcurrentDict[
                 ULID, Records]()
 
         self._unregistered_threads = ConcurrentSet[ULID]()  # Tracks which threads have been requested to unregister

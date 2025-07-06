@@ -46,7 +46,7 @@ Here's how ThreadFactory elevates your concurrency game:
 
 > **NOTE**  
 > ThreadFactory is designed and tested against Python 3.13+ in **No-GIL** mode.  
-> This library will only function on 3.13 and higher.
+> This library will only function on 3.13 and higher as it is a **No-GIL Exclusive** library.
 
 Please see the benchmarks at the bottom of this page and if you are interested there are more in the repository.  
 
