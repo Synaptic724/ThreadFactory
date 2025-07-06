@@ -48,8 +48,7 @@ class SignalController(IDisposable):
     There will be more integration with other synchronization primitives in the future.***
     """
 
-    def __init__(self, controller_name: str = None, controller_type: str = None,
-                 controller_group: str = None, logger: Optional[logging.Logger] = None):
+    def __init__(self, controller_name: str = None, controller_type: str = None, logger: Optional[logging.Logger] = None):
         """
         Initialize the SignalController.
 
@@ -60,9 +59,19 @@ class SignalController(IDisposable):
         """
         super().__init__()
         self.id = str(ulid.ULID())
+
+        # optional users management tools
         self.name = controller_name if controller_name else "SignalController"
         self.type = controller_type
-        self.group = controller_group
+        self.job = None  # Placeholder for a job or task associated with this controller, if any.
+        self.task = None  # Placeholder for a job or task associated with this controller, if any.
+        self.activity_id = None  # Placeholder for an activity ID, if applicable.
+
+
+        # internal group management
+        self._group_name = None
+        self._group_id = None
+
         # Setup internal logger if none provided
         if logger is None:
             self._logger = logging.getLogger(__name__)

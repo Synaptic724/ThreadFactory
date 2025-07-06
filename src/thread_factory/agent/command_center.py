@@ -320,6 +320,8 @@ class CommandCenter(IDisposable):
             activity = self._activity_builder.build_activity(name, **kwargs)
             if activity:
                 command = self.get_command_group(command_group_name)
+                activity._group_name = command.name
+                activity._group_id = command.id
                 command._active_activities[activity.id] = activity
                 self._logger.info(f"Created and registered Activity '{activity.id}' of type '{name}'. Using command group '{command.name}'.")
                 # You could also emit a notification here
@@ -345,6 +347,8 @@ class CommandCenter(IDisposable):
         self._check_disposed()
         command = self.get_command_group(command_group_name)
         if activity.id in command._active_activities:
+            activity._group_name = None
+            activity._group_id = None
             del command._active_activities[activity.id]
             self._logger.info(f"Activity '{activity.id}' removed from CommandGroup '{command.name}'.")
             if dispose:
@@ -368,6 +372,8 @@ class CommandCenter(IDisposable):
 
         for group in self._command_groups.values():
             if activity.id in group._active_activities:
+                activity._group_name = None
+                activity._group_id = None
                 del group._active_activities[activity.id]
                 self._logger.info(f"Activity '{activity.id}' removed from CommandGroup '{group.name}'.")
                 if dispose:
@@ -719,6 +725,8 @@ class CommandCenter(IDisposable):
         """
         if not self._disposed and agent:
             with self._lock:
+                agent._group_name = command.name
+                agent._group_id = command.id
                 command._worker_count.increment()
                 command._active_agents[agent.factory_id] = agent
                 self._notify('AGENT_CREATED', {'agent_id': agent.factory_id, 'template_name': agent.name, 'command_group': command.id, 'command_group_name': command.name})
@@ -732,6 +740,8 @@ class CommandCenter(IDisposable):
             if not command:
                 raise RuntimeError(f"Agent '{agent.factory_id}' not found in any command group. Significant error!")
             with self._lock:
+                agent._group_name = None
+                agent._group_id = None
                 if command._active_agents.pop(agent.factory_id, None):
                     command._worker_count.decrement()
                     self._notify('AGENT_UNREGISTERED', {'agent_id': agent.factory_id, 'command_group': command.id, 'command_group_name': command.name})
@@ -953,6 +963,8 @@ class CommandCenter(IDisposable):
             if name in self.find_controller_by_name(name, command_group_name):
                 raise ValueError(f"A SignalController with the name '{name}' already exists in command group '{command_group_name}'.")
             new_controller = controller or SignalController(logger=self._logger)
+            new_controller._group_name = command.name
+            new_controller._group_id = command.id
             command._signal_controllers[new_controller.id] = new_controller
             self._logger.info(f"Added SignalController: '{name}'")
             self._notify('SIGNAL_CONTROLLER_ADDED', {'controller_name': name, 'command_group': command.id, 'command_group_name': command.name})
@@ -999,6 +1011,8 @@ class CommandCenter(IDisposable):
                 name = controller.name
                 self._logger.info(f"Removed SignalController: '{name}'")
                 self._notify('SIGNAL_CONTROLLER_REMOVED', {'controller_name': name, 'command_group': group.id, 'command_group_name': group.name})
+                controller._group_name = None
+                controller._group_id = None
                 if dispose:
                     try:
                         controller.dispose()

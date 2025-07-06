@@ -44,6 +44,9 @@ class BaseActivity(IDisposable, ABC):
         """
         super().__init__()
         self._id: str = str(ulid.ULID())
+        self._name: Optional[str] = None
+        self._group_name = None
+        self._group_id = None
         self._logger = logger or logging.getLogger(__name__)
         self._lock = threading.RLock()
         self._metadata: ConcurrentDict[str, Any] = ConcurrentDict(kwargs)

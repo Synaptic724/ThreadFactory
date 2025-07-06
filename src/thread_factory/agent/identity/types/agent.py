@@ -94,6 +94,11 @@ class Agent(Worker):
         else:
             self._target = Pack.bundle(target) if target else None
 
+        self._group_name = None
+        self._group_id = None
+        self._activity_name = None
+        self._activity_id = None
+
         self._worker_type = "agentic" # Overrides Worker's default "mainpool"
         self._pool_agent: bool = False # This flag might be set by a pool manager
         self._return_home: bool = False # Controls behavior after task completion
@@ -179,6 +184,8 @@ class Agent(Worker):
         """
         if self._command_center:
             self._command_center._unregister_agent(self)
+            self._group_name = None
+            self._group_id = None
             self._command_center = None
 
     def _dispose_work(self) -> None:
@@ -221,6 +228,8 @@ class Agent(Worker):
             # This call completes the link and triggers the notification
             activity.register_agent(self)
             self._logger.info(f"Agent '{self.factory_id}' registered with Activity '{activity.id}'.")
+            self._activity_id = activity._id
+            self._activity_name = activity._name
 
     def deregister_from_activity(self, activity: 'BaseActivity'):
         """
@@ -230,6 +239,8 @@ class Agent(Worker):
             # This call breaks the link from the activity's side
             activity.unregister_agent(self)
             self._logger.info(f"Agent '{self.factory_id}' deregistered from Activity '{activity.id}'.")
+            self._activity_id = None
+            self._activity_name = None
 
 
     def list_registered_activities(self) -> list:
