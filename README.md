@@ -25,7 +25,7 @@ Tired of battling race conditions and deadlocks in your multiprocessing Python a
 Here's how ThreadFactory elevates your concurrency game:
 
 * 🔒 **Sync Types: Atomic & Immutable-like Control**
-    Experience effortless thread-safe manipulation of fundamental data types. Our `SyncInt`, `SyncBool`, `SyncString`, and more, act as atomic wrappers, guaranteeing data integrity without complex locking rituals.
+    Experience effortless thread-safe manipulation of fundamental data types. Our `SyncInt`, `SyncBool`, `SyncString`, and more, act as atomic wrappers, guaranteeing data integrity without complex locking rituals.  These types are also now reference types and are no longer treated like simple values (Use them cautiously).
 
 * 🤝 **Concurrent Collections: High-Performance Shared Data Structures**
     Transform your shared data management. Access and modify dictionaries, lists, sets, queues, stacks, and buffers with confidence, knowing they are built for high-load, concurrent environments. **🔥 Say goodbye to data corruption!**

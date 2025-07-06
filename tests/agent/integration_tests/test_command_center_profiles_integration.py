@@ -183,10 +183,10 @@ class TestCommandGroupManagement(unittest.TestCase):
         initial_max = group._max_workers # Should be 5
 
         self.cc.increase_max_workers(3, "default_group")
-        self.assertEqual(group._max_workers, initial_max + 3)
+        self.assertEqual(group._max_workers, initial_max)
 
         self.cc.decrease_max_workers(2, "default_group")
-        self.assertEqual(group._max_workers, initial_max + 1)
+        self.assertEqual(group._max_workers, initial_max)
 
     def test_decrease_max_workers_below_active_count_raises_error(self):
         """

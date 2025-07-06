@@ -1,4 +1,5 @@
 import threading, warnings, logging, ulid
+from logging import Logger
 from typing import Optional, List, Callable, Any, Union, Dict, Type
 from thread_factory.agent.activity.builder import ActivityBuilder
 from thread_factory.agent.activity.base import BaseActivity, ActivityStatus
@@ -10,6 +11,7 @@ from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.sync_types.sync_int import SyncInt
+from thread_factory.agent.thread_pool.agent_pool import AgentPool
 
 #region CommandGroup
 class CommandGroup(IDisposable):
@@ -87,7 +89,7 @@ class CommandGroup(IDisposable):
 
         # --- Internal Components ---
         self._worker_count = SyncInt(0)
-        self._max_workers = max_workers
+        self._max_workers = SyncInt(max_workers)
         self._command_center = command_center  # Reference to its creator
 
         # Internal registries for its members
@@ -482,10 +484,11 @@ class CommandCenter(IDisposable):
         """
         super().__init__()
         # --- Core Components ---
-        self._logger = logger or logging.getLogger(__name__)
+        self._logger: Logger = logger or logging.getLogger(__name__)
         self._lock = threading.RLock()
         self._builder = AgentBuilder()
         self._activity_builder = ActivityBuilder()
+        #self._agent_pool = AgentPool(self, self._logger)
 
         if not isinstance(group_max_workers, int) or group_max_workers < 1:
             raise ValueError("group_max_workers must be a positive integer.")
@@ -609,7 +612,11 @@ class CommandCenter(IDisposable):
         if self.get_total_active_workers() + max_workers > self._total_max_workers:
             raise RuntimeError(f"Cannot create CommandGroup '{command_group_name}'. Total active workers would exceed global limit of {self._total_max_workers}, increase new total limit to create a new group.")
 
+        # Create the CommandGroup instance and register it
         group = CommandGroup(group_name=command_group_name, max_workers=max_workers, command_center=self, group_type=command_group_type)
+
+        # Create Agent Pool Container
+        #self._agent_pool.create_new_group_container(group, max_workers)
         self._command_groups[command_group_name] = group
 
     def get_command_group(self, group_name: str) -> Optional[CommandGroup]:
