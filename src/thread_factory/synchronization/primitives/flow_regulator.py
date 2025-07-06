@@ -186,7 +186,7 @@ class FlowRegulator(IDisposable):
         Checks if the current thread has a factory_id assigned.
         """
         thread = threading.current_thread()
-        return hasattr(thread, "_factory_id")
+        return hasattr(thread, "factory_id")
 
     def set_callback(self, factory_id: str, callback: Union[Callable[..., None], Pack]) -> None:
         """

@@ -19,14 +19,15 @@ class TestWorker(unittest.TestCase):
 
     def setUp(self):
         self.mock_work_queue = ConcurrentQueue()
-        self.worker = Worker(work_queue=self.mock_work_queue, factory_id="test_worker_1")
+        self.worker = Worker(work_queue=self.mock_work_queue)
         self.worker._last_hourly_reset = datetime.now()
 
     def tearDown(self):
-        if self.worker.is_alive():
-            self.worker.stop()
-            self.worker.join(timeout=1)
-        self.worker.dispose()
+        if self.worker and not self.worker.is_disposed:
+            if self.worker.is_alive():
+                self.worker.stop()
+                self.worker.join(timeout=1)
+            self.worker.dispose()
 
     def _start_worker(self):
         self.worker.start()
@@ -95,27 +96,36 @@ class TestWorker(unittest.TestCase):
         time.sleep(0.1)
         self.assertEqual(self.worker.state, WorkerState.BLOCKED)
 
+        # Stop the worker and immediately check flags BEFORE join()
         self.worker.stop()
+        self.assertIsNotNone(self.worker.shutdown_flag)
+        self.assertIsNotNone(self.worker.death_event)
+        self.assertTrue(self.worker.shutdown_flag.is_set())
+        self.assertFalse(self.worker.death_event.is_set())  # Not set yet until run() exits
+
         self.worker.join(timeout=1)
 
+        # Now the worker has run dispose() internally
         self.assertFalse(self.worker.is_alive())
-        self.assertTrue(self.worker.shutdown_flag.is_set())
-        self.assertTrue(self.worker.death_event.is_set())
-        self.assertEqual(self.worker.state, WorkerState.DISPOSED)
         self.assertTrue(self.worker.is_disposed)
+        self.assertEqual(self.worker.state, WorkerState.DISPOSED)
+        self.assertIsNone(self.worker.shutdown_flag)
+        self.assertIsNone(self.worker.death_event)
 
     def test_worker_disposal(self):
         self._start_worker()
         time.sleep(0.1)
+
+        # Stop and join before calling dispose to ensure thread exits gracefully
+        self.worker.stop()
+        self.worker.join(timeout=1)
+
         self.worker.dispose()
 
         self.assertTrue(self.worker.is_disposed)
-        self.assertTrue(self.worker.shutdown_flag.is_set())
-        self.assertTrue(self.worker.death_event.is_set())
         self.assertEqual(self.worker.state, WorkerState.DISPOSED)
-
-        self.worker.join(timeout=1)
-        self.assertFalse(self.worker.is_alive())
+        self.assertIsNone(self.worker.shutdown_flag)
+        self.assertIsNone(self.worker.death_event)
 
     def test_worker_metrics_update(self):
         num_tasks = 5

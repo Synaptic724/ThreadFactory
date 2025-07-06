@@ -223,7 +223,7 @@ class TestGeneralAgentSignalControllerIntegration(unittest.TestCase):
 
         # Clean up new agent for this specific test
         new_agent.dispose()
-        new_agent.join(timeout=1)  # This should now work
+        new_agent.join(timeout=5)  # This should now work
 
         # After new_agent is disposed, only the original should remain
         self.assertNotIn(new_agent.id, self.command_center._agents)

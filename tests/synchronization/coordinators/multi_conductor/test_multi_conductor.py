@@ -40,7 +40,7 @@ class TestMultiConductor(unittest.TestCase):
     def test_multiple_group_lockstep_execution(self):
         """Verify tasks from all groups run in a synchronized, sequential order."""
         execution_log = []
-        log_lock = threading.Lock()
+        log_lock = threading.RLock()
 
         def make_logging_task(name: str) -> Callable:
             def task():
@@ -57,31 +57,35 @@ class TestMultiConductor(unittest.TestCase):
         group2 = Group(name="group2", tasks=[task_g2_t1])
         mc = MultiConductor(threshold=3, groups=[group1, group2])
 
-        threads = _spawn(3, mc.start)
+        try:
+            threads = _spawn(3, mc.start)
 
-        # Wait for all threads to complete first
-        for t in threads:
-            # FIX: Increase the timeout to a more generous value like 8 seconds.
-            t.join(8)
+            # Wait for threads to finish with generous timeout
+            for t in threads:
+                t.join(timeout=8)
 
-        # Now, check if any threads timed out
-        alive_threads = [t.name for t in threads if t.is_alive()]
-        self.assertFalse(
-            alive_threads,
-            f"Test failed: The following threads did not finish in time: {alive_threads}"
-        )
+            # Check if any threads are still alive
+            alive_threads = [t.name for t in threads if t.is_alive()]
+            self.assertFalse(
+                alive_threads,
+                f"Test failed: The following threads did not finish in time: {alive_threads}"
+            )
 
-        # Assertions will now run reliably
-        self.assertEqual(len(execution_log), 9)
-        self.assertEqual(execution_log.count("g1-t1"), 3)
-        self.assertEqual(execution_log.count("g1-t2"), 3)
-        self.assertEqual(execution_log.count("g2-t1"), 3)
+            # Validate execution log
+            self.assertEqual(len(execution_log), 9)
+            self.assertEqual(execution_log.count("g1-t1"), 3)
+            self.assertEqual(execution_log.count("g1-t2"), 3)
+            self.assertEqual(execution_log.count("g2-t1"), 3)
 
-        # Verify the lock-step order
-        self.assertEqual(execution_log[0:3], ["g1-t1"] * 3)
-        self.assertEqual(execution_log[3:6], ["g1-t2"] * 3)
-        self.assertEqual(execution_log[6:9], ["g2-t1"] * 3)
-        mc.dispose()
+            # Verify lock-step order
+            self.assertEqual(execution_log[0:3], ["g1-t1"] * 3)
+            self.assertEqual(execution_log[3:6], ["g1-t2"] * 3)
+            self.assertEqual(execution_log[6:9], ["g2-t1"] * 3)
+
+        finally:
+            # Prevent stuck threads from lingering
+            mc.notify_all_override()
+            mc.dispose()
 
     def test_reusable_multiconductor_with_reset(self):
         """Ensure reset clears outcomes in all groups for a second run."""
