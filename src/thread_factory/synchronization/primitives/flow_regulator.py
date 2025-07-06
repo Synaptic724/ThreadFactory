@@ -1,7 +1,5 @@
-import threading
-import time
+import threading, time, ulid
 from typing import Optional, Union, Iterable, Any, Callable
-import ulid
 from thread_factory.concurrency.concurrent_set import ConcurrentSet
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.synchronization.primitives.smart_condition import SmartCondition

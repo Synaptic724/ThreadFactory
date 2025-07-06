@@ -6,7 +6,6 @@ from thread_factory.runtime.orchestrator.monitoring.records.records import WorkS
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.package import Pack
 
-
 class HelpRequest(IDisposable):
     """
     HelpRequest

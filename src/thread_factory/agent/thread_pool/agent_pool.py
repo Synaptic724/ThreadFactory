@@ -1,7 +1,14 @@
+import logging, threading, time
 from typing import Callable
-import threading
 from ulid import ULID
-from thread_factory.concurrency import ConcurrentSet, ConcurrentQueue, ConcurrentList, ConcurrentDict
+from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
+from thread_factory.agent.identity.types.agent import Agent
+from thread_factory.agent.command_center import CommandCenter
+from thread_factory.agent.thread_pool import HelpRequest
+from thread_factory.concurrency.concurrent_list import ConcurrentList
+from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
+from thread_factory.concurrency.concurrent_set import ConcurrentSet
+from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.runtime.orchestrator.monitoring.records.records import Records
@@ -70,8 +77,8 @@ class _AgentPoolContainer(IDisposable):
                 self._unregistered_threads = ConcurrentSet(self._registered_threads.keys())
 
             self._unregister_thread_check = True
-            self._switch_lock.notify_all()  # Wake all threads
-            self._switch_lock.dispose()  # Dispose of the switch lock
+            self._flow_regulator.notify_all()  # Wake all threads
+            self._flow_regulator.dispose()  # Dispose of the switch lock
             self._active = False  # Mark container inactive
             self._registered_threads.dispose()  # Dispose of registry
             self._unregistered_threads.dispose()  # Dispose of unregistration list
@@ -92,7 +99,7 @@ class _AgentPoolContainer(IDisposable):
         self._register_thread()  # Add thread to the pool registry
 
         while self._active:
-            with self._switch_lock:
+            with self._flow_regulator:
                 pass  # Thread will block here until notified
 
             if not self._ignore_tracking:
@@ -197,8 +204,8 @@ class _AgentPoolContainer(IDisposable):
             self._unregister_thread_check = True
 
         # If thread is currently waiting on switch lock, wake it up
-        if thread_id in self._switch_lock._cond._waiters:
-            self._switch_lock.notify(factory_ids=[thread_id], awaited_caller=False)
+        if thread_id in self._flow_regulator._cond._waiters:
+            self._flow_regulator.notify(factory_ids=[thread_id], awaited_caller=False)
 
     def _change_bias(self, bias: int):
         """
@@ -207,7 +214,7 @@ class _AgentPoolContainer(IDisposable):
         Args:
             bias (int): New bias threshold value.
         """
-        self._switch_lock.set_bias_threshold(bias)
+        self._flow_regulator.set_bias_threshold(bias)
 
     def _notify_callable(self, worker_count: int, work_request: Callable):
         """
@@ -219,7 +226,7 @@ class _AgentPoolContainer(IDisposable):
             worker_count (int): Number of threads to wake.
             work_request (Callable): The callable to be passed to each thread.
         """
-        self._switch_lock.notify(n=worker_count, awaited_caller=True, callback=work_request)
+        self._flow_regulator.notify(n=worker_count, awaited_caller=True, callback=work_request)
 
     def _notify_priority_callable(self, worker_count: int, work_request: Callable):
         """
@@ -231,7 +238,7 @@ class _AgentPoolContainer(IDisposable):
             worker_count (int): Number of threads to wake.
             work_request (Callable): The callable to pass to awakened threads.
         """
-        self._switch_lock.bypass_bias_and_notify(n=worker_count, awaited_caller=True, callback=work_request)
+        self._flow_regulator.bypass_bias_and_notify(n=worker_count, awaited_caller=True, callback=work_request)
 
 
 class AgentPool(IDisposable):
@@ -276,57 +283,118 @@ class AgentPool(IDisposable):
     AgentPool is a foundational component of the larger `MainPool` architecture,
     but it can also be used independently for standalone agentic threading needs.
     """
-    def __init__(self, max_workers: int, min_workers: int = 1):
-        super().__init__()
-        self.max_workers = max_workers
-        self.min_workers = min_workers
-        self.worker_pool: ConcurrentList['DynamicWorker'] = ConcurrentList()
-        self.task_queue = ConcurrentQueue()
-        self.lock = threading.Lock()
 
-        # Initially create workers up to min_workers
-        self._create_workers(self.min_workers)
+    class AgentPool(IDisposable):
+        """
+        A cooperative, auto-scaling auxiliary thread pool for handling bursty,
+        parallelizable workloads.
+        """
 
-    def _create_workers(self, num_workers: int):
-        """
-        Creates workers and starts them.
-        """
-        from thread_factory.agent.thread_pool.agent import Agent
-        for worker_id in range(len(self.worker_pool), len(self.worker_pool) + num_workers):
-            worker = Agent()
-            self.worker_pool.append(worker)
-            worker.start()
+        def __init__(self, command_center: CommandCenter, group_name: str, min_workers: int = 0, max_workers: int = 10):
+            super().__init__()
+            if not command_center or not isinstance(command_center, CommandCenter):
+                raise TypeError("A valid CommandCenter instance is required.")
 
-    def submit_task(self, task: Callable):
-        """
-        Submits a new task to the pool.
-        If there are not enough workers, create more.
-        """
-        with self.lock:
-            if self._should_create_more_workers():
-                self._create_workers(1)  # Create one more worker if needed
-            self.task_queue.put(task)
+            self._lock = threading.RLock()
+            self._command_center = command_center
+            self._group_name = group_name
+            self.min_workers = min_workers
+            self.max_workers = max_workers
 
-    def _should_create_more_workers(self) -> bool:
-        """
-        Dynamically add more workers if the number of tasks exceeds the current worker pool size.
-        """
-        return self.task_queue.qsize() > len(self.worker_pool)
+            self._pool_container = _AgentPoolContainer()
+            self._all_workers = ConcurrentSet()
+            self._shutdown = threading.Event()
 
-    def return_worker(self, worker: 'DynamicWorker'):
-        """
-        Returns a worker to the pool when done.
-        """
-        with self.lock:
-            if self.task_queue.empty() and len(self.worker_pool) > self.min_workers:
-                worker.shutdown()
-                self.worker_pool.remove(worker)
+            # The Maintenance Worker
+            self._maintenance_agent = self._create_maintenance_worker()
+            self._maintenance_agent.deploy()
 
-    def shutdown(self):
-        """
-        Gracefully shuts down all workers in the pool.
-        """
-        with self.lock:
-            for worker in self.worker_pool:
-                worker.shutdown()
+        def dispose(self):
+            if self._disposed: return
+            with self._lock:
+                self._disposed = True
+                self._shutdown.set()
+                # Politely ask all workers to shut down
+                for worker_id in list(self._all_workers):
+                    self._retire_worker_by_id(worker_id)
 
+                # Ensure maintenance agent is stopped
+                if self._maintenance_agent:
+                    self._maintenance_agent.shutdown_flag.set()
+                    self._maintenance_agent = None
+
+                self._pool_container.dispose()
+                self._all_workers.dispose()
+
+        def submit(self, help_request: HelpRequest, num_workers: int):
+            """
+            Submits a parallel job to the pool, requesting a specific number of agents.
+            """
+            if self._disposed:
+                raise RuntimeError("AgentPool has been disposed.")
+            if num_workers <= 0:
+                raise ValueError("Number of workers must be positive.")
+            if num_workers > self.max_workers:
+                logging.warning(f"Request for {num_workers} workers exceeds pool max of {self.max_workers}. Capping.")
+                num_workers = self.max_workers
+
+            help_request.record.status = WorkStatus.IN_PROGRESS
+            self._pool_container.dispatch_work(help_request, num_workers)
+
+        def _create_maintenance_worker(self) -> Agent:
+            """Creates the dedicated agent responsible for pool scaling."""
+            # The maintenance agent does not count towards the user-facing worker pool limits.
+            # It's created in the 'default' group to keep it separate.
+            agent = self._command_center.create_agent(
+                template_name="default",
+                target=self._maintenance_loop,
+                command_group_name="default"  # Or a dedicated internal group
+            )
+            return agent
+
+        def _maintenance_loop(self):
+            """The main logic for the maintenance agent."""
+            while not self._shutdown.is_set():
+                try:
+                    with self._lock:
+                        # --- Scale Up ---
+                        if len(self._all_workers) < self.min_workers:
+                            self._add_worker()
+
+                        # --- Scale Down (Example Logic) ---
+                        # A more sophisticated logic could check for sustained idle time.
+                        if self._pool_container.get_idle_worker_count() > self.min_workers:
+                            if len(self._all_workers) > self.min_workers:
+                                worker_to_retire = self._pool_container.get_idle_workers(1)
+                                if worker_to_retire:
+                                    self._retire_worker_by_id(worker_to_retire[0].factory_id)
+
+                except Exception as e:
+                    logging.error(f"Error in AgentPool maintenance loop: {e}")
+
+                time.sleep(2)  # Maintenance check interval
+
+        def _add_worker(self):
+            """Requests a new worker from the CommandCenter and adds it to the pool."""
+            if len(self._all_workers) >= self.max_workers:
+                return  # Cannot exceed max workers
+
+            agent = self._command_center.create_agent(
+                template_name="general_agent",  # Use the customizable General agent
+                define_home=self._pool_container.agent_home_loop,
+                command_group_name=self._group_name
+            )
+            if agent:
+                self._all_workers.add(agent.factory_id)
+                agent.deploy()
+                logging.info(f"AgentPool added worker {agent.factory_id}. Total workers: {len(self._all_workers)}")
+
+        def _retire_worker_by_id(self, agent_id: str):
+            """Retires a specific worker from the pool."""
+            if agent_id in self._all_workers:
+                agent = self._command_center.find_agent_by_id(agent_id)
+                if agent:
+                    agent.shutdown_flag.set()  # Signal the agent's home loop to exit
+                    self._pool_container._flow_regulator.release(n=1)  # Wake it up to process the shutdown
+                    self._all_workers.remove(agent_id)
+                    logging.info(f"AgentPool retired worker {agent_id}. Total workers: {len(self._all_workers)}")

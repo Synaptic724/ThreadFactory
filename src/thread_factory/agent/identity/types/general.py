@@ -156,7 +156,6 @@ class General(Agent):
             "get_public_id": self.get_public_id,
             "get_public_name": self.get_public_name,
             "get_job_title": self.get_job_title,
-            "get_activity_group": self.get_activity_group,
 
             # Behavior routing management
             "register_location": self.register_location,
@@ -206,16 +205,6 @@ class General(Agent):
         """
         with self._lock:
             return self.job_title
-
-    def get_activity_group(self) -> Optional[str]:
-        """
-        Retrieves the activity group this General agent belongs to.
-
-        Returns:
-            Optional[str]: The activity group, or None if not set.
-        """
-        with self._lock:
-            return self.activity_group
 
 #endregion
 
