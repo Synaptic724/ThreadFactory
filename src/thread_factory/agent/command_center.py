@@ -204,7 +204,7 @@ class CommandCenter(IDisposable):
 #region Agent Management
     def create_agent(
             self,
-            template_name: str,
+            template_name: str = "default",
             define_home: Optional[Union[Callable[..., None], Pack]] = None,
             target: Optional[Union[Callable[..., None], Pack]] = None,
             *args, **kwargs
@@ -235,7 +235,7 @@ class CommandCenter(IDisposable):
     def create_agents(
         self,
         count: int,
-        template_name: str,
+        template_name: str = "default",
         target: Optional[Union[Callable[..., None], Pack]] = None,
         define_home: Optional[Union[Callable[..., None], Pack]] = None,
         *args, **kwargs
@@ -411,33 +411,33 @@ class CommandCenter(IDisposable):
         except Exception as e:
             raise RuntimeError(f"Agent creation failed: {str(e)}") from e
 
-    def register_template(self, name: str, factory_fn: Union[Callable[..., Agent], Pack]):
+    def register_template(self, template_name: str, factory_fn: Union[Callable[..., Agent], Pack]):
         """
         Registers a new agent creation template.
 
         Args:
-            name (str): Symbolic name of the template.
+            template_name (str): Symbolic name of the template.
             factory_fn (Callable | Pack): Factory function or Pack object used to construct the agent.
         """
         if self._disposed:
             raise RuntimeError("Cannot register templates after CommandCenter is disposed.")
-        self._builder.register_template(name, factory_fn)
-        self._notify('TEMPLATE_REGISTERED', {'template_name': name})
+        self._builder.register_template(template_name, factory_fn)
+        self._notify('TEMPLATE_REGISTERED', {'template_name': template_name})
 
-    def unregister_template(self, name: str) -> bool:
+    def unregister_template(self, template_name: str) -> bool:
         """
         Removes a previously registered agent template.
 
         Args:
-            name (str): Symbolic name of the template to remove.
+            template_name (str): Symbolic name of the template to remove.
 
         Returns:
             bool: True if removed successfully, False if not found.
         """
         self._check_disposed()
-        was_unregistered = self._builder.unregister_template(name)
+        was_unregistered = self._builder.unregister_template(template_name)
         if was_unregistered:
-            self._notify('TEMPLATE_UNREGISTERED', {'template_name': name})
+            self._notify('TEMPLATE_UNREGISTERED', {'template_name': template_name})
         return was_unregistered
 
     def list_templates(self) -> List[str]:

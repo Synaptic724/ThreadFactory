@@ -14,30 +14,9 @@ import threading
 import time
 import unittest
 from contextlib import ExitStack
-
+from thread_factory.agent import CommandCenter
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
-from thread_factory.agent.thread_pool.agent import Agent
-
-
-# --------------------------------------------------------------------------- #
-#  Tiny compatibility layer                                                   #
-# --------------------------------------------------------------------------- #
-class Worker(Agent):
-    """
-    Fire-and-forget wrapper: run target once, then stop().
-    """
-
-    def __init__(self, *, target=None, args=(), kwargs=None, name=None):
-        super().__init__(name=name)
-        self._target = target
-        self._args   = args
-        self._kwargs = kwargs or {}
-        self.set_home(self._run_once_and_quit)
-
-    def _run_once_and_quit(self):
-        if self._target:
-            self._target(*self._args, **self._kwargs)
-        self.stop()
+from thread_factory.utils.coordination.package import Pack
 
 
 # --------------------------------------------------------------------------- #
@@ -59,27 +38,48 @@ def wait_for_waiters(lock: FlowRegulator, expected: int, timeout: float = 2.0):
 #  Test-suite                                                                 #
 # --------------------------------------------------------------------------- #
 class TestFlowRegulatorEdgeCases(unittest.TestCase):
+
+
+    def setUp(self):
+        self.center = CommandCenter(max_workers=800)
+
+    def tearDown(self):
+        self.center.shutdown()
+
+   # self.center.create_agent(target=attempt)
     # ----------------------------------------------------------------------- #
     # 1. Ultra-contention shutdown                                            #
     # ----------------------------------------------------------------------- #
     def test_ultra_contention_dispose(self):
+        """
+        All threads block on acquire() and must be released when dispose() is called.
+        """
+        from thread_factory.utils.coordination.package import Pack
+
         n_threads = 200
-        lock      = FlowRegulator(value=0)          # every thread blocks
-        done      = [threading.Event() for _ in range(n_threads)]
+        lock = FlowRegulator(value=0)  # All threads block
+        done = [threading.Event() for _ in range(n_threads)]
+        agents = []
 
         def waiter(idx):
-            lock.acquire()                       # blocks until dispose
+            lock.acquire()
             done[idx].set()
 
-        threads = [Worker(target=waiter, args=(i,), name=f"UC-{i}")
-                   for i in range(n_threads)]
-        for t in threads: t.start()
+        for i in range(n_threads):
+            agent = self.center.create_agent(target=Pack(waiter, i))
+            agent.name = f"UC-{i}"
+            agents.append(agent)
+            agent.start()
 
         wait_for_waiters(lock, n_threads)
         lock.dispose()
 
-        self.assertTrue(all(e.wait(2) for e in done))
-        for t in threads: t.join(timeout=1)
+        self.assertTrue(all(e.wait(2) for e in done), "Some waiters were not released on dispose()")
+
+        for agent in agents:
+            agent.join(timeout=1)
+            self.assertFalse(agent.is_alive(), f"{agent.name} did not terminate properly")
+
         self.assertEqual(lock._value, 0)
 
     # ----------------------------------------------------------------------- #
@@ -99,7 +99,8 @@ class TestFlowRegulatorEdgeCases(unittest.TestCase):
             lock.acquire()      # will wake via notify
             lock.release()
 
-        w = Worker(target=waiter, name="CBChaos")
+        w = self.center.create_agent(target=waiter)
+        w.name="CBChaos"
         w.start()
         wait_for_waiters(lock, 1)
 
@@ -121,7 +122,7 @@ class TestFlowRegulatorEdgeCases(unittest.TestCase):
             ok = lock.acquire(timeout=0.1)
             result.append(ok)
 
-        w = Worker(target=waiter)
+        w = self.center.create_agent(target=waiter)
         w.start()
 
         time.sleep(random.uniform(0.02, 0.08))  # race window
@@ -149,7 +150,7 @@ class TestFlowRegulatorEdgeCases(unittest.TestCase):
 
         # Step 1 — 6 waiters block
         for ev in evs:
-            Worker(target=lambda e=ev: (lock.acquire(), e.set())).start()
+            self.center.create_agent(target=Pack(lambda e=ev: (lock.acquire(), e.set()))).start()
 
         wait_for_waiters(lock, 6)
 
@@ -183,7 +184,7 @@ class TestFlowRegulatorEdgeCases(unittest.TestCase):
             lock.acquire()
             wakies.append("up")
 
-        threads = [Worker(target=waiter) for _ in range(10)]
+        threads = [self.center.create_agent(target=waiter) for _ in range(10)]
         for t in threads: t.start()
         wait_for_waiters(lock, 10)
 
@@ -201,35 +202,39 @@ class TestFlowRegulatorEdgeCases(unittest.TestCase):
     # 6. Permit-leak fuzzer                                                   #
     # ----------------------------------------------------------------------- #
     def test_permit_leak_fuzzer(self):
+        """
+        Fuzz test simulating a chaotic mix of acquire/release/notify.
+        Ensures permits don’t leak and all threads terminate cleanly.
+        """
+        import random
+
         init_permits = 3
-        lock = FlowRegulator(value=init_permits, bias_threshold=None)
         ops = 2000
+        lock = FlowRegulator(value=init_permits, bias_threshold=None)
 
-        class ActorWorker(Worker):
-            def __init__(self, name):
-                super().__init__(name=name, target=self._loop)
+        def fuzz_loop(name: str):
+            for _ in range(ops):
+                op = random.choice(("acq", "rel", "not"))
+                if op == "acq":
+                    if lock.acquire(timeout=0.01):
+                        lock.release()
+                elif op == "rel":
+                    lock.increase_permits(1)
+                else:
+                    lock.notify()
 
-            def _loop(self):
-                for _ in range(ops):
-                    op = random.choice(("acq", "rel", "not"))
-                    if op == "acq":
-                        if lock.acquire(timeout=0.01):
-                            lock.release()
-                    elif op == "rel":
-                        lock.increase_permits(1)
-                    else:
-                        lock.notify()
+        agents = [
+            self.center.create_agent(target=Pack(fuzz_loop, f"Fuzz-{i}"))
+            for i in range(8)
+        ]
+        for a in agents:
+            a.start()
+        for a in agents:
+            a.join(timeout=2)
 
-        actors = [ActorWorker(name=f"Fuzz-{i}") for i in range(8)]
-        for a in actors: a.start()
-        for a in actors: a.join()
-
-        # Instead of strict equality, sanity-check for integrity:
         live_permits = lock._value + lock._pending_permits
-        self.assertGreaterEqual(live_permits, 0,
-                                "Permit count went negative")
-        self.assertEqual(len(lock.get_all_waiters()), 0,
-                         "Waiters leaked after fuzz")
+        self.assertGreaterEqual(live_permits, 0, "Permit count went negative")
+        self.assertEqual(len(lock.get_all_waiters()), 0, "Waiters leaked after fuzz")
 
 
 # --------------------------------------------------------------------------- #

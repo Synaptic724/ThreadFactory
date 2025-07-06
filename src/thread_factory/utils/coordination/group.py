@@ -72,6 +72,16 @@ class Group(IDisposable):
         self.tasks.clear()
         self._disposed = True
 
+
+    def __len__(self):
+        """
+        Return the number of tasks currently stored in the group.
+
+        Returns:
+            int: The number of registered Pack-wrapped callables.
+        """
+        return len(self.tasks)
+
     def __repr__(self):
         """
         Return a string representation of the Group.

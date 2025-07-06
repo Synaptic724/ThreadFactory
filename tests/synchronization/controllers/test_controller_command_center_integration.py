@@ -251,7 +251,7 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         self.cc_with_controller.register_template("test_template", MagicMock())
         self.mock_external_controller.notify.reset_mock()
 
-        self.cc_with_controller.create_agent("test_template")
+        self.cc_with_controller.create_agent("test_template", lambda: None)
 
         self.mock_external_controller.notify.assert_called_with(
             self.cc_with_controller.id,
@@ -269,7 +269,7 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         mock_create_agent.return_value = mock_agent
 
         self.cc_with_controller.register_template("test_template", MagicMock())
-        agent = self.cc_with_controller.create_agent("test_template")
+        agent = self.cc_with_controller.create_agent("test_template", lambda: None)
 
         self.mock_external_controller.notify.reset_mock()
 
@@ -310,7 +310,7 @@ class TestCommandCenterExternalSignalIntegration(unittest.TestCase):
         self.cc_with_controller.register_template("test", MagicMock())
 
         with self.assertRaises(RuntimeError):
-            self.cc_with_controller.create_agent("test")
+            self.cc_with_controller.create_agent("test", lambda: None)
 
         self.mock_external_controller.notify.assert_called_with(
             self.cc_with_controller.id,

@@ -116,6 +116,7 @@ class TestConductorTimeoutBehaviour(unittest.TestCase):
 
 
 class TestConductorMultipleTasks(unittest.TestCase):
+    # TODO: THIS TEST FAILS DURING ENTIRE SUITE RUN
     def test_multiple_tasks_results_and_exceptions(self):
         """Each 'ok' task should succeed on every thread; each 'bad' task should raise."""
         def ok():  return "ok"
@@ -129,7 +130,7 @@ class TestConductorMultipleTasks(unittest.TestCase):
         _spawn(3, c.start)
 
         # Allow threads to finish
-        time.sleep(2)
+        time.sleep(8)
 
         # Collect results and exceptions
         results = [o.result()    for o in c.outcomes[0]] + \

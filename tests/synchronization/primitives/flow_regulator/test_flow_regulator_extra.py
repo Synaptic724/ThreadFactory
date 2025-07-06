@@ -17,26 +17,9 @@ import threading
 import time
 import unittest
 from time import perf_counter
-
+from thread_factory.agent.command_center import CommandCenter
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
-from thread_factory.agent.thread_pool.agent import Agent
-
-
-# --------------------------------------------------------------------------- #
-#  Tiny Worker wrapper (fire-and-forget)                                      #
-# --------------------------------------------------------------------------- #
-class Worker(Agent):
-    def __init__(self, *, target=None, args=(), kwargs=None, name=None):
-        super().__init__(name=name)
-        self._target = target
-        self._args   = args or ()
-        self._kwargs = kwargs or {}
-        self.set_home(self._run_once_and_quit)
-
-    def _run_once_and_quit(self):
-        if self._target:
-            self._target(*self._args, **self._kwargs)
-        self.stop()
+from thread_factory.utils.coordination.package import Pack
 
 
 # --------------------------------------------------------------------------- #
@@ -60,37 +43,54 @@ def wait_for_waiters(lock: FlowRegulator, expected: int, timeout: float = 2.0):
 # --------------------------------------------------------------------------- #
 class TestFlowRegulatorExtra(unittest.TestCase):
 
+    def setUp(self):
+        self.center = CommandCenter(max_workers=800)
+
+    def tearDown(self):
+        self.center.shutdown()
+#        t = self.center.create_agent(target=attempt)
     # ------------------------------------------------------------------- #
     # 1. Fairness / starvation                                            #
     # ------------------------------------------------------------------- #
     def test_fairness_no_starvation(self):
+        """
+        All 10 agents (A0–A4, B0–B4) compete for the same permit.
+        After ~5s of runtime, every agent must have acquired the lock at least once.
+        """
         lock = FlowRegulator(value=1)
         acquired_ctr = {f"A{i}": 0 for i in range(5)} | {f"B{i}": 0 for i in range(5)}
         stop_flag = threading.Event()
+        ctr_lock = threading.Lock()
 
-        def actor(name):
+        def actor(name: str):
             threading.current_thread().factory_id = name
             while not stop_flag.is_set():
-                acquired = lock.acquire(timeout=1.0)
-                if acquired:
-                    acquired_ctr[name] += 1
-                    time.sleep(0.01)
-                    lock.release()
+                if lock.acquire(timeout=1.0):
+                    try:
+                        with ctr_lock:
+                            acquired_ctr[name] += 1
+                        time.sleep(0.01)
+                    finally:
+                        lock.release()
                 else:
                     time.sleep(0.005)
 
-        workers = [
-            Worker(target=actor, args=(name,), name=name)
-            for name in acquired_ctr
-        ]
-        for w in workers:
-            w.start()
+        agents = []
+        for name in acquired_ctr:
+            agent = self.center.create_agent(target=Pack(actor, name))
+            agent.name = name  # ✅ Set name here, not during creation
+            agents.append(agent)
 
-        time.sleep(5)      # run window
+        for a in agents:
+            a.start()
+
+        time.sleep(5)
         stop_flag.set()
 
-        for w in workers:
-            w.join(timeout=2)
+        for a in agents:
+            a.join(timeout=2)
+            self.assertFalse(a.is_alive(), f"Agent {a.name} did not terminate")
+
         starved = [k for k, v in acquired_ctr.items() if v == 0]
         self.assertFalse(starved, f"Starvation detected: {starved}")
 
@@ -98,18 +98,29 @@ class TestFlowRegulatorExtra(unittest.TestCase):
     # 2. Explicit dispose wakes waiters                                   #
     # ------------------------------------------------------------------- #
     def test_dispose_wakes_waiters(self):
-        lock     = FlowRegulator(value=0)
+        """
+        When FlowRegulator is disposed while threads are waiting, all waiters
+        must be woken immediately. This test confirms proper wake-up behavior.
+        """
+        lock = FlowRegulator(value=0)
         woke_evt = threading.Event()
 
         def waiter():
             lock.acquire()
             woke_evt.set()
 
-        Worker(target=waiter, name="DisposeWaiter").start()
+        agent = self.center.create_agent(target=Pack(waiter))
+        agent.name = "DisposeWaiter"
+        agent.start()
+
         wait_for_waiters(lock, 1)
+
+        # Dispose from a different thread
         threading.Thread(target=lock.dispose, name="Disposer").start()
 
         self.assertTrue(woke_evt.wait(2), "Waiter was not released by dispose()")
+        agent.join(timeout=1)
+        self.assertFalse(agent.is_alive(), "Agent did not terminate after dispose")
 
     # ------------------------------------------------------------------- #
     # 3. Recursive acquire guard                                          #
@@ -122,14 +133,15 @@ class TestFlowRegulatorExtra(unittest.TestCase):
                 with lock:
                     with lock:   # nested acquire must fail
                         pass
-
-        Worker(target=naughty, name="RecursiveGuard").start()
+        agent = self.center.create_agent(target=Pack(naughty))
+        agent.name = "RecursiveGuard"  # ✅ Set name here, not during creation
+        agent.start()
 
     # ------------------------------------------------------------------- #
     # 4. Duplicate factory-ID targeted notify                             #
     # ------------------------------------------------------------------- #
     def test_duplicate_factory_id_targeted_notify(self):
-        lock   = FlowRegulator(value=0)
+        lock = FlowRegulator(value=0)
         dup_id = "DUP-XYZ"
         ev1, ev2 = threading.Event(), threading.Event()
 
@@ -138,8 +150,14 @@ class TestFlowRegulatorExtra(unittest.TestCase):
             lock.acquire()
             evt.set()
 
-        Worker(target=waiter, args=(ev1,), name="Dup1").start()
-        Worker(target=waiter, args=(ev2,), name="Dup2").start()
+        a1 = self.center.create_agent(target=Pack(waiter, ev1))
+        a1.name = "Dup1"
+        a1.start()
+
+        a2 = self.center.create_agent(target=Pack(waiter, ev2))
+        a2.name = "Dup2"
+        a2.start()
+
         wait_for_waiters(lock, 2)
 
         lock.notify(n=1, factory_ids=dup_id)
@@ -152,29 +170,29 @@ class TestFlowRegulatorExtra(unittest.TestCase):
     # ------------------------------------------------------------------- #
     # 5. Performance smoke                                                #
     # ------------------------------------------------------------------- #
-    # ------------------------------------------------------------------- #
-    # 5. Performance smoke (contended vs. uncontended)                    #
-    # ------------------------------------------------------------------- #
     def test_acquire_latency_ratio(self):
         """
         Compare acquire+release latency with and without contention.
         Passes if contended latency is < 50 × uncontended latency.
         """
         ITER = 1_000
-        q    = queue.Queue()
+        q = queue.Queue()
 
         def bench(name: str, lock_obj: FlowRegulator):
             # warm-up
             for _ in range(10):
-                lock_obj.acquire(); lock_obj.release()
+                lock_obj.acquire()
+                lock_obj.release()
             start = perf_counter()
             for _ in range(ITER):
-                lock_obj.acquire(); lock_obj.release()
+                lock_obj.acquire()
+                lock_obj.release()
             q.put((name, perf_counter() - start))
 
         # ---------- uncontended case ---------- #
         lock_fast = FlowRegulator(value=1)
-        fast_worker = Worker(target=bench, args=("fast", lock_fast), name="BenchFast")
+        fast_worker = self.center.create_agent(target=Pack(bench, "fast", lock_fast))
+        fast_worker.name = "BenchFast"
         fast_worker.start()
 
         # ---------- contended case ---------- #
@@ -185,26 +203,32 @@ class TestFlowRegulatorExtra(unittest.TestCase):
                 time.sleep(0.25)
                 lock_slow.release()
 
-        blockers = [Worker(target=blocker, name=f"Blocker-{i}") for i in range(20)]
-        for b in blockers:
+        blockers = [
+            self.center.create_agent(target=Pack(blocker))
+            for i in range(20)
+        ]
+        for i, b in enumerate(blockers):
+            b.name = f"Blocker-{i}"
             b.start()
 
-        # We only need “enough” waiters to ensure real contention.
+        # Ensure there's enough contention
         wait_for_waiters(lock_slow, 10, timeout=2.0)
 
-        slow_worker = Worker(target=bench, args=("slow", lock_slow), name="BenchSlow")
+        slow_worker = self.center.create_agent(target=Pack(bench, "slow", lock_slow))
+        slow_worker.name = "BenchSlow"
         slow_worker.start()
 
         # ---------- collect results ---------- #
-        name1, t1 = q.get(); name2, t2 = q.get()
+        name1, t1 = q.get()
+        name2, t2 = q.get()
         if name1 == "slow":
             fast_time, slow_time = t2, t1
         else:
             fast_time, slow_time = t1, t2
 
         ratio = slow_time / fast_time if fast_time else 1
-        print(f"[Perf] {fast_time*1e6:.1f} µs uncontended  "
-              f"{slow_time*1e6:.1f} µs contended  ratio ≈ {ratio:.1f}")
+        print(f"[Perf] {fast_time * 1e6:.1f} µs uncontended  "
+              f"{slow_time * 1e6:.1f} µs contended  ratio ≈ {ratio:.1f}")
 
         self.assertLess(
             ratio, 50,
@@ -217,7 +241,6 @@ class TestFlowRegulatorExtra(unittest.TestCase):
         for b in blockers:
             b.join(timeout=2)
 
-
     # ------------------------------------------------------------------- #
     # 6. Bias-threshold reserve (bypass-bias bulk)                        #
     # ------------------------------------------------------------------- #
@@ -226,18 +249,23 @@ class TestFlowRegulatorExtra(unittest.TestCase):
         Bias threshold keeps the last `BIAS_THRESHOLD` threads in reserve
         until we explicitly bypass bias and wake only `RELEASE_COUNT`.
         """
-        TOTAL_THREADS   = 13
-        BIAS_THRESHOLD  = 10
-        RELEASE_COUNT   = 3
+        TOTAL_THREADS = 13
+        BIAS_THRESHOLD = 10
+        RELEASE_COUNT = 3
 
         lock = FlowRegulator(value=0, bias_threshold=BIAS_THRESHOLD)
         events = [threading.Event() for _ in range(TOTAL_THREADS)]
 
         def waiter(evt):
-            lock.acquire(); evt.set()
+            lock.acquire()
+            evt.set()
 
+        agents = []
         for i in range(TOTAL_THREADS):
-            Worker(target=waiter, args=(events[i],), name=f"BiasWaiter-{i}").start()
+            a = self.center.create_agent(target=Pack(waiter, events[i]))
+            a.name = f"BiasWaiter-{i}"
+            agents.append(a)
+            a.start()
 
         wait_for_waiters(lock, TOTAL_THREADS)
 
@@ -267,8 +295,8 @@ class TestFlowRegulatorExtra(unittest.TestCase):
         When notify_all is called with bias active, only threads above the
         bias threshold should be woken. The others should remain in reserve.
         """
-        TOTAL_THREADS   = 13
-        BIAS_THRESHOLD  = 10
+        TOTAL_THREADS = 13
+        BIAS_THRESHOLD = 10
         lock = FlowRegulator(value=0, bias_threshold=BIAS_THRESHOLD)
         events = [threading.Event() for _ in range(TOTAL_THREADS)]
 
@@ -276,9 +304,12 @@ class TestFlowRegulatorExtra(unittest.TestCase):
             lock.acquire()
             evt.set()
 
-        # Spawn all waiters
+        agents = []
         for i in range(TOTAL_THREADS):
-            Worker(target=waiter, args=(events[i],), name=f"BiasWaiterAll-{i}").start()
+            a = self.center.create_agent(target=Pack(waiter, events[i]))
+            a.name = f"BiasWaiterAll-{i}"
+            agents.append(a)
+            a.start()
 
         wait_for_waiters(lock, TOTAL_THREADS)
 
@@ -301,6 +332,7 @@ class TestFlowRegulatorExtra(unittest.TestCase):
         lock.bypass_bias()
         for evt in events:
             evt.wait(timeout=1)
+
 
 # --------------------------------------------------------------------------- #
 #  Run standalone                                                             #

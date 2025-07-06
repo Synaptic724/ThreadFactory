@@ -86,9 +86,9 @@ class General(Agent):
         # Capture General-specific identity attributes.
         # Use provided argument first, then pop from kwargs if not provided directly.
         self.public_id = public_id or kwargs.pop("public_id", None)
-        self.public_name = public_name or kwargs.pop("public_name", None)
-        self.job_title = job_title or kwargs.pop("job_title", None)
-        self.activity_group = activity_group or kwargs.pop("activity_group", None)
+        self.public_name = public_name or kwargs.pop("public_name", "UnnamedAgent")
+        self.job_title = job_title or kwargs.pop("job_title", "General Agent")
+        self.activity_group = activity_group or kwargs.pop("activity_group", "undefined")
 
         # Initialize General-specific routing registries as ConcurrentDicts.
         # Assuming ConcurrentDict is IDisposable and needs to be initialized.

@@ -173,21 +173,24 @@ class TestGeneralAgentSignalControllerIntegration(unittest.TestCase):
         """
         If General agents always get unique internal factory_id,
         registering new instances with the same public_id should add them as distinct agents,
-        not overwrite.
+        not overwrite or conflict.
+
+        This test verifies:
+        - Both agents with the same `public_id` get unique internal IDs
+        - Both are tracked separately in the command_center and signal_controller
+        - Disposal does not affect unrelated agent entries
         """
-        # We expect self.agent to already be registered from setUp
+        # Get the original agent from setUp
         initial_agent_id = self.agent.id
-        self.assertIsNotNone(self.command_center.get_agent_by_id(initial_agent_id),
-                             "Original agent should be registered in command_center from setUp.")
+        self.assertIsNotNone(
+            self.command_center.get_agent_by_id(initial_agent_id),
+            "Original agent should be registered in command_center from setUp."
+        )
 
-        # Ensure the original agent is also running, as some tests might rely on its thread.
-        # It should already be started in setUp, but good to be aware.
-        # if not self.agent.is_alive():
-        #     self.agent.start() # This is generally handled by setUp.
-
+        # Create a second agent with the same public_id
         new_agent = General(
             command_center=self.command_center,
-            public_id="agent-001",  # Same public_id as original, but will get new factory_id
+            public_id="agent-001",  # Same public_id, different instance
             public_name="New Name",
             job_title="New Job",
             activity_group="New Group",
@@ -195,39 +198,42 @@ class TestGeneralAgentSignalControllerIntegration(unittest.TestCase):
             work_queue=ConcurrentQueue(),
             logger=self.logger
         )
-        self.command_center.register_agent(new_agent)  # Explicitly register the new agent
+        self.command_center.register_agent(new_agent)
+        new_agent.start()
 
-        # --- ADD THIS LINE HERE ---
-        new_agent.start()  # <--- Start the new agent's thread
-        # --------------------------
-
-        # Assert that the new agent has a different factory_id
+        # Confirm unique internal IDs
         self.assertNotEqual(new_agent.id, initial_agent_id)
 
-        # Assert that both original and new agents are present by their unique factory_id
-        self.assertIs(self.command_center.get_agent_by_id(initial_agent_id), self.agent,
-                      "Original agent should still be retrievable by its factory_id.")
-        self.assertIs(self.command_center.get_agent_by_id(new_agent.id), new_agent,
-                      "New agent should be retrievable by its factory_id after explicit registration.")
+        # Take a snapshot BEFORE disposal to avoid dict teardown issues
+        agents_snapshot = dict(self.command_center._agents)
 
-        # Verify SignalController also sees them as distinct
-        registered_in_signal_controller = self.signal_controller.list_objects()
-        registered_ids = {obj["id"] for obj in registered_in_signal_controller}
+        # Verify both agents are present in the snapshot
+        self.assertIn(initial_agent_id, agents_snapshot, "Original agent ID missing.")
+        self.assertIn(new_agent.id, agents_snapshot, "New agent ID missing.")
+
+        # Verify mapping integrity
+        self.assertIs(agents_snapshot[initial_agent_id], self.agent, "Original agent mismatch.")
+        self.assertIs(agents_snapshot[new_agent.id], new_agent, "New agent mismatch.")
+
+        # Verify SignalController also sees both
+        registered_ids = {obj["id"] for obj in self.signal_controller.list_objects()}
         self.assertIn(initial_agent_id, registered_ids)
         self.assertIn(new_agent.id, registered_ids)
-        self.assertEqual(len(registered_ids), 2)
+        self.assertEqual(len(registered_ids), 2, "SignalController should register both agents.")
 
-        # Assert that attempting to get by the 'public_id' will still fail
-        self.assertIsNone(self.command_center.get_agent_by_id("agent-001"),
-                          "Getting by 'agent-001' public_id should return None if only factory_id is used as key.")
+        # Verify factory_id lookup only works (not public_id)
+        self.assertIsNone(
+            self.command_center.get_agent_by_id("agent-001"),
+            "Public ID lookup should fail if command_center only uses factory_id."
+        )
 
-        # Clean up new agent for this specific test
+        # Dispose the new agent and confirm cleanup
         new_agent.dispose()
-        new_agent.join(timeout=5)  # This should now work
+        new_agent.join(timeout=5)
 
-        # After new_agent is disposed, only the original should remain
         self.assertNotIn(new_agent.id, self.command_center._agents)
         self.assertIn(self.agent.id, self.command_center._agents)
+
     def test_unknown_command_raises(self):
         """SignalController should raise KeyError if a command doesn't exist."""
         with self.assertRaises(KeyError):

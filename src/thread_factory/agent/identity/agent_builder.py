@@ -70,15 +70,15 @@ class AgentBuilder(IDisposable):
         self.register_template(
             "default",
             Pack(
-                lambda command_center: General(
+                lambda command_center, *args, **kwargs: General(
                     command_center=command_center,
-                    public_name="Default Agent",
-                    job_title="General Purpose"
+                    *args,
+                    **kwargs  # Allows for additional keyword arguments to be passed
                 )
             )
         )
 
-    def register_template(self, name: str, factory_fn: Pack) -> None:
+    def register_template(self, template_name: str, factory_fn: Pack) -> None:
         """
         Registers an agent factory function under a symbolic name.
 
@@ -89,7 +89,7 @@ class AgentBuilder(IDisposable):
         wrapped for deferred execution and argument management.
 
         Args:
-            name (str): The unique symbolic name for this agent template.
+            template_name (str): The unique symbolic name for this agent template.
             factory_fn (Pack): A `Pack` instance containing the callable
                                function that will create an agent.
 
@@ -97,32 +97,32 @@ class AgentBuilder(IDisposable):
             ValueError: If `name` is empty or `factory_fn` is not callable,
                         or if a template with the given `name` is already registered.
         """
-        if not name or not callable(factory_fn):  # Check if factory_fn is actually callable (Pack is callable)
+        if not template_name or not callable(factory_fn):  # Check if factory_fn is actually callable (Pack is callable)
             raise ValueError("Template name must be a non-empty string and factory_fn must be callable.")
 
         # If Pack.bundle(factory_fn) is always applied below, then factory_fn passed here could be raw callable
         # However, if factory_fn is *expected* to be a Pack, then the callable() check is for Pack itself.
         # Assuming factory_fn is a Pack instance based on the type hint.
-        if name in self._registry:
-            raise ValueError(f"An agent template with the name '{name}' is already registered.")
+        if template_name in self._registry:
+            raise ValueError(f"An agent template with the name '{template_name}' is already registered.")
 
         # Ensure the factory_fn is correctly bundled as a Pack for consistent storage
-        self._registry[name] = Pack.bundle(
+        self._registry[template_name] = Pack.bundle(
             factory_fn)  # This might bundle an already bundled Pack, depends on Pack.bundle logic
 
-    def unregister_template(self, name: str) -> bool:
+    def unregister_template(self, template_name: str) -> bool:
         """
         Removes a registered agent template by name.
 
         This effectively makes the template unavailable for creating new agents.
 
         Args:
-            name (str): The name of the template to remove.
+            template_name (str): The name of the template to remove.
 
         Returns:
             bool: True if the template was successfully removed, False if it was not found.
         """
-        return self._registry.pop(name, None) is not None
+        return self._registry.pop(template_name, None) is not None
 
     def list_templates(self) -> List[str]:
         """
@@ -135,61 +135,52 @@ class AgentBuilder(IDisposable):
         """
         return list(self._registry.keys())
 
-    def has_template(self, name: str) -> bool:
+    def has_template(self, template_name: str) -> bool:
         """
         Checks if a given template name is registered in the builder.
 
         Args:
-            name (str): The name of the template to check for.
+            template_name (str): The name of the template to check for.
 
         Returns:
             bool: True if a template with the given `name` is registered, False otherwise.
         """
-        return name in self._registry
+        return template_name in self._registry
 
-    def create_agent(self, name: str, *args: Any, **kwargs: Any) -> Agent:
+    def create_agent(self, template_name: str, *args: Any, **kwargs: Any) -> Agent:
         """
         Creates a fresh agent instance from a registered template, allowing for argument overrides.
 
-        This method retrieves the specified agent template (a `Pack` instance)
-        and then applies any additional positional (`*args`) or keyword (`**kwargs`)
-        arguments provided at runtime. These new arguments will override or augment
-        those already bound within the template's `Pack`, facilitating flexible
-        agent creation. The method then executes the configured factory function
-        to produce the agent instance.
+        This method retrieves the specified agent template (a `Pack` instance),
+        applies any additional positional or keyword arguments, and executes it
+        to create a new agent.
 
         Args:
-            name (str): The name of the registered template to use for creating the agent.
-            *args: Positional arguments to override or pass to the agent factory.
-            **kwargs: Keyword arguments to override or pass to the agent factory.
+            template_name (str): The symbolic name of the template to use.
+            *args: Positional overrides passed to the agent factory.
+            **kwargs: Keyword overrides passed to the agent factory.
 
         Returns:
-            Agent: A new agent instance, which must be a subclass of `threading.Thread`
-                   and an instance of `Agent`.
+            Agent: A newly created agent instance.
 
         Raises:
             KeyError: If the template name is not registered.
-            TypeError: If the factory function for the template does not return a
-                       valid `Agent` instance (i.e., it's not a `threading.Thread`
-                       and an `Agent` subclass).
-            Exception: Any other exception raised by the underlying agent factory function.
+            TypeError: If the resulting object is not an Agent and a Thread.
+            RuntimeError: If agent creation fails for any other reason.
         """
-        factory_pack = self._registry.get(name)
+        factory_pack = self._registry.get(template_name)
         if not factory_pack:
-            raise KeyError(f"No agent template registered under the name '{name}'")
+            raise KeyError(f"No agent template registered under the name '{template_name}'")
 
-        # Apply argument overrides — Pack's curry method handles merging
-        # This creates a new Pack instance with the combined arguments
-        override_pack = factory_pack.curry(*args, **kwargs)
+        try:
+            # Directly invoke with overrides — no need to curry unless you're caching
+            agent_instance = factory_pack(*args, **kwargs)
+        except Exception as e:
+            raise RuntimeError(f"Agent creation failed for template '{template_name}': {e}") from e
 
-        # Execute the final factory function to get the agent instance
-        agent_instance = override_pack()
-
-        # Type checking to ensure the factory produces a valid Agent and Thread
-        # An Agent should typically be a Thread or manage a Thread for execution.
         if not isinstance(agent_instance, threading.Thread) or not isinstance(agent_instance, Agent):
             raise TypeError(
-                f"Factory for template '{name}' did not return a valid Agent instance. "
+                f"Factory for template '{template_name}' did not return a valid Agent instance. "
                 f"Expected an instance of threading.Thread and Agent, but got {type(agent_instance).__name__}."
             )
 

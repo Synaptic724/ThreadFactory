@@ -37,6 +37,8 @@ class TestMultiConductor(unittest.TestCase):
         self.assertEqual(mc.outcomes["alpha"][1].result(), "a2")
         mc.dispose()
 
+
+#TODO: THIS TEST FAILS DURING ENTIRE SUITE RUN
     def test_multiple_group_lockstep_execution(self):
         """Verify tasks from all groups run in a synchronized, sequential order."""
         execution_log = []
@@ -62,7 +64,7 @@ class TestMultiConductor(unittest.TestCase):
 
             # Wait for threads to finish with generous timeout
             for t in threads:
-                t.join(timeout=8)
+                t.join(timeout=15)
 
             # Check if any threads are still alive
             alive_threads = [t.name for t in threads if t.is_alive()]

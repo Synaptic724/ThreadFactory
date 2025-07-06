@@ -7,30 +7,8 @@ import threading
 import time
 import unittest
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
-from thread_factory.agent import Agent
-
-
-# --------------------------------------------------------------------------- #
-#  Tiny compatibility layer                                                   #
-# --------------------------------------------------------------------------- #
-class Worker(Agent):
-    """
-    A one-shot façade around DynamicWorker so the legacy tests that expect a
-    simple `Worker(target=…, args=…, kwargs=…)` continue to work unchanged.
-    """
-
-    def __init__(self, *, target=None, args=(), kwargs=None, name=None):
-        super().__init__(name=name)
-        self._target = target
-        self._args   = args
-        self._kwargs = kwargs or {}
-        self.set_home(self._run_once_and_quit)
-
-    # ------------------------------------------------------------------ #
-    def _run_once_and_quit(self):
-        if self._target is not None:
-            self._target(*self._args, **self._kwargs)
-        self.stop()                       # leave DynamicWorker loop
+from thread_factory.agent.command_center import CommandCenter
+from thread_factory.utils.coordination.package import Pack
 
 
 # --------------------------------------------------------------------------- #
@@ -56,6 +34,13 @@ def _set_thread_factory_id(fid: str):       # kept for completeness
 # --------------------------------------------------------------------------- #
 class TestFlowRegulator(unittest.TestCase):
 
+    def setUp(self):
+        self.center = CommandCenter(max_workers=80)
+
+    def tearDown(self):
+        self.center.shutdown()
+
+
     # ------------------------------------------------------------------- #
     #  Basic behaviour                                                    #
     # ------------------------------------------------------------------- #
@@ -71,7 +56,7 @@ class TestFlowRegulator(unittest.TestCase):
             if lock.acquire(timeout=0.5):
                 ev.set()
 
-        t = Worker(target=attempt)
+        t = self.center.create_agent(target=attempt)
         t.start()
         wait_for_waiters(lock, 1)
         lock.release()
@@ -91,7 +76,7 @@ class TestFlowRegulator(unittest.TestCase):
                 out.append("done")
                 done.set()
 
-        t = Worker(target=wait_and_append)
+        t = self.center.create_agent(target=wait_and_append)
         t.start()
         wait_for_waiters(lock, 1)
         lock.increase_permits(1)
@@ -114,7 +99,7 @@ class TestFlowRegulator(unittest.TestCase):
                 results[fid] = results.get(fid, 0) + 1
 
         for _ in range(4):
-            t = Worker(target=blocking)
+            t = self.center.create_agent(target=blocking)
             threads.append(t)
             t.start()
 
@@ -142,7 +127,7 @@ class TestFlowRegulator(unittest.TestCase):
             lock.acquire()
             done[idx].set()
 
-        threads = [Worker(target=waiter, args=(i,)) for i in range(2)]
+        threads = [self.center.create_agent(target=Pack(waiter, i)) for i in range(2)]
         for t in threads:
             t.start()
 
@@ -164,7 +149,7 @@ class TestFlowRegulator(unittest.TestCase):
         def blocking():
             lock.acquire()
 
-        threads = [Worker(target=blocking) for _ in range(3)]
+        threads = [self.center.create_agent(target=blocking) for _ in range(3)]
         for t in threads:
             t.start()
 
@@ -183,9 +168,9 @@ class TestFlowRegulator(unittest.TestCase):
     #  Release N unblocks N                                               #
     # ------------------------------------------------------------------- #
     def test_release_n_unblocks_n_threads(self):
-        lock      = FlowRegulator(value=0)
-        released  = []
-        events    = [threading.Event() for _ in range(5)]
+        lock = FlowRegulator(value=0)
+        released = []
+        events = [threading.Event() for _ in range(5)]
 
         def waiter(idx, evt):
             if lock.acquire(timeout=2):
@@ -193,10 +178,11 @@ class TestFlowRegulator(unittest.TestCase):
                     released.append(idx)
                 evt.set()
 
-        threads = []
-        for i in range(5):
-            t = Worker(target=waiter, args=(i, events[i]))
-            threads.append(t)
+        threads = [
+            self.center.create_agent(target=Pack(waiter, i, events[i]))
+            for i in range(5)
+        ]
+        for t in threads:
             t.start()
 
         time.sleep(0.2)
@@ -214,8 +200,8 @@ class TestFlowRegulator(unittest.TestCase):
     #  Targeted release by ULID                                           #
     # ------------------------------------------------------------------- #
     def test_targeted_release_by_ulid(self):
-        lock   = FlowRegulator(value=0)
-        got    = []
+        lock = FlowRegulator(value=0)
+        got = []
         events = [threading.Event() for _ in range(4)]
 
         def waiter(evt):
@@ -227,8 +213,10 @@ class TestFlowRegulator(unittest.TestCase):
 
         threads = []
         for i in range(4):
-            t = Worker(target=waiter, args=(events[i],), name=f"TestWorker-{i}")
+            t = self.center.create_agent(target=Pack(waiter, events[i]))
+            t.name = f"TestWorker-{i}"
             threads.append(t)
+        for t in threads:
             t.start()
 
         time.sleep(0.2)
@@ -256,7 +244,8 @@ class TestFlowRegulator(unittest.TestCase):
                 lock.release()
                 lock.release()  # excessive release to simulate over-permit
 
-        t = Worker(target=work)
+
+        t = self.center.create_agent(target=work)
         t.start()
         t.join(timeout=1)
 
@@ -289,8 +278,8 @@ class TestFlowRegulator(unittest.TestCase):
                     lock.release()
                 barrier.wait()  # Force racey contention
 
-        t1 = Worker(target=run)
-        t2 = Worker(target=run)
+        t1 = self.center.create_agent(target=run)
+        t2 = self.center.create_agent(target=run)
         t1.start()
         t2.start()
         t1.join(timeout=2)
@@ -309,7 +298,8 @@ class TestFlowRegulator(unittest.TestCase):
             lock.acquire()
             lock.release()
 
-        t = Worker(target=waiter, name="AwaitedCallerTest")
+        t = self.center.create_agent(target=waiter)
+        t.name = "AwaitedCallerTest"
         t.start()
         wait_for_waiters(lock, 1)
         lock.notify(n=1, awaited_caller=True)
@@ -327,7 +317,7 @@ class TestFlowRegulator(unittest.TestCase):
             lock.acquire()
             lock.release()
 
-        t = Worker(target=waiter)
+        t = self.center.create_agent(target=waiter)
         t.start()
         wait_for_waiters(lock, 1)
         # Should not crash, even if callback throws
@@ -343,7 +333,8 @@ class TestFlowRegulator(unittest.TestCase):
         def wait():
             result.append(lock.acquire(timeout=1))
 
-        t = Worker(target=wait)
+
+        t = self.center.create_agent(target=wait)
         t.start()
         wait_for_waiters(lock, 1)
         time.sleep(0.1)
@@ -355,7 +346,7 @@ class TestFlowRegulator(unittest.TestCase):
     #  Notify all                                                         #
     # ------------------------------------------------------------------- #
     def test_notify_all_threads(self):
-        lock   = FlowRegulator(value=0)
+        lock = FlowRegulator(value=0)
         events = []
 
         def waiter(evt):
@@ -366,7 +357,7 @@ class TestFlowRegulator(unittest.TestCase):
         for _ in range(4):
             ev = threading.Event()
             events.append(ev)
-            t  = Worker(target=waiter, args=(ev,))
+            t = self.center.create_agent(target=Pack(waiter, ev))
             threads.append(t)
             t.start()
 
@@ -386,12 +377,12 @@ class TestFlowRegulator(unittest.TestCase):
     def test_concurrent_stress_simple(self):
         num_threads = 10
         ops_per_thr = 50
-        total_ops   = num_threads * ops_per_thr
+        total_ops = num_threads * ops_per_thr
 
-        lock     = FlowRegulator(value=num_threads // 2)
-        counter  = 0
-        c_lock   = threading.Lock()
-        events   = [threading.Event() for _ in range(num_threads)]
+        lock = FlowRegulator(value=num_threads // 2)
+        counter = 0
+        c_lock = threading.Lock()
+        events = [threading.Event() for _ in range(num_threads)]
 
         def job(evt):
             nonlocal counter
@@ -405,8 +396,11 @@ class TestFlowRegulator(unittest.TestCase):
                         lock.release()
             evt.set()
 
-        threads = [Worker(target=job, args=(events[i],), name=f"Stress-{i}")
-                   for i in range(num_threads)]
+        threads = []
+        for i in range(num_threads):
+            t = self.center.create_agent(target=Pack(job, events[i]))
+            t.name = f"Stress-{i}"  # avoid conflict with AgentBuilder.create_agent()
+            threads.append(t)
 
         start = time.perf_counter()
         for t in threads:
@@ -420,19 +414,9 @@ class TestFlowRegulator(unittest.TestCase):
             self.assertFalse(t.is_alive())
 
         print(f"\n--- Stress simple --- "
-              f"time={end-start:.3f}s  ops={counter}")
+              f"time={end - start:.3f}s  ops={counter}")
 
         self.assertEqual(counter, total_ops)
-
-
-# --------------------------------------------------------------------------- #
-#  Bias-threshold behaviour                                                   #
-# --------------------------------------------------------------------------- #
-class TestFlowRegulatorBias(unittest.TestCase):
-    """
-    Verifies that permits are buffered when bias is ON and that the buffer
-    is flushed exactly once the waiter count reaches the threshold.
-    """
 
     def test_bias_holds_until_threshold_exceeded(self):
         bias = 3
@@ -447,7 +431,7 @@ class TestFlowRegulatorBias(unittest.TestCase):
                 lock.release()
 
         for ev in events:
-            t = Worker(target=waiter, args=(ev,))
+            t = self.center.create_agent(target=Pack(waiter, ev))
             threads.append(t)
             t.start()
 
@@ -472,7 +456,7 @@ class TestFlowRegulatorBias(unittest.TestCase):
         evs = [threading.Event() for _ in range(5)]
 
         for ev in evs:
-            Worker(target=lambda e=ev: (lock.acquire(), e.set())).start()
+            self.center.create_agent(target=Pack(lambda e=ev: (lock.acquire(), e.set()))).start()
 
         wait_for_waiters(lock, 5)
         lock.increase_permits(5)  # buffered
@@ -486,13 +470,13 @@ class TestFlowRegulatorBias(unittest.TestCase):
 
         # start three waiters – bias not exceeded
         for _ in range(3):
-            Worker(target=lambda: lock.acquire(timeout=1)).start()
+            self.center.create_agent(target=Pack(lambda: lock.acquire(timeout=1))).start()
         wait_for_waiters(lock, 3)
         lock.increase_permits(3)  # buffer
 
         # spawn the *fourth* waiter – should trigger flush
         flag = threading.Event()
-        Worker(target=lambda: (lock.acquire(timeout=1) and flag.set())).start()
+        self.center.create_agent(target=lambda: (lock.acquire(timeout=1) and flag.set())).start()
 
         self.assertTrue(flag.wait(1), "Fourth waiter should acquire after flush")
         self.assertEqual(lock._pending_permits, 0, "Buffer must be empty")
@@ -505,7 +489,7 @@ class TestFlowRegulatorBias(unittest.TestCase):
             if lock.acquire(timeout=1):
                 evt.set()
 
-        t = Worker(target=waiter)
+        t = self.center.create_agent(target=waiter)
         t.start()
         wait_for_waiters(lock, 1)
 
@@ -516,17 +500,10 @@ class TestFlowRegulatorBias(unittest.TestCase):
         self.assertFalse(t.is_alive())
         self.assertEqual(lock._value, 0)
 
-    # ------------------------------------------------------------------- #
-    #  Callback-aware notify / notify_all                                 #
-    # ------------------------------------------------------------------- #
     def test_notify_inline_callback_notifier_thread(self):
-        """
-        lock.notify(..., awaited_caller=False, callback=cb)
-        → cb must run in the notifying thread *before* the waiter resumes.
-        """
         lock = FlowRegulator(value=0)
         events = []
-        trail = []  # execution log (order matters)
+        trail = []
         tlock = threading.Lock()
 
         def inline_cb():
@@ -540,8 +517,10 @@ class TestFlowRegulatorBias(unittest.TestCase):
             ev.set()
             lock.release()
 
-        w = Worker(target=waiter, args=(threading.Event(),), name="InlineNotifyWorker")
-        events.append(w._args[0])
+        ev = threading.Event()
+        w = self.center.create_agent(target=Pack(waiter, ev))
+        w.name = "InlineNotifyWorker"
+        events.append(ev)
         w.start()
 
         wait_for_waiters(lock, 1)
@@ -551,7 +530,6 @@ class TestFlowRegulatorBias(unittest.TestCase):
         events[0].wait(timeout=1)
         w.join(timeout=1)
 
-        # Assertions ------------------------------------------------------
         cb_entry = next(e for e in trail if e[0] == "cb")
         woken_entry = next(e for e in trail if e[0] == "woken")
         self.assertEqual(cb_entry[1], threading.current_thread().name,
@@ -574,7 +552,8 @@ class TestFlowRegulatorBias(unittest.TestCase):
             lock.acquire()
             lock.release()
 
-        w = Worker(target=waiter, name="AwaitedWorker")
+        w = self.center.create_agent(target=Pack(waiter))
+        w.name = "AwaitedWorker"
         w.start()
         wait_for_waiters(lock, 1)
 
@@ -606,9 +585,13 @@ class TestFlowRegulatorBias(unittest.TestCase):
             ev.set()
             lock.release()
 
-        workers = [Worker(target=waiter,
-                          args=(i, evs[i]),
-                          name=f"Worker-{i}") for i in range(num_w)]
+        workers = [
+            self.center.create_agent(
+                target=Pack(waiter, i, evs[i])
+            )
+            for i in range(num_w)
+        ]
+
         for w in workers:
             w.start()
 

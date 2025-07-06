@@ -117,10 +117,12 @@ class Agent(Worker):
         self._unregister()
         # Dispose agent-specific resources
         self._dispose_work()
-        self._private_inventory.dispose()
-        self._private_inventory = None
-        self.public_inventory.dispose()
-        self.public_inventory = None
+        if self._private_inventory:
+            self._private_inventory.dispose()
+            self._private_inventory = None
+        if self.public_inventory:
+            self.public_inventory.dispose()
+            self.public_inventory = None
         self._event_loop = None
 
         super().dispose()  # Call parent dispose if it exists
