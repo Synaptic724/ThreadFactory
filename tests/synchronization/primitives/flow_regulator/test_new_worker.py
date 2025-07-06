@@ -1,9 +1,7 @@
-import threading
-import time
+import threading, time
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
 from thread_factory.agent.command_center import CommandCenter
 from thread_factory.utils.coordination.package import Pack
-from thread_factory.agent.identity.types.general import General
 
 def blocking_task(flow: FlowRegulator, duration: float = 1.0):
     """
@@ -22,7 +20,7 @@ def blocking_task(flow: FlowRegulator, duration: float = 1.0):
 # Set up the test
 if __name__ == "__main__":
     flow = FlowRegulator(value=2)  # allow 2 permits
-    center = CommandCenter(max_workers=5)
+    center = CommandCenter(max_workers=10)
 
     # Create and start agents with the blocking task
     for _ in range(5):

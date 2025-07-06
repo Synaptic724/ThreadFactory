@@ -25,7 +25,21 @@ class CommandCenter(IDisposable):
                  logger: Optional[logging.Logger] = None,
                  external_signal_controller: Optional[SignalController] = None):
         """
-        Initializes the CommandCenter.
+        Initializes the CommandCenter. This object is responsible for managing
+        the lifecycle of agents, enforcing a global worker cap, and providing
+        a centralized interface for creating and managing agents.
+        It can also register with an external SignalController for remote management.
+
+        It currently has a default maximum of 8 concurrent agents, but this can be
+        adjusted using the `increase_max_workers` and `decrease_max_workers` methods.
+        This class is thread-safe and can be used in multithreaded environments.
+        It is also disposable, meaning it can be cleaned up and all resources released
+        when no longer needed.
+
+        The threadpool integration is built into this object however this will be moved
+        to a normal threadpool in the future.  There will be a main pool
+        that will utilize standard workers and  an agent pool in the future,
+        allowing for more granular control over thread management and resource allocation.
 
         Args:
             max_workers (int): Maximum number of concurrent agents allowed to exist.
