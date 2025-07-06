@@ -78,7 +78,8 @@ class CommandCenter(IDisposable):
     """
 
     def __init__(self,
-                 max_workers: int = 8,
+                 group_max_workers: int = 10,
+                 total_max_workers: int = 30,
                  command_group_name: str = "default",
                  logger: Optional[logging.Logger] = None,
                  external_signal_controller: Optional[SignalController] = None):
@@ -112,9 +113,13 @@ class CommandCenter(IDisposable):
         self._builder = AgentBuilder()
         self._activity_builder = ActivityBuilder()
 
+        if not isinstance(group_max_workers, int) or group_max_workers < 1:
+            raise ValueError("group_max_workers must be a positive integer.")
+        self._total_max_workers = SyncInt(total_max_workers)
+
         # --- Group Management ---
         self._command_groups: ConcurrentDict[str, CommandGroup] = ConcurrentDict()
-        self.create_command_group(command_group_name, max_workers) # creates initial command group
+        self.create_command_group(command_group_name, group_max_workers) # creates initial command group
 
         # --- External Controller Integration ---
         self._id: str = str(ulid.ULID())
@@ -166,6 +171,96 @@ class CommandCenter(IDisposable):
 
 #endregion Destructor
 #region Command Group Management
+    # Add these methods to the CommandCenter class
+
+    def get_total_max_workers(self) -> int:
+        """
+        Calculates and returns the total number of active workers across all command groups.
+        """
+        self._check_disposed()
+        total = 0
+        for group in self._command_groups.values():
+            total += group._max_workers
+        return total
+
+    def get_total_active_workers(self) -> int:
+        """
+        Calculates and returns the total number of active workers across all command groups.
+        """
+        self._check_disposed()
+        total = 0
+        for group in self._command_groups.values():
+            total += group._worker_count.value
+        return total
+
+    # Add this method to the CommandCenter class
+
+    def adjust_global_limit(self, new_global_limit: int):
+        """
+        Adjusts the global maximum worker limit and proportionally reduces the
+        limits of individual command groups if necessary.
+
+        This method will not reduce a group's max_workers below its current
+        number of active workers.
+
+        Args:
+            new_global_limit (int): The new desired global maximum for all workers.
+
+        Raises:
+            ValueError: If the new limit is less than the current total number
+                        of active workers across all groups.
+        """
+        self._check_disposed()
+
+        # Use the single global lock to ensure a safe, atomic operation
+        with self._lock:
+            current_active = self.get_total_active_workers()
+            if new_global_limit < current_active:
+                raise ValueError(
+                    f"New limit ({new_global_limit}) cannot be less than the current total active worker count ({current_active}).")
+
+            self._total_max_workers = new_global_limit
+
+            # Now, check if we need to reduce the sum of group capacities
+            current_max_sum = self.get_total_max_workers()
+
+            deficit = current_max_sum - new_global_limit
+
+            if deficit <= 0:
+                self._logger.info(
+                    f"Global max workers limit adjusted to {new_global_limit}. No group reduction needed.")
+                return
+
+            self._logger.info(f"Global limit reduced. Need to reclaim {deficit} worker slots from group capacities.")
+
+            # "Greedy" reduction loop: repeatedly remove one slot from the
+            # largest available group until the deficit is gone.
+            while deficit > 0:
+                # Find the best group to take a slot from:
+                # one that is not at its minimum capacity and has the highest max.
+                best_group_to_reduce = None
+                max_so_far = -1
+
+                for group in self._command_groups.values():
+                    # Check if we *can* reduce this group
+                    if group._max_workers > group._worker_count.value:
+                        # Check if it's the best candidate so far
+                        if group._max_workers > max_so_far:
+                            max_so_far = group._max_workers
+                            best_group_to_reduce = group
+
+                if best_group_to_reduce:
+                    best_group_to_reduce._max_workers -= 1
+                    deficit -= 1
+                else:
+                    # This can happen if all groups are at full capacity
+                    # with active workers. We cannot reduce further.
+                    self._logger.warning(
+                        f"Could not reclaim all {deficit} slots as remaining groups are at full utilization.")
+                    break  # Exit the loop
+
+            self._logger.info("Finished redistributing group capacities.")
+
     def create_command_group(self, command_group_name: str, max_workers, command_group_type:str = None) -> None:
         """
         Internal method to create and register the default group.
@@ -177,6 +272,9 @@ class CommandCenter(IDisposable):
             raise ValueError("group_name cannot be None.")
         if command_group_name in self._command_groups:
             raise ValueError(f"A CommandGroup with the name '{command_group_name}' already exists.")
+
+        if self.get_total_active_workers() + max_workers > self._total_max_workers:
+            raise RuntimeError(f"Cannot create CommandGroup '{command_group_name}'. Total active workers would exceed global limit of {self._total_max_workers}, increase new total limit to create a new group.")
 
         group = CommandGroup(group_name=command_group_name, max_workers=max_workers, command_center=self, group_type=command_group_type)
         self._command_groups[command_group_name] = group
@@ -207,6 +305,7 @@ class CommandCenter(IDisposable):
         Args:
             name (str): The name of the registered activity template (e.g., "job_activity").
             **kwargs: Keyword arguments to pass to the activity's constructor.
+            command_group_name (str): The name of the command group to register the activity in.
 
         Returns:
             Optional[BaseActivity]: The created activity instance, or None if creation fails.
@@ -652,6 +751,8 @@ class CommandCenter(IDisposable):
         command = self.get_command_group(command_group_name)
         if not isinstance(amount, int) or amount < 1:
             raise ValueError("Amount must be a positive integer.")
+        if self.get_total_active_workers() + amount > self._total_max_workers:
+            raise RuntimeError(f"Cannot create CommandGroup '{command_group_name}'. Total active workers would exceed global limit of {self._total_max_workers}, increase new total limit to create a new group.")
         with self._lock:
             command._max_workers += amount
             self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._max_workers, 'command_group': command})
