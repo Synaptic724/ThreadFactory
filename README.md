@@ -20,7 +20,7 @@ Built to *scale up, fan out,* and leave the old GIL-bound world in the dust. �
 
 ## ✨ Why ThreadFactory? Unlocking Peak Concurrency Performance
 
-Tired of battling race conditions and deadlocks in your multithreaded Python applications? ThreadFactory provides a meticulously crafted suite of tools designed for **uncompromising thread safety and blazing-fast performance**.
+Tired of battling race conditions and deadlocks in your multiprocessing Python applications? ThreadFactory provides a meticulously crafted suite of tools designed for **uncompromising thread safety and blazing-fast performance**.
 
 Here's how ThreadFactory elevates your concurrency game:
 
@@ -29,6 +29,10 @@ Here's how ThreadFactory elevates your concurrency game:
 
 * 🤝 **Concurrent Collections: High-Performance Shared Data Structures**
     Transform your shared data management. Access and modify dictionaries, lists, sets, queues, stacks, and buffers with confidence, knowing they are built for high-load, concurrent environments. **🔥 Say goodbye to data corruption!**
+
+* 📦 **Pack / Package: Delegate-Style Callables for Agentic Threads**  
+    Encapsulate sync functions with full thread-safe state control. `Pack` stores arguments, supports currying, composition (`|`, `+`), and dynamic introspection. Ideal for agent behaviors, orchestration flows, and deferred execution.  
+    **→ Think `functools.partial` meets `Promise`, optimized for concurrency.**
 
 * 🔬 **First-Principles Primitives: Building Blocks for Robust Systems**
     Dive deeper with powerful, low-level synchronization constructs like `Dynaphore` (dynamic semaphores), `SmartCondition` (intelligent condition variables), and `SignalLatch` (one-shot signal mechanisms). Engineer sophisticated thread interactions with precision.
