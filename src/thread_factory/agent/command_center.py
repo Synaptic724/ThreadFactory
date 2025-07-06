@@ -1,5 +1,7 @@
 import threading, warnings, logging, ulid
-from typing import Optional, List, Callable, Any, Union, Dict
+from typing import Optional, List, Callable, Any, Union, Dict, Type
+from thread_factory.agent import ActivityBuilder
+from thread_factory.agent.activity.base import BaseActivity
 from thread_factory.agent.identity.agent_builder import AgentBuilder
 from thread_factory.agent.identity.types.agent import Agent
 from thread_factory.synchronization.controllers.signal_controller import SignalController
@@ -51,15 +53,18 @@ class CommandCenter(IDisposable):
         if max_workers < 1 or not isinstance(max_workers, int):
             raise ValueError("max_workers must be a positive integer.")
 
+        # --- Core Components ---
         self._logger = logger or logging.getLogger(__name__)
         self._lock = threading.RLock()
-
-        # --- Core Components ---
-        self._active_agents: ConcurrentDict[str, Agent] = ConcurrentDict()
         self._builder = AgentBuilder()
+        self._activity_builder = ActivityBuilder()
+
+        # --- Internal Components ---
         self._worker_count = SyncInt(0)
         self._max_workers = max_workers
+        self._active_agents: ConcurrentDict[str, Agent] = ConcurrentDict()
         self._signal_controllers: ConcurrentDict[str, SignalController] = ConcurrentDict()
+        self._active_activities: ConcurrentDict[str, BaseActivity] = ConcurrentDict()
 
         # --- External Controller Integration ---
         self._id: str = str(ulid.ULID())
@@ -116,6 +121,16 @@ class CommandCenter(IDisposable):
                 self._active_agents.clear()
                 self._active_agents = None
 
+            # --- Dispose Activities ---
+            if self._activity_builder:
+                self._activity_builder.dispose()
+                self._activity_builder = None
+
+            if self._active_activities:
+                for activity in list(self._active_activities.values()):
+                    activity.dispose()
+                self._active_activities.dispose()
+                self._active_activities = None
             try:
                 self._builder.dispose()
             except Exception:
@@ -137,7 +152,124 @@ class CommandCenter(IDisposable):
         if self._disposed:
             raise RuntimeError(f"CommandCenter '{self.id}' has been disposed.")
 
-    #endregion Destructor
+#endregion Destructor
+#region Activity Management
+    def create_activity(self, name: str, **kwargs: Any) -> Optional[BaseActivity]:
+        """
+        Builds and registers a new activity instance from a template.
+
+        Args:
+            name (str): The name of the registered activity template (e.g., "job_activity").
+            **kwargs: Keyword arguments to pass to the activity's constructor.
+
+        Returns:
+            Optional[BaseActivity]: The created activity instance, or None if creation fails.
+        """
+        self._check_disposed()  # Ensure CommandCenter is active
+
+        # Pass the CommandCenter's signal controller if the activity needs one
+        if 'signal_controller' not in kwargs and self._external_signal_controller:
+            kwargs['signal_controller'] = self._external_signal_controller
+
+        try:
+            activity = self._activity_builder.build_activity(name, **kwargs)
+            if activity:
+                self._active_activities[activity.id] = activity
+                self._logger.info(f"Created and registered Activity '{activity.id}' of type '{name}'.")
+                # You could also emit a notification here
+                # self._notify('ACTIVITY_CREATED', {'activity_id': activity.id, 'type': name})
+                return activity
+        except Exception as e:
+            self._logger.error(f"Failed to create activity of type '{name}': {e}", exc_info=True)
+
+        return None
+
+    def register_activity_template(self, name: str, activity_class: Type[BaseActivity]):
+        """
+        Registers a new activity class with the factory, making it available for creation.
+
+        This allows developers to extend the library with their own custom activity types.
+
+        Args:
+            name (str): The unique name to assign to the activity template.
+            activity_class (Type[BaseActivity]): The custom activity class to register.
+        """
+        self._check_disposed()
+        self._activity_builder.register_activity(name, activity_class)
+        self._logger.info(f"New activity template registered: '{name}'")
+
+    def unregister_activity_template(self, name: str):
+        """
+        Removes a previously registered activity template.
+
+        Args:
+            name (str): The name of the activity template to remove.
+        """
+        self._check_disposed()
+        try:
+            self._activity_builder.unregister_activity(name)
+            self._logger.info(f"Activity template unregistered: '{name}'")
+        except KeyError as e:
+            self._logger.warning(f"Failed to unregister activity template: {e}")
+
+    def list_activity_templates(self) -> list[str]:
+        """
+        Returns a list of all currently registered activity template names.
+
+        Returns:
+            list[str]: A list of available activity template names.
+        """
+        self._check_disposed()
+        return self._activity_builder.list_activities()
+
+    # In the CommandCenter class:
+
+    def deploy_activity(self, activity: 'BaseActivity', worker_count: int):
+        """
+        Creates, assigns, and deploys a specified number of workers to a given
+        JobActivity, starting the work immediately.
+
+        This is a high-level convenience method that handles the entire setup
+        process for running a job in parallel.
+
+        Args:
+            activity (JobActivity): The pre-configured job to be executed. It must
+                                    have a `perform_activity` and `start` method.
+            worker_count (int): The number of agents to create and assign to the job.
+
+        Raises:
+            TypeError: If the provided object is not a valid JobActivity.
+            RuntimeError: If there are not enough available worker slots.
+        """
+        self._check_disposed()
+
+        # --- Safety Checks ---
+        if not isinstance(activity, BaseActivity) or not all(
+                hasattr(activity, attr) for attr in ['perform_activity', 'start']):
+            raise TypeError("The provided activity is not a valid JobActivity with the required methods.")
+
+        available_slots = self._max_workers - self._worker_count.value
+        if worker_count > available_slots:
+            raise RuntimeError(f"Cannot deploy {worker_count} workers. Only {available_slots} slots are available.")
+
+        # --- Deployment Logic ---
+        self._logger.info(f"Deploying {worker_count} agents to Activity '{activity.id}'...")
+
+        # "Open the gate" for all agents before they are deployed
+        activity.start()
+
+        # Create and deploy the team of agents
+        for _ in range(worker_count):
+            # Create an agent whose target is the activity's main work loop
+            agent = self.create_agent(target=activity.perform_activity)
+
+            # Formally register the agent with the activity
+            activity.register_agent(agent)
+
+        activity.deploy_all_agents()
+        self._logger.info(f"Deployment complete for Activity '{activity.id}'.")
+
+#endregion Activity Management
 #region Controller Contract
     def set_external_controller(self, controller: SignalController, logger: Optional[logging.Logger] = None):
         """
@@ -184,7 +316,8 @@ class CommandCenter(IDisposable):
                 'decrease_max_workers': self.decrease_max_workers,
                 'add_signal_controller': self.add_signal_controller,
                 'remove_signal_controller': self.remove_signal_controller,
-                'list_signal_controllers': self.list_signal_controllers
+                'list_signal_controllers': self.list_signal_controllers,
+                'list_activity_templates': self.list_activity_templates,
             }),
         }
 

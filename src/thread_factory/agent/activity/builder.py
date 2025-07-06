@@ -65,10 +65,10 @@ class ActivityBuilder(IDisposable):
         """
         if self._registered:
             return
-        self.register_activity_class("job_activity", JobActivity)  # Register the class directly
+        self.register_activity("job_activity", JobActivity)  # Register the class directly
         self._registered = True
 
-    def register_activity_class(self, name: str, activity_class: Type[BaseActivity]) -> None:
+    def register_activity(self, name: str, activity_class: Type[BaseActivity]) -> None:
         """
         Registers a new activity class (its constructor) under a given name.
 
@@ -85,6 +85,28 @@ class ActivityBuilder(IDisposable):
         if not issubclass(activity_class, BaseActivity):
             raise TypeError(f"Registered class '{activity_class.__name__}' must be a subclass of BaseActivity.")
         self._registry[name] = activity_class
+
+    def unregister_activity(self, name: str) -> None:
+        """
+        Registers a new activity class (its constructor) under a given name.
+
+        This allows the `build_activity` method to instantiate activities
+        of this type by name.
+
+        Args:
+            name (str): The unique name or alias for this activity type.
+            activity_class (Type[BaseActivity]): The concrete `BaseActivity` subclass
+                                                 (its constructor) to register.
+        Raises:
+            TypeError: If the provided `activity_class` is not a subclass of BaseActivity.
+        """
+        if not isinstance(name, str):
+            raise TypeError(f"Activity name must be a string, got {type(name).__name__}.")
+        if name in self._registry:
+            del self._registry[name]
+        else:
+            raise KeyError(f"No activity registered with name '{name}'.")
+
 
     def build_activity(self, name: str, **kwargs: Any) -> Optional[BaseActivity]:
         """
@@ -115,6 +137,19 @@ class ActivityBuilder(IDisposable):
                 raise TypeError(f"Failed to build activity '{name}'. "
                                 f"Constructor of '{activity_class.__name__}' received invalid arguments: {e}")
         return None
+
+    def list_activities(self) -> list[str]:
+        """
+        Returns a list of all registered activity names.
+
+        This provides a snapshot of the currently available activity types
+        that can be instantiated using the `build_activity` method.
+
+        Returns:
+            list[str]: A list of strings, where each string is the name of a registered activity.
+        """
+        self._check_disposed()
+        return list(self._registry.keys())
 
 
     def _check_disposed(self):

@@ -94,7 +94,6 @@ class Agent(Worker):
         else:
             self._target = Pack.bundle(target) if target else None
 
-
         self._worker_type = "agentic" # Overrides Worker's default "mainpool"
         self._pool_agent: bool = False # This flag might be set by a pool manager
         self._return_home: bool = False # Controls behavior after task completion
@@ -104,6 +103,7 @@ class Agent(Worker):
 
         self._private_inventory = ConcurrentDict()
         self.public_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
+        self._registered_activities: ConcurrentDict[str, 'BaseActivity'] = ConcurrentDict()
 
     def dispose(self):
         """
@@ -123,6 +123,14 @@ class Agent(Worker):
         if self.public_inventory:
             self.public_inventory.dispose()
             self.public_inventory = None
+
+        # Unregister from all activities
+        if self._registered_activities:
+            for activity in list(self._registered_activities.values()):
+                self.deregister_from_activity(activity)
+            self._registered_activities.dispose()
+            self._registered_activities = None
+
         self._event_loop = None
 
         super().dispose()  # Call parent dispose if it exists
@@ -155,13 +163,15 @@ class Agent(Worker):
             "set_home": self.set_home,
             "set_return_home": self.set_return_home,
             "get_bound_work_state": self._get_work_state,
-            "get_bound_work_id": lambda: self._value_work.record.task_id if self._value_work else None
+            "get_bound_work_id": lambda: self._value_work.record.task_id if self._value_work else None,
+            "list_registered_activities": self.list_registered_activities,
         })
         details["name"] = self.__class__.__name__
         return details
 
 #endregion Signal Controller Methods
 #region Generic Agent System Methods
+#region Command Center Management Methods
     def _unregister(self) -> None:
         """
         Unregisters the agent from the command center, if applicable.
@@ -195,7 +205,45 @@ class Agent(Worker):
                 that represents the agent's main execution loop.
         """
         self._event_loop = Pack.bundle(fn) if fn else None
+#endregion Command Center Management Methods
+#region Activity Management Methods
+    # Add these new methods to the Agent class
 
+    def register_with_activity(self, activity: 'BaseActivity'):
+        """
+        Registers this agent with a given activity.
+
+        This creates a two-way link: the agent tracks the activity,
+        and the activity tracks the agent.
+        """
+        if activity and activity.id not in self._registered_activities:
+            self._registered_activities[activity.id] = activity
+            # This call completes the link and triggers the notification
+            activity.register_agent(self)
+            self._logger.info(f"Agent '{self.factory_id}' registered with Activity '{activity.id}'.")
+
+    def deregister_from_activity(self, activity: 'BaseActivity'):
+        """
+        Deregisters this agent from a given activity.
+        """
+        if activity and self._registered_activities.pop(activity.id, None):
+            # This call breaks the link from the activity's side
+            activity.unregister_agent(self)
+            self._logger.info(f"Agent '{self.factory_id}' deregistered from Activity '{activity.id}'.")
+
+
+    def list_registered_activities(self) -> list:
+        """
+        Lists all activities that this agent is currently registered with.
+
+        Returns:
+            list: A list of activity IDs that this agent is registered with.
+        """
+        return list(self._registered_activities.keys())
+
+#endregion Activity Management Methods
+
+#region Agent Execution Methods
     def run(self):
         """
         Main execution entry point for the agentic thread.
@@ -289,6 +337,7 @@ class Agent(Worker):
             str: A string showing the agent's type and ID.
         """
         return f"AgenticProfile<{self.factory_id}>"
+#endregion Agent Execution Methods
 #endregion
 #region Queue Pool Management Methods
     def _set_work_state(self, new_state: WorkStatus) -> None:

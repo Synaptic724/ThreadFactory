@@ -6,7 +6,20 @@ from thread_factory.agent.identity.types.agent import Agent
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.concurrent_list import ConcurrentList
+from enum import Enum, auto
 
+
+class ActivityStatus(Enum):
+    """
+    Defines the lifecycle status of a Job.
+    """
+    PENDING = auto()
+    RUNNING = auto()
+    PAUSED = auto()
+    COMPLETED = auto()
+    FAILED = auto()
+    CANCELLED = auto()
+    DISPOSED = auto()
 
 class BaseActivity(IDisposable, ABC):
     """
@@ -35,6 +48,10 @@ class BaseActivity(IDisposable, ABC):
         self._lock = threading.RLock()
         self._metadata: ConcurrentDict[str, Any] = ConcurrentDict(kwargs)
         self._registered_agents: ConcurrentDict[str, Agent] = ConcurrentDict()
+
+
+        # Activity Status
+        self._status: ActivityStatus = ActivityStatus.PENDING
 
         self._signal_controller = signal_controller
         if self._signal_controller:
@@ -69,6 +86,7 @@ class BaseActivity(IDisposable, ABC):
                 return
 
             self._disposed = True
+            self._status = ActivityStatus.DISPOSED  # Final state
             self._logger.info(f"Disposing Activity '{self.id}'.")
 
             if self._signal_controller:
@@ -130,7 +148,13 @@ class BaseActivity(IDisposable, ABC):
             "name": self.__class__.__name__,
             "commands": ConcurrentDict({
                 "get_metadata": self.get_metadata,
-                "get_assigned_agents": self.get_assigned_agents
+                "get_assigned_agents": self.get_assigned_agents,
+                "cancel": self.cancel,
+                "pause": self.pause,
+                "resume": self.resume,
+                "get_status": self.get_status,
+                "get_progress": self.get_progress,
+                "get_job_result": self.get_job_result,
             })
         })
     # --- Agent Management ---
@@ -237,6 +261,144 @@ class BaseActivity(IDisposable, ABC):
         """
         return self._metadata.copy()
 
+    def deploy_all_agents(self):
+        """
+        Deploys all registered agents to this activity.
+
+        This method iterates through all agents currently registered with this activity
+        and invokes their `deploy` method. It is typically used to initiate the activity
+        across all assigned agents, allowing them to start processing tasks or performing
+        actions as defined by the activity's logic.
+
+        Note: The actual deployment logic should be implemented in the Agent class.
+        """
+        for agent in self._registered_agents.values():
+            if agent:
+                try:
+                    agent.deploy()
+                except Exception as e:
+                    self._logger.error(f"Failed to deploy agent '{agent.factory_id}' for Activity '{self.id}': {e}",
+                                       exc_info=True)
+
+    #region Activity Control Methods
+
+
+    def cancel(self):
+        """
+        Requests the cancellation of the job.
+
+        If the job is not already completed, failed, or cancelled, its status
+        will be updated to `ActivityStatus.CANCELLED`. This method is thread-safe.
+        A "STATUS_CHANGED" notification is emitted upon a successful status change.
+
+        The actual termination of the running task associated with this job
+        depends on the task periodically checking `is_cancellation_requested()`.
+        """
+        with self._lock:
+            if self._status not in [ActivityStatus.COMPLETED, ActivityStatus.FAILED, ActivityStatus.CANCELLED]:
+                self._logger.info(f"JobActivity '{self.id}' cancelled.")
+                self._status = ActivityStatus.CANCELLED
+                self._notify("STATUS_CHANGED", {"status": self._status.name})
+            else:
+                self._logger.debug(
+                    f"JobActivity '{self.id}' already in a terminal/cancelled state ({self._status.name}). Cancellation request ignored.")
+
+    def pause(self):
+        """
+        Requests that the job be paused.
+
+        The job can only be paused if its current status is `ActivityStatus.RUNNING`.
+        Upon successful pausing, its status is updated to `ActivityStatus.PAUSED`.
+        This method is thread-safe. A "STATUS_CHANGED" notification is emitted.
+
+        The actual pausing of the running task associated with this job
+        depends on the task implementing pause/resume logic based on status checks.
+        """
+        with self._lock:
+            if self._status == ActivityStatus.RUNNING:
+                self._logger.info(f"JobActivity '{self.id}' paused.")
+                self._status = ActivityStatus.PAUSED
+                self._notify("STATUS_CHANGED", {"status": self._status.name})
+            else:
+                self._logger.debug(
+                    f"JobActivity '{self.id}' cannot be paused from current status: {self._status.name}.")
+
+    def resume(self):
+        """
+        Resumes a paused job.
+
+        The job can only be resumed if its current status is `ActivityStatus.PAUSED`.
+        Upon successful resumption, its status is updated to `ActivityStatus.RUNNING`.
+        This method is thread-safe. A "STATUS_CHANGED" notification is emitted.
+
+        The actual continuation of the running task associated with this job
+        depends on the task implementing pause/resume logic based on status checks.
+        """
+        with self._lock:
+            if self._status == ActivityStatus.PAUSED:
+                self._logger.info(f"JobActivity '{self.id}' resumed.")
+                self._status = ActivityStatus.RUNNING
+                self._notify("STATUS_CHANGED", {"status": self._status.name})
+            else:
+                self._logger.debug(
+                    f"JobActivity '{self.id}' cannot be resumed from current status: {self._status.name}.")
+
+    # In the JobActivity class, add this new method:
+    def set_status(self, status_str: str):
+        """
+        Sets the current status of the job from a string.
+
+        Args:
+            status_str: The string representation of the desired ActivityStatus.
+
+        Raises:
+            ValueError: If the provided string does not match any ActivityStatus enum member.
+        """
+        with self._lock:
+            try:
+                agent_id = self._get_agent_id()
+                new_status = ActivityStatus[status_str.upper()]
+                if self._status != new_status:
+                    self._logger.info(
+                        f"JobActivity '{self.id}' status changed from {self._status.name} to {new_status.name}.")
+                    self._status = new_status
+                    self._notify("STATUS_CHANGED", {"status": self._status.name, "agent_id": agent_id})
+            except KeyError:
+                raise ValueError(
+                    f"Invalid job status string: '{status_str}'. Must be one of {[s.name for s in ActivityStatus]}.")
+
+    def start(self):
+        """
+        Activates the job by setting its status from PENDING to RUNNING.
+
+        This acts as a gate, allowing waiting agents to begin processing items
+        from the queue.
+        """
+        if self.get_status() == ActivityStatus.PENDING:
+            self.set_status("RUNNING")
+            self._logger.info(f"Job '{self.id}' has been started.")
+
+    def get_status(self) -> ActivityStatus:
+        """
+        Retrieves the current lifecycle status of the job.
+
+        This method provides a thread-safe way to access the job's
+        internal status, reflecting its current state (e.g., PENDING, RUNNING, PAUSED).
+
+        Returns:
+            ActivityStatus: An enum member representing the current status of the job.
+        """
+        with self._lock:
+            return self._status
+
+    @abstractmethod
+    def perform_activity(self):
+        """
+        An agent calls this method to start working on the job's collection.
+        The agent will only perform work if the job's status is RUNNING.
+        """
+        raise NotImplementedError("Subclasses must implement the perform_activity method.")
+#endregion Activity Control Methods
     # --- Private Helpers ---
 
     def _notify(self, event_type: str, data: Optional[Dict[str, Any]] = None):
