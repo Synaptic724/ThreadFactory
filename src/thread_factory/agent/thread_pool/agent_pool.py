@@ -46,16 +46,16 @@ class _AgentPoolContainer(IDisposable):
 
         # Track threads either as a simple set (if no tracking) or as a dict mapping to Records
         if ignore_tracking:
-            self._registered_threads: Union[ConcurrentSet[ULID], ConcurrentDict[ULID, Records]] = ConcurrentSet[ULID]()
+            self._registered_agents: Union[ConcurrentSet[ULID], ConcurrentDict[ULID, Records]] = ConcurrentSet[ULID]()
         else:
-            self._registered_threads: Union[ConcurrentSet[ULID], ConcurrentDict[ULID, Records]] = ConcurrentDict[
+            self._registered_agents: Union[ConcurrentSet[ULID], ConcurrentDict[ULID, Records]] = ConcurrentDict[
                 ULID, Records]()
 
-        self._unregistered_threads = ConcurrentSet[ULID]()  # Tracks which threads have been requested to unregister
-        self._unregister_thread_check = False  # Flag to indicate if any threads should unregister
+        self._unregistered_agents = ConcurrentSet[ULID]()  # Tracks which threads have been requested to unregister
+        self._unregister_agent_check = False  # Flag to indicate if any threads should unregister
         self._command_group_id = command_group.id  # The CommandGroup this container is associated with
         self._command_group_worker_count = command_group._worker_count
-        self._command_group_worker_count = command_group._max_workers
+        self._command_group_max_worker_count = command_group._max_workers
 
     def dispose(self):
         """
@@ -75,21 +75,22 @@ class _AgentPoolContainer(IDisposable):
 
             # Prepare unregistration set based on tracking strategy
             if self._ignore_tracking:
-                self._unregistered_threads = self._registered_threads
+                self._unregistered_agents = self._registered_agents
             else:
-                self._unregistered_threads = ConcurrentSet(self._registered_threads.keys())
+                self._unregistered_agents = ConcurrentSet(self._registered_agents.keys())
 
-            self._unregister_thread_check = True
+            self._unregister_agent_check = True
             self._flow_regulator.notify_all()  # Wake all threads
             self._flow_regulator.dispose()  # Dispose of the switch lock
             self._flow_regulator = None  # Clear reference to FlowRegulator
             self._active = False  # Mark container inactive
-            self._registered_threads.dispose()  # Dispose of registry
-            self._registered_threads = None
-            self._unregistered_threads.dispose()  # Dispose of unregistration list
-            self._unregistered_threads = None
-            self._unregister_thread_check = False
-            self._command_group = None  # Clear reference to CommandGroup
+            self._registered_agents.dispose()  # Dispose of registry
+            self._registered_agents = None
+            self._unregistered_agents.dispose()  # Dispose of unregistration list
+            self._unregistered_agents = None
+            self._unregister_agent_check = False
+            self._command_group_worker_count = None  # Clear reference to CommandGroup
+            self._command_group_max_worker_count = None  # Clear reference to CommandGroup
 
     def _container(self):
         """
@@ -102,8 +103,8 @@ class _AgentPoolContainer(IDisposable):
         """
         if self._disposed:
             raise RuntimeError("Container has been disposed and cannot be used.")
-        self._check_thread()  # Validate the thread is an AgenticWorker
-        self._register_thread()  # Add thread to the pool registry
+        self._check_agent()  # Validate the thread is an AgenticWorker
+        self._register_agent()  # Add thread to the pool registry
 
         while self._active:
             with self._flow_regulator:
@@ -124,19 +125,19 @@ class _AgentPoolContainer(IDisposable):
         Raises:
             RuntimeError: If the current thread is not registered in the container.
         """
-        thread_id = self._get_thread_id()  # Get the unique thread identifier
+        thread_id = self._get_agent_id()  # Get the unique thread identifier
 
         # Try to fetch the current ValueWork task from the thread
         if value_work := getattr(threading.current_thread(), "_value_work", None):
             # Ensure this thread is registered before assigning work
-            if thread_id not in self._registered_threads:
+            if thread_id not in self._registered_agents:
                 raise RuntimeError("Thread is not registered in the AgenticPoolContainer.")
 
             # Attach the task into the record structure
-            records = self._registered_threads.get(thread_id)
+            records = self._registered_agents.get(thread_id)
             records[value_work.task_id] = value_work
 
-    def _check_thread(self) -> None:
+    def _check_agent(self) -> None:
         """
         Ensures the calling thread is a valid AgenticWorker.
         """
@@ -144,23 +145,23 @@ class _AgentPoolContainer(IDisposable):
         if not isinstance(current_thread, 'Agent'):
             raise TypeError("Current thread must be an instance of AgenticWorker")
 
-    def _register_thread(self):
+    def _register_agent(self):
         """
         Registers the current thread in the container.
 
         Depending on `ignore_tracking`, either adds to a set or creates a Records entry.
         """
-        thread_id = self._get_thread_id()
+        thread_id = self._get_agent_id()
         with self._lock:
             if not self._active:
                 self._active = True
             if self._ignore_tracking:
-                self._registered_threads.add(thread_id)
+                self._registered_agents.add(thread_id)
             else:
-                if thread_id not in self._registered_threads:
-                    self._registered_threads[thread_id] = Records()
+                if thread_id not in self._registered_agents:
+                    self._registered_agents[thread_id] = Records()
 
-    def _get_thread_id(self) -> ULID:
+    def _get_agent_id(self) -> ULID:
         """
         Returns the current thread's factory_id (ULID), which uniquely identifies it.
 
@@ -176,37 +177,37 @@ class _AgentPoolContainer(IDisposable):
         Returns:
             bool: True if the thread should unregister and exit.
         """
-        return self._get_thread_id() in self._unregistered_threads
+        return self._get_agent_id() in self._unregistered_agents
 
     def _finalize_unregistration(self):
         """
         Final cleanup for a thread that is leaving the container.
         Disposes its tracking record and removes it from the active registry.
         """
-        thread_id = self._get_thread_id()
+        thread_id = self._get_agent_id()
         if not self._ignore_tracking:
-            if records := self._registered_threads.get(thread_id):
+            if records := self._registered_agents.get(thread_id):
                 records.dispose()
         if self._ignore_tracking:
-            self._registered_threads.discard(thread_id)
+            self._registered_agents.discard(thread_id)
         else:
-            self._registered_threads.pop(thread_id, None)
+            self._registered_agents.pop(thread_id, None)
 
         # If the registry is now empty, mark inactive
-        if len(self._registered_threads) == 0:
+        if len(self._registered_agents) == 0:
             self._active = False
         # If no more threads left to unregister, unset the check flag
-        if len(self._unregistered_threads) == 0:
+        if len(self._unregistered_agents) == 0:
             self._unregister_thread_check = False
 
-    def _unregister_thread(self, thread_id: ULID):
+    def _unregister_agent(self, thread_id: ULID):
         """
         Marks a thread for unregistration and notifies it if it's waiting.
 
         Args:
             thread_id (ULID): The ID of the thread to unregister.
         """
-        self._unregistered_threads.add(thread_id)
+        self._unregistered_agents.add(thread_id)
         with self._lock:
             self._unregister_thread_check = True
 
@@ -298,6 +299,7 @@ class AgentPool(IDisposable):
             self._id = str(ulid.ULID())
             self._command_center = command_center
             self._logger = logger or logging.getLogger(__name__)
+            self._group_container_map = ConcurrentDict[str, str]()
             self._containers: ConcurrentDict[str, _AgentPoolContainer] = ConcurrentDict()
             self._shutdown_gate = Gate(True)
 
@@ -346,8 +348,9 @@ class AgentPool(IDisposable):
             self._logger.info(f"New pool container {command_group.id} already exists.")
             raise ValueError(f"Pool already exists for group CommandGroup: Name: {command_group.name} ID: '{command_group.id}'.")
 
-        container = _AgentPoolContainer(ignore_tracking=tracking_records)
-        self._containers[command_group.id] = container
+        container = _AgentPoolContainer(command_group=command_group, ignore_tracking=tracking_records)
+        self._group_container_map[command_group.id] = container._id
+        self._containers[container._id] = container
         return container
 
 #endregion Command Group Pool Management
@@ -408,8 +411,6 @@ class AgentPool(IDisposable):
 
     def _add_worker(self, group_name: str):
         """Requests a new worker from the CommandCenter for a specific group's pool."""
-        group = self._command_center.get_command_group(group_name)
-        config = self._group_configs[group_name]
         container = self._containers[group_name]
 
         if group._worker_count >= config['max']:
