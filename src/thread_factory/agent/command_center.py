@@ -129,62 +129,24 @@ class CommandCenter(IDisposable):
 
 #region Destructor
     def dispose(self):
-        """
-        Disposes the CommandCenter and all resources it manages, including all
-        agents and SignalControllers. This is a terminal and idempotent operation.
-        """
         with self._lock:
             if self._disposed:
                 return
             self._disposed = True
-
             self._logger.info(f"Disposing CommandCenter '{self.id}'...")
 
-            # --- Unregister from external controller first ---
-            if self._external_signal_controller:
-                try:
-                    # Set dispose_object=False as we are already disposing.
-                    self._external_signal_controller.unregister(self.id, dispose_object=False)
-                    self._logger.info(f"Unregistered CommandCenter '{self.id}' from external SignalController.")
-                except Exception as e:
-                    self._logger.warning(f"Failed to unregister CommandCenter from external SignalController: {e}", exc_info=True)
+            # --- Dispose all CommandGroups ---
+            if self._command_groups:
+                for group in list(self._command_groups.values()):
+                    group.dispose()
+                self._command_groups.dispose()
+                self._command_groups = None
 
-            # --- Dispose internal SignalControllers ---
-            if self._signal_controllers:
-                for controller_name, controller in list(self._signal_controllers.items()):
-                    self._logger.debug(f"Disposing internal SignalController: {controller_name}")
-                    try:
-                        controller.dispose()
-                    except Exception as e:
-                        self._logger.error(f"Error disposing internal SignalController '{controller_name}': {e}", exc_info=True)
-                self._signal_controllers.dispose()
-                self._signal_controllers = None
-
-            # --- Dispose Agents ---
-            if self._active_agents:
-                for agent in list(self._active_agents.values()):
-                    try:
-                        if hasattr(agent, "dispose") and callable(agent.dispose):
-                            agent.dispose()
-                    except Exception:
-                        pass
-                self._active_agents.clear()
-                self._active_agents = None
-
-            # --- Dispose Activities ---
+            # --- Dispose Builders ---
             if self._activity_builder:
                 self._activity_builder.dispose()
-                self._activity_builder = None
-
-            if self._active_activities:
-                for activity in list(self._active_activities.values()):
-                    activity.dispose()
-                self._active_activities.dispose()
-                self._active_activities = None
-            try:
+            if self._builder:
                 self._builder.dispose()
-            except Exception:
-                pass
 
             self._logger.info(f"CommandCenter '{self.id}' disposed.")
 
@@ -269,6 +231,28 @@ class CommandCenter(IDisposable):
 
         return None
 
+    def remove_activity_by_command_group(self, activity: BaseActivity, dispose: bool =True, command_group_name: str = "default") -> bool:
+        """
+        Removes an activity from the CommandCenter's management.
+
+        Args:
+            activity (BaseActivity): The activity instance to remove.
+            dispose (bool): If True, the activity will be disposed of after removal.
+            command_group_name (str): The name of the command group to remove the activity from.
+
+        Returns:
+            bool: True if the activity was successfully removed, False if it was not found.
+        """
+        self._check_disposed()
+        command = self.get_command_group(command_group_name)
+        if activity.id in command._active_activities:
+            del command._active_activities[activity.id]
+            self._logger.info(f"Activity '{activity.id}' removed from CommandGroup '{command.name}'.")
+            if dispose:
+                activity.dispose()
+            return True
+        self._logger.warning(f"Activity '{activity.id}' not found in CommandGroup '{command.name}'.")
+        return False
 
     def remove_activity(self, activity: BaseActivity, dispose: bool =True) -> bool:
         """
@@ -949,9 +933,9 @@ class CommandCenter(IDisposable):
             Optional[SignalController]: The SignalController instance, or None if not found.
         """
         self._check_disposed()
-        for controller in self._signal_controllers.values():
-            if controller.id == controller_id:
-                return controller
+        for group in self._command_groups.values():
+            if controller_id in group._signal_controllers:
+                return group._signal_controllers[controller_id]
         return None
 
 
@@ -971,14 +955,14 @@ class CommandCenter(IDisposable):
 
         return signal_controller_list
 
-    def invoke_on_controller(self, controller_id: str, object_id: str, command: str, command_group_name: str = "default", *args, **kwargs) -> Any:
+    def invoke_on_controller_by_id(self, controller_id: str, object_id: str, command: str, *args, **kwargs) -> Any:
         """
         Invokes a command on an object registered with a specific internal SignalController.
 
         This acts as a proxy, allowing remote command execution on any managed bus.
 
         Args:
-            controller_name (str): The name of the internal SignalController to use.
+            controller_id (str): The name of the internal SignalController to use.
             object_id (str): The ID of the target object on that controller.
             command (str): The name of the command to execute (e.g., 'open', 'reset').
             *args: Positional arguments to pass to the command.
@@ -996,7 +980,35 @@ class CommandCenter(IDisposable):
             raise ValueError(f"No SignalController with the name '{controller.name}' is managed by this CommandCenter.")
         return controller.invoke(object_id, command, *args, **kwargs)
 
-    def subscribe_to_event(self, controller_name: str, object_id: str, event_type: str, callback: Callable):
+    def invoke_on_controller_by_name(self, controller_name: str, object_id: str, command: str, command_group_name: str = "default", *args, **kwargs) -> Any:
+        """
+        Invokes a command on an object registered with a specific internal SignalController.
+
+        This acts as a proxy, allowing remote command execution on any managed bus.
+
+        Args:
+            controller_name (str): The name of the internal SignalController to use.
+            command_group_name (str): The name of the command group to search in.
+            object_id (str): The ID of the target object on that controller.
+            command (str): The name of the command to execute (e.g., 'open', 'reset').
+            *args: Positional arguments to pass to the command.
+            **kwargs: Keyword arguments to pass to the command.
+
+        Returns:
+            Any: The result from the invoked command.
+
+        Raises:
+            ValueError: If no controller with the given name exists.
+        """
+        self._check_disposed()
+        controller = self.find_controller_by_name(controller_name, command_group_name)
+        if len(controller) > 1:
+            raise ValueError(f"Multiple SignalControllers with the name '{controller_name}' found in command group '{command_group_name}'. Please specify by ID.")
+        if not controller:
+            raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter.")
+        return controller[0].invoke(object_id, command, *args, **kwargs)
+
+    def subscribe_to_event(self, controller_name: str, object_id: str, event_type: str, callback: Callable, command_group_name: str = "default"):
         """
         Subscribes a callback to an event on a specific object managed by an internal SignalController.
 
@@ -1005,17 +1017,18 @@ class CommandCenter(IDisposable):
             object_id (str): The ID of the object emitting the event.
             event_type (str): The name of the event to subscribe to (e.g., 'THRESHOLD_MET').
             callback (Callable): The function to call when the event occurs.
+            command_group_name (str): The name of the command group to search in.
 
         Raises:
             ValueError: If no controller with the given name exists.
         """
         self._check_disposed()
-        controller = self.get_signal_controller(controller_name)
+        controller = self.get_signal_controller(controller_name, command_group_name)
         if not controller:
             raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter.")
         controller.subscribe(object_id, event_type, callback)
 
-    def add_hook_to_controller(self, controller_name: str, hook_type: str, callback: Callable):
+    def add_hook_to_controller(self, controller_name: str, hook_type: str, callback: Callable, command_group_name: str = "default"):
         """
         Attaches a pre- or post-invocation hook to an internal SignalController for auditing
         or performance monitoring.
@@ -1023,15 +1036,16 @@ class CommandCenter(IDisposable):
         Args:
             controller_name (str): The name of the controller to attach the hook to.
             hook_type (str): The type of hook, must be either 'pre_invoke' or 'post_invoke'.
+            command_group_name (str): The name of the command group to search in.
             callback (Callable): The hook function to add.
 
         Raises:
             ValueError: If the controller name is not found or the hook_type is invalid.
         """
         self._check_disposed()
-        controller = self.get_signal_controller(controller_name)
+        controller = self.get_signal_controller(controller_name, command_group_name)
         if not controller:
-            raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter.")
+            raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter in command group {command_group_name}.")
 
         if hook_type == 'pre_invoke':
             controller.add_pre_invoke_hook(callback)
@@ -1040,13 +1054,14 @@ class CommandCenter(IDisposable):
         else:
             raise ValueError("hook_type must be either 'pre_invoke' or 'post_invoke'.")
 
-    def list_objects_on_controller(self, controller_name: str, name_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_objects_on_controller(self, controller_name: str, name_filter: Optional[str] = None, command_group_name:str = "default") -> List[Dict[str, Any]]:
         """
         Gets a list of all objects currently registered on a specific internal SignalController.
 
         Args:
             controller_name (str): The name of the controller to query.
             name_filter (Optional[str]): An optional filter to only list objects with a specific name.
+            command_group_name (str): The name of the command group to search in.
 
         Returns:
             List[Dict[str, Any]]: A list of object details.
@@ -1055,18 +1070,19 @@ class CommandCenter(IDisposable):
             ValueError: If no controller with the given name exists.
         """
         self._check_disposed()
-        controller = self.get_signal_controller(controller_name)
+        controller = self.get_signal_controller(controller_name, command_group_name)
         if not controller:
-            raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter.")
+            raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter in command group {command_group_name}.")
         return controller.list_objects(name_filter)
 
-    def get_waiting_objects_on_controller(self, controller_name: str) -> List[str]:
+    def get_waiting_objects_on_controller(self, controller_name: str, command_group_name: str = "default") -> List[str]:
         """
         Gets a list of object IDs that are currently in a "waiting" state on a specific
         internal SignalController.
 
         Args:
             controller_name (str): The name of the controller to query.
+            command_group_name (str): The name of the command group to search in.
 
         Returns:
             List[str]: A list of object IDs in a waiting state.
@@ -1075,9 +1091,9 @@ class CommandCenter(IDisposable):
             ValueError: If no controller with the given name exists.
         """
         self._check_disposed()
-        controller = self.get_signal_controller(controller_name)
+        controller = self.get_signal_controller(controller_name, command_group_name)
         if not controller:
-            raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter.")
+            raise ValueError(f"No SignalController with the name '{controller_name}' is managed by this CommandCenter in command group {command_group_name}.")
         return controller.get_waiting_objects()
 
 #endregion SignalController Management
