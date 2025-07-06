@@ -7,7 +7,7 @@ import threading
 import time
 import unittest
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
-from thread_factory.agent.thread_pool.agent import Agent
+from thread_factory.agent import Agent
 
 
 # --------------------------------------------------------------------------- #

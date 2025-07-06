@@ -491,6 +491,37 @@ class SignalController(IDisposable):
                 self._subscribers[object_id][event_type].append(callback)
                 self._logger.debug(f"New subscription to '{event_type}' on '{object_id}'")
 
+    def unsubscribe(self, object_id: str, event_type: str, callback: Callable[..., None]):
+        """
+        Unsubscribe a callback function from a specific event type for a specific object.
+
+        Args:
+            object_id (str): The unique ID of the object from which to unsubscribe.
+            event_type (str): The type of event to unsubscribe from.
+            callback (Callable): The function to be unsubscribed.
+        """
+        with self._outer_lock:
+            if object_id in self._subscribers:
+                object_subscribers = self._subscribers[object_id]
+                if event_type in object_subscribers:
+                    if callback in object_subscribers[event_type]:
+                        object_subscribers[event_type].remove(callback)
+                        self._logger.debug(f"Unsubscribed callback from '{event_type}' on '{object_id}'")
+                        # Optionally, clean up empty ConcurrentLists or ConcurrentDicts
+                        if not object_subscribers[event_type]:
+                            object_subscribers.pop(event_type)
+                            if not object_subscribers:
+                                self._subscribers.pop(object_id)
+                    else:
+                        self._logger.warning(
+                            f"Attempted to unsubscribe a non-existent callback for event '{event_type}' on '{object_id}'.")
+                else:
+                    self._logger.warning(
+                        f"Attempted to unsubscribe from non-existent event type '{event_type}' on '{object_id}'.")
+            else:
+                self._logger.warning(
+                    f"Attempted to unsubscribe from non-existent object ID '{object_id}'.")
+
     # -------------------------------------------
     # Query Methods
     # -------------------------------------------
