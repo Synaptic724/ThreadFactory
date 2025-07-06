@@ -1,6 +1,9 @@
 import logging
 import threading
 from typing import Any, Callable, Dict, List, Optional, Union
+
+import ulid
+
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.utils.interfaces.disposable import IDisposable
@@ -45,7 +48,8 @@ class SignalController(IDisposable):
     There will be more integration with other synchronization primitives in the future.***
     """
 
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    def __init__(self, controller_name: str = None, controller_type: str = None,
+                 controller_group: str = None, logger: Optional[logging.Logger] = None):
         """
         Initialize the SignalController.
 
@@ -55,7 +59,10 @@ class SignalController(IDisposable):
                                                configured for the controller.
         """
         super().__init__()
-
+        self.id = str(ulid.ULID())
+        self.name = controller_name if controller_name else "SignalController"
+        self.type = controller_type
+        self.group = controller_group
         # Setup internal logger if none provided
         if logger is None:
             self._logger = logging.getLogger(__name__)

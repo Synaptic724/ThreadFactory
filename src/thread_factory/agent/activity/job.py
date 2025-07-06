@@ -142,6 +142,9 @@ class JobActivity(BaseActivity, IDisposable):
             "load_work": self.load_work,
             "reset": self.reset,
             "perform_activity": self.perform_activity,
+            "get_job_result": self.get_job_result,
+            "get_progress": self.get_progress,
+            "report_progress": self.report_progress,
         })
         details["name"] = "JobActivity"
         return details

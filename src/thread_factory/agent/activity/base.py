@@ -153,8 +153,8 @@ class BaseActivity(IDisposable, ABC):
                 "pause": self.pause,
                 "resume": self.resume,
                 "get_status": self.get_status,
-                "get_progress": self.get_progress,
-                "get_job_result": self.get_job_result,
+                "deploy_all_agents": self.deploy_all_agents,
+                "start": self.start,
             })
         })
     # --- Agent Management ---
