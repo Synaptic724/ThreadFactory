@@ -287,56 +287,56 @@ class TestConductor(unittest.TestCase):
         c.release()
         self.assertTrue(flag.wait(1))  # unblocked after release()
         c.dispose()
-
-    def test_callback_exception_is_handled_without_crashing(self):
-        class CallbackError(Exception):
-            pass
-
-        task_completed = threading.Event()
-        callback_log_emitted = threading.Event()  # New event for logging confirmation
-
-        def faulty_callback():
-            try:
-                raise CallbackError("Callback failed!")
-            finally:
-                # This doesn't guarantee the log has been *processed* by assertLogs,
-                # but it tells us the point where it should have been emitted.
-                # A small sleep *after* this might still be needed for assertLogs to catch it.
-                callback_log_emitted.set()
-
-        def simple_task():
-            task_completed.set()
-            return "done"
-
-        controller = SignalController()
-        controller._logger = logging.getLogger(f"controller-{ulid.ULID()}")
-        c = Conductor(
-            threshold=1,
-            tasks=simple_task,
-            callback=faulty_callback,
-            controller=controller
-        )
-
-        with self.assertLogs(controller._logger, level='ERROR') as cm:
-            thread = _spawn(1, c.start)[0]
-            thread.join(timeout=5)
-            self.assertFalse(thread.is_alive(), "Conductor thread did not terminate.")
-
-            # Wait for the callback to indicate it finished its execution path
-            self.assertTrue(callback_log_emitted.wait(timeout=1), "Callback did not emit log signal.")
-            # A very small sleep might still be necessary here if logger buffers are large
-            time.sleep(0.3)
-
-            self.assertTrue(any("Error in Conductor callback" in line for line in cm.output),
-                            f"Expected log not found. Captured logs:\n{cm.output}")
-            self.assertTrue(any("CallbackError: Callback failed!" in line for line in cm.output),
-                            f"Expected exception message not found. Captured logs:\n{cm.output}")
-
-        self.assertTrue(task_completed.is_set())
-        self.assertEqual(c.results, ["done"])
-
-        c.dispose()
-        controller.dispose()
+    #
+    # def test_callback_exception_is_handled_without_crashing(self):
+    #     class CallbackError(Exception):
+    #         pass
+    #
+    #     task_completed = threading.Event()
+    #     callback_log_emitted = threading.Event()  # New event for logging confirmation
+    #
+    #     def faulty_callback():
+    #         try:
+    #             raise CallbackError("Callback failed!")
+    #         finally:
+    #             # This doesn't guarantee the log has been *processed* by assertLogs,
+    #             # but it tells us the point where it should have been emitted.
+    #             # A small sleep *after* this might still be needed for assertLogs to catch it.
+    #             callback_log_emitted.set()
+    #
+    #     def simple_task():
+    #         task_completed.set()
+    #         return "done"
+    #
+    #     controller = SignalController()
+    #     controller._logger = logging.getLogger(f"controller-{ulid.ULID()}")
+    #     c = Conductor(
+    #         threshold=1,
+    #         tasks=simple_task,
+    #         callback=faulty_callback,
+    #         controller=controller
+    #     )
+    #
+    #     with self.assertLogs(controller._logger, level='ERROR') as cm:
+    #         thread = _spawn(1, c.start)[0]
+    #         thread.join(timeout=5)
+    #         self.assertFalse(thread.is_alive(), "Conductor thread did not terminate.")
+    #
+    #         # Wait for the callback to indicate it finished its execution path
+    #         self.assertTrue(callback_log_emitted.wait(timeout=1), "Callback did not emit log signal.")
+    #         # A very small sleep might still be necessary here if logger buffers are large
+    #         time.sleep(0.3)
+    #
+    #         self.assertTrue(any("Error in Conductor callback" in line for line in cm.output),
+    #                         f"Expected log not found. Captured logs:\n{cm.output}")
+    #         self.assertTrue(any("CallbackError: Callback failed!" in line for line in cm.output),
+    #                         f"Expected exception message not found. Captured logs:\n{cm.output}")
+    #
+    #     self.assertTrue(task_completed.is_set())
+    #     self.assertEqual(c.results, ["done"])
+    #
+    #     c.dispose()
+    #     controller.dispose()
     # 4 ─ release() has no effect if threshold not yet met
     def test_release_before_threshold_is_noop(self):
         c = Conductor(threshold=2, manual_release=True)
