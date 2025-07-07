@@ -1175,26 +1175,62 @@ class CommandCenter(IDisposable):
         command = self.get_command_group(command_group)
 
         if command._worker_count >= command._max_workers:
-            self._notify('WORKER_CAP_REACHED', {'max_workers': command._max_workers, 'command_group': command.id} )
+            self._notify('WORKER_CAP_REACHED', {'max_workers': command._max_workers, 'command_group': command.id})
+            self._logger.warning(f"Cannot create agent. Worker cap of {command._max_workers} reached in command group '{command_group}'.")
             raise RuntimeError(f"Cannot create agent. Worker cap of {command._max_workers} reached.")
 
-            #TODO: Implement intercept for KWARGS and args to reset agent and redress it for reuse before we let it leave the pool
-            #TODO: Implement home location for the agent to return to after it has completed its task
-        try:
+        # Attempt to get an agent from the pool first
+        agent = self._attempt_pool_get_agent(template_name=template_name, command_group_id=command.id)
+        # Fallback to factory if needed
+        if agent is None:
+            agent = self._create_agent_from_template(template_name=template_name, command_group_id=command.id)
 
+        # Ensure the agent is properly configured
+        self._post_agent_creation(agent=agent, define_home=define_home, target=target, reset_agent=reset_agent, *args, **kwargs)
+        # Final registration
+        self._register_agent(agent, command)
+        return agent
+
+    def _attempt_pool_get_agent(self, template_name: str, command_group_id: str) -> Optional[Agent]:
+        """
+        Attempts to retrieve an agent from the AgentPool if available.
+        """
+        try:
+            return self._agent_pool.try_get_agent(template_name=template_name, group_name_id=command_group_id)
+        except Exception as e:
+            self._logger.error(f"AgentPool failed to provide pooled agent: {e}. Falling back to factory.")
+            self._notify('POOL_GET_FAILED', {'template_name': template_name, 'command_group': command_group_id})
+
+
+    def _create_agent_from_template(self, template_name: str, command_group_id: str, *args, **kwargs) -> Agent:
+        """
+        Internal helper to create an agent from a registered template.
+        This is used by the CommandCenter to create agents from templates.
+        """
+        try:
             kwargs["command_center"] = self
             agent = self._builder.create_agent(template_name, *args, **kwargs)
             agent.template_name = template_name
-            if reset_agent:
-                agent.reset()
-            if target:
-                agent.set_target(target)
-            if define_home:
-                agent.set_home(define_home)
-            self._register_agent(agent, command)
+            #TODO: Register agent with pool
             return agent
         except Exception as e:
+            self._logger.error(f"Failed to create agent from template '{template_name}': {e}", exc_info=True)
+            self._notify('AGENT_CREATION_FAILED', {'template_name': template_name, 'error': str(e)})
             raise RuntimeError(f"Agent creation failed: {str(e)}") from e
+
+    def _post_agent_creation(self, agent: Agent, define_home: Optional[Union[Callable[..., None], Pack]] = None,
+            target: Optional[Union[Callable[..., None], Pack]] = None, reset_agent: bool = False, *args, **kwargs) -> None:
+        """
+        Internal helper to finalize agent creation and setup.
+        """
+        #TODO: Implement kwargs onto agent somehow
+        if reset_agent:
+            agent.reset()
+        if target:
+            agent.set_target(target)
+        if define_home:
+            agent.set_home(define_home)
+
 
     def register_template(self, template_name: str, factory_fn: Union[Callable[..., Agent], Pack]):
         """

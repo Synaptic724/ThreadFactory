@@ -53,6 +53,8 @@ class _AgentPoolContainer(IDisposable):
 
         self._unregistered_agents = ConcurrentSet[ULID]()  # Tracks which threads have been requested to unregister
         self._unregister_agent_check = False  # Flag to indicate if any threads should unregister
+
+        # Command group information
         self._command_group_id = command_group.id  # The CommandGroup this container is associated with
         self._command_group_worker_count = command_group._worker_count
         self._command_group_max_worker_count = command_group._max_workers
@@ -89,6 +91,7 @@ class _AgentPoolContainer(IDisposable):
             self._unregistered_agents.dispose()  # Dispose of unregistration list
             self._unregistered_agents = None
             self._unregister_agent_check = False
+            # Clear references to CommandGroup
             self._command_group_worker_count = None  # Clear reference to CommandGroup
             self._command_group_max_worker_count = None  # Clear reference to CommandGroup
 
