@@ -1,4 +1,4 @@
-# ThreadFactory - The home of high-performance Agentic Multithreading
+[//]: # (# ThreadFactory - The home of high-performance Agentic Multithreading)
 
 [![PyPI version](https://badge.fury.io/py/threadfactory.svg)](https://badge.fury.io/py/threadfactory)
 [![License](https://img.shields.io/github/license/Synaptic724/threadfactory)](https://github.com/Synaptic724/threadfactory/blob/production/LICENSE)
@@ -15,8 +15,8 @@
 <!--[![Coverage Status](https://coveralls.io/repos/github/Synaptic724/threadfactory/badge.svg?branch=main)](https://coveralls.io/github/Synaptic724/threadfactory?branch=main) -->
 <!--[![CodeFactor](https://www.codefactor.io/repository/github/synaptic724/threadfactory/badge)](https://www.codefactor.io/repository/github/synaptic724/threadfactory) -->
 
-High-performance **No-GIL-friendly** data-structures & concurrency primitives for Python 3.13+.  
-Built to *scale up, fan out,* and leave the old GIL-bound world in the dust. 🚀
+High-performance concurrency toolkit — built **exclusively** for No-GIL Python 3.13+.  
+Scale across threads. Control the flow. Welcome to Python’s next generation of parallelism.
 
 ## ✨ Why ThreadFactory? Unlocking Peak Concurrency Performance
 
