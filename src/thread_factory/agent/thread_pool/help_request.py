@@ -2,7 +2,7 @@ import threading
 from datetime import datetime
 from ulid import ULID
 from typing import Callable, Union
-from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
+from thread_factory.agent.thread_pool.records import WorkStatus, Record
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.package import Pack
 

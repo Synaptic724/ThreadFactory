@@ -4,15 +4,14 @@ from typing import Callable, Union, Optional
 import ulid
 from thread_factory.concurrency.sync_types.sync_bool import SyncBool
 from thread_factory.concurrency.sync_types.sync_int import SyncInt
-from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
+from thread_factory.agent.thread_pool.records import WorkStatus
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from thread_factory.concurrency.concurrent_set import ConcurrentSet
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
 from thread_factory.synchronization.primitives.latch import Gate
 from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.runtime.orchestrator.monitoring.records.records import Records
+from thread_factory.agent.thread_pool.records import Records
 
 
 @dataclass(slots=True)
@@ -127,7 +126,7 @@ class _AgentPoolContainer(IDisposable):
             self._command_group_worker_count = None  # Clear reference to CommandGroup
             self._command_group_max_worker_count = None  # Clear reference to CommandGroup
 
-    def _container(self):
+    def _dispatch_loop(self):
         """
         Main entrypoint for worker participation in this pool.
 
@@ -158,6 +157,50 @@ class _AgentPoolContainer(IDisposable):
         except Exception as e:
             logging.error(f"Error in agent pool container: {e}")
 
+
+
+    def _throughput_loop(self):
+        """
+        Main entrypoint for worker participation in this pool.
+
+        Threads calling this will:
+        - Register themselves
+        - Wait until a notify is received
+        - Exit gracefully if they're marked for unregistration
+        """
+        if self._disposed:
+            raise RuntimeError("Container has been disposed and cannot be used.")
+        self._check_agent()  # Validate the thread is an AgenticWorker
+        self._register_agent()  # Add thread to the pool registry
+
+        try:
+            while self._active and not self._disposed:
+                if self._flow_regulator is None:
+                    break  # Container was disposed mid-loop
+
+                with self._flow_regulator:
+                    pass
+
+                if not self._ignore_tracking:
+                    self.attach_record()
+
+                if self._unregister_thread_check and self._should_exit():
+                    self._finalize_unregistration()
+                    return
+        except Exception as e:
+            logging.error(f"Error in agent pool container: {e}")
+
+
+    def _throughput_sleep(self):
+        while self._active and not self._disposed:
+            if self._flow_regulator is None:
+                break  # Container was disposed mid-loop
+
+            with self._flow_regulator:
+                pass
+
+            if threading.current_thread()._main_pool == True:
+                return
 
     def attach_record(self) -> None:
         """

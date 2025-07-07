@@ -451,8 +451,8 @@ class CommandCenter(IDisposable):
     """
 
     def __init__(self,
-                 group_max_workers: int = 10,
-                 total_max_workers: int = 30,
+                 group_max_workers: int = 30,
+                 total_max_workers: int = 300,
                  command_group_name: str = "default",
                  logger: Optional[logging.Logger] = None,
                  external_signal_controller: Optional[SignalController] = None):

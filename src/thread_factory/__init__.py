@@ -49,10 +49,6 @@ from thread_factory.synchronization.primitives import (
 # ---- Runtime Primitives ----
 from thread_factory.synchronization.primitives import __all__ as primatives_all
 
-# ---- Operations ----
-from thread_factory.runtime.factory.operations import (
-    Work # this will be implemented in the future
-)
 __all__ = primatives_all + [
     # Concurrency Collections
     "ConcurrentBuffer",

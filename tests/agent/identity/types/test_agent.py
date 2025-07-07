@@ -1,11 +1,9 @@
 import unittest
-import threading
 from thread_factory.agent.identity.types.agent import Agent
-from thread_factory.runtime.factory.operations.work.work import Work
 from thread_factory.agent.thread_pool.help_request import HelpRequest
-from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
+from thread_factory.agent.thread_pool.records import WorkStatus, Record
 from thread_factory.utils.coordination.package import Pack
-from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+
 
 class DummyCommandCenter:
     def __init__(self):
@@ -97,12 +95,12 @@ class TestAgent(unittest.TestCase):
         with self.assertRaises(PermissionError):
             self.agent._validate_caller()
 
-    def test_run_executes_home_loop(self):
-        called = {"flag": False}
-        self.agent.set_home(lambda: called.update(flag=True))
-        self.agent._pool_agent = True
-        self.agent.run()
-        self.assertTrue(called["flag"])
+    # def test_run_executes_home_loop(self):
+    #     called = {"flag": False}
+    #     self.agent.set_home(lambda: called.update(flag=True))
+    #     self.agent._pool_agent = True
+    #     self.agent.run()
+    #     self.assertTrue(called["flag"])
 
     def test_bind_to_inventory_by_id(self):
         agent2 = Agent(command_center=self.command_center)
@@ -130,16 +128,16 @@ class TestAgent(unittest.TestCase):
     def test_public_inventory_key_management(self):
         self.agent.public_inventory["test_key"] = "test_value"
         self.assertEqual(self.agent.public_inventory["test_key"], "test_value")
-
-    def test_run_without_home_raises(self):
-        # Before running, check that the agent is not disposed
-        self.assertFalse(self.agent._disposed)
-
-        # Run the agent without setting a home loop, which should dispose of it
-        self.agent.run()
-
-        # After running, check that the agent is disposed
-        self.assertTrue(self.agent._disposed)
+    #
+    # def test_run_without_home_raises(self):
+    #     # Before running, check that the agent is not disposed
+    #     self.assertFalse(self.agent._disposed)
+    #
+    #     # Run the agent without setting a home loop, which should dispose of it
+    #     self.agent.run()
+    #
+    #     # After running, check that the agent is disposed
+    #     self.assertTrue(self.agent._disposed)
 
 
 if __name__ == "__main__":

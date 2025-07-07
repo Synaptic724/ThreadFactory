@@ -1,18 +1,26 @@
 import logging
-import threading, ulid
+import threading
+from enum import Enum, auto
 from typing import Optional, Callable, Union, Any
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
-from thread_factory.runtime.factory.operations.work.work import Work
-from thread_factory.runtime.worker.worker.worker import Worker, WorkerState
+from thread_factory.agent.thread_pool.work import Work
+from thread_factory.agent.identity.types.base_agent import BaseAgent, AgentState
 from thread_factory.agent.thread_pool.help_request import HelpRequest
-from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
+from thread_factory.agent.thread_pool.records import WorkStatus, Record
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.synchronization import SignalController
 from thread_factory.utils.coordination.package import Pack
 
+class AgentPoolType(Enum):
+    """
+    Enum representing the type of agent.
+    """
+    NOTSET = auto()  # Represents an agent that has not been set to a specific type
+    DISPATCHER = auto()  # Represents a worker focused on dispatching tasks
+    THROUGHPUT = auto()   # Represents a worker focused on high throughput
 
 
-class Agent(Worker):
+class Agent(BaseAgent):
     """
     Agent
     ---------
@@ -99,15 +107,20 @@ class Agent(Worker):
         self._activity_name = None
         self._activity_id = None
 
+        # Internal State Management
         self._template_name = None  # This can be set to a specific template name if needed
         self._worker_type = "agentic" # Overrides Worker's default "mainpool"
         self._pool_agent: bool = False # This flag might be set by a pool manager
         self._return_home: bool = False # Controls behavior after task completion
         self._agent_reset: bool = False  # Indicates if the agent has been reset
 
+        # Loop and Event Pool Management
+        self._dismiss_agent: bool = False # Flag to indicate if the agent should be dismissed
+        self._pool_type = AgentPoolType.NOTSET
         self._event_loop: Optional['Pack'] = None # Example: Pack for the main behavior loop
         self._value_work: Optional['HelpRequest'] = None # Example: For binding specific work
 
+        # Agentic State Management
         self._private_inventory = ConcurrentDict()
         self.public_inventory: ConcurrentDict[str, Any] = ConcurrentDict()
         self._registered_activities: ConcurrentDict[str, 'BaseActivity'] = ConcurrentDict()
@@ -182,7 +195,7 @@ class Agent(Worker):
         self._activity_id = None
         self._activity_name = None
         self._agent_reset = True
-        self.state = WorkerState.IDLE
+        self.state = AgentState.IDLE
 
     def apply_attributes_from_kwargs(self, **kwargs) -> None:
         """
@@ -335,8 +348,28 @@ class Agent(Worker):
         with self._lock:
             if self._disposed:
                 raise RuntimeError("Cannot activate a disposed agent.")
-            self.state = WorkerState.ACTIVE
+            self.state = AgentState.ACTIVE
 
+
+        while not self._dismiss_agent:
+            if not self._dismiss_agent:
+                if self._pool_agent and self._pool_type == AgentPoolType.DISPATCHER:
+                    # If this is a pool agent, run the dispatcher loop
+                    self._dispatcher_loop()
+                elif self._pool_agent and self._pool_type == AgentPoolType.THROUGHPUT:
+                    self._throughput_loop()
+            else:
+                self.dispose()
+
+    def _dispatcher_loop(self):
+        """
+        This is the dispatcher loop for the agentic thread.
+
+        It will attempt to finish the target and if it can't, it'll attempt to
+        return to the event loop if it exists. If the agent is a pool agent,
+        it will run the event loop set via `set_home()`. If it is a standalone agent,
+        it will execute the `_target` function if provided.
+        """
         try:
             if self._target:
                 return self._target()  # Run the target if it's a standalone agent
@@ -347,6 +380,7 @@ class Agent(Worker):
             # Optionally, log the exception if needed
             pass
         finally:
+            self._logger.info(f"Agent '{self.factory_id}' dispatcher loop terminated.")
             # Ensure agent is disposed properly even after an exception
             self.dispose()
 
