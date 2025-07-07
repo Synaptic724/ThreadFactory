@@ -10,9 +10,9 @@ from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 
 class SignalLatch(IDisposable):
     """
-    SignalLatch
+    SignalLatch or SignalGate
     ===========
-    A *one-shot* (but reusable) latch that blocks threads until it is explicitly
+    A *one-shot* (but reusable) latch/gate that blocks threads until it is explicitly
     opened.  Just before a thread goes to sleep it can “signal” an external
     observer — typically a **Controller** — so orchestration layers know the
     thread is about to wait.
@@ -269,3 +269,6 @@ class SignalLatch(IDisposable):
         self._cond.dispose()
         self._signal_callback = None
         self._controller = None
+
+
+SignalGate = SignalLatch  # Alias for backward compatibility

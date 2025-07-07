@@ -36,7 +36,7 @@ class CommandGroup(IDisposable):
         An optional classification for the group (e.g., "ETL", "Modeling", etc.).
     """
 
-    def __init__(self, command_center: 'CommandCenter', group_name: str, max_workers: int, group_type: str = None):
+    def __init__(self, command_center: 'CommandCenter', group_name: str, max_workers: int, group_type: str = None, targeted_retrival: bool = False):
         """
         Initializes a new CommandGroup instance.
 
@@ -90,7 +90,10 @@ class CommandGroup(IDisposable):
         # --- Internal Components ---
         self._worker_count = SyncInt(0)
         self._max_workers = SyncInt(max_workers)
+        self._targeted_retrival = targeted_retrival
         self._command_center = command_center  # Reference to its creator
+        # Create Agent Pool Container
+        #self._agent_pool.create_new_group_container(group, max_workers)
 
         # Internal registries for its members
         self._active_agents: ConcurrentDict[str, Agent] = ConcurrentDict()
@@ -452,8 +455,7 @@ class CommandCenter(IDisposable):
                  total_max_workers: int = 30,
                  command_group_name: str = "default",
                  logger: Optional[logging.Logger] = None,
-                 external_signal_controller: Optional[SignalController] = None,
-                 targeted_retrival: bool = False):
+                 external_signal_controller: Optional[SignalController] = None):
         """
         Initializes a new CommandCenter instance.
 
@@ -499,7 +501,6 @@ class CommandCenter(IDisposable):
         self._builder = AgentBuilder()
         self._activity_builder = ActivityBuilder()
         # --- Pool Management ---
-        self._targeted_retrival = targeted_retrival
         self._agent_pool = AgentPool(self, self._logger)
 
         if not isinstance(group_max_workers, int) or group_max_workers < 1:
@@ -615,7 +616,7 @@ class CommandCenter(IDisposable):
             self._total_max_workers = new_global_limit
             self._logger.info(f"Global max workers limit increased to {new_global_limit}.")
 
-    def create_command_group(self, command_group_name: str, max_workers, command_group_type:str = None) -> None:
+    def create_command_group(self, command_group_name: str, max_workers, command_group_type:str = None, targeted_retrival: bool = False) -> None:
         """
         Internal method to create and register the default group.
         """
@@ -631,10 +632,7 @@ class CommandCenter(IDisposable):
             raise RuntimeError(f"Cannot create CommandGroup '{command_group_name}'. Total active workers would exceed global limit of {self._total_max_workers}, increase new total limit to create a new group.")
 
         # Create the CommandGroup instance and register it
-        group = CommandGroup(group_name=command_group_name, max_workers=max_workers, command_center=self, group_type=command_group_type)
-
-        # Create Agent Pool Container
-        #self._agent_pool.create_new_group_container(group, max_workers)
+        group = CommandGroup(group_name=command_group_name, max_workers=max_workers, command_center=self, group_type=command_group_type, targeted_retrival=targeted_retrival)
         self._command_groups[command_group_name] = group
 
     def get_command_group(self, group_name: str) -> Optional[CommandGroup]:

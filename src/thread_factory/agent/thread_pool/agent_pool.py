@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Callable, Union, Optional
 import ulid
 from thread_factory.concurrency.sync_types.sync_bool import SyncBool
+from thread_factory.concurrency.sync_types.sync_int import SyncInt
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
@@ -14,7 +15,7 @@ from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.runtime.orchestrator.monitoring.records.records import Records
 
 
-@dataclass
+@dataclass(slots=True)
 class ClaimedAgentRef:
     """
     Represents a temporarily claimed agent for pre-dispatch coordination.
@@ -82,7 +83,6 @@ class _AgentPoolContainer(IDisposable):
         self._unregister_agent_check = False  # Flag to indicate if any threads should unregister
 
         # Command group information
-        self._command_group = command_group  # The CommandGroup this container is associated with
         self._command_group_id = command_group.id  # The CommandGroup this container is associated with
         self._command_group_worker_count = command_group._worker_count
         self._command_group_max_worker_count = command_group._max_workers
@@ -108,14 +108,15 @@ class _AgentPoolContainer(IDisposable):
                 self._unregistered_agents = self._registered_agents
             else:
                 self._unregistered_agents = ConcurrentSet(self._registered_agents.keys())
-
-            self._unregister_agent_check = True
+                self._unregister_agent_check = True
 
             self._flow_regulator.notify_all()  # Wake all threads
             self._flow_regulator.dispose()  # Dispose of the switch lock
             self._flow_regulator = None  # Clear reference to FlowRegulator
             self._active = False  # Mark container inactive
 
+            for records in self._registered_agents.values():
+                records.dispose()
             self._registered_agents.dispose()  # Dispose of registry
             self._registered_agents = None
             self._unregistered_agents.dispose()  # Dispose of unregistration list
@@ -141,9 +142,12 @@ class _AgentPoolContainer(IDisposable):
         self._register_agent()  # Add thread to the pool registry
 
         try:
-            while self._active:
+            while self._active and not self._disposed:
+                if self._flow_regulator is None:
+                    break  # Container was disposed mid-loop
+
                 with self._flow_regulator:
-                    pass  # Thread will block here until notified
+                    pass
 
                 if not self._ignore_tracking:
                     self.attach_record()
@@ -189,6 +193,8 @@ class _AgentPoolContainer(IDisposable):
 
         Depending on `ignore_tracking`, either adds to a set or creates a Records entry.
         """
+        if self._disposed:
+            raise RuntimeError("Container has been disposed; cannot register new agents.")
         threading.current_thread()._pool_agent = True
         factory_id = self._get_agent_id()
         with self._lock:
@@ -310,6 +316,55 @@ class _AgentPoolContainer(IDisposable):
         """
         return item in self._registered_agents if self._ignore_tracking else item in self._registered_agents.keys()
 
+@dataclass(slots=True)
+class ContainerCluster:
+    container_type: str
+    containers: Optional[ConcurrentList[_AgentPoolContainer]]
+    max_size: Optional[SyncInt]  # Optional: max agents per container
+
+    def dispose(self):
+        """
+        Disposes all containers in this cluster.
+        """
+        for container in self.containers:
+            container.dispose()
+        self.containers.dispose()
+        self.containers = None
+        self.max_size = None
+
+    def get_available_container(self) -> Optional[_AgentPoolContainer]:
+        """
+        Returns a container that has room for more agents.
+
+        If all containers are full, returns None.
+        """
+        for container in self.containers:
+            if len(container) < self.max_size.value:
+                return container
+        return None
+
+    def register_container(self, container: _AgentPoolContainer):
+        """
+        Registers a new container into the cluster.
+
+        Args:
+            container (_AgentPoolContainer): The container to register.
+        """
+        self.containers.append(container)
+
+    def unregister_container(self, container: _AgentPoolContainer):
+        """
+        Removes a container from the cluster.
+
+        Args:
+            container (_AgentPoolContainer): The container to remove.
+        """
+        try:
+            self.containers.remove(container)
+            container.dispose()
+        except ValueError:
+            pass
+
 
 class _CommandGroupContainer(IDisposable):
     """
@@ -338,8 +393,10 @@ class _CommandGroupContainer(IDisposable):
         self._group_id = group_id
 
         # Template name => agent containers (for both targeted/untargeted)
-        self._targeted_containers: ConcurrentDict[str, _AgentPoolContainer] = ConcurrentDict()
-        self._untargeted_containers: ConcurrentDict[str, _AgentPoolContainer] = ConcurrentDict()
+        self._targeted_cluster: ConcurrentDict[str, ContainerCluster] = ConcurrentDict()
+        self._untargeted_cluster: Optional[ContainerCluster] = None
+
+        self._logger.info(f"Initialized CommandGroupContainer for group ID: {group_id}")
 
     def dispose(self):
         """
@@ -348,41 +405,80 @@ class _CommandGroupContainer(IDisposable):
         if self._disposed: return
         with self._lock:
             self._disposed = True
-            for container in self._targeted_containers.values():
+            for container in self._targeted_cluster.values():
                 container.dispose()
-            for container in self._untargeted_containers.values():
-                container.dispose()
-            self._targeted_containers.clear()
-            self._untargeted_containers.clear()
+            self._targeted_cluster = None
+            self._untargeted_cluster.dispose()
+            self._untargeted_cluster = None
 
-
-    def register_container(self, template_name: str, container: _AgentPoolContainer, targeted: bool = False):
+    def register_container(self, container: _AgentPoolContainer, max_size: int, template_name: str = "default",  targeted: bool = False):
         """
-        Registers a new container for a given agent template.
+        Registers a container under the correct cluster based on targeting strategy.
 
         Args:
-            template_name (str): The agent template this container handles.
-            container (_AgentPoolContainer): The container instance.
-            targeted (bool): Whether this is a targeted dispatch container.
+            container (_AgentPoolContainer): The pool to register.
+            max_size (int): Maximum number of agents this container can hold.
+            template_name (str): Template name or dispatch key.
+            targeted (bool): Whether this is a targeted or general pool.
         """
         if targeted:
-            self._targeted_containers[template_name] = container
+            cluster = self._targeted_cluster.get(template_name)
+            if not cluster:
+                cluster = ContainerCluster(container_type=template_name,
+                                           containers=ConcurrentList[_AgentPoolContainer](),
+                                           max_size=SyncInt(max_size))  # default cap
+                self._targeted_cluster[template_name] = cluster
+            cluster.register_container(container)
         else:
-            self._untargeted_containers[template_name] = container
+            if not self._untargeted_cluster:
+                self._untargeted_cluster = ContainerCluster(container_type="untargeted",
+                                                            containers=ConcurrentList[_AgentPoolContainer](),
+                                                            max_size=SyncInt(max_size))
+            self._untargeted_cluster.register_container(container)
 
-    def get_container(self, template_name: str, targeted: bool = False) -> Optional[_AgentPoolContainer]:
+    def unregister_container(self, template_name: str, container: _AgentPoolContainer, targeted: bool = False):
         """
-        Retrieves the container for a given template and dispatch mode.
+        Unregisters a container from the cluster.
 
         Args:
-            template_name (str): The agent template.
-            targeted (bool): Whether to look in targeted or untargeted pools.
+            template_name (str): The template or key under which the container is stored.
+            container (_AgentPoolContainer): The container to unregister.
+            targeted (bool): Whether it's from the targeted or untargeted set.
+        """
+        if targeted:
+            cluster = self._targeted_cluster.get(template_name)
+            if cluster:
+                cluster.unregister_container(container)
+                if not cluster.containers:  # if empty
+                    self._targeted_cluster.pop(template_name, None)
+        else:
+            if self._untargeted_cluster:
+                self._untargeted_cluster.unregister_container(container)
+                if not self._untargeted_cluster.containers:
+                    self._untargeted_cluster = None
+
+    def get_or_create_container(self, template_name: str, targeted: bool = False) -> _AgentPoolContainer:
+        """
+        Retrieves a usable container or creates one if none available.
+
+        Args:
+            template_name (str): Template or dispatch key.
+            targeted (bool): Whether the container should be targeted.
 
         Returns:
-            Optional[_AgentPoolContainer]: The matching container or None.
+            _AgentPoolContainer: A ready-to-use container.
         """
-        containers = self._targeted_containers if targeted else self._untargeted_containers
-        return containers.get(template_name, None)
+        cluster = self._targeted_cluster.get(template_name) if targeted else self._untargeted_cluster
+        if cluster:
+            container = cluster.get_available_container()
+            if container:
+                return container
+
+        # Make a new one
+        new_container = _AgentPoolContainer(command_group=self, logger=self._logger)
+        self.register_container(template_name=template_name, container=new_container, targeted=targeted)
+        return new_container
+
 
 class AgentPool(IDisposable):
     """
