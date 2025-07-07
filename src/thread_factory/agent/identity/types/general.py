@@ -212,7 +212,7 @@ class General(Agent):
             "register_data_transfer": self.register_data_transfer,
             "execute_transfer": self.execute_transfer,
             "get_data_transfer_dict": self.get_data_transfer_dict,
-
+            "set_home": self.set_home,
             # The get_name and get_description are overridden in General,
             # so these calls will now reflect the General profile's implementation.
             "get_name": self.get_name,

@@ -318,7 +318,6 @@ class Agent(threading.Thread, IDisposable):
             "commands": ConcurrentDict({
                 "get_name": self.get_name,
                 "get_description": self.get_description,
-                "set_home": self.set_home,
                 "set_return_home": self.set_return_home,
                 "get_bound_work_state": self._get_work_state,
                 "get_bound_work_id": lambda: self._value_work.record.task_id if self._value_work else None,
