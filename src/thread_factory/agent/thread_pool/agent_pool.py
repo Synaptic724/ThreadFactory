@@ -125,7 +125,7 @@ class AgentPoolContainer(IDisposable):
             self._command_group_worker_count = None  # Clear reference to CommandGroup
             self._command_group_max_worker_count = None  # Clear reference to CommandGroup
 
-    def _dispatch_loop(self):
+    def _untargeted_dispatch_loop(self):
         """
         Main entrypoint for worker participation in this pool.
 
@@ -154,8 +154,38 @@ class AgentPoolContainer(IDisposable):
                     self._finalize_unregistration()
                     return
         except Exception as e:
-            logging.error(f"Error in agent pool container: {e}")
+            self._logger.error(f"Error in agent pool container: {e}")
 
+    def _targeted_dispatch_loop(self):
+        """
+        Main entrypoint for worker participation in this pool.
+
+        Threads calling this will:
+        - Register themselves
+        - Wait until a notify is received
+        - Exit gracefully if they're marked for unregistration
+        """
+        if self._disposed:
+            raise RuntimeError("Container has been disposed and cannot be used.")
+        self._check_agent()  # Validate the thread is an AgenticWorker
+        self._register_agent()  # Add thread to the pool registry
+
+        try:
+            while self._active and not self._disposed:
+                if self._flow_regulator is None:
+                    break  # Container was disposed mid-loop
+
+                with self._flow_regulator:
+                    pass
+
+                if not self._ignore_tracking:
+                    self.attach_record()
+
+                if self._unregister_thread_check and self._should_exit():
+                    self._finalize_unregistration()
+                    return
+        except Exception as e:
+            self._logger.error(f"Error in agent pool container: {e}")
 
 
     def _throughput_loop(self):
@@ -168,6 +198,7 @@ class AgentPoolContainer(IDisposable):
         - Exit gracefully if they're marked for unregistration
         """
         if self._disposed:
+            self._logger.error("Container has been disposed and cannot be used.")
             raise RuntimeError("Container has been disposed and cannot be used.")
         self._check_agent()  # Validate the thread is an AgenticWorker
         self._register_agent()  # Add thread to the pool registry
@@ -187,7 +218,7 @@ class AgentPoolContainer(IDisposable):
                     self._finalize_unregistration()
                     return
         except Exception as e:
-            logging.error(f"Error in agent pool container: {e}")
+            self._logger.error(f"Error in agent pool container: {e}")
 
 
     def _throughput_sleep(self):
@@ -359,21 +390,29 @@ class AgentPoolContainer(IDisposable):
         return item in self._registered_agents if self._ignore_tracking else item in self._registered_agents.keys()
 
 
-@dataclass(slots=True)
-class ContainerCluster:
-    container_type: str
-    containers: Optional[ConcurrentList[AgentPoolContainer]]
-    max_size: Optional[SyncInt]  # Optional: max agents per container
+class ContainerCluster(IDisposable):
+
+    def __init__(self, command_group: 'CommandGroup', logger: Union[logging.Logger, None] = None):
+        super().__init__()
+
+        self._logger = logger or logging.getLogger(__name__)
+        self._container_type: Optional[str] = None
+        self._containers: Optional[ConcurrentList[AgentPoolContainer]] = None
+        self._max_size: Optional[SyncInt] = SyncInt(command_group._max_workers)# Optional: max agents per container
+        self._logger.info("Initialized ContainerCluster for CommandGroup: %s", command_group.id)
 
     def dispose(self):
         """
         Disposes all containers in this cluster.
         """
-        for container in self.containers:
+        for container in self._containers:
             container.dispose()
-        self.containers.dispose()
-        self.containers = None
-        self.max_size = None
+
+        self._containers.dispose()
+        self._containers = None
+        self._max_size = None
+        self._logger.info("Disposed ContainerCluster for CommandGroup: %s", self._container_type)
+
 
     def get_available_container(self) -> Optional[AgentPoolContainer]:
         """
@@ -381,8 +420,8 @@ class ContainerCluster:
 
         If all containers are full, returns None.
         """
-        for container in self.containers:
-            if len(container) < self.max_size.value:
+        for container in self._containers:
+            if len(container) < self._max_size.value:
                 return container
         return None
 
@@ -393,7 +432,7 @@ class ContainerCluster:
         Args:
             container (_AgentPoolContainer): The container to register.
         """
-        self.containers.append(container)
+        self._containers.append(container)
 
     def unregister_container(self, container: AgentPoolContainer):
         """
@@ -403,7 +442,7 @@ class ContainerCluster:
             container (_AgentPoolContainer): The container to remove.
         """
         try:
-            self.containers.remove(container)
+            self._containers.remove(container)
             container.dispose()
         except ValueError:
             pass
@@ -411,7 +450,7 @@ class ContainerCluster:
 
 class CommandGroupContainer(IDisposable):
     """
-    _CommandGroupContainer
+    CommandGroupContainer
     -----------------------
     Manages the containers for a specific CommandGroup.
 
@@ -570,10 +609,7 @@ class DataCenter(IDisposable):
         if self._disposed:
             raise RuntimeError("DataCenter has been disposed.")
         with self._lock:
-            container = self._containers.get(group_id)
-            if not container:
-                raise ValueError(f"No container found for group ID: {group_id}")
-            container.receive_records(records)
+            pass
 
 
 class AgentPool(IDisposable):
@@ -689,8 +725,6 @@ class AgentPool(IDisposable):
 
 #endregion Destructor
 #region Targeted Retrieval System
-
-
 
 #endregion Targeted Retrieval System
 

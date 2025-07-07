@@ -1,5 +1,5 @@
 import logging
-from thread_factory.agent.identity.types.agent import Agent
+from thread_factory.agent.identity.types.agent import Agent, AgentPoolType, AgentState
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.synchronization import SignalController
 from thread_factory.utils.coordination.package import Pack
@@ -88,9 +88,13 @@ class General(Agent):
 
         # Initialize General-specific routing registries as ConcurrentDicts.
         # Assuming ConcurrentDict is IDisposable and needs to be initialized.
-        self.save_points = None
-        self.locations = None
-        self.data_transfer = None
+        self.save_points: Optional[str, Pack] = ConcurrentDict() #Callables that can be executed for small work or activity
+        self.locations: Optional[str, Pack] = ConcurrentDict() # Concrete location of interest
+        self.data_transfer: Optional[str, Pack] = ConcurrentDict() # Important data transfer areas
+
+        # Agentic State Management
+        self._private_inventory = ConcurrentDict() # Local Inventory for this agent, only accessible by the agent itself.
+        self.public_inventory: ConcurrentDict[str, Any] = ConcurrentDict() # Public Inventory for this agent, accessible by all threads.
 
         # Call the parent Agent's __init__ method.
         # Pass all necessary arguments that Agent's __init__ expects.
@@ -110,22 +114,34 @@ class General(Agent):
         disposing of all registered behaviors and identity attributes before
         calling the base class's dispose method.
         """
-        if self._disposed:
-            return
 
-        # Dispose of collections specific to the General profile
-        if self.save_points:
-            self.save_points.dispose()
-            self.save_points = None
-        if self.locations:
-            self.locations.dispose()
-            self.locations = None
-        if self.data_transfer:
-            self.data_transfer.dispose()
-            self.data_transfer = None
+        with self._lock:
+            if self._disposed:
+                return
 
-        # Call the dispose method of the parent class
-        super().dispose()
+            self._dismiss_agent = True
+
+            # Dispose of collections specific to the General profile
+            if self.save_points:
+                self.save_points.dispose()
+                self.save_points = None
+            if self.locations:
+                self.locations.dispose()
+                self.locations = None
+            if self.data_transfer:
+                self.data_transfer.dispose()
+                self.data_transfer = None
+
+            if self._private_inventory:
+                self._private_inventory.dispose()
+                self._private_inventory = None
+            if self.public_inventory:
+                self.public_inventory.dispose()
+                self.public_inventory = None
+
+
+            # Call the dispose method of the parent class
+            super().dispose()
 
     def reset(self) -> None:
         """
@@ -148,6 +164,12 @@ class General(Agent):
             self.save_points.clear()
         if self.data_transfer:
             self.data_transfer.clear()
+        # Clear inventories without disposing
+        if self._private_inventory:
+            self._private_inventory.clear()
+        if self.public_inventory:
+            self.public_inventory.clear()
+
 
         self.public_id = None
         self.public_name = None
@@ -194,12 +216,192 @@ class General(Agent):
             # The get_name and get_description are overridden in General,
             # so these calls will now reflect the General profile's implementation.
             "get_name": self.get_name,
-            "get_description": self.get_description
+            "get_description": self.get_description,
+            # General-specific inventory management
+            "get_from_private_inventory": self.get_from_private_inventory,
+            "put_in_private_inventory": self.put_in_private_inventory,
+
         })
         # Override or set agent_type specifically for General if desired
         details["name"] = self.__class__.__name__
         return details
 
+#region Agentic Activity
+    def set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
+        """
+        Sets the primary, default execution loop or "home behavior" for the agent.
+
+        This function defines the agent's main operational loop, which is executed
+        when `run()` is called for a pool-bound agent.
+
+        Args:
+            fn (Union[Callable[..., None], Pack]): A parameterless callable or `Pack`
+                that represents the agent's main execution loop.
+        """
+        self.locations["home"] = Pack.bundle(fn) if fn else None
+
+    def set_sleep_location(self, fn: Union[Callable[..., None], Pack]) -> None:
+        """
+        Sets the primary, default execution loop or "home behavior" for the agent.
+
+        This function defines the agent's main operational loop, which is executed
+        when `run()` is called for a pool-bound agent.
+
+        Args:
+            fn (Union[Callable[..., None], Pack]): A parameterless callable or `Pack`
+                that represents the agent's main execution loop.
+        """
+        self.locations["sleep"] = Pack.bundle(fn) if fn else None
+
+    def set_target(self, target: Union[Callable[..., Any], Pack]) -> None:
+        """
+        This method sets the target function or `Pack` for the agent.
+        """
+        if target and (isinstance(target, Callable) or isinstance(target, Pack)):
+            self.locations["target"] = Pack.bundle(target)
+        elif target is not None:
+            raise TypeError("Target must be a Callable or Pack instance.")
+        else:
+            self.locations["target"] = None
+
+
+    def run(self):
+        """
+        Main execution entry point for the agentic thread.
+
+        - If `self._pool_agent` is `True`, this thread executes the agentic event
+          loop set via `set_home()`. This is the standard behavior for agents
+          within a dynamic thread pool.
+        - Otherwise, it falls back to the standard `threading.Thread.run()`
+          behavior, executing the `_target` function if provided. This supports
+          standalone thread logic outside the pool framework.
+
+        Raises:
+            RuntimeError: If the agent is a pool agent but `_event_loop` has not
+                been set, or if it is a standalone agent but no `_target` is defined.
+        """
+        with self._lock:
+            if self._disposed:
+                raise RuntimeError("Cannot activate a disposed agent.")
+            self.state = AgentState.ACTIVE
+
+        self._life_loop()
+
+    def _life_loop(self):
+        """
+        This is the main life loop for the agentic thread.
+
+        It allows the agentic agent to travel through many states and
+        locations when required it provides a robust way to manage its life
+        cycle by going through the various states of the agentic thread.
+        """
+        while not self._dismiss_agent:
+            if not self._dismiss_agent:
+                if self._pool_agent and self._pool_type == AgentPoolType.DISPATCHER:
+                    self._notify("Agentic thread started.")
+                    # If this is a pool agent, run the dispatcher loop
+                    self._dispatcher_loop()
+                elif self._pool_agent and self._pool_type == AgentPoolType.THROUGHPUT:
+                    self._throughput_loop()
+            else:
+                self.dispose()
+
+    def _dispatcher_loop(self) -> None:
+        """
+        This is the dispatcher loop for the agentic thread.
+
+        It will attempt to finish the target and if it can't, it'll attempt to
+        return to the event loop if it exists. If the agent is a pool agent,
+        it will run the event loop set via `set_home()`. If it is a standalone agent,
+        it will execute the `_target` function if provided.
+        """
+        try:
+            if self.locations["target"]:
+                return self.locations["target"]()  # Run the target if it's a standalone agent
+
+            if self.locations["home"]:
+                self.locations["home"]()
+        except Exception as e:
+            # Optionally, log the exception if needed
+            pass
+        finally:
+            if self._return_home:
+                return
+            self._logger.info(f"Agent '{self.factory_id}' dispatcher loop terminated.")
+            # Ensure agent is disposed properly even after an exception
+            self.dispose()
+
+    def _throughput_loop(self):
+        """
+        This is the dispatcher loop for the agentic thread.
+
+        It will attempt to finish the target and if it can't, it'll attempt to
+        return to the event loop if it exists. If the agent is a pool agent,
+        it will run the event loop set via `set_home()`. If it is a standalone agent,
+        it will execute the `_target` function if provided.
+        """
+        try:
+            while not self._dismiss_agent:
+                if self._pool_type == AgentPoolType.THROUGHPUT:
+                    self.locations["home"]()
+
+                if self._pool_type == AgentPoolType.THROUGHPUT_SLEEP:
+                    self.locations["sleep"]()
+
+                if self._return_home:
+                    return
+
+        except Exception as e:
+            # Optionally, log the exception if needed
+            pass
+        finally:
+            if self._return_home:
+                return
+            self._logger.info(f"Agent '{self.factory_id}' dispatcher loop terminated.")
+            # Ensure agent is disposed properly even after an exception
+            self.dispose()
+
+    def assign_throughput_to_sleep(self):
+        """
+        Assigns the agent to a sleep loop, which is a specialized behavior for
+        agents that need to manage their execution in a controlled manner.
+
+        This method sets the `_pool_type` to `AgentPoolType.THROUGHPUT_SLEEP`
+        and assigns the `_sleep_loop` to the agent's event loop.
+        """
+        self._pool_type = AgentPoolType.THROUGHPUT_SLEEP
+
+    def assign_sleep_to_throughput(self):
+        """
+        Assigns the agent to a throughput loop, which is a specialized behavior for
+        agents that need to manage their execution in a high-throughput manner.
+
+        This method sets the `_pool_type` to `AgentPoolType.THROUGHPUT`
+        and assigns the `_event_loop` to the agent's event loop.
+        """
+        self._pool_type = AgentPoolType.THROUGHPUT
+
+    def assign_dispatcher(self):
+        """
+        Assigns the agent to a dispatcher loop, which is a specialized behavior for
+        agents that need to manage their execution in a dispatching manner.
+
+        This method sets the `_pool_type` to `AgentPoolType.DISPATCHER`
+        and assigns the `_event_loop` to the agent's event loop.
+        """
+        self._pool_type = AgentPoolType.DISPATCHER
+
+    def assign_dispatcher_targeted(self):
+        """
+        Assigns the agent to a targeted dispatcher loop, which is a specialized behavior for
+        agents that need to manage their execution in a dispatching manner where they can be claimed.
+
+        This method sets the `_pool_type` to `AgentPoolType.DISPATCHER_TARGETED`
+        and assigns the `_event_loop` to the agent's event loop.
+        """
+        self._pool_type = AgentPoolType.DISPATCHER_TARGETED
+
+#endregion Agentic Activity
 #region General-specific Identity Getters
     def get_public_id(self) -> Optional[str]:
         """
@@ -231,6 +433,32 @@ class General(Agent):
         with self._lock:
             return self.job_title
 
+    def get_from_private_inventory(self, key: str, default=None) -> Any:
+        """
+        Retrieves a value from the private inventory of this agent, only if the calling thread has the
+        correct `factory_id`.
+
+        Args:
+            key (str): The key of the item to retrieve.
+            default (Any, optional): The value to return if the key is not found. Defaults to None.
+
+        Returns:
+            Any: The value from the inventory, or the default value if not found.
+        """
+        self._validate_caller()  # Validate caller using the existing method
+        return self._private_inventory.get(key, default)
+
+    def put_in_private_inventory(self, key: str, value: Any) -> None:
+        """
+        Puts a value in the private inventory of this agent, only if the calling thread has the
+        correct `factory_id`.
+
+        Args:
+            key (str): The key under which to store the value.
+            value (Any): The value to store in the inventory.
+        """
+        self._validate_caller()  # Validate caller using the existing method
+        self._private_inventory[key] = value
 #endregion
 
     def get_name(self) -> str:
