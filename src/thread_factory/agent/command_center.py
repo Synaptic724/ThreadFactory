@@ -1206,6 +1206,9 @@ class CommandCenter(IDisposable):
 
         # Attempt to get an agent from the pool first
         agent = self._attempt_pool_get_agent(template_name=template_name, command_group_id=command.id)
+
+        #TODO: WE need to handle the case where the pool returns None, which means we need to apply backpressure if the pool is maxed they wont' be able tom ake workers anyways
+        #we need to fill the pool immediately upon creation
         # Fallback to factory if needed
         if agent is None:
             agent = self._create_agent_from_template(template_name=template_name, command_group_id=command.id)
