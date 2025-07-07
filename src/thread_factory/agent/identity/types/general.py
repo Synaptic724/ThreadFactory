@@ -131,6 +131,35 @@ class General(Agent):
         # Call the dispose method of the parent class
         super().dispose()
 
+    def reset(self) -> None:
+        """
+        Soft-reset the General agent to a clean state for reuse.
+
+        This method:
+        - Clears all registered locations, save points, and data transfer logic.
+        - Preserves the instance (no disposal).
+        - Invokes the base Agent's `reset()` method to clear work state and inventories.
+
+        Raises:
+            RuntimeError: If the agent has already been disposed.
+        """
+        if self._disposed:
+            raise RuntimeError("Cannot reset a disposed agent.")
+
+        if self.locations:
+            self.locations.clear()
+        if self.save_points:
+            self.save_points.clear()
+        if self.data_transfer:
+            self.data_transfer.clear()
+
+        self.public_id = None
+        self.public_name = None
+        self.job_title = None
+
+        # Now defer to base Agent's reset logic
+        super().reset()
+
     def _get_object_details(self) -> ConcurrentDict[str, Any]:
         """
         Extends the base Agent's object details with commands and metadata specific to a General profile.

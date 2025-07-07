@@ -128,7 +128,7 @@ class CommandGroup(IDisposable):
             self._active_activities.dispose()
 
     # region CommandGroup Methods
-    def add_agent(self, template_name: str = "default", **kwargs) -> Optional[Agent]:
+    def add_agent(self, template_name: str = "default", reset_agent: bool = False, *args, **kwargs) -> Optional[Agent]:
         """
         Creates and registers a new agent under this CommandGroup.
 
@@ -139,6 +139,10 @@ class CommandGroup(IDisposable):
         -----------
         template_name : str
             The agent template to use when creating the new agent.
+        reset_agent : bool
+            If True, the agent will be reset before deployment.
+        *args : Any
+            Positional arguments to pass to the CommandCenter's agent creation logic.
         **kwargs : Any
             Additional arguments to pass to the CommandCenter's agent creation logic.
 
@@ -156,6 +160,8 @@ class CommandGroup(IDisposable):
         agent = self._command_center.create_agent(
             template_name=template_name,
             command_group_name=self.name,
+            reset_agent=reset_agent,
+            *args,
             **kwargs
         )
         return agent
@@ -794,7 +800,7 @@ class CommandCenter(IDisposable):
         return self._activity_builder.list_activities()
 
 
-    def deploy_activity(self, activity: 'BaseActivity', worker_count: int, command_group_name: str = "default"):
+    def deploy_activity(self, activity: 'BaseActivity', worker_count: int, command_group_name: str = "default", reset_agents: bool = False,):
         """
         Creates, assigns, and deploys a specified number of workers to a given
         JobActivity, starting the work immediately.
@@ -807,6 +813,7 @@ class CommandCenter(IDisposable):
                                     have a `perform_activity` and `start` method.
             worker_count (int): The number of agents to create and assign to the job.
             command_group_name (str): The name of the command group to deploy the activity in.
+            reset_agents (bool): If True, agents will be reset before deployment.
 
         Raises:
             TypeError: If the provided object is not a valid JobActivity.
@@ -835,7 +842,7 @@ class CommandCenter(IDisposable):
         # Create and deploy the team of agents
         for _ in range(worker_count):
             # Create an agent whose target is the activity's main work loop
-            agent = self.create_agent(command_group_name=command_group_name, target=activity.perform_activity)
+            agent = self.create_agent(command_group_name=command_group_name, target=activity.perform_activity, reset_agent=reset_agents)
 
             # Formally register the agent with the activity
             activity.register_agent(agent)
@@ -944,6 +951,7 @@ class CommandCenter(IDisposable):
             define_home: Optional[Union[Callable[..., None], Pack]] = None,
             target: Optional[Union[Callable[..., None], Pack]] = None,
             command_group_name: str = "default",
+            reset_agent: bool = False,
             *args, **kwargs
     ) -> Agent:
         """
@@ -954,6 +962,7 @@ class CommandCenter(IDisposable):
             define_home (Callable | Pack, optional): A function representing the agent's long-lived event loop.
             target (Callable | Pack, optional): A one-time task to run before the main loop.
             command_group_name (str): The name of the command group to register the agent in.
+            reset_agent (bool): If True, the agent will be reset before execution.
             *args: Positional overrides passed to the template factory.
             **kwargs: Keyword overrides passed to the template factory.
 
@@ -963,12 +972,7 @@ class CommandCenter(IDisposable):
         self._check_disposed()
         if define_home is None and target is None:
             raise ValueError("At least one of define_home or target must be provided.")
-        agent = self._create_and_register_agent(template_name, command_group_name, *args, **kwargs)
-        if target:
-            agent.set_target(target)
-        if define_home:
-            agent.set_home(define_home)
-        return agent
+        return self._create_and_register_agent(template_name=template_name, define_home=define_home,target=target, command_group=command_group_name, reset_agent=reset_agent,*args, **kwargs)
 
     def create_agents(
         self,
@@ -977,6 +981,7 @@ class CommandCenter(IDisposable):
         target: Optional[Union[Callable[..., None], Pack]] = None,
         define_home: Optional[Union[Callable[..., None], Pack]] = None,
         command_group_name: str = "default",
+        reset_agents: bool = False,
         *args, **kwargs
     ) -> ConcurrentList[Agent]:
         """
@@ -988,6 +993,7 @@ class CommandCenter(IDisposable):
             template_name (str): Template to use for agent construction.
             target (Callable | Pack, optional): One-time task to execute inside each agent.
             define_home (Callable | Pack, optional): Loop function to run as main logic.
+            reset_agents (bool): If True, the agent will be reset before execution.
             *args: Positional overrides for the factory.
             **kwargs: Keyword overrides for the factory.
 
@@ -1001,7 +1007,7 @@ class CommandCenter(IDisposable):
         new_agents = ConcurrentList()
         for i in range(count):
             try:
-                agent = self.create_agent(command_group_name=command_group_name, template_name=template_name, define_home=define_home, target=target, *args, **kwargs)
+                agent = self.create_agent(command_group_name=command_group_name, template_name=template_name, define_home=define_home, target=target, reset_agent=reset_agents, *args, **kwargs)
                 new_agents.append(agent)
             except RuntimeError:
                 warnings.warn(f"Worker cap reached. Created {i} of {count} requested agents.", UserWarning)
@@ -1014,6 +1020,7 @@ class CommandCenter(IDisposable):
         define_home: Optional[Union[Callable[..., None], Pack]] = None,
         template_name: str = "default",
         command_group_name: str = "default",
+        reset_agent: bool = False,
         *args, **kwargs
     ) -> None:
         """
@@ -1026,11 +1033,12 @@ class CommandCenter(IDisposable):
             command_group_name (str): The name of the command group to register the agent in.
             define_home (Callable | Pack, optional): A function representing the agent's long-lived event loop.
             template_name (str, optional): Template to use (defaults to 'default').
+            reset_agent (bool): If True, the agent will be reset before execution.
             *args: Positional overrides passed to the agent template.
             **kwargs: Keyword overrides passed to the agent template.
         """
         agent = self.create_agent(command_group_name=command_group_name, template_name=template_name,
-                                  target=target, define_home=define_home,*args, **kwargs)
+                                  target=target, define_home=define_home, reset_agent=reset_agent, *args, **kwargs)
         agent.deploy()
 
     def group_submit(
@@ -1040,6 +1048,7 @@ class CommandCenter(IDisposable):
             define_home: Optional[Union[Callable[..., None], Pack]] = None,
             template_name: str = "default",
             command_group_name: str = "default",
+            reset_agents: bool = False,
             *args, **kwargs
     ) -> None:
         """
@@ -1053,6 +1062,7 @@ class CommandCenter(IDisposable):
             define_home (Callable | Pack, optional): A function representing the agent's long-lived event loop.
             agents (int): Number of agents to create and run the task in parallel.
             template_name (str, optional): Template to use (defaults to 'default').
+            reset_agents (bool): If True, the agents will be reset before execution.
             *args: Positional overrides passed to the agent template.
             **kwargs: Keyword overrides passed to the agent template.
         """
@@ -1065,7 +1075,7 @@ class CommandCenter(IDisposable):
         with self._lock:
             #Create and start the specified number of agents
             for _ in range(agents):
-                agent = self.create_agent(template_name, target=target, define_home=define_home, command_group_name= command_group_name, *args, **kwargs)
+                agent = self.create_agent(template_name, target=target, define_home=define_home, command_group_name= command_group_name, reset_agent=reset_agents,  *args, **kwargs)
                 agent.deploy()
 
     def _register_agent(self, agent: Agent, command: CommandGroup) -> None:
@@ -1138,12 +1148,17 @@ class CommandCenter(IDisposable):
             command._max_workers -= amount
             self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._max_workers, 'command_group': command.id})
 
-    def _create_and_register_agent(self, template_name: str, command_group:str = "default",  *args, **kwargs) -> Agent:
+    def _create_and_register_agent(self, template_name: str, define_home: Optional[Union[Callable[..., None], Pack]] = None,
+            target: Optional[Union[Callable[..., None], Pack]] = None, command_group:str = "default", reset_agent: bool = False, *args, **kwargs) -> Agent:
         """
         Internal method to create and register an agent under the global worker cap.
 
         Args:
             template_name (str): The symbolic name of the registered agent template.
+            define_home (Callable | Pack, optional): A function representing the agent's long-lived event loop.
+            target (Callable | Pack, optional): A one-time task to run before the main loop.
+            command_group (str): The name of the command group to register the agent in.
+            reset_agent (bool): If True, the agent will be reset before execution.
             *args: Optional positional overrides for the factory.
             **kwargs: Optional keyword overrides for the factory.
 
@@ -1163,9 +1178,19 @@ class CommandCenter(IDisposable):
             self._notify('WORKER_CAP_REACHED', {'max_workers': command._max_workers, 'command_group': command.id} )
             raise RuntimeError(f"Cannot create agent. Worker cap of {command._max_workers} reached.")
 
+            #TODO: Implement intercept for KWARGS and args to reset agent and redress it for reuse before we let it leave the pool
+            #TODO: Implement home location for the agent to return to after it has completed its task
         try:
+
             kwargs["command_center"] = self
             agent = self._builder.create_agent(template_name, *args, **kwargs)
+            agent.template_name = template_name
+            if reset_agent:
+                agent.reset()
+            if target:
+                agent.set_target(target)
+            if define_home:
+                agent.set_home(define_home)
             self._register_agent(agent, command)
             return agent
         except Exception as e:

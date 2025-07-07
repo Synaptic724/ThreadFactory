@@ -99,9 +99,11 @@ class Agent(Worker):
         self._activity_name = None
         self._activity_id = None
 
+        self._template_name = None  # This can be set to a specific template name if needed
         self._worker_type = "agentic" # Overrides Worker's default "mainpool"
         self._pool_agent: bool = False # This flag might be set by a pool manager
         self._return_home: bool = False # Controls behavior after task completion
+        self._agent_reset: bool = False  # Indicates if the agent has been reset
 
         self._event_loop: Optional['Pack'] = None # Example: Pack for the main behavior loop
         self._value_work: Optional['HelpRequest'] = None # Example: For binding specific work
@@ -140,7 +142,68 @@ class Agent(Worker):
 
         super().dispose()  # Call parent dispose if it exists
 
-#region Signal Controller Methods
+    def reset(self) -> None:
+        """
+        Soft-reset the agent without disposing it.
+
+        This clears:
+        - All items from public and private inventories
+        - Bound work reference and its status
+        - Registered activities
+        - Agent's current event loop and activity metadata
+        - Internal state flags like `_return_home`
+        - Execution state to `IDLE`
+
+        This does NOT:
+        - Dispose or delete any object
+        - Shutdown the thread
+        - Affect identity or registration with the CommandCenter
+        """
+        if self._disposed:
+            raise RuntimeError("Cannot reset a disposed agent.")
+
+        # Clear inventories without disposing
+        if self._private_inventory:
+            self._private_inventory.clear()
+        if self.public_inventory:
+            self.public_inventory.clear()
+
+        # Unbind work and reset its state
+        if self._value_work:
+            self._value_work = None
+
+        # Deregister from activities but keep the container alive
+        if self._registered_activities:
+            for activity in list(self._registered_activities.values()):
+                self.deregister_from_activity(activity)
+            self._registered_activities.clear()
+
+        # Reset internal state
+        self._activity_id = None
+        self._activity_name = None
+        self._agent_reset = True
+        self.state = WorkerState.IDLE
+
+    def apply_attributes_from_kwargs(self, **kwargs) -> None:
+        """
+        Applies the provided keyword arguments to existing attributes on the agent.
+
+        This method dynamically updates the agent's attributes only if the attribute
+        already exists on the object.
+
+        Args:
+            **kwargs: Arbitrary keyword arguments, where each key corresponds to an
+                      attribute name, and the value is the value to assign.
+
+        Example:
+            agent.apply_attributes_from_kwargs(public_name="Alice", job_title="Commander")
+        """
+        with self._lock:
+            for key, value in kwargs.items():
+                if hasattr(self, key):
+                    setattr(self, key, value)
+
+    #region Signal Controller Methods
     def _get_object_details(self) -> ConcurrentDict[str, Any]:
         """
         Extends the base Worker's object details with high-level agent-specific commands and metadata.
@@ -253,7 +316,6 @@ class Agent(Worker):
         return list(self._registered_activities.keys())
 
 #endregion Activity Management Methods
-
 #region Agent Execution Methods
     def run(self):
         """
