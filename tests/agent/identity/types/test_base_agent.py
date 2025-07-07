@@ -48,7 +48,6 @@ class TestWorker(unittest.TestCase):
         self.assertEqual(self.worker.units_per_hour, [])
         self.assertEqual(self.worker.work_unit_counter, 0)
         self.assertIsNotNone(self.worker.start_time)
-        self.assertIsNotNone(self.worker.work_queue)
         self.assertFalse(self.worker.is_disposed)
         self.assertIsNotNone(self.worker._last_hourly_reset)
 

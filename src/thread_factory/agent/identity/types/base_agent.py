@@ -58,8 +58,6 @@ class BaseAgent(threading.Thread, IDisposable):
                  args: tuple = (),
                  kwargs: Optional[dict] = None,
                  *,
-                 factory: Any = None,
-                 work_queue: Optional[ConcurrentQueue['Work']] = None,
                  signal_controller: Optional['SignalController'] = None,
                  logger: Optional[logging.Logger] = None):
         """
@@ -79,11 +77,6 @@ class BaseAgent(threading.Thread, IDisposable):
                 empty tuple.
             kwargs (Optional[dict]): A dictionary of keyword arguments for the target
                 callable. Defaults to None.
-            factory (Any): An optional reference to the parent factory or manager that
-                created this worker, used for sending back aggregate records.
-            work_queue (Optional[ConcurrentQueue[Work]]): A concurrent queue from which
-                the worker continuously dequeues and executes `Work` units. If None,
-                the worker will remain in a blocked/idle state without a work source.
             signal_controller (Optional[SignalController]): An optional instance of
                 `SignalController` to which this worker will register itself. This
                 enables external monitoring, command invocation, and event notification
@@ -95,7 +88,6 @@ class BaseAgent(threading.Thread, IDisposable):
         IDisposable.__init__(self)
 
         self._lock = threading.RLock() # Thread-safe lock for internal state management
-        self.factory = factory
         self.factory_id: str = str(ulid.ULID())
         self._logger = logger or logging.getLogger(__name__)
         self._signal_controller: Optional[SignalController] = signal_controller # Optional SignalController for external management
@@ -116,7 +108,6 @@ class BaseAgent(threading.Thread, IDisposable):
         self.start_time: datetime = datetime.now() # Timestamp of when the worker instance was created
 
         # Work queue for continuous task processing.
-        self.work_queue: Optional[ConcurrentQueue[Work]] = work_queue
         self._last_hourly_reset: datetime = datetime.now() # Tracks the start of the current hourly aggregation period
 
         # Auto-register with controller (best-effort)
@@ -158,10 +149,6 @@ class BaseAgent(threading.Thread, IDisposable):
                 self.units_per_hour.dispose()
             self.units_per_hour = None
 
-            if self.work_queue:
-                self.work_queue.dispose()
-            self.work_queue = None
-
             if self.records:
                 self.records.dispose()
             self.records = None
@@ -183,7 +170,6 @@ class BaseAgent(threading.Thread, IDisposable):
 
             # Nullify remaining references
             self.last_completed_work = None
-            self.factory = None
             self.shutdown_flag = None
             self.death_event = None
             self._lock = None
@@ -298,32 +284,7 @@ class BaseAgent(threading.Thread, IDisposable):
         Main thread entry point (called by `start()`).
         Handles continuous task loop from queue.
         """
-        self.set_worker_state("STARTING")
-
-        try:
-            while not self.shutdown_flag.is_set():
-                if len(self.work_queue) == 0:
-                    self.set_worker_state("BLOCKED")
-                    time.sleep(0.01) # Small sleep to prevent busy-waiting
-                    continue
-
-                try:
-                    task = self.work_queue.dequeue()
-                    self.set_worker_state("ACTIVE")
-                    self._execute_task(task)
-                except Empty:
-                    self.set_worker_state("IDLE") # If dequeue with timeout was used
-                    time.sleep(0.01)
-                except Exception as e:
-                    # This catches unexpected errors during dequeue or before _execute_task is fully engaged
-                    print(f"[BaseAgent {self.factory_id}] Error dequeuing or executing task: {e}")
-                    time.sleep(0.1)
-
-
-        finally:
-            self.state = AgentState.TERMINATING
-            self.death_event.set()
-            self.dispose() # Ensure resources are disposed when thread exits gracefully
+        raise NotImplemented("This is a base class and should not be instantiated directly for its run method. ")
 
     # Add simple getters for metrics that you expose in _get_object_details
     def get_state(self) -> AgentState:
@@ -372,7 +333,8 @@ class BaseAgent(threading.Thread, IDisposable):
         except Exception as e:
             # This 'except' block catches *any* exception that propagates out of task.run().
             # This includes the "Future in unexpected state" error.
-            print(f"[BaseAgent {self.factory_id}] Critical worker-level error during task execution: {e}")
+            self._logger.error(f"[BaseAgent {self.factory_id}] Critical worker-level error during task execution: {e}")
+            self._notify("CRITICAL_WORKER_ERROR", {"error": str(e)})
             # If Work.run() failed in a way that its own internal set_exception/set_result
             # didn't finalize the record, we force it to FAILED here.
             if task_record_reference and not task.done(): # Check if Future itself wasn't marked done
@@ -394,7 +356,7 @@ class BaseAgent(threading.Thread, IDisposable):
                 self.last_completed_work = task_record_reference
             else:
                 # This indicates a problem where Work.run() did not complete its Future lifecycle properly.
-                print(f"[BaseAgent {self.factory_id}] Warning: Task Future did not complete its lifecycle or record not finalized.")
+                self._logger.error(f"[BaseAgent {self.factory_id}] Warning: Task Future did not complete its lifecycle or record not finalized.")
                 # Force add if not done but record has a state
                 if task_record_reference and task_record_reference.status != WorkStatus.PENDING:
                     self.records.add(task_record_reference)
@@ -450,6 +412,9 @@ class BaseAgent(threading.Thread, IDisposable):
             ctypes.pythonapi.PyThreadState_SetAsyncExc(self.ident, None) # Clear pending exceptions
             if hasattr(self, '_logger') and self._logger:
                 self._logger.error(f"Failed to hard_kill worker '{self.id}': Multiple exceptions already set.")
+                self._notify("CRITICAL_WORKER_ERROR", {
+                    "error": f"Multiple exceptions set for thread {self.ident}."
+                })
             raise SystemError(f"Multiple exceptions set for thread {self.ident}.")
 
         self.state = AgentState.KILLED

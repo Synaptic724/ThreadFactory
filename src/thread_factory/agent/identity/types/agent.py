@@ -18,6 +18,7 @@ class AgentPoolType(Enum):
     NOTSET = auto()  # Represents an agent that has not been set to a specific type
     DISPATCHER = auto()  # Represents a worker focused on dispatching tasks
     THROUGHPUT = auto()   # Represents a worker focused on high throughput
+    THROUGHPUT_SLEEP = auto()  # Represents a worker focused on high throughput with sleep behavior
 
 
 class Agent(BaseAgent):
@@ -53,8 +54,6 @@ class Agent(BaseAgent):
 
     def __init__(self, command_center: 'CommandCenter',
                  target: Union[Callable[..., Any], 'Pack'] = None, # Make sure 'Pack' is imported or defined
-                 factory: Any = None,
-                 work_queue: Optional[ConcurrentQueue[Work]] = None,
                  signal_controller: Optional[SignalController] = None, # Explicitly pass this through
                  logger: Optional[logging.Logger] = None,            # Explicitly pass this through
                  *args, **kwargs):
@@ -89,8 +88,6 @@ class Agent(BaseAgent):
             target=target,
             args=args,
             kwargs=kwargs, # Pass remaining kwargs to super() if any are left
-            factory=factory,
-            work_queue=work_queue,
             signal_controller=signal_controller, # This is now explicitly passed from Agent's init
             logger=logger                        # This is now explicitly passed from Agent's init
         )
@@ -112,11 +109,12 @@ class Agent(BaseAgent):
         self._worker_type = "agentic" # Overrides Worker's default "mainpool"
         self._pool_agent: bool = False # This flag might be set by a pool manager
         self._return_home: bool = False # Controls behavior after task completion
-        self._agent_reset: bool = False  # Indicates if the agent has been reset
+        self._agent_reset: bool = False  # Indicates if the agent has been reset recently
 
         # Loop and Event Pool Management
         self._dismiss_agent: bool = False # Flag to indicate if the agent should be dismissed
         self._pool_type = AgentPoolType.NOTSET
+        self._sleep_loop: Optional['Pack'] = None # Flag to control sleep behavior in the loop
         self._event_loop: Optional['Pack'] = None # Example: Pack for the main behavior loop
         self._value_work: Optional['HelpRequest'] = None # Example: For binding specific work
 
@@ -134,6 +132,7 @@ class Agent(BaseAgent):
         if self._disposed:
             return
 
+        self._dismiss_agent = True
         self._unregister()
         # Dispose agent-specific resources
         self._dispose_work()
@@ -350,10 +349,21 @@ class Agent(BaseAgent):
                 raise RuntimeError("Cannot activate a disposed agent.")
             self.state = AgentState.ACTIVE
 
+        self._life_loop()
 
+
+    def _life_loop(self):
+        """
+        This is the main life loop for the agentic thread.
+
+        It allows the agentic agent to travel through many states and
+        locations when required it provides a robust way to manage its life
+        cycle by going through the various states of the agentic thread.
+        """
         while not self._dismiss_agent:
             if not self._dismiss_agent:
                 if self._pool_agent and self._pool_type == AgentPoolType.DISPATCHER:
+                    self._notify("Agentic thread started.")
                     # If this is a pool agent, run the dispatcher loop
                     self._dispatcher_loop()
                 elif self._pool_agent and self._pool_type == AgentPoolType.THROUGHPUT:
@@ -361,7 +371,7 @@ class Agent(BaseAgent):
             else:
                 self.dispose()
 
-    def _dispatcher_loop(self):
+    def _dispatcher_loop(self) -> None:
         """
         This is the dispatcher loop for the agentic thread.
 
@@ -380,9 +390,62 @@ class Agent(BaseAgent):
             # Optionally, log the exception if needed
             pass
         finally:
+            if self._return_home:
+                return
             self._logger.info(f"Agent '{self.factory_id}' dispatcher loop terminated.")
             # Ensure agent is disposed properly even after an exception
             self.dispose()
+
+
+    def _throughput_loop(self):
+        """
+        This is the dispatcher loop for the agentic thread.
+
+        It will attempt to finish the target and if it can't, it'll attempt to
+        return to the event loop if it exists. If the agent is a pool agent,
+        it will run the event loop set via `set_home()`. If it is a standalone agent,
+        it will execute the `_target` function if provided.
+        """
+        try:
+            while not self._dismiss_agent:
+                if self._pool_type == AgentPoolType.THROUGHPUT:
+                    self._event_loop()
+
+                if self._pool_type == AgentPoolType.THROUGHPUT_SLEEP:
+                    self._sleep_loop()
+
+                if self._return_home:
+                    return
+
+        except Exception as e:
+            # Optionally, log the exception if needed
+            pass
+        finally:
+            if self._return_home:
+                return
+            self._logger.info(f"Agent '{self.factory_id}' dispatcher loop terminated.")
+            # Ensure agent is disposed properly even after an exception
+            self.dispose()
+
+    def assign_throughput_to_sleep(self):
+        """
+        Assigns the agent to a sleep loop, which is a specialized behavior for
+        agents that need to manage their execution in a controlled manner.
+
+        This method sets the `_pool_type` to `AgentPoolType.THROUGHPUT_SLEEP`
+        and assigns the `_sleep_loop` to the agent's event loop.
+        """
+        self._pool_type = AgentPoolType.THROUGHPUT_SLEEP
+
+    def assign_sleep_to_throughput(self):
+        """
+        Assigns the agent to a throughput loop, which is a specialized behavior for
+        agents that need to manage their execution in a high-throughput manner.
+
+        This method sets the `_pool_type` to `AgentPoolType.THROUGHPUT`
+        and assigns the `_event_loop` to the agent's event loop.
+        """
+        self._pool_type = AgentPoolType.THROUGHPUT
 
     def deploy(self):
         """

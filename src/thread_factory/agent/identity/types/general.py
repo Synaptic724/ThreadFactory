@@ -47,8 +47,6 @@ class General(Agent):
                  public_name: Optional[str] = None,
                  job_title: Optional[str] = None,
                  # Explicitly add Agent-specific optional parameters if General needs to accept them
-                 factory: Any = None,
-                 work_queue = None,
                  signal_controller: Optional[SignalController] = None,
                  logger: Optional[logging.Logger] = None,
                  *args, **kwargs):
@@ -100,8 +98,6 @@ class General(Agent):
         super().__init__(
             command_center=command_center,
             target=target,
-            factory=factory,
-            work_queue=work_queue,
             signal_controller=signal_controller,
             logger=logger,
             *args,
