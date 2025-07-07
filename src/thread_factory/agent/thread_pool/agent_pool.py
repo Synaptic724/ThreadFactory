@@ -7,6 +7,7 @@ from thread_factory.concurrency.sync_types.sync_int import SyncInt
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.concurrency.concurrent_set import ConcurrentSet
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory.synchronization import SignalController
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
 from thread_factory.synchronization.primitives.latch import Gate
 from thread_factory.utils.interfaces.disposable import IDisposable
@@ -37,9 +38,9 @@ class ClaimedAgentRef:
         return self.claimed.get()
 
 
-class AgentPoolContainer(IDisposable):
+class AgentContainer(IDisposable):
     """
-    _AgentPoolContainer
+    AgentContainer
     ---------------------
     Internal coordination structure for managing a set of AgenticWorker threads.
 
@@ -63,6 +64,7 @@ class AgentPoolContainer(IDisposable):
                                     Instead, threads are tracked using only a ULID set.
         """
         super().__init__()
+        # Internal State
         self._lock = threading.RLock()  # Internal lock for safe concurrent modifications
         self._logger = logger or logging.getLogger(__name__)
         self._id = str(ulid.ULID())
@@ -70,6 +72,8 @@ class AgentPoolContainer(IDisposable):
         self._active = False  # Flag to indicate whether the container is active
         self._ignore_tracking = ignore_tracking  # Whether to store tracking Records or not
 
+
+        # Agent Tracking Details
         # Track threads either as a simple set (if no tracking) or as a dict mapping to Records
         if ignore_tracking:
             self._registered_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentSet[ulid.ULID]()
@@ -77,6 +81,7 @@ class AgentPoolContainer(IDisposable):
             self._registered_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentDict[
                 ulid.ULID, Records]()
 
+        # Unregistration Tracking
         self._unregistered_agents = ConcurrentSet[ulid.ULID]()  # Tracks which threads have been requested to unregister
         self._unregister_agent_check = False  # Flag to indicate if any threads should unregister
 
@@ -394,11 +399,17 @@ class ContainerCluster(IDisposable):
 
     def __init__(self, command_group: 'CommandGroup', logger: Union[logging.Logger, None] = None):
         super().__init__()
-
+        # Internal State
+        self._lock = threading.RLock()  # Internal lock for thread-safe operations
+        self._id = str(ulid.ULID())
         self._logger = logger or logging.getLogger(__name__)
+
+        # Container Management
         self._container_type: Optional[str] = None
-        self._containers: Optional[ConcurrentList[AgentPoolContainer]] = None
+        self._containers: Optional[ConcurrentDict[str, AgentContainer]] = ConcurrentDict[str, AgentContainer]()
         self._max_size: Optional[SyncInt] = SyncInt(command_group._max_workers)# Optional: max agents per container
+
+        # Command Group Information
         self._logger.info("Initialized ContainerCluster for CommandGroup: %s", command_group.id)
 
     def dispose(self):
@@ -414,7 +425,7 @@ class ContainerCluster(IDisposable):
         self._logger.info("Disposed ContainerCluster for CommandGroup: %s", self._container_type)
 
 
-    def get_available_container(self) -> Optional[AgentPoolContainer]:
+    def get_available_container(self) -> Optional[AgentContainer]:
         """
         Returns a container that has room for more agents.
 
@@ -425,21 +436,21 @@ class ContainerCluster(IDisposable):
                 return container
         return None
 
-    def register_container(self, container: AgentPoolContainer):
+    def register_container(self, container: AgentContainer):
         """
         Registers a new container into the cluster.
 
         Args:
-            container (_AgentPoolContainer): The container to register.
+            container (AgentContainer): The container to register.
         """
         self._containers.append(container)
 
-    def unregister_container(self, container: AgentPoolContainer):
+    def unregister_container(self, container: AgentContainer):
         """
         Removes a container from the cluster.
 
         Args:
-            container (_AgentPoolContainer): The container to remove.
+            container (AgentContainer): The container to remove.
         """
         try:
             self._containers.remove(container)
@@ -462,7 +473,7 @@ class CommandGroupContainer(IDisposable):
     for all agent templates under a CommandGroup.
     """
 
-    def __init__(self, group_id: str, logger: Union[logging.Logger, None] = None):
+    def __init__(self, group_id: str, logger: Union[logging.Logger, None] = None, target_retrival: bool = False):
         """
         Initializes the container manager for a command group.
 
@@ -471,8 +482,17 @@ class CommandGroupContainer(IDisposable):
         """
         super().__init__()
         self._lock = threading.RLock()
+        self._id = str(ulid.ULID())
         self._logger = logger or logging.getLogger(__name__)
         self._group_id = group_id
+
+        # Agent Management
+        self._target_retrival = target_retrival  # Whether to use target retrieval for agent claims
+        self._claimed_agents: ConcurrentDict[str, ClaimedAgentRef] = ConcurrentDict()
+
+        # Container Management
+        self._group_container_map = ConcurrentDict[str, str]()  # Lookup of CommandGroup ID to its pool container ID  #TODO: Might not be needed, Review
+        self._containers: ConcurrentDict[str, AgentContainer] = ConcurrentDict()  # All pool containers, keyed by their ULID #TODO: Might not be needed, Review
 
         # Template name => agent containers (for both targeted/untargeted)
         self._targeted_cluster: ConcurrentDict[str, ContainerCluster] = ConcurrentDict()
@@ -493,12 +513,18 @@ class CommandGroupContainer(IDisposable):
             self._untargeted_cluster.dispose()
             self._untargeted_cluster = None
 
-    def register_container(self, container: AgentPoolContainer, max_size: int, template_name: str = "default",  targeted: bool = False):
+            for container in self._containers.values():
+                container.dispose()
+
+            self._containers.dispose()
+#region Container Management
+
+    def register_container(self, container: AgentContainer, max_size: int, template_name: str = "default",  targeted: bool = False):
         """
         Registers a container under the correct cluster based on targeting strategy.
 
         Args:
-            container (_AgentPoolContainer): The pool to register.
+            container (AgentContainer): The pool to register.
             max_size (int): Maximum number of agents this container can hold.
             template_name (str): Template name or dispatch key.
             targeted (bool): Whether this is a targeted or general pool.
@@ -507,18 +533,18 @@ class CommandGroupContainer(IDisposable):
             cluster = self._targeted_cluster.get(template_name)
             if not cluster:
                 cluster = ContainerCluster(container_type=template_name,
-                                           containers=ConcurrentList[AgentPoolContainer](),
+                                           containers=ConcurrentList[AgentContainer](),
                                            max_size=SyncInt(max_size))  # default cap
                 self._targeted_cluster[template_name] = cluster
             cluster.register_container(container)
         else:
             if not self._untargeted_cluster:
                 self._untargeted_cluster = ContainerCluster(container_type="untargeted",
-                                                            containers=ConcurrentList[AgentPoolContainer](),
+                                                            containers=ConcurrentList[AgentContainer](),
                                                             max_size=SyncInt(max_size))
             self._untargeted_cluster.register_container(container)
 
-    def unregister_container(self, template_name: str, container: AgentPoolContainer, targeted: bool = False):
+    def unregister_container(self, template_name: str, container: AgentContainer, targeted: bool = False):
         """
         Unregisters a container from the cluster.
 
@@ -539,7 +565,7 @@ class CommandGroupContainer(IDisposable):
                 if not self._untargeted_cluster.containers:
                     self._untargeted_cluster = None
 
-    def get_or_create_container(self, template_name: str, targeted: bool = False) -> AgentPoolContainer:
+    def get_or_create_container(self, template_name: str, targeted: bool = False) -> AgentContainer:
         """
         Retrieves a usable container or creates one if none available.
 
@@ -557,10 +583,37 @@ class CommandGroupContainer(IDisposable):
                 return container
 
         # Make a new one
-        new_container = AgentPoolContainer(command_group=self, logger=self._logger)
+        new_container = AgentContainer(command_group=self, logger=self._logger)
         self.register_container(template_name=template_name, container=new_container, targeted=targeted)
         return new_container
 
+#endregion Container Management
+#region Targeted Retrieval System
+
+#endregion Targeted Retrieval System
+#region Worker Management
+    def submit(self, help_request: 'HelpRequest', group_name: str, num_workers: int):
+        """
+        Submits a parallel job to a specific group's pool.
+
+        Args:
+            help_request (HelpRequest): The parallel work contract to be executed.
+            group_name (str): The name of the CommandGroup whose pool should handle the request.
+            num_workers (int): The number of agents requested for the job.
+        """
+        if self._disposed: raise RuntimeError("AgentPool has been disposed.")
+        if group_name not in self._containers:
+            raise ValueError(f"No pool configured for group '{group_name}'. Use configure_pool_for_group() first.")
+
+        config = self._group_configs[group_name]
+        if num_workers > config['max']:
+            logging.warning(
+                f"Request for {num_workers} workers exceeds group '{group_name}' max of {config['max']}. Capping.")
+            num_workers = config['max']
+
+        help_request.record.status = WorkStatus.IN_PROGRESS
+        self._containers[group_name].dispatch_work(help_request, num_workers)
+#endregion Worker Management
 
 class DataCenter(IDisposable):
     """
@@ -582,6 +635,7 @@ class DataCenter(IDisposable):
     def __init__(self, logger: Union[logging.Logger, None] = None):
         super().__init__()
         self._lock = threading.RLock()
+        self._id = str(ulid.ULID())
         self._logger = logger or logging.getLogger(__name__)
         self._containers: ConcurrentDict[str, CommandGroupContainer] = ConcurrentDict()
         self._data_records = ConcurrentDict()
@@ -657,7 +711,7 @@ class AgentPool(IDisposable):
         with cls._singleton_lock:
             cls._singleton_instance = None
 
-    def __init__(self, command_center: 'CommandCenter', logger: Union[logging.Logger, None] = None, target_retrival: bool = False, maintenance_agent: bool = True):
+    def __init__(self, command_center: 'CommandCenter', logger: Union[logging.Logger, None] = None, target_retrival: bool = False, maintenance_agent: bool = True, signal_controller: 'SignalController' = None):
         """
         Initializes the AgentPool singleton.
 
@@ -682,26 +736,24 @@ class AgentPool(IDisposable):
         self._command_center = command_center
         self._logger = logger or logging.getLogger(__name__)
         self._shutdown_gate = Gate(True)
-
-        # Container Management
-        self._group_container_map = ConcurrentDict[ulid.ULID, ulid.ULID]() # Lookup of CommandGroup ID to its pool container ID
-        self._containers: ConcurrentDict[ulid.ULID, AgentPoolContainer] = ConcurrentDict() # All pool containers, keyed by their ULID
+        self._data_center = DataCenter(logger=self._logger)  # Centralized data center for records and metadata
 
         # Create and deploy the maintenance agent
         if maintenance_agent:
             self._maintenance_agent = self._create_maintenance_worker()
             self._maintenance_agent.deploy()
 
-        # Agent Management
-        self._target_retrival = target_retrival  # Whether to use target retrieval for agent claims
-        self._claimed_agents: ConcurrentDict[ulid.ULID, ClaimedAgentRef] = ConcurrentDict()
-
-        # Dictionary of type, of queues for each template type and agent reference if targetted retrieval is enabled
-
-        # Else we have a ConcurrentQueue thats un ordered?
-
+        self._command_group_containers = ConcurrentDict[str, CommandGroupContainer]()  # All CommandGroup containers
         self._initialized = True
         logger.info(f"Initialized AgentPool singleton.")
+
+        self._signal_controller = signal_controller
+        if self._signal_controller:
+            try:
+                self._signal_controller.register(self)
+                self._logger.info(f"CommandCenter '{self._id}' registered with external SignalController.")
+            except Exception as e:
+                self._logger.warning(f"Failed to register CommandCenter with external SignalController: {e}", exc_info=True)
 
 #region Destructor
     def dispose(self):
@@ -712,67 +764,90 @@ class AgentPool(IDisposable):
         with self._lock:
             self._logger.warning("Disposing down AgentPool")
             self._disposed = True
+            self._data_center.dispose()
+            self._data_center = None
             self._shutdown_gate.close()  # Signal shutdown to the maintenance agent
 
             if self._maintenance_agent:
                 self._maintenance_agent.shutdown_flag.set()
 
-            for container in self._containers.values():
-                container.dispose()
-            self._containers.dispose()
             self._command_center = None  # Clear reference to CommandCenter
             self._logger.warning("AgentPool disposed, shutting down AgentPool")
 
 #endregion Destructor
-#region Targeted Retrieval System
+#region Container Group Management
 
-#endregion Targeted Retrieval System
-
-#region Command Group Pool Management
-    def create_new_group_container(self, command_group : 'CommandGroup', tracking_records: bool = False) -> AgentPoolContainer:
+    def create_command_group_container(self, command_group: 'CommandGroup', logger: Union[logging.Logger, None] = None, target_retrival: bool = False) -> 'CommandGroupContainer':
         """
-        Creates a new pool container for a specific CommandGroup.
+        Creates a new CommandGroupContainer for managing agents in a specific CommandGroup.
 
         Args:
-            command_group (CommandGroup): The CommandGroup for which to create a pool.
-            tracking_records (bool): If True, enables tracking of Records per thread.
+            command_group (CommandGroup): The unique ID of the CommandGroup.
+            logger (logging.Logger, optional): Optional logger for logging events.
+            target_retrival (bool): Whether to use target retrieval for agent claims.
 
         Returns:
-            _AgentPoolContainer: The newly created pool container.
+            CommandGroupContainer: The newly created container for the CommandGroup.
         """
-        if self._disposed: raise RuntimeError("AgentPool has been disposed.")
-        if command_group.id in self._containers:
-            self._logger.info(f"New pool container {command_group.id} already exists.")
-            raise ValueError(f"Pool already exists for group CommandGroup: Name: {command_group.name} ID: '{command_group.id}'.")
+        if self._disposed:
+            raise RuntimeError("AgentPool has been disposed and cannot create new containers.")
 
-        container = AgentPoolContainer(command_group=command_group, ignore_tracking=tracking_records)
-        self._group_container_map[command_group.id] = container._id
-        self._containers[container._id] = container
-        return container
+        with self._lock:
+            if command_group.id in self._command_group_containers:
+                logger.warning(f"CommandGroupContainer for group '{command_group.id}' already exists.")
+                raise ValueError(f"CommandGroupContainer for group '{command_group.id}' already exists.")
 
-#endregion Command Group Pool Management
-    def submit(self, help_request: 'HelpRequest', group_name: str, num_workers: int):
+            container = CommandGroupContainer(group_id=command_group.id, logger=logger, target_retrival=target_retrival)
+            self._command_group_containers[command_group.id] = container
+            self._logger.info(f"Created CommandGroupContainer for group '{command_group.id}' with ID {container._id}.")
+            return container
+
+
+    def remove_command_group_container(self, command_group: 'CommandGroup') -> bool:
         """
-        Submits a parallel job to a specific group's pool.
+        Removes a CommandGroupContainer from the AgentPool.
 
         Args:
-            help_request (HelpRequest): The parallel work contract to be executed.
-            group_name (str): The name of the CommandGroup whose pool should handle the request.
-            num_workers (int): The number of agents requested for the job.
+            command_group (CommandGroup): The unique ID of the CommandGroup to remove.
         """
-        if self._disposed: raise RuntimeError("AgentPool has been disposed.")
-        if group_name not in self._containers:
-            raise ValueError(f"No pool configured for group '{group_name}'. Use configure_pool_for_group() first.")
+        if self._disposed:
+            raise RuntimeError("AgentPool has been disposed and cannot remove containers.")
 
-        config = self._group_configs[group_name]
-        if num_workers > config['max']:
-            logging.warning(
-                f"Request for {num_workers} workers exceeds group '{group_name}' max of {config['max']}. Capping.")
-            num_workers = config['max']
+        with self._lock:
+            if command_group.id not in self._command_group_containers:
+                raise ValueError(f"No CommandGroupContainer found for group '{command_group.id}'.")
 
-        help_request.record.status = WorkStatus.IN_PROGRESS
-        self._containers[group_name].dispatch_work(help_request, num_workers)
+            container = self._command_group_containers.pop(command_group.id, None)
+            if container:
+                container.dispose()
+                self._logger.info(f"Removed CommandGroupContainer for group '{command_group.id}'.")
+                return True
+            else:
+                self._logger.warning(f"CommandGroupContainer for group '{command_group.id}' not found.")
+                raise RuntimeError(f"No CommandGroupContainer for group '{command_group.id}'.")
 
+
+    def get_command_group_container(self, command_group: 'CommandGroup') -> 'CommandGroupContainer':
+        """
+        Retrieves the CommandGroupContainer for a specific CommandGroup.
+
+        Args:
+            command_group (CommandGroup): The unique ID of the CommandGroup.
+
+        Returns:
+            CommandGroupContainer: The container for the specified CommandGroup.
+        """
+        if self._disposed:
+            raise RuntimeError("AgentPool has been disposed and cannot retrieve containers.")
+
+        with self._lock:
+            if command_group.id not in self._command_group_containers:
+                raise ValueError(f"No CommandGroupContainer found for group '{command_group.id}'.")
+
+            return self._command_group_containers[command_group.id]
+
+
+#region Maintenance Agent
     def _create_maintenance_worker(self) -> 'Agent':
         """Creates the dedicated agent responsible for all pool scaling."""
         agent = self._command_center.create_agent(
@@ -832,3 +907,4 @@ class AgentPool(IDisposable):
             container._flow_regulator.release(n=1, factory_ids=[agent.factory_id])
             logging.info(f"AgentPool retired worker {agent.factory_id} from group '{agent._group_name}'.")
 
+#endregion Maintenance Agent

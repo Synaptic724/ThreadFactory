@@ -36,7 +36,7 @@ class CommandGroup(IDisposable):
         An optional classification for the group (e.g., "ETL", "Modeling", etc.).
     """
 
-    def __init__(self, command_center: 'CommandCenter', group_name: str, max_workers: int, group_type: str = None, targeted_retrival: bool = False):
+    def __init__(self, command_center: 'CommandCenter', group_name: str, max_workers: int, logger: Optional[logging.Logger] = None, group_type: str = None, targeted_retrival: bool = False):
         """
         Initializes a new CommandGroup instance.
 
@@ -60,6 +60,7 @@ class CommandGroup(IDisposable):
         group_type : Optional[str]
             An optional tag or label that classifies this group (e.g., "etl", "analytics", "simulation").
             Can be used for filtering, scheduling preferences, or display purposes.
+
 
         Attributes:
         -----------
@@ -86,6 +87,7 @@ class CommandGroup(IDisposable):
         self.id = str(ulid.ULID())
         self.name = group_name
         self.type = group_type
+        self._logger: Logger = logger or logging.getLogger(__name__)
 
         # --- Internal Components ---
         self._worker_count = SyncInt(0)
@@ -93,7 +95,7 @@ class CommandGroup(IDisposable):
         self._targeted_retrival = targeted_retrival
         self._command_center = command_center  # Reference to its creator
         # Create Agent Pool Container
-        #self._agent_pool.create_new_group_container(group, max_workers)
+        self._container_cluster = command_center._agent_pool.create_command_group_container(self, self._logger, target_retrival=targeted_retrival)
 
         # Internal registries for its members
         self._active_agents: ConcurrentDict[str, Agent] = ConcurrentDict()
@@ -105,6 +107,9 @@ class CommandGroup(IDisposable):
         with self._lock:
             self._disposed = True
             self._command_center = None
+            self._logger.warning(f"Disposing CommandGroup '{self.name}'...")
+            self._container_cluster.dispose()
+            self._container_cluster = None
 
             # Dispose all SignalControllers
             for controller in list(self._signal_controllers.values()):
