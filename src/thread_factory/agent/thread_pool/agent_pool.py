@@ -316,6 +316,7 @@ class _AgentPoolContainer(IDisposable):
         """
         return item in self._registered_agents if self._ignore_tracking else item in self._registered_agents.keys()
 
+
 @dataclass(slots=True)
 class ContainerCluster:
     container_type: str
