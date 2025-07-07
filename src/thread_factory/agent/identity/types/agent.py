@@ -2,10 +2,8 @@ import logging
 import threading
 from enum import Enum, auto
 from typing import Optional, Callable, Union, Any
-from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
-from thread_factory.agent.thread_pool.work import Work
 from thread_factory.agent.identity.types.base_agent import BaseAgent, AgentState
-from thread_factory.agent.thread_pool.help_request import HelpRequest
+from thread_factory.agent.thread_pool.requests.help_request import HelpRequest
 from thread_factory.agent.thread_pool.records import WorkStatus, Record
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.synchronization import SignalController

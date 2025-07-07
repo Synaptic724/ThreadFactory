@@ -36,6 +36,18 @@ class AgentBuilder(IDisposable):
         super().__init__()
         self._registry: ConcurrentDict[str, Pack] = ConcurrentDict()
         # _disposed is handled by IDisposable base
+        self.register_default_templates()
+
+
+    def register_default_templates(self) -> None:
+        """
+        Registers the default agent templates.
+
+        This method is called to ensure that the builder has at least one
+        callable agent factory registered. It sets up a basic `General` agent
+        template that can be used if no specific template name is provided.
+        """
+        self._register_general_template()
         self._register_default_template()
 
     def dispose(self) -> None:
@@ -59,18 +71,40 @@ class AgentBuilder(IDisposable):
             # Setting to None after dispose is good practice for explicit cleanup
             self._registry = None
 
+    def _register_general_template(self) -> None:
+        """
+        Registers a symbolic 'general' agent template.
+
+        This internal helper method sets up a basic `General` agent template
+        that can be used for general-purpose agent creation. It ensures that
+        the builder has a callable agent factory that can be used for creating
+        agents that do not require specific configurations or parameters.
+        This is useful for creating agents that can handle a wide range of tasks
+        without needing to define a specialized template for each use case.
+        """
+        self.register_template(
+            "general",
+            Pack(
+                lambda command_center, *args, **kwargs: General(
+                    command_center=command_center,
+                    *args,
+                    **kwargs  # Allows for additional keyword arguments to be passed
+                )
+            )
+        )
+
     def _register_default_template(self) -> None:
         """
         Registers a symbolic 'default' agent template.
 
-        This internal helper method sets up a basic `General` agent template
+        This internal helper method sets up a basic `agent` agent template
         that can be used if no specific template name is provided. It ensures
         that the builder always has at least one callable agent factory.
         """
         self.register_template(
             "default",
             Pack(
-                lambda command_center, *args, **kwargs: General(
+                lambda command_center, *args, **kwargs: Agent(
                     command_center=command_center,
                     *args,
                     **kwargs  # Allows for additional keyword arguments to be passed

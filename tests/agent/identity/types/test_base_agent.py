@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from thread_factory.agent.identity.types.base_agent import AgentState, BaseAgent
 from thread_factory.agent.thread_pool.records import WorkStatus
-from thread_factory.agent.thread_pool.work import Work  # This should be the corrected Work class above
+from thread_factory.agent.thread_pool.requests.work import Work  # This should be the corrected Work class above
 
 def sample_work_function():
     """A simple function to simulate work."""
@@ -19,7 +19,7 @@ class TestWorker(unittest.TestCase):
 
     def setUp(self):
         self.mock_work_queue = ConcurrentQueue()
-        self.worker = BaseAgent(work_queue=self.mock_work_queue)
+        self.worker = BaseAgent()
         self.worker._last_hourly_reset = datetime.now()
 
     def tearDown(self):

@@ -455,7 +455,8 @@ class CommandCenter(IDisposable):
                  total_max_workers: int = 300,
                  command_group_name: str = "default",
                  logger: Optional[logging.Logger] = None,
-                 external_signal_controller: Optional[SignalController] = None):
+                 external_signal_controller: Optional[SignalController] = None,
+                 agent_pool_singleton: bool = True):
         """
         Initializes a new CommandCenter instance.
 
@@ -484,6 +485,11 @@ class CommandCenter(IDisposable):
             An optional remote SignalController to register this CommandCenter with.
             This allows it to be invoked or manipulated by external orchestrators.
 
+        agent_pool_singleton : bool, default=True
+            If True, uses a singleton AgentPool instance for managing agents.
+            This allows for shared state and resource management across multiple CommandCenters.
+
+
         Behavior:
         ---------
         • Automatically creates a default CommandGroup on initialization.
@@ -500,8 +506,20 @@ class CommandCenter(IDisposable):
         self._lock = threading.RLock()
         self._builder = AgentBuilder()
         self._activity_builder = ActivityBuilder()
+        self._singleton_agent_pool = agent_pool_singleton
         # --- Pool Management ---
-        self._agent_pool = AgentPool(self, self._logger)
+
+        if self._singleton_agent_pool:
+            try:
+                self._agent_pool = AgentPool.get_instance()
+                self._logger.debug("Reusing AgentPool singleton.")
+            except RuntimeError:
+                self._agent_pool = AgentPool.initialize_singleton(command_center=self, logger=self._logger)
+                self._logger.debug("Initialized new AgentPool singleton.")
+        else:
+            self._agent_pool = AgentPool(command_center=self, logger=self._logger)
+            self._logger.debug("Initialized standalone AgentPool instance.")
+
 
         if not isinstance(group_max_workers, int) or group_max_workers < 1:
             raise ValueError("group_max_workers must be a positive integer.")
@@ -982,7 +1000,6 @@ class CommandCenter(IDisposable):
             Agent: The created agent instance.
         """
         self._check_disposed()
-        self._check_if_eligible_for_targeted_retrival()
 
         if define_home is None and target is None:
             raise ValueError("At least one of define_home or target must be provided.")
@@ -1020,7 +1037,6 @@ class CommandCenter(IDisposable):
             Will warn if the global worker cap is reached mid-creation.
         """
         self._check_disposed()
-        self._check_if_eligible_for_targeted_retrival()
 
         new_agents = ConcurrentList()
         for i in range(count):
@@ -1031,13 +1047,6 @@ class CommandCenter(IDisposable):
                 warnings.warn(f"Worker cap reached. Created {i} of {count} requested agents.", UserWarning)
                 break
         return new_agents
-
-    def _check_if_eligible_for_targeted_retrival(self):
-        """
-        Internal helper to check if targeted retrieval is enabled for this CommandCenter.
-        """
-        if not self._targeted_retrival:
-            raise RuntimeError("Targeted retrieval is not enabled for this CommandCenter. Set 'target_retrival' to True in the AgentPool constructor when creating it to enable this feature.")
 
     def submit(
         self,
@@ -1218,6 +1227,13 @@ class CommandCenter(IDisposable):
         # Final registration
         self._register_agent(agent, command)
         return agent
+
+    def _check_if_eligible_for_targeted_retrival(self, command_group : CommandGroup):
+        """
+        Internal helper to check if targeted retrieval is enabled for this CommandCenter.
+        """
+        if not command_group._targeted_retrival:
+            raise RuntimeError("Targeted retrieval is not enabled for this CommandCenter. Set 'target_retrival' to True in the AgentPool constructor when creating it to enable this feature.")
 
     def _attempt_pool_get_agent(self, template_name: str, command_group_id: str) -> Optional[Agent]:
         """

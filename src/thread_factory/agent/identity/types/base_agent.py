@@ -1,14 +1,12 @@
-import logging, ulid, ctypes, time, threading
+import logging, ulid, ctypes, threading
 from enum import Enum, auto
 from datetime import datetime, timedelta
 from typing import Callable, Any, Optional
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict  # Make sure this is imported
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.utils.exceptions.empty import Empty
 from thread_factory.agent.thread_pool.records import Records, Record, WorkStatus
-from thread_factory.agent.thread_pool.work import Work
+from thread_factory.agent.thread_pool.requests.work import Work
 from thread_factory.synchronization.controllers.signal_controller import SignalController
 
 class AgentState(Enum):
@@ -96,7 +94,8 @@ class BaseAgent(threading.Thread, IDisposable):
         self.state = AgentState.CREATED
         self.shutdown_flag = threading.Event()
         self.death_event = threading.Event()
-        self.worker_type = "mainpool" # Categorization for specific worker pools
+        self.worker_type = None
+        self._data_center = None
 
         # Metrics tracking
         self.records = Records() # Stores historical records of completed work units
@@ -473,8 +472,8 @@ class BaseAgent(threading.Thread, IDisposable):
         Sends the worker's records to the factory for aggregation or storage.
         This method is a placeholder and should be implemented in subclasses or by the factory.
         """
-        if self.factory and hasattr(self.factory, 'receive_worker_records'):
-            self.factory.receive_worker_records(self.records)
+        if self._data_center and hasattr(self._data_center, 'receive_worker_records'):
+            self._data_center.receive_agent_records(self.records)
 
     def __repr__(self):
         """Human-readable representation for debugging/logging."""
