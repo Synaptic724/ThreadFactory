@@ -1,6 +1,6 @@
 import logging, threading, time
 from dataclasses import dataclass
-from typing import Callable, Union
+from typing import Callable, Union, Optional
 import ulid
 from thread_factory.concurrency.sync_types.sync_bool import SyncBool
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
@@ -55,7 +55,7 @@ class _AgentPoolContainer(IDisposable):
     that behave like living actors in a system.
     """
 
-    def __init__(self, command_group: 'CommandGroup', ignore_tracking: bool = False):
+    def __init__(self, command_group: 'CommandGroup', logger: Union[logging.Logger, None] = None, ignore_tracking: bool = False):
         """
         Initializes the container.
 
@@ -65,6 +65,7 @@ class _AgentPoolContainer(IDisposable):
         """
         super().__init__()
         self._lock = threading.RLock()  # Internal lock for safe concurrent modifications
+        self._logger = logger or logging.getLogger(__name__)
         self._id = str(ulid.ULID())
         self._flow_regulator = FlowRegulator(0)  # Smart semaphore-like switch used for synchronization
         self._active = False  # Flag to indicate whether the container is active
@@ -81,6 +82,7 @@ class _AgentPoolContainer(IDisposable):
         self._unregister_agent_check = False  # Flag to indicate if any threads should unregister
 
         # Command group information
+        self._command_group = command_group  # The CommandGroup this container is associated with
         self._command_group_id = command_group.id  # The CommandGroup this container is associated with
         self._command_group_worker_count = command_group._worker_count
         self._command_group_max_worker_count = command_group._max_workers
@@ -108,14 +110,17 @@ class _AgentPoolContainer(IDisposable):
                 self._unregistered_agents = ConcurrentSet(self._registered_agents.keys())
 
             self._unregister_agent_check = True
+
             self._flow_regulator.notify_all()  # Wake all threads
             self._flow_regulator.dispose()  # Dispose of the switch lock
             self._flow_regulator = None  # Clear reference to FlowRegulator
             self._active = False  # Mark container inactive
+
             self._registered_agents.dispose()  # Dispose of registry
             self._registered_agents = None
             self._unregistered_agents.dispose()  # Dispose of unregistration list
             self._unregistered_agents = None
+
             self._unregister_agent_check = False
             # Clear references to CommandGroup
             self._command_group_worker_count = None  # Clear reference to CommandGroup
@@ -135,16 +140,20 @@ class _AgentPoolContainer(IDisposable):
         self._check_agent()  # Validate the thread is an AgenticWorker
         self._register_agent()  # Add thread to the pool registry
 
-        while self._active:
-            with self._flow_regulator:
-                pass  # Thread will block here until notified
+        try:
+            while self._active:
+                with self._flow_regulator:
+                    pass  # Thread will block here until notified
 
-            if not self._ignore_tracking:
-                self.attach_record()
+                if not self._ignore_tracking:
+                    self.attach_record()
 
-            if self._unregister_thread_check and self._should_exit():
-                self._finalize_unregistration()
-                return
+                if self._unregister_thread_check and self._should_exit():
+                    self._finalize_unregistration()
+                    return
+        except Exception as e:
+            logging.error(f"Error in agent pool container: {e}")
+
 
     def attach_record(self) -> None:
         """
@@ -302,6 +311,79 @@ class _AgentPoolContainer(IDisposable):
         return item in self._registered_agents if self._ignore_tracking else item in self._registered_agents.keys()
 
 
+class _CommandGroupContainer(IDisposable):
+    """
+    _CommandGroupContainer
+    -----------------------
+    Manages the containers for a specific CommandGroup.
+
+    Handles both targeted and untargeted containers per template,
+    providing a central access point for retrieving or dispatching
+    agents according to dispatch strategy.
+
+    This object abstracts container registration, lookup, and disposal
+    for all agent templates under a CommandGroup.
+    """
+
+    def __init__(self, group_id: str, logger: Union[logging.Logger, None] = None):
+        """
+        Initializes the container manager for a command group.
+
+        Args:
+            group_id (str): The unique ID of the associated CommandGroup.
+        """
+        super().__init__()
+        self._lock = threading.RLock()
+        self._logger = logger or logging.getLogger(__name__)
+        self._group_id = group_id
+
+        # Template name => agent containers (for both targeted/untargeted)
+        self._targeted_containers: ConcurrentDict[str, _AgentPoolContainer] = ConcurrentDict()
+        self._untargeted_containers: ConcurrentDict[str, _AgentPoolContainer] = ConcurrentDict()
+
+    def dispose(self):
+        """
+        Disposes all containers managed by this group.
+        """
+        if self._disposed: return
+        with self._lock:
+            self._disposed = True
+            for container in self._targeted_containers.values():
+                container.dispose()
+            for container in self._untargeted_containers.values():
+                container.dispose()
+            self._targeted_containers.clear()
+            self._untargeted_containers.clear()
+
+
+    def register_container(self, template_name: str, container: _AgentPoolContainer, targeted: bool = False):
+        """
+        Registers a new container for a given agent template.
+
+        Args:
+            template_name (str): The agent template this container handles.
+            container (_AgentPoolContainer): The container instance.
+            targeted (bool): Whether this is a targeted dispatch container.
+        """
+        if targeted:
+            self._targeted_containers[template_name] = container
+        else:
+            self._untargeted_containers[template_name] = container
+
+    def get_container(self, template_name: str, targeted: bool = False) -> Optional[_AgentPoolContainer]:
+        """
+        Retrieves the container for a given template and dispatch mode.
+
+        Args:
+            template_name (str): The agent template.
+            targeted (bool): Whether to look in targeted or untargeted pools.
+
+        Returns:
+            Optional[_AgentPoolContainer]: The matching container or None.
+        """
+        containers = self._targeted_containers if targeted else self._untargeted_containers
+        return containers.get(template_name, None)
+
 class AgentPool(IDisposable):
     """
     AgentPool
@@ -347,18 +429,24 @@ class AgentPool(IDisposable):
         self._id = str(ulid.ULID())
         self._command_center = command_center
         self._logger = logger or logging.getLogger(__name__)
+        self._shutdown_gate = Gate(True)
+
+        # Container Management
         self._group_container_map = ConcurrentDict[ulid.ULID, ulid.ULID]() # Lookup of CommandGroup ID to its pool container ID
         self._containers: ConcurrentDict[ulid.ULID, _AgentPoolContainer] = ConcurrentDict() # All pool containers, keyed by their ULID
-        self._shutdown_gate = Gate(True)
 
         # Create and deploy the maintenance agent
         if maintenance_agent:
             self._maintenance_agent = self._create_maintenance_worker()
             self._maintenance_agent.deploy()
 
-        # Claim Registry and System State
+        # Agent Management
         self._target_retrival = target_retrival  # Whether to use target retrieval for agent claims
+        self._claimed_agents: ConcurrentDict[ulid.ULID, ClaimedAgentRef] = ConcurrentDict()
 
+        # Dictionary of type, of queues for each template type and agent reference if targetted retrieval is enabled
+
+        # Else we have a ConcurrentQueue thats un ordered?
 
         self._initialized = True
         logger.info(f"Initialized AgentPool singleton.")

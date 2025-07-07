@@ -127,7 +127,10 @@ class CommandGroup(IDisposable):
                     logging.error(f"Error disposing Activity '{activity.id}': {e}", exc_info=True)
             self._active_activities.dispose()
 
-    # region CommandGroup Methods
+            self._worker_count = None
+            self._max_workers = None
+
+            # region CommandGroup Methods
     def add_agent(self, template_name: str = "default", reset_agent: bool = False, *args, **kwargs) -> Optional[Agent]:
         """
         Creates and registers a new agent under this CommandGroup.
@@ -540,6 +543,12 @@ class CommandCenter(IDisposable):
                 self._builder.dispose()
 
             self._logger.info(f"CommandCenter '{self.id}' disposed.")
+            self._logger = None
+            self._agent_pool.dispose()
+            self._agent_pool = None
+            self._external_signal_controller = None
+            self._total_max_workers = None
+
 
     def shutdown(self):
         """
