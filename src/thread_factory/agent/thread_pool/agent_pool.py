@@ -142,8 +142,8 @@ class _AgentPoolContainer(IDisposable):
         Ensures the calling thread is a valid AgenticWorker.
         """
         current_thread = threading.current_thread()
-        if not isinstance(current_thread, 'Agent'):
-            raise TypeError("Current thread must be an instance of AgenticWorker")
+        if not hasattr(current_thread, "_pool_agent"):
+            raise TypeError("Current thread be a subclass of Agent to use this pool container.")
 
     def _register_agent(self):
         """
@@ -151,15 +151,16 @@ class _AgentPoolContainer(IDisposable):
 
         Depending on `ignore_tracking`, either adds to a set or creates a Records entry.
         """
-        thread_id = self._get_agent_id()
+        threading.current_thread()._pool_agent = True
+        factory_id = self._get_agent_id()
         with self._lock:
             if not self._active:
                 self._active = True
             if self._ignore_tracking:
-                self._registered_agents.add(thread_id)
+                self._registered_agents.add(factory_id)
             else:
-                if thread_id not in self._registered_agents:
-                    self._registered_agents[thread_id] = Records()
+                if factory_id not in self._registered_agents:
+                    self._registered_agents[factory_id] = Records()
 
     def _get_agent_id(self) -> ULID:
         """
@@ -184,14 +185,14 @@ class _AgentPoolContainer(IDisposable):
         Final cleanup for a thread that is leaving the container.
         Disposes its tracking record and removes it from the active registry.
         """
-        thread_id = self._get_agent_id()
+        factory_id = self._get_agent_id()
         if not self._ignore_tracking:
-            if records := self._registered_agents.get(thread_id):
+            if records := self._registered_agents.get(factory_id):
                 records.dispose()
         if self._ignore_tracking:
-            self._registered_agents.discard(thread_id)
+            self._registered_agents.discard(factory_id)
         else:
-            self._registered_agents.pop(thread_id, None)
+            self._registered_agents.pop(factory_id, None)
 
         # If the registry is now empty, mark inactive
         if len(self._registered_agents) == 0:
@@ -200,20 +201,21 @@ class _AgentPoolContainer(IDisposable):
         if len(self._unregistered_agents) == 0:
             self._unregister_thread_check = False
 
-    def _unregister_agent(self, thread_id: ULID):
+    def _unregister_agent(self, factory_id: ULID):
         """
         Marks a thread for unregistration and notifies it if it's waiting.
 
         Args:
-            thread_id (ULID): The ID of the thread to unregister.
+            factory_id (ULID): The ID of the thread to unregister.
         """
-        self._unregistered_agents.add(thread_id)
+        self._unregistered_agents.add(factory_id)
         with self._lock:
             self._unregister_thread_check = True
+            threading.current_thread()._pool_agent = False
 
         # If thread is currently waiting on switch lock, wake it up
-        if thread_id in self._flow_regulator._cond._waiters:
-            self._flow_regulator.notify(factory_ids=[thread_id], awaited_caller=False)
+        if factory_id in self._flow_regulator._cond._waiters:
+            self._flow_regulator.notify(factory_ids=[factory_id], awaited_caller=False)
 
     def _change_bias(self, bias: int):
         """
@@ -249,6 +251,26 @@ class _AgentPoolContainer(IDisposable):
         self._flow_regulator.bypass_bias_and_notify(n=worker_count, awaited_caller=True, callback=work_request)
 
 
+    def __len__(self):
+        """
+        Returns the number of currently registered agents in this pool.
+
+        Returns:
+            int: The count of active agents in the pool.
+        """
+        return len(self._registered_agents) if self._ignore_tracking else len(self._registered_agents.keys())
+
+    def __contains__(self, item):
+        """
+        Checks if a given agent ID is registered in this pool.
+
+        Args:
+            item (ULID): The agent ID to check for.
+
+        Returns:
+            bool: True if the agent ID is registered, False otherwise.
+        """
+        return item in self._registered_agents if self._ignore_tracking else item in self._registered_agents.keys()
 
 
 class AgentPool(IDisposable):
