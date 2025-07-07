@@ -95,7 +95,7 @@ class CommandGroup(IDisposable):
         self._targeted_retrival = targeted_retrival
         self._command_center = command_center  # Reference to its creator
         # Create Agent Pool Container
-        self._container_cluster = command_center._agent_pool.create_command_group_container(self, self._logger, target_retrival=targeted_retrival)
+        self._container_cluster = command_center._agent_pool.create_command_group_container(self.id, self._logger, target_retrival=targeted_retrival)
 
         # Internal registries for its members
         self._active_agents: ConcurrentDict[str, Agent] = ConcurrentDict()

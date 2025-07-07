@@ -473,7 +473,7 @@ class CommandGroupContainer(IDisposable):
     for all agent templates under a CommandGroup.
     """
 
-    def __init__(self, group_id: str, logger: Union[logging.Logger, None] = None, target_retrival: bool = False):
+    def __init__(self, group_id: str, agent_pool: 'AgentPool',  logger: Union[logging.Logger, None] = None, target_retrival: bool = False):
         """
         Initializes the container manager for a command group.
 
@@ -485,6 +485,7 @@ class CommandGroupContainer(IDisposable):
         self._id = str(ulid.ULID())
         self._logger = logger or logging.getLogger(__name__)
         self._group_id = group_id
+        self._agent_pool = agent_pool
 
         # Agent Management
         self._target_retrival = target_retrival  # Whether to use target retrieval for agent claims
@@ -507,6 +508,8 @@ class CommandGroupContainer(IDisposable):
         if self._disposed: return
         with self._lock:
             self._disposed = True
+            self._agent_pool.remove_command_group_container(self._group_id)
+
             for container in self._targeted_cluster.values():
                 container.dispose()
             self._targeted_cluster = None
@@ -777,12 +780,12 @@ class AgentPool(IDisposable):
 #endregion Destructor
 #region Container Group Management
 
-    def create_command_group_container(self, command_group: 'CommandGroup', logger: Union[logging.Logger, None] = None, target_retrival: bool = False) -> 'CommandGroupContainer':
+    def create_command_group_container(self, command_group_id: str, logger: Union[logging.Logger, None] = None, target_retrival: bool = False) -> 'CommandGroupContainer':
         """
         Creates a new CommandGroupContainer for managing agents in a specific CommandGroup.
 
         Args:
-            command_group (CommandGroup): The unique ID of the CommandGroup.
+            command_group_id (str): The unique ID of the CommandGroup.
             logger (logging.Logger, optional): Optional logger for logging events.
             target_retrival (bool): Whether to use target retrieval for agent claims.
 
@@ -793,46 +796,46 @@ class AgentPool(IDisposable):
             raise RuntimeError("AgentPool has been disposed and cannot create new containers.")
 
         with self._lock:
-            if command_group.id in self._command_group_containers:
-                logger.warning(f"CommandGroupContainer for group '{command_group.id}' already exists.")
-                raise ValueError(f"CommandGroupContainer for group '{command_group.id}' already exists.")
+            if command_group_id in self._command_group_containers:
+                logger.warning(f"CommandGroupContainer for group '{command_group_id}' already exists.")
+                raise ValueError(f"CommandGroupContainer for group '{command_group_id}' already exists.")
 
-            container = CommandGroupContainer(group_id=command_group.id, logger=logger, target_retrival=target_retrival)
-            self._command_group_containers[command_group.id] = container
-            self._logger.info(f"Created CommandGroupContainer for group '{command_group.id}' with ID {container._id}.")
+            container = CommandGroupContainer(group_id=command_group_id, logger=logger, target_retrival=target_retrival)
+            self._command_group_containers[command_group_id] = container
+            self._logger.info(f"Created CommandGroupContainer for group '{command_group_id}' with ID {container._id}.")
             return container
 
 
-    def remove_command_group_container(self, command_group: 'CommandGroup') -> bool:
+    def remove_command_group_container(self, command_group_id: str) -> bool:
         """
         Removes a CommandGroupContainer from the AgentPool.
 
         Args:
-            command_group (CommandGroup): The unique ID of the CommandGroup to remove.
+            command_group_id (str): The unique ID of the CommandGroup to remove.
         """
         if self._disposed:
             raise RuntimeError("AgentPool has been disposed and cannot remove containers.")
 
         with self._lock:
-            if command_group.id not in self._command_group_containers:
-                raise ValueError(f"No CommandGroupContainer found for group '{command_group.id}'.")
+            if command_group_id not in self._command_group_containers:
+                raise ValueError(f"No CommandGroupContainer found for group '{command_group_id}'.")
 
-            container = self._command_group_containers.pop(command_group.id, None)
+            container = self._command_group_containers.pop(command_group_id, None)
             if container:
                 container.dispose()
-                self._logger.info(f"Removed CommandGroupContainer for group '{command_group.id}'.")
+                self._logger.info(f"Removed CommandGroupContainer for group '{command_group_id}'.")
                 return True
             else:
-                self._logger.warning(f"CommandGroupContainer for group '{command_group.id}' not found.")
-                raise RuntimeError(f"No CommandGroupContainer for group '{command_group.id}'.")
+                self._logger.warning(f"CommandGroupContainer for group '{command_group_id}' not found.")
+                raise RuntimeError(f"No CommandGroupContainer for group '{command_group_id}'.")
 
 
-    def get_command_group_container(self, command_group: 'CommandGroup') -> 'CommandGroupContainer':
+    def get_command_group_container(self, command_group_id: str) -> 'CommandGroupContainer':
         """
         Retrieves the CommandGroupContainer for a specific CommandGroup.
 
         Args:
-            command_group (CommandGroup): The unique ID of the CommandGroup.
+            command_group_id (str): The unique ID of the CommandGroup.
 
         Returns:
             CommandGroupContainer: The container for the specified CommandGroup.
@@ -841,10 +844,10 @@ class AgentPool(IDisposable):
             raise RuntimeError("AgentPool has been disposed and cannot retrieve containers.")
 
         with self._lock:
-            if command_group.id not in self._command_group_containers:
-                raise ValueError(f"No CommandGroupContainer found for group '{command_group.id}'.")
+            if command_group_id not in self._command_group_containers:
+                raise ValueError(f"No CommandGroupContainer found for group '{command_group_id}'.")
 
-            return self._command_group_containers[command_group.id]
+            return self._command_group_containers[command_group_id]
 
 
 #region Maintenance Agent
