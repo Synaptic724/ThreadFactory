@@ -449,7 +449,8 @@ class CommandCenter(IDisposable):
                  total_max_workers: int = 30,
                  command_group_name: str = "default",
                  logger: Optional[logging.Logger] = None,
-                 external_signal_controller: Optional[SignalController] = None):
+                 external_signal_controller: Optional[SignalController] = None,
+                 targeted_retrival: bool = False):
         """
         Initializes a new CommandCenter instance.
 
@@ -494,7 +495,9 @@ class CommandCenter(IDisposable):
         self._lock = threading.RLock()
         self._builder = AgentBuilder()
         self._activity_builder = ActivityBuilder()
-        #self._agent_pool = AgentPool(self, self._logger)
+        # --- Pool Management ---
+        self._targeted_retrival = targeted_retrival
+        self._agent_pool = AgentPool(self, self._logger)
 
         if not isinstance(group_max_workers, int) or group_max_workers < 1:
             raise ValueError("group_max_workers must be a positive integer.")
@@ -952,6 +955,7 @@ class CommandCenter(IDisposable):
             target: Optional[Union[Callable[..., None], Pack]] = None,
             command_group_name: str = "default",
             reset_agent: bool = False,
+            targeted_retrival: bool = False,
             *args, **kwargs
     ) -> Agent:
         """
@@ -963,6 +967,7 @@ class CommandCenter(IDisposable):
             target (Callable | Pack, optional): A one-time task to run before the main loop.
             command_group_name (str): The name of the command group to register the agent in.
             reset_agent (bool): If True, the agent will be reset before execution.
+            targeted_retrival (bool): If True, will attempt to get an agent of your template type before trying to create a new one if possible.
             *args: Positional overrides passed to the template factory.
             **kwargs: Keyword overrides passed to the template factory.
 
@@ -970,9 +975,11 @@ class CommandCenter(IDisposable):
             Agent: The created agent instance.
         """
         self._check_disposed()
+        self._check_if_eligible_for_targeted_retrival()
+
         if define_home is None and target is None:
             raise ValueError("At least one of define_home or target must be provided.")
-        return self._create_and_register_agent(template_name=template_name, define_home=define_home,target=target, command_group=command_group_name, reset_agent=reset_agent,*args, **kwargs)
+        return self._create_and_register_agent(template_name=template_name, define_home=define_home,target=target, command_group=command_group_name, reset_agent=reset_agent, targeted_retrival=targeted_retrival,*args, **kwargs)
 
     def create_agents(
         self,
@@ -982,6 +989,7 @@ class CommandCenter(IDisposable):
         define_home: Optional[Union[Callable[..., None], Pack]] = None,
         command_group_name: str = "default",
         reset_agents: bool = False,
+        targeted_retrival = False,
         *args, **kwargs
     ) -> ConcurrentList[Agent]:
         """
@@ -994,6 +1002,7 @@ class CommandCenter(IDisposable):
             target (Callable | Pack, optional): One-time task to execute inside each agent.
             define_home (Callable | Pack, optional): Loop function to run as main logic.
             reset_agents (bool): If True, the agent will be reset before execution.
+            targeted_retrival (bool): If True, will attempt to get an agent of your template type before trying to create a new one if possible.
             *args: Positional overrides for the factory.
             **kwargs: Keyword overrides for the factory.
 
@@ -1004,15 +1013,24 @@ class CommandCenter(IDisposable):
             Will warn if the global worker cap is reached mid-creation.
         """
         self._check_disposed()
+        self._check_if_eligible_for_targeted_retrival()
+
         new_agents = ConcurrentList()
         for i in range(count):
             try:
-                agent = self.create_agent(command_group_name=command_group_name, template_name=template_name, define_home=define_home, target=target, reset_agent=reset_agents, *args, **kwargs)
+                agent = self.create_agent(command_group_name=command_group_name, template_name=template_name, define_home=define_home, target=target, reset_agent=reset_agents, targeted_retrival=targeted_retrival, *args, **kwargs)
                 new_agents.append(agent)
             except RuntimeError:
                 warnings.warn(f"Worker cap reached. Created {i} of {count} requested agents.", UserWarning)
                 break
         return new_agents
+
+    def _check_if_eligible_for_targeted_retrival(self):
+        """
+        Internal helper to check if targeted retrieval is enabled for this CommandCenter.
+        """
+        if not self._targeted_retrival:
+            raise RuntimeError("Targeted retrieval is not enabled for this CommandCenter. Set 'target_retrival' to True in the AgentPool constructor when creating it to enable this feature.")
 
     def submit(
         self,
@@ -1149,7 +1167,7 @@ class CommandCenter(IDisposable):
             self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._max_workers, 'command_group': command.id})
 
     def _create_and_register_agent(self, template_name: str, define_home: Optional[Union[Callable[..., None], Pack]] = None,
-            target: Optional[Union[Callable[..., None], Pack]] = None, command_group:str = "default", reset_agent: bool = False, *args, **kwargs) -> Agent:
+            target: Optional[Union[Callable[..., None], Pack]] = None, command_group:str = "default", reset_agent: bool = False, targeted_retrival= False, *args, **kwargs) -> Agent:
         """
         Internal method to create and register an agent under the global worker cap.
 
@@ -1225,7 +1243,7 @@ class CommandCenter(IDisposable):
         """
         #TODO: Implement kwargs onto agent somehow
         if reset_agent:
-            agent.reset()
+            agent.reset() #TODO: This reset still needs to be fleshed out
         if target:
             agent.set_target(target)
         if define_home:

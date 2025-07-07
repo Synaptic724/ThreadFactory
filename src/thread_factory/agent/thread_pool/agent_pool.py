@@ -1,7 +1,8 @@
 import logging, threading, time
+from dataclasses import dataclass
 from typing import Callable, Union
 import ulid
-from ulid import ULID
+from thread_factory.concurrency.sync_types.sync_bool import SyncBool
 from thread_factory.runtime.orchestrator.monitoring.records.records import WorkStatus, Record
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
@@ -11,6 +12,31 @@ from thread_factory.synchronization.primitives.flow_regulator import FlowRegulat
 from thread_factory.synchronization.primitives.latch import Gate
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.runtime.orchestrator.monitoring.records.records import Records
+
+
+@dataclass
+class ClaimedAgentRef:
+    """
+    Represents a temporarily claimed agent for pre-dispatch coordination.
+    """
+    agent_id: str
+    template_name: str
+    claimed: SyncBool
+    pool_id: str
+    available: bool
+
+    def release(self):
+        """
+        Releases this claim, making it available again.
+        """
+        self.claimed.set(False)
+
+    def is_active(self) -> bool:
+        """
+        Checks if the agent is still claimed.
+        """
+        return self.claimed.get()
+
 
 class _AgentPoolContainer(IDisposable):
     """
@@ -46,12 +72,12 @@ class _AgentPoolContainer(IDisposable):
 
         # Track threads either as a simple set (if no tracking) or as a dict mapping to Records
         if ignore_tracking:
-            self._registered_agents: Union[ConcurrentSet[ULID], ConcurrentDict[ULID, Records]] = ConcurrentSet[ULID]()
+            self._registered_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentSet[ulid.ULID]()
         else:
-            self._registered_agents: Union[ConcurrentSet[ULID], ConcurrentDict[ULID, Records]] = ConcurrentDict[
-                ULID, Records]()
+            self._registered_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentDict[
+                ulid.ULID, Records]()
 
-        self._unregistered_agents = ConcurrentSet[ULID]()  # Tracks which threads have been requested to unregister
+        self._unregistered_agents = ConcurrentSet[ulid.ULID]()  # Tracks which threads have been requested to unregister
         self._unregister_agent_check = False  # Flag to indicate if any threads should unregister
 
         # Command group information
@@ -165,7 +191,7 @@ class _AgentPoolContainer(IDisposable):
                 if factory_id not in self._registered_agents:
                     self._registered_agents[factory_id] = Records()
 
-    def _get_agent_id(self) -> ULID:
+    def _get_agent_id(self) -> ulid.ULID:
         """
         Returns the current thread's factory_id (ULID), which uniquely identifies it.
 
@@ -204,7 +230,7 @@ class _AgentPoolContainer(IDisposable):
         if len(self._unregistered_agents) == 0:
             self._unregister_thread_check = False
 
-    def _unregister_agent(self, factory_id: ULID):
+    def _unregister_agent(self, factory_id: ulid.ULID):
         """
         Marks a thread for unregistration and notifies it if it's waiting.
 
@@ -278,9 +304,9 @@ class _AgentPoolContainer(IDisposable):
 
 class AgentPool(IDisposable):
     """
-    AgentPool (Singleton)
+    AgentPool
     ---------------------
-    A system-wide, cooperative, auto-scaling auxiliary thread pool for handling
+    A cooperative, auto-scaling auxiliary thread pool for handling
     bursty, parallelizable workloads. It manages multiple, isolated pools of agents,
     one for each CommandGroup, ensuring resources are not shared between them.
 
@@ -297,43 +323,45 @@ class AgentPool(IDisposable):
     - **On-Demand Dispatch**: Allows users to `submit` a `HelpRequest` to a specific
       group's pool, requesting a team of agents to work on it concurrently.
     """
-    _instance = None
-    _lock = threading.RLock()
-
-    def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            with cls._lock:
-                if not cls._instance:
-                    cls._instance = super(AgentPool, cls).__new__(cls)
-        return cls._instance
-
-    def __init__(self, command_center: 'CommandCenter', logger: Union[logging.Logger, None] = None):
+    def __init__(self, command_center: 'CommandCenter', logger: Union[logging.Logger, None] = None, target_retrival: bool = False, maintenance_agent: bool = True):
         """
         Initializes the AgentPool singleton.
 
         This is guarded by a lock to prevent race conditions if multiple threads
         try to initialize it at the same time.
+
+        Args:
+            command_center (CommandCenter): The CommandCenter instance to manage agents.
+            logger (logging.Logger, optional): Optional logger for logging events.
+            target_retrival (bool): Whether to use target retrieval for agent claims.
+        Raises:
+            RuntimeError: If the AgentPool has already been initialized.
         """
-        if getattr(self, '_initialized', False):
-            return
-        with self._lock:  # 🧠 Use the class-level lock
-            if getattr(self, '_initialized', False):
-                return
+        super().__init__()
+        # Internal State Flags
+        self._maintenance_agent = maintenance_agent
+        self._target_retrival = target_retrival
 
-            super().__init__()
-            self._id = str(ulid.ULID())
-            self._command_center = command_center
-            self._logger = logger or logging.getLogger(__name__)
-            self._group_container_map = ConcurrentDict[str, str]()
-            self._containers: ConcurrentDict[str, _AgentPoolContainer] = ConcurrentDict()
-            self._shutdown_gate = Gate(True)
+        # Internal State
+        self._lock = threading.RLock()  # Internal lock for thread-safe initialization
+        self._id = str(ulid.ULID())
+        self._command_center = command_center
+        self._logger = logger or logging.getLogger(__name__)
+        self._group_container_map = ConcurrentDict[ulid.ULID, ulid.ULID]() # Lookup of CommandGroup ID to its pool container ID
+        self._containers: ConcurrentDict[ulid.ULID, _AgentPoolContainer] = ConcurrentDict() # All pool containers, keyed by their ULID
+        self._shutdown_gate = Gate(True)
 
-            # Create and deploy the maintenance agent
+        # Create and deploy the maintenance agent
+        if maintenance_agent:
             self._maintenance_agent = self._create_maintenance_worker()
             self._maintenance_agent.deploy()
 
-            self._initialized = True
-            logger.info(f"Initialized AgentPool singleton.")
+        # Claim Registry and System State
+        self._target_retrival = target_retrival  # Whether to use target retrieval for agent claims
+
+
+        self._initialized = True
+        logger.info(f"Initialized AgentPool singleton.")
 
 #region Destructor
     def dispose(self):
@@ -356,6 +384,12 @@ class AgentPool(IDisposable):
             self._logger.warning("AgentPool disposed, shutting down AgentPool")
 
 #endregion Destructor
+#region Targeted Retrieval System
+
+
+
+#endregion Targeted Retrieval System
+
 #region Command Group Pool Management
     def create_new_group_container(self, command_group : 'CommandGroup', tracking_records: bool = False) -> _AgentPoolContainer:
         """
