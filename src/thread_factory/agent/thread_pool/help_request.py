@@ -389,7 +389,7 @@ class HelpRequest(IDisposable):
         if thread._worker_type != "agentic":
             return  # This is only for dynamic threads
         thread._value_work = self
-        if not callable(self._work_callable):
+        if not callable(self._work_callable): #TODO: Inspect this section here it might be broken
             raise RuntimeError("No callable has been assigned to this HelpRequest.")
         try:
             self.record.add_factory_id(thread._factory_id)
