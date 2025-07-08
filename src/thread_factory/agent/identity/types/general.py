@@ -297,12 +297,14 @@ class General(Agent):
         """
         while not self._dismiss_agent:
             if not self._dismiss_agent:
-                if self._pool_agent and self._pool_type == AgentPoolType.DISPATCHER:
+                if self._pool_agent and self._pool_type == AgentPoolType.DISPATCHER and not self._return_home:
                     self._notify("Agentic thread started.")
                     # If this is a pool agent, run the dispatcher loop
                     self._dispatcher_loop()
-                elif self._pool_agent and self._pool_type == AgentPoolType.THROUGHPUT:
+                elif self._pool_agent and self._pool_type == AgentPoolType.THROUGHPUT and not self._return_home:
                     self._throughput_loop()
+                else:
+                    self._return_home = False
             else:
                 self.dispose()
 
@@ -342,10 +344,10 @@ class General(Agent):
         """
         try:
             while not self._dismiss_agent:
-                if self._pool_type == AgentPoolType.THROUGHPUT:
+                if self._pool_type == AgentPoolType.THROUGHPUT and not self._return_home:
                     self.locations["home"]()
 
-                if self._pool_type == AgentPoolType.THROUGHPUT_SLEEP:
+                if self._pool_type == AgentPoolType.THROUGHPUT_SLEEP and not self._return_home:
                     self.locations["sleep"]()
 
                 if self._return_home:

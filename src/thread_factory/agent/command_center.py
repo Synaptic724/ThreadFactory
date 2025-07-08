@@ -90,8 +90,13 @@ class CommandGroup(IDisposable):
         self._logger: Logger = logger or logging.getLogger(__name__)
 
         # --- Internal Components ---
+        # Pool Internals
         self._worker_count = SyncInt(0)
-        self._max_workers = SyncInt(max_workers)
+        self._max_workers = SyncInt(max_workers)  #TODO: Decouple this from pool count and separate these two and have max workers in relation to the two
+        # Freelancer Internals #TODO: Figure out how to implement freelancers in relation to max_workers
+        self._max_freelancers = SyncInt(0)
+        self._freelancer_count = SyncInt(0)
+
         self._command_center = command_center  # Reference to its creator
         # Create Agent Pool Container
         self._group_pool_container: 'CommandGroupContainer' = command_center._agent_pool.create_command_group_container(self.id, self._logger)
@@ -920,12 +925,6 @@ class CommandCenter(IDisposable):
         except Exception as e:
             self._logger.warning(f"Failed to register CommandCenter with external SignalController: {e}", exc_info=True)
 
-    @property
-    def id(self) -> str:
-        """
-        The unique identifier for this CommandCenter instance.
-        """
-        return self._id
 
     # In CommandCenter class
     def _get_object_details(self) -> ConcurrentDict[str, Any]:
