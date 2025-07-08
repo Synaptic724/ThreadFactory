@@ -90,6 +90,7 @@ class FlowRegulator(IDisposable):
         if self.disposed:  # Check if the lock has already been disposed
             return
         self._disposed = True  # Mark the lock as disposed
+        self._cond.notify_all()
         self._cond.dispose()
         self._cond = None
         self._log_ids.clear()

@@ -68,10 +68,13 @@ class AgentContainer(IDisposable):
         self._lock = threading.RLock()  # Internal lock for safe concurrent modifications
         self._logger = logger or logging.getLogger(__name__)
         self._id = str(ulid.ULID())
-        self._flow_regulator = FlowRegulator(0)  # Smart semaphore-like switch used for synchronization
         self._active = False  # Flag to indicate whether the container is active
         self._ignore_tracking = ignore_tracking  # Whether to store tracking Records or not
 
+        # Command group information
+        self._command_group_id = command_group.id  # The CommandGroup this container is associated with
+        self._command_group_worker_count = command_group._worker_count
+        self._command_group_max_worker_count = command_group._max_workers
 
         # Agent Tracking Details
         # Track threads either as a simple set (if no tracking) or as a dict mapping to Records
@@ -85,10 +88,17 @@ class AgentContainer(IDisposable):
         self._unregistered_agents = ConcurrentSet[ulid.ULID]()  # Tracks which threads have been requested to unregister
         self._unregister_agent_check = False  # Flag to indicate if any threads should unregister
 
-        # Command group information
-        self._command_group_id = command_group.id  # The CommandGroup this container is associated with
-        self._command_group_worker_count = command_group._worker_count
-        self._command_group_max_worker_count = command_group._max_workers
+        # Assignments by Category
+        self._throughput_agents = ConcurrentSet[ulid.ULID]()
+        self._dispatch_agents = ConcurrentSet[ulid.ULID]()
+        self._targeted_dispatch_agents = ConcurrentSet[ulid.ULID]()
+        self._untargeted_dispatch_agents = ConcurrentSet[ulid.ULID]()
+
+        # FlowRegulator for managing thread signaling
+        self._untargeted_dispatch_flow_regulator = FlowRegulator(0)  # Untargeted flow regulator for non-targeted dispatch
+        self._targeted_dispatch_flow_regulator = FlowRegulator(0)  # Targeted flow regulator for targeted dispatch
+        self._throughput_flow_regulator = FlowRegulator(0)  # Smart semaphore-like switch used for synchronization
+        self._throughput_sleep_flow_regulator = FlowRegulator(0)  # Flow regulator for throughput sleep
 
         # Targeted Agent Tracking
         self._claimed_agents: ConcurrentDict[str, ClaimedAgentRef] = ConcurrentDict()
@@ -116,9 +126,14 @@ class AgentContainer(IDisposable):
                 self._unregistered_agents = ConcurrentSet(self._registered_agents.keys())
                 self._unregister_agent_check = True
 
-            self._flow_regulator.notify_all()  # Wake all threads
-            self._flow_regulator.dispose()  # Dispose of the switch lock
-            self._flow_regulator = None  # Clear reference to FlowRegulator
+            self._throughput_flow_regulator.dispose()
+            self._throughput_flow_regulator = None
+            self._untargeted_dispatch_flow_regulator.dispose()
+            self._untargeted_dispatch_flow_regulator = None
+            self._targeted_dispatch_flow_regulator.dispose()
+            self._targeted_dispatch_flow_regulator = None
+            self._throughput_sleep_flow_regulator.dispose()
+            self._throughput_sleep_flow_regulator = None
             self._active = False  # Mark container inactive
 
             for records in self._registered_agents.values():
@@ -155,10 +170,10 @@ class AgentContainer(IDisposable):
 
         try:
             while self._active and not self._disposed:
-                if self._flow_regulator is None:
+                if self._untargeted_dispatch_flow_regulator is None:
                     break  # Container was disposed mid-loop
 
-                with self._flow_regulator:
+                with self._untargeted_dispatch_flow_regulator:
                     pass
 
                 if not self._ignore_tracking:
@@ -186,10 +201,10 @@ class AgentContainer(IDisposable):
 
         try:
             while self._active and not self._disposed:
-                if self._flow_regulator is None:
+                if self._targeted_dispatch_flow_regulator is None:
                     break  # Container was disposed mid-loop
 
-                with self._flow_regulator:
+                with self._targeted_dispatch_flow_regulator:
                     pass
 
                 if not self._ignore_tracking:
@@ -219,10 +234,10 @@ class AgentContainer(IDisposable):
 
         try:
             while self._active and not self._disposed:
-                if self._flow_regulator is None:
+                if self._throughput_flow_regulator is None:
                     break  # Container was disposed mid-loop
 
-                with self._flow_regulator:
+                with self._throughput_flow_regulator:
                     pass
 
                 if not self._ignore_tracking:
@@ -231,19 +246,24 @@ class AgentContainer(IDisposable):
                 if self._unregister_thread_check and self._should_exit():
                     self._finalize_unregistration()
                     return
+
         except Exception as e:
             self._logger.error(f"Error in agent pool container: {e}")
 
 
     def _throughput_sleep(self):
         while self._active and not self._disposed:
-            if self._flow_regulator is None:
+            if self._throughput_sleep_flow_regulator is None:
                 break  # Container was disposed mid-loop
 
-            with self._flow_regulator:
+            with self._throughput_sleep_flow_regulator:
                 pass
 
             if threading.current_thread()._main_pool == True:
+                return
+
+            if self._unregister_thread_check and self._should_exit():
+                self._finalize_unregistration()
                 return
 
     def attach_record(self) -> None:
@@ -494,9 +514,9 @@ class CommandGroupContainer(IDisposable):
         self._agent_pool = agent_pool
 
         # Worker Management
-        self._throughput_worker_count = 60
-        self._dispatch_worker_count = 40
-        self._targeted_dispatch_worker_count = 0
+        self._throughput_worker_count = SyncInt(60)
+        self._dispatch_worker_count = SyncInt(40)
+        self._targeted_dispatch_worker_count = SyncInt(0)
 
         # Container Management
         self._containers: Optional[ConcurrentDict[str, AgentContainer]] = ConcurrentDict[str, AgentContainer]() # UUID and Agent Container
@@ -514,8 +534,14 @@ class CommandGroupContainer(IDisposable):
             self._disposed = True
             self._agent_pool.remove_command_group_container(self._group_id)
             self._agent_pool = None
+            self._command_group = None  # Clear reference to CommandGroup
 
+            #Clear SyncInt Refs
+            self._throughput_worker_count = None
+            self._dispatch_worker_count = None
+            self._targeted_dispatch_worker_count = None
 
+            # Dispose all containers in this group
             for container in self._containers.values():
                 container.dispose()
 
