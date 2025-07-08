@@ -956,6 +956,12 @@ class CommandCenter(IDisposable):
                 self._logger.error(f"Error notifying external SignalController: {e}", exc_info=True)
 
 #endregion Controller Contract
+
+#region Agent Pool Management
+
+
+
+#endregion Agent Pool Management
 #region Agent Management
     def find_agent_by_id(self, factory_id: str, command_group_name: str = "default") -> Optional[Agent]:
         """
