@@ -36,7 +36,7 @@ class CommandGroup(IDisposable):
         An optional classification for the group (e.g., "ETL", "Modeling", etc.).
     """
 
-    def __init__(self, command_center: 'CommandCenter', group_name: str, max_workers: int, logger: Optional[logging.Logger] = None, group_type: str = None, targeted_retrival: bool = False):
+    def __init__(self, command_center: 'CommandCenter', group_name: str, max_workers: int, logger: Optional[logging.Logger] = None, group_type: str = None):
         """
         Initializes a new CommandGroup instance.
 
@@ -92,10 +92,9 @@ class CommandGroup(IDisposable):
         # --- Internal Components ---
         self._worker_count = SyncInt(0)
         self._max_workers = SyncInt(max_workers)
-        self._targeted_retrival = targeted_retrival
         self._command_center = command_center  # Reference to its creator
         # Create Agent Pool Container
-        self._container_cluster = command_center._agent_pool.create_command_group_container(self.id, self._logger, target_retrival=targeted_retrival)
+        self._container_cluster = command_center._agent_pool.create_command_group_container(self.id, self._logger)
 
         # Internal registries for its members
         self._active_agents: ConcurrentDict[str, Agent] = ConcurrentDict()
@@ -639,7 +638,7 @@ class CommandCenter(IDisposable):
             self._total_max_workers = new_global_limit
             self._logger.info(f"Global max workers limit increased to {new_global_limit}.")
 
-    def create_command_group(self, command_group_name: str, max_workers, command_group_type:str = None, targeted_retrival: bool = False) -> None:
+    def create_command_group(self, command_group_name: str, max_workers, command_group_type:str = None) -> None:
         """
         Internal method to create and register the default group.
         """
@@ -655,7 +654,7 @@ class CommandCenter(IDisposable):
             raise RuntimeError(f"Cannot create CommandGroup '{command_group_name}'. Total active workers would exceed global limit of {self._total_max_workers}, increase new total limit to create a new group.")
 
         # Create the CommandGroup instance and register it
-        group = CommandGroup(group_name=command_group_name, max_workers=max_workers, command_center=self, group_type=command_group_type, targeted_retrival=targeted_retrival)
+        group = CommandGroup(group_name=command_group_name, max_workers=max_workers, command_center=self, group_type=command_group_type)
         self._command_groups[command_group_name] = group
 
     def get_command_group(self, group_name: str) -> Optional[CommandGroup]:
@@ -985,7 +984,6 @@ class CommandCenter(IDisposable):
             target: Optional[Union[Callable[..., None], Pack]] = None,
             command_group_name: str = "default",
             reset_agent: bool = False,
-            targeted_retrival: bool = False,
             *args, **kwargs
     ) -> Agent:
         """
@@ -997,7 +995,6 @@ class CommandCenter(IDisposable):
             target (Callable | Pack, optional): A one-time task to run before the main loop.
             command_group_name (str): The name of the command group to register the agent in.
             reset_agent (bool): If True, the agent will be reset before execution.
-            targeted_retrival (bool): If True, will attempt to get an agent of your template type before trying to create a new one if possible.
             *args: Positional overrides passed to the template factory.
             **kwargs: Keyword overrides passed to the template factory.
 
@@ -1008,7 +1005,7 @@ class CommandCenter(IDisposable):
 
         if define_home is None and target is None:
             raise ValueError("At least one of define_home or target must be provided.")
-        return self._create_and_register_agent(template_name=template_name, define_home=define_home,target=target, command_group=command_group_name, reset_agent=reset_agent, targeted_retrival=targeted_retrival,*args, **kwargs)
+        return self._create_and_register_agent(template_name=template_name, define_home=define_home,target=target, command_group=command_group_name, reset_agent=reset_agent,*args, **kwargs)
 
     def create_agents(
         self,
@@ -1018,7 +1015,6 @@ class CommandCenter(IDisposable):
         define_home: Optional[Union[Callable[..., None], Pack]] = None,
         command_group_name: str = "default",
         reset_agents: bool = False,
-        targeted_retrival = False,
         *args, **kwargs
     ) -> ConcurrentList[Agent]:
         """
@@ -1031,7 +1027,6 @@ class CommandCenter(IDisposable):
             target (Callable | Pack, optional): One-time task to execute inside each agent.
             define_home (Callable | Pack, optional): Loop function to run as main logic.
             reset_agents (bool): If True, the agent will be reset before execution.
-            targeted_retrival (bool): If True, will attempt to get an agent of your template type before trying to create a new one if possible.
             *args: Positional overrides for the factory.
             **kwargs: Keyword overrides for the factory.
 
@@ -1046,7 +1041,7 @@ class CommandCenter(IDisposable):
         new_agents = ConcurrentList()
         for i in range(count):
             try:
-                agent = self.create_agent(command_group_name=command_group_name, template_name=template_name, define_home=define_home, target=target, reset_agent=reset_agents, targeted_retrival=targeted_retrival, *args, **kwargs)
+                agent = self.create_agent(command_group_name=command_group_name, template_name=template_name, define_home=define_home, target=target, reset_agent=reset_agents, *args, **kwargs)
                 new_agents.append(agent)
             except RuntimeError:
                 warnings.warn(f"Worker cap reached. Created {i} of {count} requested agents.", UserWarning)
@@ -1188,7 +1183,7 @@ class CommandCenter(IDisposable):
             self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._max_workers, 'command_group': command.id})
 
     def _create_and_register_agent(self, template_name: str, define_home: Optional[Union[Callable[..., None], Pack]] = None,
-            target: Optional[Union[Callable[..., None], Pack]] = None, command_group:str = "default", reset_agent: bool = False, targeted_retrival= False, *args, **kwargs) -> Agent:
+            target: Optional[Union[Callable[..., None], Pack]] = None, command_group:str = "default", reset_agent: bool = False,*args, **kwargs) -> Agent:
         """
         Internal method to create and register an agent under the global worker cap.
 
@@ -1232,13 +1227,6 @@ class CommandCenter(IDisposable):
         # Final registration
         self._register_agent(agent, command)
         return agent
-
-    def _check_if_eligible_for_targeted_retrival(self, command_group : CommandGroup):
-        """
-        Internal helper to check if targeted retrieval is enabled for this CommandCenter.
-        """
-        if not command_group._targeted_retrival:
-            raise RuntimeError("Targeted retrieval is not enabled for this CommandCenter. Set 'target_retrival' to True in the AgentPool constructor when creating it to enable this feature.")
 
     def _attempt_pool_get_agent(self, template_name: str, command_group_id: str) -> Optional[Agent]:
         """
