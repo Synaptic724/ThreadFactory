@@ -628,6 +628,7 @@ class CommandGroupContainer(IDisposable):
         # Notify the maintenance agent to increased worker count
         if self._maintenance_agent: #TODO: Decide if we change something or if the system does
             self._maintenance_agent.increase_max_worker_count(number)
+        raise NotImplemented("Method increase_max_worker_count is not implemented yet.")
 
     def decrease_max_worker_count(self, number: int):
         """
@@ -645,6 +646,7 @@ class CommandGroupContainer(IDisposable):
         # Notify the maintenance agent to adjust worker distribution
         if self._maintenance_agent: #TODO: Decide if we change something or if the system does
             self._maintenance_agent.decrease_max_worker_count(number)
+        raise NotImplemented("Method decrease_max_worker_count is not implemented yet.")
 
 
     def _notify_distribution_change_event(self):
@@ -655,6 +657,7 @@ class CommandGroupContainer(IDisposable):
         """
         if self._disposed:
             raise RuntimeError("AgentPool has been disposed and cannot notify distribution change.")
+        raise NotImplemented("Method _notify_distribution_change_event is not implemented yet.")
 
         # Notify the maintenance agent to adjust worker distribution
         if self._maintenance_agent: #TODO: Decide if we change something or if the system does
