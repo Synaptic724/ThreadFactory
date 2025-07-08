@@ -94,7 +94,7 @@ class CommandGroup(IDisposable):
         self._max_workers = SyncInt(max_workers)
         self._command_center = command_center  # Reference to its creator
         # Create Agent Pool Container
-        self._group_pool_container = command_center._agent_pool.create_command_group_container(self.id, self._logger)
+        self._group_pool_container: 'CommandGroupContainer' = command_center._agent_pool.create_command_group_container(self.id, self._logger)
 
         # Internal registries for its members
         self._active_agents: ConcurrentDict[str, Agent] = ConcurrentDict()
@@ -958,8 +958,34 @@ class CommandCenter(IDisposable):
 #endregion Controller Contract
 
 #region Agent Pool Management
+    def set_agent_pool_distribution(self, throughput_agents: int = 60, dispatch_agents: int= 40, targeted_dispatch_agents: int = 0, command_group_name: str = "default"):
+        """
+        Sets the distribution parameters for the AgentPool.
 
+        Args:
+            throughput_agents (int): Maximum number of agents dedicated to discrete queues
+            dispatch_agents (int): Maximum number of agents available for dispatching.
+            targeted_dispatch_agents (int): The number of agents available for targeted dispatching (e.g., for specific tasks, thread affinity, LLM tooling).
+            command_group_name (str): The name of the command group to set the distribution for.
+        """
+        self._check_disposed()
+        if not isinstance(throughput_agents, int) or throughput_agents < 0:
+            raise ValueError("Throughput must be a non-negative integer.")
+        if not isinstance(dispatch_agents, int) or dispatch_agents < 0:
+            raise ValueError("Dispatched agents must be a non-negative integer.")
+        if not isinstance(targeted_dispatch_agents, int) or targeted_dispatch_agents < 0:
+            raise ValueError("Dispatch targeted must be a non-negative integer.")
+        if throughput_agents + dispatch_agents + targeted_dispatch_agents > 100:
+            raise ValueError("Total distribution cannot exceed 100% of the agent pool capacity.")
 
+        command = self.get_command_group(command_group_name)
+        command._group_pool_container.set_distribution(throughput_agents, dispatch_agents, targeted_dispatch_agents)
+        self._logger.info(f"AgentPool distribution set: throughput={throughput_agents}, dispatched_agents={dispatch_agents}, dispatch_targeted={targeted_dispatch_agents}")
+        self._notify('AGENT_POOL_DISTRIBUTION_SET', {
+            'throughput_agents': throughput_agents,
+            'dispatched_agents': dispatch_agents,
+            'dispatch_targeted': targeted_dispatch_agents
+        })
 
 #endregion Agent Pool Management
 #region Agent Management

@@ -487,6 +487,11 @@ class CommandGroupContainer(IDisposable):
         self._group_id = command_group.id
         self._agent_pool = agent_pool
 
+        # Worker Management
+        self._throughput_worker_count = 60
+        self._dispatch_worker_count = 40
+        self._targeted_dispatch_worker_count = 0
+
         # Container Management
         self._containers: Optional[ConcurrentDict[str, AgentContainer]] = ConcurrentDict[str, AgentContainer]() # UUID and Agent Container
         self._agents_in_container: ConcurrentDict[str, ConcurrentSet] =  ConcurrentDict[str, ConcurrentSet]()  # UUID and Agent Container
@@ -581,11 +586,26 @@ class CommandGroupContainer(IDisposable):
         return new_container
 
 #endregion Container Management
-
 #region Targeted Retrieval System
-
 #endregion Targeted Retrieval System
 #region Worker Management
+    def set_agent_pool_distribution(self, throughput_agents: int = 60, dispatch_agents: int= 40, targeted_dispatch_agents: int = 0):
+        """
+        Sets the distribution of agents across different pools.
+
+        Args:
+            throughput_agents (int): Number of agents for throughput tasks.
+            dispatch_agents (int): Number of agents for dispatch tasks.
+            targeted_dispatch_agents (int): Number of agents for targeted dispatch tasks.
+        """
+        if self._disposed:
+            raise RuntimeError("AgentPool has been disposed and cannot set distribution.")
+
+        with self._lock:
+            self._throughput_worker_count = throughput_agents
+            self._dispatch_worker_count = dispatch_agents
+            self._targeted_dispatch_worker_count = targeted_dispatch_agents
+
     def increase_max_worker_count(self, number: int):
         """
         Notify the pool to increase its maximum worker count.
@@ -596,7 +616,12 @@ class CommandGroupContainer(IDisposable):
         Args:
             number (int): The number of workers to add to the pool.
         """
-        pass
+        if self._disposed:
+            raise RuntimeError("AgentPool has been disposed and cannot notify distribution change.")
+
+        # Notify the maintenance agent to increased worker count
+        if self._maintenance_agent: #TODO: Decide if we change something or if the system does
+            self._maintenance_agent.increase_max_worker_count(number)
 
     def decrease_max_worker_count(self, number: int):
         """
@@ -608,7 +633,28 @@ class CommandGroupContainer(IDisposable):
         Args:
             number (int): The number of workers to remove from the pool.
         """
-        pass
+        if self._disposed:
+            raise RuntimeError("AgentPool has been disposed and cannot notify distribution change.")
+
+        # Notify the maintenance agent to adjust worker distribution
+        if self._maintenance_agent: #TODO: Decide if we change something or if the system does
+            self._maintenance_agent.decrease_max_worker_count(number)
+
+
+    def _notify_distribution_change_event(self):
+        """
+        Notifies the maintenance agent of a change in worker distribution.
+        This is used to trigger a re-evaluation of the current worker allocation
+        based on the new distribution settings.
+        """
+        if self._disposed:
+            raise RuntimeError("AgentPool has been disposed and cannot notify distribution change.")
+
+        # Notify the maintenance agent to adjust worker distribution
+        if self._maintenance_agent: #TODO: Decide if we change something or if the system does
+            self._maintenance_agent.notify_distribution_change(self._throughput_worker_count,
+                                                               self._dispatch_worker_count,
+                                                               self._targeted_dispatch_worker_count)
 
 
     def submit(self, help_request: 'HelpRequest', group_name: str, num_workers: int):
