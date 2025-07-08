@@ -200,14 +200,19 @@ class Conductor(IDisposable):
 
             self.outcomes.dispose()
             self.outcomes = None
-            if self._controller:
-                self._controller.notify(self.id, "DISPOSED")
-                self._controller = None
             if self.tasks:
                 self.tasks.dispose()
                 self.tasks = None
             self._broken = True
             self._released = True
+            if self._controller:
+                self._controller.notify(self.id, "DISPOSED")
+            if self._controller and hasattr(self._controller, 'unregister'):
+                try:
+                    self._controller.unregister(self)
+                except Exception:
+                    pass
+                self._controller = None
 
     @property
     def id(self) -> str:

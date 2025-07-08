@@ -58,7 +58,7 @@ class SignalController(IDisposable):
                                                configured for the controller.
         """
         super().__init__()
-        self.id = str(ulid.ULID())
+        self._id = str(ulid.ULID())
 
         # optional users management tools
         self.name = controller_name if controller_name else "SignalController"
@@ -378,6 +378,13 @@ class SignalController(IDisposable):
                 self._registry.pop(object_id)
 
             self._logger.debug(f"Unregistered object: {object_id}")
+
+    @property
+    def id(self) -> str:  # noqa: D401
+        """
+        ULID that uniquely identifies this latch.
+        """
+        return self._id
 
     # -------------------------------------------
     # Broadcast and Notification

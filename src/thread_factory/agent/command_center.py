@@ -509,6 +509,7 @@ class CommandCenter(IDisposable):
         super().__init__()
         # --- Core Components ---
         self._logger: Logger = logger or logging.getLogger(__name__)
+        self._id = str(ulid.ULID())
         self._lock = threading.RLock()
         self._builder = AgentBuilder()
         self._activity_builder = ActivityBuilder()
@@ -569,11 +570,25 @@ class CommandCenter(IDisposable):
 
             self._agent_pool.dispose()
             self._agent_pool = None
-            self._external_signal_controller = None
             self._total_max_workers = None
+            if self._external_signal_controller:
+                self._external_signal_controller.notify(self.id, "DISPOSED")
+            if self._external_signal_controller and hasattr(self._external_signal_controller, 'unregister'):
+                try:
+                    self._external_signal_controller.unregister(self.id)
+                except Exception:
+                    pass
+                self._external_signal_controller = None
+
             self._logger.info(f"CommandCenter '{self.id}' disposed.")
             self._logger = None
 
+    @property
+    def id(self) -> str:  # noqa: D401
+        """
+        ULID that uniquely identifies this latch.
+        """
+        return self._id
 
     def shutdown(self):
         """

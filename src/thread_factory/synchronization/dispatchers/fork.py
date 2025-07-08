@@ -149,7 +149,8 @@ class Fork(IDisposable):
             for unit in self._list_of_forks:
                 unit.dispose()
 
-            self._list_of_forks.clear()
+            self._list_of_forks.dispose()
+            self._list_of_forks = None
 
 
     def reset(self) -> None:

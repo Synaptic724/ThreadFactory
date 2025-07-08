@@ -101,8 +101,16 @@ class TransitBarrier(IDisposable):
         with self._condition:
             self._condition.notify_all()
 
+        self._condition.dispose()
+        self._condition = None
+
         # Null out any strong reference types
         self._transit = None
+        if self._controller and hasattr(self._controller, 'unregister'):
+            try:
+                self._controller.unregister(self)
+            except Exception:
+                pass
         self._controller = None
 
     @property

@@ -93,6 +93,12 @@ class TransitCondition(IDisposable):
         self._waiters.dispose()
         self._default_callback = None
 
+    @property
+    def id(self) -> str:  # noqa: D401
+        """
+        ULID that uniquely identifies this latch.
+        """
+        return self._id
 
     def __enter__(self):
         """Enter the context manager and acquire the lock."""

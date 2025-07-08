@@ -273,6 +273,11 @@ class MultiConductor(IDisposable):
             # This is now safe to do because no threads are stuck waiting on us.
             if self._controller:
                 self._controller.notify(self.id, "DISPOSED")
+                if self._controller and hasattr(self._controller, 'unregister'):
+                    try:
+                        self._controller.unregister(self)
+                    except Exception:
+                        pass
                 self._controller = None
 
     # This is your intended global check, now slightly more Pythonic.

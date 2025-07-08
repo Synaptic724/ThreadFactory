@@ -174,7 +174,9 @@ class SignalFork(IDisposable):
             self._forks_closed = True
             for unit in self._list_of_forks:
                 unit.dispose()
-            self._list_of_forks.clear()
+            self._list_of_forks.dispose()
+            self._list_of_forks = None
+            self._callback = None
 
             # --- FINAL POLISH: Unregister from controller on dispose ---
             # This prevents the controller from holding a dead reference.
@@ -183,6 +185,7 @@ class SignalFork(IDisposable):
                     self._controller.unregister(self)
                 except Exception:
                     pass
+            self._controller = None
 
     def reset(self) -> None:
         """

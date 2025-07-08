@@ -140,12 +140,19 @@ class SignalBarrier(IDisposable):
                 return
             self._disposed = True
             # Clean up references
-            self._controller = None
             self._signal_callback = None
             self._transit_callback = None
 
         with self._condition:
             self._condition.notify_all()
+        if self._controller:
+            self._controller.notify(self.id, "DISPOSED")
+        if self._controller and hasattr(self._controller, 'unregister'):
+            try:
+                self._controller.unregister(self.id)
+            except Exception:
+                pass
+            self._controller = None
 
     # --- Controller Contract Properties ---
 

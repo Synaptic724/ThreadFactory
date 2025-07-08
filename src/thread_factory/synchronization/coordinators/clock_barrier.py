@@ -97,10 +97,18 @@ class ClockBarrier(IDisposable):
             return
 
         self._disposed  = True
-        self._controller = None
         with self._cond:
             self._break_barrier_locked()
             self._cond.notify_all()  # Wake all waiting threads
+
+        if self._controller:
+            self._controller.notify(self.id, "DISPOSED")
+        if self._controller and hasattr(self._controller, 'unregister'):
+            try:
+                self._controller.unregister(self)
+            except Exception:
+                pass
+            self._controller = None
         self._on_broken = None
 
     def __enter__(self):

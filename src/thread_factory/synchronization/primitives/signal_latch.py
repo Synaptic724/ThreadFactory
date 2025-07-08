@@ -107,6 +107,41 @@ class SignalLatch(IDisposable):
             except Exception:
                 pass
 
+    def dispose(self) -> None:
+        """
+        Release all blocked threads **permanently**; further operations raise.
+
+        Notes
+        -----
+        • Once disposed, :py:meth:`open` and :py:meth:`reset` are ignored.
+        • The internal :class:`TransitCondition` is also disposed to free
+          resources.
+        """
+        if self._disposed:
+            return
+        with self._lock:
+            if self._disposed:
+                return
+            self._disposed = True
+
+        # Wake any waiters immediately
+        with self._cond:
+            self._open = True
+            self._cond.notify_all()
+
+        # Tear down internals
+        self._cond.dispose()
+        self._signal_callback = None
+        if self._controller:
+            self._controller.notify(self.id, "DISPOSED")
+        if self._controller and hasattr(self._controller, 'unregister'):
+            try:
+                self._controller.unregister(self.id)
+            except Exception:
+                pass
+            self._controller = None
+
+
     # ──────────────────────────────────────────────────────────────────
     # Controller contract helpers
     # ──────────────────────────────────────────────────────────────────
@@ -242,33 +277,6 @@ class SignalLatch(IDisposable):
         bool
         """
         return self._open
-
-    def dispose(self) -> None:
-        """
-        Release all blocked threads **permanently**; further operations raise.
-
-        Notes
-        -----
-        • Once disposed, :py:meth:`open` and :py:meth:`reset` are ignored.
-        • The internal :class:`TransitCondition` is also disposed to free
-          resources.
-        """
-        if self._disposed:
-            return
-        with self._lock:
-            if self._disposed:
-                return
-            self._disposed = True
-
-        # Wake any waiters immediately
-        with self._cond:
-            self._open = True
-            self._cond.notify_all()
-
-        # Tear down internals
-        self._cond.dispose()
-        self._signal_callback = None
-        self._controller = None
 
 
 SignalGate = SignalLatch  # Alias for backward compatibility
