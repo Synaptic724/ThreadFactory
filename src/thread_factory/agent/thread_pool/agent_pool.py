@@ -132,6 +132,12 @@ class AgentContainer(IDisposable):
             # Clear references to CommandGroup
             self._command_group_worker_count = None  # Clear reference to CommandGroup
             self._command_group_max_worker_count = None  # Clear reference to CommandGroup
+            self._command_group_id = None  # Clear reference to CommandGroup
+            self._claimed_agents.dispose()  # Dispose of claimed agents
+            self._claimed_agents = None  # Clear reference to claimed agents
+            self._logger.info(f"Disposed AgentContainer for CommandGroup: {self._command_group_id}")
+            self._logger = None  # Clear logger reference
+
 
     def _untargeted_dispatch_loop(self):
         """
@@ -839,6 +845,7 @@ class AgentPool(IDisposable):
 
             self._command_center = None  # Clear reference to CommandCenter
             self._logger.warning("AgentPool disposed, shutting down AgentPool")
+            self._logger = None  # Clear logger reference
 
 #endregion Destructor
 #region Container Group Management

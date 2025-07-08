@@ -100,6 +100,8 @@ class ClockBarrier(IDisposable):
         self._controller = None
         with self._cond:
             self._break_barrier_locked()
+            self._cond.notify_all()  # Wake all waiting threads
+        self._on_broken = None
 
     def __enter__(self):
         """

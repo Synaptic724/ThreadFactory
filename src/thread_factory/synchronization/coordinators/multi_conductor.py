@@ -240,6 +240,8 @@ class MultiConductor(IDisposable):
             self._disposed = True
             self._broken = True
             self._released = True
+            self._create_fork = None
+            self._callback = None
 
             # --- Step 1: Immediately release all possible waiters ---
             # This is the most critical step to prevent deadlocks during shutdown.
@@ -256,17 +258,22 @@ class MultiConductor(IDisposable):
             if self._manual_release_gate:
                 self._manual_release_gate.set()
 
+            for group in self.groups:
+                group.dispose()
+
+            self.groups.dispose()
+            self.groups = None
+            self.outcomes.dispose()
+            self.outcomes = None
+            if self._fork_processor:
+                self._fork_processor.dispose()
+                self._fork_processor = None
+
             # --- Step 2: Perform secondary cleanup of child objects and data ---
             # This is now safe to do because no threads are stuck waiting on us.
             if self._controller:
                 self._controller.notify(self.id, "DISPOSED")
                 self._controller = None
-
-            for group in self.groups:
-                group.dispose()
-
-            self.groups.clear()
-            self.outcomes.clear()
 
     # This is your intended global check, now slightly more Pythonic.
     def _check_if_eligible_for_sync_fork(self) -> bool:

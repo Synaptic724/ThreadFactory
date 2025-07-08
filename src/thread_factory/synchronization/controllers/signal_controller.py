@@ -162,6 +162,8 @@ class SignalController(IDisposable):
             # Mark the controller as disposed
             self._disposed = True
             self._logger.info("SignalController disposed.")
+            # Clear the logger to prevent further logging after disposal
+            self._logger = None
 
     # -------------------------------------------
     # Hook Registration

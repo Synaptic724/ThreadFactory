@@ -72,6 +72,28 @@ class Scout(IDisposable):
         self._is_active_monitoring = False  # True if a thread is currently inside monitor()
         self._monitoring_cycle_completed = False  # True if a cycle has finished (latch state)
 
+    def dispose(self) -> None:
+        """
+        Disposes the Scout instance. This makes it permanently unusable.
+        All resources are released. Does NOT call super().dispose().
+        """
+        # Per user request, do not call super().dispose()
+        if self._disposed:
+            return  # Already disposed, do nothing
+
+        with self._condition:
+            self._disposed = True
+            # Clear internal state and references
+            self._is_active_monitoring = False
+            self._monitoring_cycle_completed = False
+            self._predicate = None  # Release reference
+            self._on_timeout_callable = None  # Release reference
+            self._on_success_callable = None  # Release reference
+            # The Condition object itself can't be truly 'disposed' but references are cleared.
+            self._condition.notify_all()  # Notify any waiting threads that it's disposed
+            # No need to acquire/release lock again for the final cleanup within the with block.
+
+
     def exit_monitor(self):
         """
         Marks the Scout as disposed, effectively exiting any ongoing monitoring.
@@ -180,27 +202,6 @@ class Scout(IDisposable):
         """
         with self._condition:
             return self._monitoring_cycle_completed and not self._autoreset_on_exit
-
-    def dispose(self) -> None:
-        """
-        Disposes the Scout instance. This makes it permanently unusable.
-        All resources are released. Does NOT call super().dispose().
-        """
-        # Per user request, do not call super().dispose()
-        if self._disposed:
-            return  # Already disposed, do nothing
-
-        with self._condition:
-            self._disposed = True
-            # Clear internal state and references
-            self._is_active_monitoring = False
-            self._monitoring_cycle_completed = False
-            self._predicate = None  # Release reference
-            self._on_timeout_callable = None  # Release reference
-            self._on_success_callable = None  # Release reference
-            # The Condition object itself can't be truly 'disposed' but references are cleared.
-            self._condition.notify_all()  # Notify any waiting threads that it's disposed
-            # No need to acquire/release lock again for the final cleanup within the with block.
 
     def __repr__(self):
         status = "Active" if self.is_active() else "Idle"

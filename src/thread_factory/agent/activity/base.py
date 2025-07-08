@@ -113,10 +113,13 @@ class BaseActivity(IDisposable, ABC):
             self._metadata.dispose()
             self._metadata = None
             self._pause_event.dispose()
+            self._pause_event = None
 
             # Nullify references to external objects to aid garbage collection
             self._signal_controller = None
+            self._pause_system = None
             self._logger.debug(f"Activity '{self.id}' disposal complete.")
+            self._logger = None  # Clear logger reference to prevent circular references
 
     # --- SignalController Contract ---
 

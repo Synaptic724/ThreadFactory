@@ -116,6 +116,10 @@ class JobActivity(BaseActivity, IDisposable):
             self.job_id = None
             self.task_id = None
 
+            self._collection.dispose()
+            self._collection = None
+
+            self._work_function = None
             # Delegate to BaseActivity / IDisposable cleanup
             super().dispose()
 

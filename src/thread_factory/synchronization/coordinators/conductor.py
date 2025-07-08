@@ -162,6 +162,53 @@ class Conductor(IDisposable):
         # Outcomes management
         self.outcomes: ConcurrentDict[int, Union[Outcome, ConcurrentList[Outcome]]] = ConcurrentDict()
 
+    def dispose(self):
+        """
+        Disposes of the Conductor, cleaning up all associated resources.
+
+        This method performs a full teardown of the Conductor. It marks the
+        instance as disposed, notifies the controller (if any), and releases all
+        internal synchronization primitives (barriers, locks, events). This action
+        effectively unblocks any threads currently waiting on the Conductor.
+
+        Once disposed, a Conductor cannot be used or reset. Any subsequent calls
+        to its methods will have no effect or raise a `RuntimeError`. This method
+        is thread-safe.
+        """
+        if self._disposed: return
+        with self._lock:
+            self._disposed = True
+            if self._clock_barrier:
+                self._clock_barrier.dispose()
+                self._clock_barrier = None
+            if self._signal_barrier:
+                self._signal_barrier.dispose()
+                self._signal_barrier = None
+            if self._internal_threshold_barrier:
+                self._internal_threshold_barrier.dispose()
+                self._internal_threshold_barrier = None
+            if self._dynaphore:
+                self._dynaphore.dispose()
+                self._dynaphore = None
+            if self._manual_release_gate:
+                self._manual_release_gate.set()
+                self._manual_release_gate = None
+            if self.outcomes:
+                for value in self.outcomes.values():
+                    outcomes_to_dispose = value if self._multiple_outcomes_per_task else [value]
+                    for obj in outcomes_to_dispose: obj.dispose()
+
+            self.outcomes.dispose()
+            self.outcomes = None
+            if self._controller:
+                self._controller.notify(self.id, "DISPOSED")
+                self._controller = None
+            if self.tasks:
+                self.tasks.dispose()
+                self.tasks = None
+            self._broken = True
+            self._released = True
+
     @property
     def id(self) -> str:
         """
@@ -202,38 +249,6 @@ class Conductor(IDisposable):
                 'notify_all_override': self.notify_all_override, 'is_spent': self.is_spent,
             })
         })
-
-    def dispose(self):
-        """
-        Disposes of the Conductor, cleaning up all associated resources.
-
-        This method performs a full teardown of the Conductor. It marks the
-        instance as disposed, notifies the controller (if any), and releases all
-        internal synchronization primitives (barriers, locks, events). This action
-        effectively unblocks any threads currently waiting on the Conductor.
-
-        Once disposed, a Conductor cannot be used or reset. Any subsequent calls
-        to its methods will have no effect or raise a `RuntimeError`. This method
-        is thread-safe.
-        """
-        if self._disposed: return
-        with self._lock:
-            self._disposed = True
-            if self._controller:
-                self._controller.notify(self.id, "DISPOSED")
-                self._controller = None
-            if self._clock_barrier: self._clock_barrier.dispose()
-            if self._signal_barrier: self._signal_barrier.dispose()
-            if self._internal_threshold_barrier: self._internal_threshold_barrier.dispose()
-            if self._dynaphore: self._dynaphore.dispose()
-            if self._manual_release_gate: self._manual_release_gate.set()
-            if self.outcomes:
-                for value in self.outcomes.values():
-                    outcomes_to_dispose = value if self._multiple_outcomes_per_task else [value]
-                    for obj in outcomes_to_dispose: obj.dispose()
-            self.outcomes.clear()
-            self._broken = True
-            self._released = True
 
     def reset(self):
         """
