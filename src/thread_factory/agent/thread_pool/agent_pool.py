@@ -2,6 +2,10 @@ import logging, threading, time
 from dataclasses import dataclass
 from typing import Callable, Union, Optional
 import ulid
+
+from thread_factory.agent.identity.types.agent import AgentPoolType, Agent
+from thread_factory.agent.thread_pool import HelpRequest
+from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from thread_factory.concurrency.sync_types.sync_bool import SyncBool
 from thread_factory.concurrency.sync_types.sync_int import SyncInt
 from thread_factory.concurrency.concurrent_list import ConcurrentList
@@ -77,31 +81,43 @@ class AgentContainer(IDisposable):
         self._command_group_max_worker_count = command_group._max_workers
 
         # Agent Tracking Details
+        self._all_agents: ConcurrentDict[ulid.ULID, Agent] = ConcurrentDict[ulid.ULID, Agent]()
+
         # Track threads either as a simple set (if no tracking) or as a dict mapping to Records
         if ignore_tracking:
-            self._registered_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentSet[ulid.ULID]()
+            self._throughput_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentSet[ulid.ULID]()
+            self._sleep_agents: ConcurrentSet[ulid.ULID] = ConcurrentSet[ulid.ULID]()
+            self._dispatch_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentSet[ulid.ULID]()
+            self._reserved_dispatch_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentSet[ulid.ULID]()
         else:
-            self._registered_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentDict[
-                ulid.ULID, Records]()
-
-        # Unregistration Tracking
-        self._unregistered_agents = ConcurrentSet[ulid.ULID]()  # Tracks which threads have been requested to unregister
-        self._unregister_agent_check = False  # Flag to indicate if any threads should unregister
+            self._throughput_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentDict[ulid.ULID, Records]()
+            self._dispatch_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentDict[ulid.ULID, Records]()
+            self._reserved_dispatch_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentDict[ulid.ULID, Records]()
 
         # Assignments by Category
-        self._throughput_agents = ConcurrentSet[ulid.ULID]()
-        self._dispatch_agents = ConcurrentSet[ulid.ULID]()
-        self._targeted_dispatch_agents = ConcurrentSet[ulid.ULID]()
-        self._untargeted_dispatch_agents = ConcurrentSet[ulid.ULID]()
+        self._unregistered_sleep_agents = ConcurrentSet[ulid.ULID]()
+        self._unregister_sleep_agents = False  # Flag to indicate if throughput sleep agents should unregister
+        self._register_sleep_agents = False
+
+        # Assignments to Sleep
+        self._sleep_dispatch_agents = ConcurrentSet[ulid.ULID]()
+        self._check_sleep_dispatch_agents = False
+        self._sleep_reserved_dispatch_agents = ConcurrentSet[ulid.ULID]()
+        self._check_sleep_reserved_dispatch_agents = False
+        self._sleep_throughput_agents = ConcurrentSet[ulid.ULID]()
+        self._check_sleep_throughput_agents = False
+
+        # Throughput Mode Queues
+        self._throughput_queue: ConcurrentQueue[HelpRequest] = ConcurrentQueue[HelpRequest]()
 
         # FlowRegulator for managing thread signaling
-        self._untargeted_dispatch_flow_regulator = FlowRegulator(0)  # Untargeted flow regulator for non-targeted dispatch
-        self._targeted_dispatch_flow_regulator = FlowRegulator(0)  # Targeted flow regulator for targeted dispatch
-        self._throughput_flow_regulator = FlowRegulator(0)  # Smart semaphore-like switch used for synchronization
-        self._throughput_sleep_flow_regulator = FlowRegulator(0)  # Flow regulator for throughput sleep
-
-        # Targeted Agent Tracking
+        self._reserved_dispatch_flow_regulator = FlowRegulator(0)  # Untargeted flow regulator for non-targeted dispatch
         self._claimed_agents: ConcurrentDict[str, ClaimedAgentRef] = ConcurrentDict()
+
+        # General Purpose Flow Regulators
+        self._dispatch_flow_regulator = FlowRegulator(0)  # Targeted flow regulator for targeted dispatch
+        self._throughput_flow_regulator = FlowRegulator(0)  # Smart semaphore-like switch used for synchronization
+        self._sleep_flow_regulator = FlowRegulator(0)  # Flow regulator for throughput sleep
 
     def dispose(self):
         """
@@ -128,22 +144,31 @@ class AgentContainer(IDisposable):
 
             self._throughput_flow_regulator.dispose()
             self._throughput_flow_regulator = None
-            self._untargeted_dispatch_flow_regulator.dispose()
-            self._untargeted_dispatch_flow_regulator = None
-            self._targeted_dispatch_flow_regulator.dispose()
-            self._targeted_dispatch_flow_regulator = None
+            self._reserved_dispatch_flow_regulator.dispose()
+            self._reserved_dispatch_flow_regulator = None
+            self._dispatch_flow_regulator.dispose()
+            self._dispatch_flow_regulator = None
             self._throughput_sleep_flow_regulator.dispose()
             self._throughput_sleep_flow_regulator = None
             self._active = False  # Mark container inactive
+
+            # Manage Queue disposal
+            if self._throughput_queue:
+                self._throughput_queue.dispose()
+                self._throughput_queue = None
 
             for records in self._registered_agents.values():
                 records.dispose()
             self._registered_agents.dispose()  # Dispose of registry
             self._registered_agents = None
-            self._unregistered_agents.dispose()  # Dispose of unregistration list
-            self._unregistered_agents = None
 
-            self._unregister_agent_check = False
+            self._unregistered_throughput_sleep_agents.dispose()
+            self._unregister_throughput_sleep_agents = None
+            self._unregistered_dispatch_agents.dispose()
+            self._unregistered_dispatch_agents = None
+            self._unregistered_reserved_dispatch_agents.dispose()
+            self._unregistered_reserved_dispatch_agents = None
+
             # Clear references to CommandGroup
             self._command_group_worker_count = None  # Clear reference to CommandGroup
             self._command_group_max_worker_count = None  # Clear reference to CommandGroup
@@ -154,7 +179,7 @@ class AgentContainer(IDisposable):
             self._logger = None  # Clear logger reference
 
 
-    def _untargeted_dispatch_loop(self):
+    def _reserved_dispatch_loop(self):
         """
         Main entrypoint for worker participation in this pool.
 
@@ -170,22 +195,22 @@ class AgentContainer(IDisposable):
 
         try:
             while self._active and not self._disposed:
-                if self._untargeted_dispatch_flow_regulator is None:
+                if self._reserved_dispatch_flow_regulator is None:
                     break  # Container was disposed mid-loop
 
-                with self._untargeted_dispatch_flow_regulator:
+                with self._reserved_dispatch_flow_regulator:
                     pass
 
                 if not self._ignore_tracking:
                     self.attach_record()
 
-                if self._unregister_thread_check and self._should_exit():
+                if self._unregister_reserved_dispatch_agents and self._should_exit():
                     self._finalize_unregistration()
                     return
         except Exception as e:
             self._logger.error(f"Error in agent pool container: {e}")
 
-    def _targeted_dispatch_loop(self):
+    def _dispatch_loop(self):
         """
         Main entrypoint for worker participation in this pool.
 
@@ -201,18 +226,19 @@ class AgentContainer(IDisposable):
 
         try:
             while self._active and not self._disposed:
-                if self._targeted_dispatch_flow_regulator is None:
+                if self._dispatch_flow_regulator is None:
                     break  # Container was disposed mid-loop
 
-                with self._targeted_dispatch_flow_regulator:
+                with self._dispatch_flow_regulator:
                     pass
 
                 if not self._ignore_tracking:
                     self.attach_record()
 
-                if self._unregister_thread_check and self._should_exit():
+                if self._check_sleep_dispatch_agents and self._should_exit():
                     self._finalize_unregistration()
                     return
+
         except Exception as e:
             self._logger.error(f"Error in agent pool container: {e}")
 
@@ -234,14 +260,20 @@ class AgentContainer(IDisposable):
 
         try:
             while self._active and not self._disposed:
-                if self._throughput_flow_regulator is None:
+                if self._throughput_flow_regulator is None or self._throughput_queue is None:
                     break  # Container was disposed mid-loop
+
+
+                while not self._throughput_queue.is_empty():
+                    try:
+                        help_request = self._throughput_queue.dequeue()
+                        help_request.acquire_work()
+                    finally:
+                        if not self._ignore_tracking:
+                            self.attach_record()
 
                 with self._throughput_flow_regulator:
                     pass
-
-                if not self._ignore_tracking:
-                    self.attach_record()
 
                 if self._unregister_thread_check and self._should_exit():
                     self._finalize_unregistration()
@@ -251,7 +283,16 @@ class AgentContainer(IDisposable):
             self._logger.error(f"Error in agent pool container: {e}")
 
 
-    def _throughput_sleep(self):
+    def _sleep(self):
+        """
+        Agents in this space will eventually be decommissioned if there is no
+        activity in their queue and they will be despawned, if activity increases
+        the load balancing will kick in and reintroduce them.
+        """
+        factory_id = self._get_agent_id()  # Get the unique thread identifier
+        if not factory_id in self._sleep_agents:
+            self._sleep_agents.add(factory_id)
+
         while self._active and not self._disposed:
             if self._throughput_sleep_flow_regulator is None:
                 break  # Container was disposed mid-loop
@@ -262,13 +303,13 @@ class AgentContainer(IDisposable):
             if threading.current_thread()._main_pool == True:
                 return
 
-            if self._unregister_thread_check and self._should_exit():
+            if self._unregistered_sleep_agents and self._should_exit():
                 self._finalize_unregistration()
                 return
 
     def attach_record(self) -> None:
         """
-        Attaches the current thread's `ValueWork` (if present) to its associated `Records` entry
+        Attaches the current thread's `HelpRequest` (if present) to its associated `Records` entry
         in the agentic pool, assuming tracking is enabled.
 
         Raises:
@@ -277,7 +318,7 @@ class AgentContainer(IDisposable):
         thread_id = self._get_agent_id()  # Get the unique thread identifier
 
         # Try to fetch the current ValueWork task from the thread
-        if value_work := getattr(threading.current_thread(), "_value_work", None):
+        if value_work := getattr(threading.current_thread(), "_help_request", None):
             # Ensure this thread is registered before assigning work
             if thread_id not in self._registered_agents:
                 raise RuntimeError("Thread is not registered in the AgenticPoolContainer.")
@@ -307,11 +348,48 @@ class AgentContainer(IDisposable):
         with self._lock:
             if not self._active:
                 self._active = True
-            if self._ignore_tracking:
-                self._registered_agents.add(factory_id)
+
+            if self._check_if_agent_is_registered(factory_id):
+                self._logger.warning(f"Thread {factory_id} is already registered in this container.")
+                return
+            pool_type = threading.current_thread()._pool_type
+            if pool_type == AgentPoolType.DISPATCHER:
+                if self._ignore_tracking:
+                    self._dispatch_agents.add(factory_id)
+                else:
+                    self._dispatch_agents[factory_id] = Records()
+                self._logger.info(f"Agent {factory_id} has been registered to dispatch.")
+            elif pool_type == AgentPoolType.THROUGHPUT:
+                if self._ignore_tracking:
+                    self._throughput_agents.add(factory_id)
+                else:
+                    self._throughput_agents[factory_id] = Records()
+                self._logger.info(f"Agent {factory_id} has been registered to throughput.")
+            elif pool_type == AgentPoolType.RESERVED_DISPATCHER:
+                if self._ignore_tracking:
+                    self._reserved_dispatch_agents.add(factory_id)
+                else:
+                    self._reserved_dispatch_agents[factory_id] = Records()
+                self._logger.info(f"Agent {factory_id} has been registered to reserved dispatch.")
             else:
-                if factory_id not in self._registered_agents:
-                    self._registered_agents[factory_id] = Records()
+                threading.current_thread()._pool_type = AgentPoolType.SLEEP
+                self._logger.warning(f"Agent {factory_id} is not a valid pool type, defaulting to SLEEP.")
+                self._sleep_agents.add(factory_id)
+
+    def _check_if_agent_is_registered(self, factory_id: Union[str, ulid.ULID]) -> bool:
+        """
+        Checks if the given factory_id is registered in this container.
+
+        Args:
+            factory_id (str): The
+        """
+        if self._ignore_tracking:
+            if factory_id in self._throughput_agents | self._sleep_agents | self._dispatch_agents | self._reserved_dispatch_agents:
+                return True
+        else:
+            if factory_id in self._sleep_agents | set(self._throughput_agents.keys() + self._dispatch_agents.keys() + self._reserved_dispatch_agents.keys()):
+                return True
+        return False
 
     def _get_agent_id(self) -> ulid.ULID:
         """

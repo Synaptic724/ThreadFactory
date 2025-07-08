@@ -2,7 +2,7 @@ import threading
 from datetime import datetime
 from ulid import ULID
 from typing import Callable, Union
-from thread_factory.agent.thread_pool.records import WorkStatus, Record
+from thread_factory.agent.thread_pool.records.records import WorkStatus, Record
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.utils.coordination.package import Pack
 
@@ -242,43 +242,6 @@ class HelpRequest(IDisposable):
             self.set_state(WorkStatus.CANCELLED)  # Mark the task as cancelled
             self._update_record()  # Update the record to reflect cancellation
 
-    def set_return_to_pool(self, should_return: bool = True):
-        """
-        Signals that the current worker intends to return to the pool after task execution.
-
-        This method can be called from within the task's callable to indicate that the thread
-        has completed its duty and does not require further chaining, context retention, or
-        special cleanup logic.
-
-        Args:
-            should_return (bool): Whether to mark this task for return to pool. Defaults to True.
-        """
-        with self._lock:
-            self._return_to_pool = should_return
-
-
-    def check_return_to_pool(self) -> bool:
-        """
-        Signals whether the worker should return to the pool after responding to this HelpRequest.
-
-        This flag is set by either the HelpRequest itself (e.g., after `mark_completed()`),
-        or by the user thread explicitly using `set_return_to_pool(True)` or `return_home()`.
-
-        Philosophical Model:
-        --------------------
-        Agentic threads do not assume ownership blindly — they verify whether help is still needed.
-        If this method returns True, it indicates the thread should gracefully release itself
-        from this contract and return to the pool.
-
-        This mechanism supports cooperative execution:
-        - Threads act only when help is truly needed.
-        - User threads retain final ownership of task state.
-        - Threads honor intent, not just availability.
-
-        Returns:
-            bool: True if this thread should return to the pool and not continue execution.
-        """
-        return self._return_to_pool
 
     def reset(self):
         """
@@ -315,6 +278,19 @@ class HelpRequest(IDisposable):
             raise RuntimeError(f"[HelpRequest] {self.record.task_id} has been disposed and cannot return a record.")
         return self.record
 
+        # Add this method within the HelpRequest class definition
+
+    def is_terminal_state(self) -> bool:
+        """
+        Checks if the HelpRequest is in a terminal state (COMPLETED, CANCELLED, or FAILED).
+        Tasks in a terminal state should not be worked on.
+
+        Returns:
+            bool: True if the task is in a terminal state, False otherwise.
+        """
+        with self._lock:  # Ensure thread-safe access to _work_state
+            return self._work_state in {WorkStatus.COMPLETED, WorkStatus.CANCELLED, WorkStatus.FAILED}
+
     def acquire_work(self):
         """
         Acquires the task and begins execution.
@@ -324,6 +300,8 @@ class HelpRequest(IDisposable):
         """
         if self._disposed:
             raise ValueError(f"[HelpRequest] {self.record.task_id} has already been disposed.")
+        if self.is_terminal_state():
+            raise RuntimeError(f"[HelpRequest] {self.record.task_id} has already been terminated.")
 
         # Acquire lock for state-changing operations only (marking in progress, completion, failure)
         with self._lock:
@@ -365,14 +343,14 @@ class HelpRequest(IDisposable):
         """
         Internal method to check if the work callable is valid.
 
-        This method ensures that the work callable is callable and sets the thread's `_value_work`
+        This method ensures that the work callable is callable and sets the thread's `_help_request`
         attribute if the thread is a dynamic worker. It raises an error if the thread does not have
         a factory ID set.
         """
         if self._work_callable is None or not callable(self._work_callable):
             raise RuntimeError(f"[HelpRequest] {self.record.task_id} does not have a valid callable.")
 
-    def bind_value_work(self) -> None:
+    def bind_help_request(self) -> None:
         """
         Executes the bound work callable for dynamic threads.
 
@@ -388,7 +366,7 @@ class HelpRequest(IDisposable):
             raise RuntimeError("Thread is not properly initialized as an AgenticWorker.")
         if thread._worker_type != "agentic":
             return  # This is only for dynamic threads
-        thread._value_work = self
+        thread._help_request = self
         if not callable(self._work_callable): #TODO: Inspect this section here it might be broken
             raise RuntimeError("No callable has been assigned to this HelpRequest.")
         try:

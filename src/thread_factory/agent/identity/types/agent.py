@@ -1,11 +1,11 @@
 import logging, ulid, ctypes, threading
 from enum import Enum, auto
 from datetime import datetime, timedelta
+from typing import Optional, Callable, Union, Any
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.agent.thread_pool.records.records import Records, Record, WorkStatus
 from thread_factory.agent.thread_pool.requests.work import Work
 from thread_factory.synchronization.controllers.signal_controller import SignalController
-from typing import Optional, Callable, Union, Any
 from thread_factory.agent.thread_pool.requests.help_request import HelpRequest
 from thread_factory.agent.thread_pool.records.records import WorkStatus, Record
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
@@ -37,10 +37,11 @@ class AgentPoolType(Enum):
     Enum representing the type of agent.
     """
     NOTSET = auto()  # Represents an agent that has not been set to a specific type
+    DISMISS = auto()  # Represents a worker that is set to be dismissed
     DISPATCHER = auto()  # Represents a worker focused on dispatching tasks
-    DISPATCHER_TARGETED = auto()  # Represents a worker focused on dispatching tasks where they can be claimed
+    RESERVED_DISPATCHER = auto()  # Represents a worker focused on dispatching tasks where they can be claimed
     THROUGHPUT = auto()   # Represents a worker focused on high throughput
-    THROUGHPUT_SLEEP = auto()  # Represents a worker focused on high throughput with sleep behavior
+    SLEEP = auto()  # Represents a worker focused on high throughput with sleep behavior
 
 
 class Agent(threading.Thread, IDisposable):
@@ -69,7 +70,7 @@ class Agent(threading.Thread, IDisposable):
         _return_home (bool): A flag that controls whether the agent should return to its primary event loop after completing a task.
         _lock (threading.RLock): A reentrant lock to ensure thread-safe access to shared state within the agent.
         _event_loop (Optional[Pack]): The packaged callable that defines the agent's primary or "home" execution logic.
-        _value_work (Optional[HelpRequest]): The `HelpRequest` object currently bound to this agent.
+        _help_request (Optional[HelpRequest]): The `HelpRequest` object currently bound to this agent.
         _private_inventory (threading.local): A thread-local storage object containing a `ConcurrentDict` for data private to this agent's thread.
         _public_inventory (ConcurrentDict[str, Any]): A dictionary for storing data that is publicly accessible within the agent's scope.
     """
@@ -158,7 +159,7 @@ class Agent(threading.Thread, IDisposable):
         # Loop and Event Pool Management
         self._dismiss_agent: bool = False # Flag to indicate if the agent should be dismissed
         self._pool_type = AgentPoolType.NOTSET
-        self._value_work: Optional['HelpRequest'] = None # Example: For binding specific work
+        self._help_request: Optional['HelpRequest'] = None # Example: For binding specific work
 
 
         # Auto-register with controller (best-effort)
@@ -265,8 +266,8 @@ class Agent(threading.Thread, IDisposable):
             self._registered_activities.clear()
 
         # Unbind work and reset its state
-        if self._value_work:
-            self._value_work = None
+        if self._help_request:
+            self._help_request = None
 
         # Reset internal state
         self._activity_id = None
@@ -320,7 +321,7 @@ class Agent(threading.Thread, IDisposable):
                 "get_description": self.get_description,
                 "set_return_home": self.set_return_home,
                 "get_bound_work_state": self._get_work_state,
-                "get_bound_work_id": lambda: self._value_work.record.task_id if self._value_work else None,
+                "get_bound_work_id": lambda: self._help_request.record.task_id if self._help_request else None,
                 "list_registered_activities": self.list_registered_activities,
                 "stop": self.stop,
                 "hard_kill": self.hard_kill,
@@ -352,9 +353,9 @@ class Agent(threading.Thread, IDisposable):
         This is typically called when a work item is no longer needed or after
         its completion/failure, allowing for resource cleanup.
         """
-        if self._value_work:
-            self._value_work.dispose()
-            self._value_work = None
+        if self._help_request:
+            self._help_request.dispose()
+            self._help_request = None
 
 #endregion Command Center Management Methods
 #region Activity Management Methods
@@ -468,8 +469,8 @@ class Agent(threading.Thread, IDisposable):
         Args:
             new_state (WorkStatus): The new status to apply to the bound work.
         """
-        if self._value_work:
-            self._value_work.set_state(new_state)
+        if self._help_request:
+            self._help_request.set_state(new_state)
 
     def _get_work_state(self) -> Optional[WorkStatus]:
         """
@@ -479,11 +480,11 @@ class Agent(threading.Thread, IDisposable):
             Optional[WorkStatus]: The current status of the bound work, or `None`
                 if no work is bound.
         """
-        if self._value_work:
-            return self._value_work.get_state()
+        if self._help_request:
+            return self._help_request.get_state()
         return None
 
-    def _get_value_work(self) -> Optional[HelpRequest]:
+    def _get_help_request(self) -> Optional[HelpRequest]:
         """
         Retrieves the `HelpRequest` instance currently bound to this agent.
 
@@ -491,51 +492,51 @@ class Agent(threading.Thread, IDisposable):
             Optional[HelpRequest]: The bound `HelpRequest` object, or `None` if
                 no work is currently assigned.
         """
-        return self._value_work
+        return self._help_request
 
-    def _set_value_work(self, help_request: HelpRequest) -> None:
+    def _set_help_request(self, help_request: HelpRequest) -> None:
         """
         Binds a `HelpRequest` instance to this agent.
 
         Args:
             help_request (HelpRequest): The `HelpRequest` object to bind.
         """
-        self._value_work = help_request
+        self._help_request = help_request
 
     def _mark_work_in_progress(self) -> None:
         """
         Convenience method to mark the bound work as 'in progress'.
         """
-        if self._value_work:
-            self._value_work.mark_in_progress()
+        if self._help_request:
+            self._help_request.mark_in_progress()
 
     def _mark_work_completed(self) -> None:
         """
         Convenience method to mark the bound work as 'completed'.
         """
-        if self._value_work:
-            self._value_work.mark_completed()
+        if self._help_request:
+            self._help_request.mark_completed()
 
     def _mark_work_failed(self) -> None:
         """
         Convenience method to mark the bound work as 'failed'.
         """
-        if self._value_work:
-            self._value_work.mark_failed()
+        if self._help_request:
+            self._help_request.mark_failed()
 
     def _mark_work_cancelled(self) -> None:
         """
         Convenience method to mark the bound work as 'cancelled'.
         """
-        if self._value_work:
-            self._value_work.mark_cancelled()
+        if self._help_request:
+            self._help_request.mark_cancelled()
 
     def _reset_work(self) -> None:
         """
         Resets the bound `HelpRequest` to its initial 'pending' state.
         """
-        if self._value_work:
-            self._value_work.reset()
+        if self._help_request:
+            self._help_request.reset()
 
     def _get_work_record(self) -> Optional[Record]:
         """
@@ -544,23 +545,23 @@ class Agent(threading.Thread, IDisposable):
         Returns:
             Optional[Record]: The record associated with the work, or `None`.
         """
-        if self._value_work:
-            return self._value_work.get_record()
+        if self._help_request:
+            return self._help_request.get_record()
         return None
 
     def _acquire_and_run_work(self):
         """
         Initiates the execution of the `HelpRequest` bound to this agent.
         """
-        if self._value_work:
-            self._value_work.acquire_work()
+        if self._help_request:
+            self._help_request.acquire_work()
 
     def _cancel_bound_job(self):
         """
         Cancels the job associated with the bound `HelpRequest`.
         """
-        if self._value_work:
-            self._value_work.cancel_job()
+        if self._help_request:
+            self._help_request.cancel_job()
 #endregion
 #region Agentic Behavior Control Methods
     def should_return_home(self) -> bool:

@@ -88,16 +88,13 @@ class CommandGroup(IDisposable):
         self.name = group_name
         self.type = group_type
         self._logger: Logger = logger or logging.getLogger(__name__)
+        self._command_center = command_center  # Reference to its creator
 
         # --- Internal Components ---
         # Pool Internals
         self._worker_count = SyncInt(0)
-        self._max_workers = SyncInt(max_workers)  #TODO: Decouple this from pool count and separate these two and have max workers in relation to the two
-        # Freelancer Internals #TODO: Figure out how to implement freelancers in relation to max_workers
-        self._max_freelancers = SyncInt(0)
-        self._freelancer_count = SyncInt(0)
+        self._max_workers = SyncInt(max_workers)
 
-        self._command_center = command_center  # Reference to its creator
         # Create Agent Pool Container
         self._group_pool_container: 'CommandGroupContainer' = command_center._agent_pool.create_command_group_container(self.id, self._logger)
 
