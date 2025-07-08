@@ -94,7 +94,7 @@ class CommandGroup(IDisposable):
         self._max_workers = SyncInt(max_workers)
         self._command_center = command_center  # Reference to its creator
         # Create Agent Pool Container
-        self._container_cluster = command_center._agent_pool.create_command_group_container(self.id, self._logger)
+        self._group_pool_container = command_center._agent_pool.create_command_group_container(self.id, self._logger)
 
         # Internal registries for its members
         self._active_agents: ConcurrentDict[str, Agent] = ConcurrentDict()
@@ -107,8 +107,8 @@ class CommandGroup(IDisposable):
             self._disposed = True
             self._command_center = None
             self._logger.warning(f"Disposing CommandGroup '{self.name}'...")
-            self._container_cluster.dispose()
-            self._container_cluster = None
+            self._group_pool_container.dispose()
+            self._group_pool_container = None
 
             # Dispose all SignalControllers
             for controller in list(self._signal_controllers.values()):
@@ -1158,6 +1158,7 @@ class CommandCenter(IDisposable):
             raise RuntimeError(f"Cannot create CommandGroup '{command_group_name}'. Total active workers would exceed global limit of {self._total_max_workers}, increase new total limit to create a new group.")
         with self._lock:
             command._max_workers += amount
+            command._group_pool_container.increase_max_worker_count(amount)
             self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._max_workers, 'command_group': command})
 
     def decrease_max_workers(self, amount: int = 1, command_group_name: str = "default"):
@@ -1180,6 +1181,7 @@ class CommandCenter(IDisposable):
             if command._worker_count > command._max_workers - amount:
                 raise RuntimeError("Cannot decrease below current active worker count.")
             command._max_workers -= amount
+            command._group_pool_container.decrease_max_worker_count(amount)
             self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._max_workers, 'command_group': command.id})
 
     def _create_and_register_agent(self, template_name: str, define_home: Optional[Union[Callable[..., None], Pack]] = None,

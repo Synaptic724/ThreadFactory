@@ -581,10 +581,36 @@ class CommandGroupContainer(IDisposable):
         return new_container
 
 #endregion Container Management
+
 #region Targeted Retrieval System
 
 #endregion Targeted Retrieval System
 #region Worker Management
+    def increase_max_worker_count(self, number: int):
+        """
+        Notify the pool to increase its maximum worker count.
+        This sends a signal to the maintenance agent to scale up
+        the number of workers in the pool, allowing it to handle more
+        concurrent requests.
+
+        Args:
+            number (int): The number of workers to add to the pool.
+        """
+        pass
+
+    def decrease_max_worker_count(self, number: int):
+        """
+        Notify the pool to decrease its maximum worker count.
+        This sends a signal to the maintenance agent to scale down
+        the number of workers in the pool, reducing resource usage
+        when demand is low.
+
+        Args:
+            number (int): The number of workers to remove from the pool.
+        """
+        pass
+
+
     def submit(self, help_request: 'HelpRequest', group_name: str, num_workers: int):
         """
         Submits a parallel job to a specific group's pool.
@@ -841,6 +867,16 @@ class AgentPool(IDisposable):
 
 
 #region Maintenance Agent
+    def _manage_worker_count_per_group(self):
+        """
+        When an increase or decrease in worker count is requested,
+        we need to adjust the groups by managing their size elastically,
+        an event can be sent here to notify the maintenance agent
+        that this happened.
+        """
+        pass
+
+
     def _create_maintenance_worker(self) -> 'Agent':
         """Creates the dedicated agent responsible for all pool scaling."""
         agent = self._command_center.create_agent(
