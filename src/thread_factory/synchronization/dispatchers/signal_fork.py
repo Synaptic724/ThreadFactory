@@ -182,7 +182,7 @@ class SignalFork(IDisposable):
             # This prevents the controller from holding a dead reference.
             if self._controller and hasattr(self._controller, 'unregister'):
                 try:
-                    self._controller.unregister(self)
+                    self._controller.unregister(self.id)
                 except Exception:
                     pass
             self._controller = None

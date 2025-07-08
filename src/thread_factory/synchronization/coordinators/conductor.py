@@ -209,7 +209,7 @@ class Conductor(IDisposable):
                 self._controller.notify(self.id, "DISPOSED")
             if self._controller and hasattr(self._controller, 'unregister'):
                 try:
-                    self._controller.unregister(self)
+                    self._controller.unregister(self.id)
                 except Exception:
                     pass
                 self._controller = None

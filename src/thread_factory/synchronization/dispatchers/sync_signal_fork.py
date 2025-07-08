@@ -197,7 +197,7 @@ class SyncSignalFork(IDisposable):
             # Optional: unregister from controller
             if self._controller:
                 try:
-                    self._controller.unregister(self)
+                    self._controller.unregister(self.id)
                 except Exception:
                     pass
 

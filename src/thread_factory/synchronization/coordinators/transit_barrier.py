@@ -77,7 +77,7 @@ class TransitBarrier(IDisposable):
         self._controller: 'Controller' = controller
         if self._controller:
             try:
-                self._controller.register(self)
+                self._controller.register(self.id)
             except Exception:
                 pass
 
