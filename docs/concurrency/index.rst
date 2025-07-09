@@ -8,7 +8,6 @@ Concurrent Data Structures Index
    concurrent_bag
    concurrent_buffer
    concurrent_collection
-   concurrent_core
    concurrent_dict
    concurrent_list
    concurrent_queue
