@@ -7,9 +7,15 @@ High-performance thread-safe (No-GIL-friendly) data structures for Python 3.13+.
    :maxdepth: 3
    :caption: Contents:
 
-   concurrency
-   primitives
-   utils
+   concurrency/concurrency
+   concurrency/sync_types/sync_types
+   synchronization/controllers/controllers
+   synchronization/coordinators/coordination
+   synchronization/dispatchers/dispatchers
+   synchronization/execution/execution
+   synchronization/primitives/primitives
+   utilities/coordination/coordination
+   utilities/timing_tools/timing_tools
 
 Indices and tables
 ==================
