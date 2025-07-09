@@ -121,7 +121,6 @@ class Agent(threading.Thread, IDisposable):
         self.state = AgentState.CREATED
         self.shutdown_flag = threading.Event()
         self.death_event = threading.Event()
-        self.worker_type = None
         self._data_center = None
 
         # Activity Management
@@ -399,6 +398,70 @@ class Agent(threading.Thread, IDisposable):
 
 #endregion Activity Management Methods
 #region Agent Execution Methods
+    def should_return_home(self) -> bool:
+        """
+        Checks if the agent is configured to return to its home event loop.
+
+        Returns:
+            bool: `True` if the agent should return home, `False` otherwise.
+
+        Raises:
+            RuntimeError: If the agent has been disposed.
+        """
+        with self._lock:
+            if self._disposed:
+                raise RuntimeError("Cannot check return home status after agent is disposed.")
+            return self._return_home
+
+    def set_return_home(self, return_home: bool) -> None:
+        """
+        Sets whether the agent should return to its home event loop.
+
+        Args:
+            return_home (bool): `True` to enable returning to the event loop.
+
+        Raises:
+            RuntimeError: If the agent has been disposed.
+        """
+        with self._lock:
+            if self._disposed:
+                raise RuntimeError("Cannot set return home status after agent is disposed.")
+            self._return_home = return_home
+
+    def set_home(self, event_loop: Union[Callable[..., Any], 'Pack']) -> None:
+        """
+        Sets the primary event loop for the agent.
+
+        This method allows the agent to define its main execution logic,
+        which can be a callable or a Pack instance.
+
+        Args:
+            event_loop (Union[Callable[..., Any], Pack]): The primary event loop to set.
+
+        Raises:
+            RuntimeError: If the agent has been disposed.
+        """
+        raise NotImplementedError(
+            "The set_home method must be implemented by subclasses of Agent. "
+            "This method defines the primary event loop for the agent."
+        )
+
+    def set_target(self, target: Union[Callable[..., Any], 'Pack']) -> None:
+        """
+        Sets the target callable or Pack for the agent's thread execution.
+
+        This method allows the agent to define what it will execute when run.
+
+        Args:
+            target (Union[Callable[..., Any], Pack]): The target callable or Pack to set.
+
+        Raises:
+            RuntimeError: If the agent has been disposed.
+        """
+        raise NotImplementedError(
+            "The set_target method must be implemented by subclasses of Agent. "
+            "This method defines the target for the agent's thread execution."
+        )
 
     def run(self):
         """
@@ -564,36 +627,6 @@ class Agent(threading.Thread, IDisposable):
             self._help_request.cancel_job()
 #endregion
 #region Agentic Behavior Control Methods
-    def should_return_home(self) -> bool:
-        """
-        Checks if the agent is configured to return to its home event loop.
-
-        Returns:
-            bool: `True` if the agent should return home, `False` otherwise.
-
-        Raises:
-            RuntimeError: If the agent has been disposed.
-        """
-        with self._lock:
-            if self._disposed:
-                raise RuntimeError("Cannot check return home status after agent is disposed.")
-            return self._return_home
-
-    def set_return_home(self, return_home: bool) -> None:
-        """
-        Sets whether the agent should return to its home event loop.
-
-        Args:
-            return_home (bool): `True` to enable returning to the event loop.
-
-        Raises:
-            RuntimeError: If the agent has been disposed.
-        """
-        with self._lock:
-            if self._disposed:
-                raise RuntimeError("Cannot set return home status after agent is disposed.")
-            self._return_home = return_home
-
     def _resolve_worker_by_id(self, factory_id: str) -> Optional['AgenticBase']:
         """
         Internal helper to resolve another agent instance by its factory ID.

@@ -89,8 +89,8 @@ class General(Agent):
         # Initialize General-specific routing registries as ConcurrentDicts.
         # Assuming ConcurrentDict is IDisposable and needs to be initialized.
         self.save_points: Optional[str, Pack] = ConcurrentDict() #Callables that can be executed for small work or activity
-        self.locations: Optional[str, Pack] = ConcurrentDict() # Concrete location of interest
         self.data_transfer: Optional[str, Pack] = ConcurrentDict() # Important data transfer areas
+        self.locations: Optional[str, Pack] = ConcurrentDict() # Concrete location of interest
 
         # Agentic State Management
         self._private_inventory = ConcurrentDict() # Local Inventory for this agent, only accessible by the agent itself.
@@ -125,9 +125,6 @@ class General(Agent):
             if self.save_points:
                 self.save_points.dispose()
                 self.save_points = None
-            if self.locations:
-                self.locations.dispose()
-                self.locations = None
             if self.data_transfer:
                 self.data_transfer.dispose()
                 self.data_transfer = None
@@ -138,7 +135,9 @@ class General(Agent):
             if self.public_inventory:
                 self.public_inventory.dispose()
                 self.public_inventory = None
-
+            if self.locations:
+                self.locations.dispose()
+                self.locations = None
 
             # Call the dispose method of the parent class
             super().dispose()
@@ -227,44 +226,6 @@ class General(Agent):
         return details
 
 #region Agentic Activity
-    def set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
-        """
-        Sets the primary, default execution loop or "home behavior" for the agent.
-
-        This function defines the agent's main operational loop, which is executed
-        when `run()` is called for a pool-bound agent.
-
-        Args:
-            fn (Union[Callable[..., None], Pack]): A parameterless callable or `Pack`
-                that represents the agent's main execution loop.
-        """
-        self.locations["home"] = Pack.bundle(fn) if fn else None
-
-    def set_sleep_location(self, fn: Union[Callable[..., None], Pack]) -> None:
-        """
-        Sets the primary, default execution loop or "home behavior" for the agent.
-
-        This function defines the agent's main operational loop, which is executed
-        when `run()` is called for a pool-bound agent.
-
-        Args:
-            fn (Union[Callable[..., None], Pack]): A parameterless callable or `Pack`
-                that represents the agent's main execution loop.
-        """
-        self.locations["sleep"] = Pack.bundle(fn) if fn else None
-
-    def set_target(self, target: Union[Callable[..., Any], Pack]) -> None:
-        """
-        This method sets the target function or `Pack` for the agent.
-        """
-        if target and (isinstance(target, Callable) or isinstance(target, Pack)):
-            self.locations["target"] = Pack.bundle(target)
-        elif target is not None:
-            raise TypeError("Target must be a Callable or Pack instance.")
-        else:
-            self.locations["target"] = None
-
-
     def run(self):
         """
         Main execution entry point for the agentic thread.
@@ -295,14 +256,16 @@ class General(Agent):
         locations when required it provides a robust way to manage its life
         cycle by going through the various states of the agentic thread.
         """
+        self._notify(f"Agentic thread started {self.factory_id}.")
         while not self._dismiss_agent:
             if not self._dismiss_agent:
                 if self._pool_agent and self._pool_type == AgentPoolType.DISPATCHER and not self._return_home:
-                    self._notify("Agentic thread started.")
                     # If this is a pool agent, run the dispatcher loop
                     self._dispatcher_loop()
                 elif self._pool_agent and self._pool_type == AgentPoolType.THROUGHPUT and not self._return_home:
                     self._throughput_loop()
+                elif self._pool_agent and self._pool_type == AgentPoolType.SLEEP and not self._return_home:
+                    self.locations["sleep"]()
                 else:
                     self._return_home = False
             else:
@@ -321,8 +284,8 @@ class General(Agent):
             if self.locations["target"]:
                 return self.locations["target"]()  # Run the target if it's a standalone agent
 
-            if self.locations["home"]:
-                self.locations["home"]()
+            if self.locations["dispatcher"]:
+                self.locations["dispatcher"]()
         except Exception as e:
             # Optionally, log the exception if needed
             pass
@@ -343,15 +306,8 @@ class General(Agent):
         it will execute the `_target` function if provided.
         """
         try:
-            while not self._dismiss_agent:
-                if self._pool_type == AgentPoolType.THROUGHPUT and not self._return_home:
-                    self.locations["home"]()
-
-                if self._pool_type == AgentPoolType.THROUGHPUT_SLEEP and not self._return_home:
-                    self.locations["sleep"]()
-
-                if self._return_home:
-                    return
+            if self._pool_type == AgentPoolType.THROUGHPUT and not self._return_home:
+                self.locations["throughput"]()
 
         except Exception as e:
             # Optionally, log the exception if needed
@@ -371,7 +327,7 @@ class General(Agent):
         This method sets the `_pool_type` to `AgentPoolType.THROUGHPUT_SLEEP`
         and assigns the `_sleep_loop` to the agent's event loop.
         """
-        self._pool_type = AgentPoolType.THROUGHPUT_SLEEP
+        self._pool_type = AgentPoolType.SLEEP
 
     def assign_sleep_to_throughput(self):
         """
@@ -401,9 +357,46 @@ class General(Agent):
         This method sets the `_pool_type` to `AgentPoolType.DISPATCHER_TARGETED`
         and assigns the `_event_loop` to the agent's event loop.
         """
-        self._pool_type = AgentPoolType.DISPATCHER_TARGETED
+        self._pool_type = AgentPoolType.RESERVED_DISPATCHER
 
-#endregion Agentic Activity
+    def set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
+        """
+        Sets the primary, default execution loop or "home behavior" for the agent.
+
+        This function defines the agent's main operational loop, which is executed
+        when `run()` is called for a pool-bound agent.
+
+        Args:
+            fn (Union[Callable[..., None], Pack]): A parameterless callable or `Pack`
+                that represents the agent's main execution loop.
+        """
+        self.locations["dispatcher"] = Pack.bundle(fn) if fn else None
+
+    def set_sleep_location(self, fn: Union[Callable[..., None], Pack]) -> None:
+        """
+        Sets the primary, default execution loop or "home behavior" for the agent.
+
+        This function defines the agent's main operational loop, which is executed
+        when `run()` is called for a pool-bound agent.
+
+        Args:
+            fn (Union[Callable[..., None], Pack]): A parameterless callable or `Pack`
+                that represents the agent's main execution loop.
+        """
+        self.locations["sleep"] = Pack.bundle(fn) if fn else None
+
+    def set_target(self, target: Union[Callable[..., Any], Pack]) -> None:
+        """
+        This method sets the target function or `Pack` for the agent.
+        """
+        if target and (isinstance(target, Callable) or isinstance(target, Pack)):
+            self.locations["target"] = Pack.bundle(target)
+        elif target is not None:
+            raise TypeError("Target must be a Callable or Pack instance.")
+        else:
+            self.locations["target"] = None
+
+    #endregion Agentic Activity
 #region General-specific Identity Getters
     def get_public_id(self) -> Optional[str]:
         """
@@ -586,6 +579,8 @@ class General(Agent):
         if self.locations is None:
             self.locations = ConcurrentDict({name: Pack.bundle(fn) if fn else None})
         else:
+            if self.locations[name] is not None:
+                self._logger.warning(f"Overwriting existing location '{name}' with new function.")
             self.locations[name] = Pack.bundle(fn) if fn else None
 
     def get_locations_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:

@@ -82,11 +82,11 @@ class AgentContainer(IDisposable):
 
         # Agent Tracking Details
         self._all_agents: ConcurrentDict[ulid.ULID, Agent] = ConcurrentDict[ulid.ULID, Agent]()
+        self._sleep_agents: ConcurrentSet[ulid.ULID] = ConcurrentSet[ulid.ULID]()
 
         # Track threads either as a simple set (if no tracking) or as a dict mapping to Records
         if ignore_tracking:
             self._throughput_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentSet[ulid.ULID]()
-            self._sleep_agents: ConcurrentSet[ulid.ULID] = ConcurrentSet[ulid.ULID]()
             self._dispatch_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentSet[ulid.ULID]()
             self._reserved_dispatch_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentSet[ulid.ULID]()
         else:
@@ -95,15 +95,14 @@ class AgentContainer(IDisposable):
             self._reserved_dispatch_agents: Union[ConcurrentSet[ulid.ULID], ConcurrentDict[ulid.ULID, Records]] = ConcurrentDict[ulid.ULID, Records]()
 
         # Assignments by Category
-        self._unregistered_sleep_agents = ConcurrentSet[ulid.ULID]()
-        self._unregister_sleep_agents = False  # Flag to indicate if throughput sleep agents should unregister
-        self._register_sleep_agents = False
+        self._dismiss_sleep_agents = False  # Flag to indicate if throughput sleep agents should unregister
+        self._reintegrate_agents = False #Agents will be internally switched to the appropriate required type
 
-        # Assignments to Sleep
+        # Assignments to Sleep for Dispatch
         self._sleep_dispatch_agents = ConcurrentSet[ulid.ULID]()
         self._check_sleep_dispatch_agents = False
-        self._sleep_reserved_dispatch_agents = ConcurrentSet[ulid.ULID]()
-        self._check_sleep_reserved_dispatch_agents = False
+
+        # Assignments to Sleep for Throughput
         self._sleep_throughput_agents = ConcurrentSet[ulid.ULID]()
         self._check_sleep_throughput_agents = False
 
@@ -117,7 +116,10 @@ class AgentContainer(IDisposable):
         # General Purpose Flow Regulators
         self._dispatch_flow_regulator = FlowRegulator(0)  # Targeted flow regulator for targeted dispatch
         self._throughput_flow_regulator = FlowRegulator(0)  # Smart semaphore-like switch used for synchronization
+
+        # Sleep Flow Regulator
         self._sleep_flow_regulator = FlowRegulator(0)  # Flow regulator for throughput sleep
+        self._sleep_count = SyncInt(0)  # Count of agents currently in sleep mode
 
     def dispose(self):
         """
@@ -148,8 +150,8 @@ class AgentContainer(IDisposable):
             self._reserved_dispatch_flow_regulator = None
             self._dispatch_flow_regulator.dispose()
             self._dispatch_flow_regulator = None
-            self._throughput_sleep_flow_regulator.dispose()
-            self._throughput_sleep_flow_regulator = None
+            self._sleep_flow_regulator.dispose()
+            self._sleep_flow_regulator = None
             self._active = False  # Mark container inactive
 
             # Manage Queue disposal
@@ -159,15 +161,10 @@ class AgentContainer(IDisposable):
 
             for records in self._registered_agents.values():
                 records.dispose()
-            self._registered_agents.dispose()  # Dispose of registry
-            self._registered_agents = None
 
-            self._unregistered_throughput_sleep_agents.dispose()
-            self._unregister_throughput_sleep_agents = None
-            self._unregistered_dispatch_agents.dispose()
-            self._unregistered_dispatch_agents = None
-            self._unregistered_reserved_dispatch_agents.dispose()
-            self._unregistered_reserved_dispatch_agents = None
+
+
+
 
             # Clear references to CommandGroup
             self._command_group_worker_count = None  # Clear reference to CommandGroup
@@ -204,11 +201,48 @@ class AgentContainer(IDisposable):
                 if not self._ignore_tracking:
                     self.attach_record()
 
-                if self._unregister_reserved_dispatch_agents and self._should_exit():
-                    self._finalize_unregistration()
+                if self._check_dismissed:
+                    if self._ignore_tracking:
+                        self._reserved_dispatch_agents.discard(self._get_agent_id())
+                    else:
+                        self._reserved_dispatch_agents.pop(self._get_agent_id(), None)
+                    threading.current_thread()._dismiss_agent = True
+                    #TODO: We need to totally dismiss this agent from the command_group, and agent_container, and
+                    #TODO: all required assets
                     return
+
         except Exception as e:
             self._logger.error(f"Error in agent pool container: {e}")
+
+    def _dismiss_reserved_dispatch_agents(self, targets: Union[str, list[str]]):
+        """
+        Dismisses reserved dispatch agents by notifying them to unregister.
+
+        Args:
+            targets (Union[str, list[str]]): The agent IDs to dismiss.
+        """
+        raise NotImplementedError("This method is not ready yet.")
+        if self._disposed:
+            raise RuntimeError("Container has been disposed and cannot dismiss agents.")
+        if isinstance(targets, str):
+            targets = [targets]
+
+        for target in targets:
+            factory_id = ulid.ULID.from_str(target)
+            if factory_id in self._reserved_dispatch_agents:
+                self._unregister_agent(factory_id)
+                self._logger.info(f"Dismissed reserved dispatch agent {factory_id}.")
+
+    def _check_dismissed(self):
+        """
+        Determines whether the current thread is marked for unregistration.
+
+        Returns:
+            bool: True if the thread should unregister and exit.
+        """
+        if threading.current_thread()._pool_type == AgentPoolType.DISMISS:
+             return True
+        return False
 
     def _dispatch_loop(self):
         """
@@ -235,8 +269,11 @@ class AgentContainer(IDisposable):
                 if not self._ignore_tracking:
                     self.attach_record()
 
-                if self._check_sleep_dispatch_agents and self._should_exit():
-                    self._finalize_unregistration()
+                if self._check_sleep_dispatch_agents and self._should_sleep():
+                    if self._ignore_tracking:
+                        self._dispatch_agents.discard(self._get_agent_id())
+                    else:
+                        self._dispatch_agents.pop(self._get_agent_id(), None)
                     return
 
         except Exception as e:
@@ -275,8 +312,11 @@ class AgentContainer(IDisposable):
                 with self._throughput_flow_regulator:
                     pass
 
-                if self._unregister_thread_check and self._should_exit():
-                    self._finalize_unregistration()
+                if self._check_sleep_throughput_agents and self._should_sleep():
+                    if self._ignore_tracking:
+                        self._throughput_agents.discard(self._get_agent_id())
+                    else:
+                        self._throughput_agents.pop(self._get_agent_id(), None)
                     return
 
         except Exception as e:
@@ -294,18 +334,34 @@ class AgentContainer(IDisposable):
             self._sleep_agents.add(factory_id)
 
         while self._active and not self._disposed:
-            if self._throughput_sleep_flow_regulator is None:
+            if self._sleep_flow_regulator is None:
                 break  # Container was disposed mid-loop
 
-            with self._throughput_sleep_flow_regulator:
+            with self._sleep_flow_regulator:
                 pass
 
-            if threading.current_thread()._main_pool == True:
+            if self._reintegrate_agents:
+                pass
+
+            if self._dismiss_sleep_agents and self._sleep_count > 0:
+                self._sleep_count.decrement(1)
+                self._finalize_dismissal()
                 return
 
-            if self._unregistered_sleep_agents and self._should_exit():
-                self._finalize_unregistration()
-                return
+    def _request_dismiss_agents(self, number_of_agents: int):
+        """
+        This method will use the flow regulator in sleep to dismiss a number of agents
+        """
+        if self._disposed:
+            raise RuntimeError("Container has been disposed and cannot request agent dismissal.")
+        if number_of_agents > len(self._sleep_agents):
+            raise ValueError("Number of agents to dismiss exceeds available sleep agents.")
+        if number_of_agents <= 0:
+            raise ValueError("Number of agents to dismiss must be greater than zero.")
+        with self._lock:
+            self._dismiss_sleep_agents = True  # Set flag to dismiss agents
+            self._sleep_flow_regulator.notify(number_of_agents)
+            self._sleep_count.increment(number_of_agents)
 
     def attach_record(self) -> None:
         """
@@ -400,16 +456,18 @@ class AgentContainer(IDisposable):
         """
         return threading.current_thread().factory_id
 
-    def _should_exit(self) -> bool:
+    def _should_sleep(self) -> bool:
         """
         Determines whether the current thread is marked for unregistration.
 
         Returns:
             bool: True if the thread should unregister and exit.
         """
-        return self._get_agent_id() in self._unregistered_agents
+        if threading.current_thread()._pool_type == AgentPoolType.SLEEP:
+             return True
+        return False
 
-    def _finalize_unregistration(self):
+    def _finalize_dismissal(self):
         """
         Final cleanup for a thread that is leaving the container.
         Disposes its tracking record and removes it from the active registry.

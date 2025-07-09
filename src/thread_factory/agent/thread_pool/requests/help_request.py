@@ -10,61 +10,31 @@ class HelpRequest(IDisposable):
     """
     HelpRequest
     -----------
-    A thread-safe, agentic task signal used to coordinate execution within a DynamicPool.
+    A thread-safe contract for agentic tasks, coordinating work execution within the thread system.
 
-    This object represents an active help-call — a formal contract between the dispatcher and
-    the thread system, signaling that a callable is ready for execution and must be picked up
-    by a DynamicWorker. It is tightly integrated with the DynamicPool/DynamicWorker architecture,
-    and is designed to enable intelligent, decentralized, and traceable thread orchestration.
+    This object represents an active task that requires assistance. It signals a callable
+    is ready for execution and must be picked up by an Agent. It is tightly integrated
+    with the Agent-based architecture, designed for intelligent, decentralized, and traceable
+    thread orchestration.
 
-    System Role:
-    ------------
-    HelpRequest is the mechanism through which tasks signal for assistance. It emits an intent
-    to execute, and the DynamicPool responds by dispatching a DynamicWorker to fulfill the contract.
+    **Agent Contract & Lifecycle:**
+    When an Agent receives a HelpRequest:
+    - It inspects the task and executes the callable via `acquire_work()`.
+    - It is responsible for marking the outcome: `mark_completed()`, `mark_failed()`, or `mark_cancelled()`.
+    - Each HelpRequest tracks its full lifecycle state in an internal `Record`.
+    - Agents should only work on tasks not in a terminal state (COMPLETED, CANCELLED, FAILED).
 
-    When a DynamicWorker receives a HelpRequest:
-    - It inspects the task.
-    - It executes the callable by invoking `acquire_work()`.
-    - It is responsible for properly marking the outcome:
-      • `mark_completed()` if successful.
-      • `mark_failed()` if an error occurred.
-      • `mark_cancelled()` if the task was aborted or unnecessary.
+    **Responsibilities:**
+    - **Dispatcher/User:** Issues the HelpRequest to the pool. Calls `cancel_job()` if no longer needed.
+    - **Agent:** Explicitly invokes `acquire_work()`. Catches exceptions and calls `mark_failed()`.
+      Manually calls `mark_completed()` if work finishes early (e.g., short-circuiting).
 
-    Agentic Threading Contract:
-    ---------------------------
-    • Threads are agents — they choose to act based on the contract state.
-    • Execution is not automatic; it must be explicitly invoked (`acquire_work()`).
-    • Each HelpRequest includes a full task lifecycle state, tracked in a `Record`.
-    • Threads must call a finalizing method if work completes early or is skipped.
-    • No blocking or waiting: all execution is observable and controlled.
+    **Disposal:**
+    After a HelpRequest reaches a terminal state, it can be `dispose()`d to release resources.
 
-    Dispatcher and User Responsibilities:
-    -------------------------------------
-    • The dispatcher issues a HelpRequest and passes it to the DynamicPool.
-    • DynamicWorkers are expected to obey contract lifecycle logic.
-    • If the task finishes early (e.g., by condition short-circuiting), the worker
-      must call `mark_completed()` manually to finalize the state.
-    • If a HelpRequest is no longer needed before execution, `cancel_job()` should be called.
-    • Threads must inspect task state before acting — executing an already completed
-      or cancelled task may introduce race conditions or logic errors.
-
-    Exception Handling:
-    -------------------
-    Exceptions during callable execution do not need to be propagated.
-    Instead, threads should catch and respond by calling `mark_failed()` or `cancel_job()`.
-    This separates logical failure from thread-crashing exceptions and allows
-    external systems to observe lifecycle outcomes via state inspection.
-
-    Disposal:
-    ---------
-    After a HelpRequest has been completed, failed, or cancelled, it can be disposed
-    via `dispose()` to release memory and signal that the contract is closed.
-
-    Summary:
-    --------
-    HelpRequest is the core execution contract for agentic thread systems using
-    DynamicPools. It provides clarity, safety, and observability in environments where
-    threads operate as autonomous responders to distributed work requests.
+    **Summary:**
+    HelpRequest defines the core execution contract for autonomous Agents, ensuring clarity,
+    safety, and observability in distributed work environments.
     """
     __slots__ = IDisposable.__slots__ + [
         "_work_state", "_lock", "record", "_work_callable", "_return_to_pool",
@@ -293,10 +263,14 @@ class HelpRequest(IDisposable):
 
     def acquire_work(self):
         """
-        Acquires the task and begins execution.
+        Acquire work doesn't bind the HelpRequest to the current thread, but executes the work callable.
+        This method is intended to be called by an Agent to execute the work associated with this HelpRequest.
+        It checks if the HelpRequest is in a valid state to be worked on, marks it as in progress,
+        and then executes the work callable. If the task is already in a terminal state, it raises an error.
 
-        This method marks the task as `IN_PROGRESS`, updates the record, and then executes the provided
-        work callable. If the work is completed or fails, the task is marked accordingly.
+        Raises:
+            ValueError: If the HelpRequest has already been disposed of.
+            RuntimeError: If the HelpRequest is in a terminal state (COMPLETED, CANCELLED, or FAILED).
         """
         if self._disposed:
             raise ValueError(f"[HelpRequest] {self.record.task_id} has already been disposed.")
@@ -352,10 +326,14 @@ class HelpRequest(IDisposable):
 
     def bind_help_request(self) -> None:
         """
-        Executes the bound work callable for dynamic threads.
+        Binds the HelpRequest to the current thread, allowing it to execute the work callable.
+        This method checks if the current thread is an AgenticWorker and sets the `_help_request`
+        attribute to this HelpRequest instance. It raises an error if the thread is not properly initialized
+        or if the work callable is not callable.
+        This method is intended to be called by the AgenticWorker to execute the work associated with this HelpRequest.
 
-        Binds this HelpRequest instance to the current dynamic thread and executes the
-        associated callable, tracking factory ID and ensuring failure reporting.
+        Raises:
+            RuntimeError: If the thread is not properly initialized as an AgenticWorker or if the work callable is not callable.
         """
         if self._work_state in (WorkStatus.COMPLETED, WorkStatus.CANCELLED, WorkStatus.FAILED):
             return
@@ -370,7 +348,7 @@ class HelpRequest(IDisposable):
         if not callable(self._work_callable): #TODO: Inspect this section here it might be broken
             raise RuntimeError("No callable has been assigned to this HelpRequest.")
         try:
-            self.record.add_factory_id(thread._factory_id)
+            self.record.add_factory_id(thread.factory_id)
             self._work_callable()
         except Exception as e:
             self.mark_failed()
