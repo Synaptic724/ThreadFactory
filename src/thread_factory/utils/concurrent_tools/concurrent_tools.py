@@ -41,7 +41,7 @@ def _chunked_iter(input_iter: Iterable[_T], sz: int):
         yield batch
 
 
-class Concurrent:
+class ConcurrentTools:
     """
     A Python class that mimics .NET's Task Parallel Library (TPL)-style operations:
       - for_loop

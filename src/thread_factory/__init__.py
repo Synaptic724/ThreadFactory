@@ -33,12 +33,12 @@ from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from thread_factory.concurrency.concurrent_set import ConcurrentSet
 from thread_factory.concurrency.concurrent_stack import ConcurrentStack
 from thread_factory.concurrency.concurrent_collection import ConcurrentCollection
-from thread_factory.concurrency.concurrent_core import Concurrent
 
 # ---- Utilities ----
 from thread_factory.utils.exceptions.empty import Empty
 from thread_factory.utils.timing_tools.auto_reset_timer import AutoResetTimer
 from thread_factory.utils.timing_tools.stopwatch import Stopwatch
+from thread_factory.utils.concurrent_tools.concurrent_tools import ConcurrentTools
 
 from thread_factory.synchronization.primitives import (
     Dynaphore,
@@ -59,9 +59,8 @@ __all__ = primatives_all + [
     "ConcurrentSet",
     "ConcurrentStack",
     "ConcurrentCollection",
-    "ConcurrentCore",
-
-    # Synchronization Primitives
+    # Utilities
+    "ConcurrentTools",
     "Empty",
     "Stopwatch",
     "AutoResetTimer",

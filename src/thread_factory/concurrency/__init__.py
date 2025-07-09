@@ -1,5 +1,4 @@
 from thread_factory.concurrency.concurrent_bag import ConcurrentBag
-from thread_factory.concurrency.concurrent_core import Concurrent
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
@@ -13,7 +12,6 @@ __all__ = [
     "ConcurrentDict",
     "ConcurrentList",
     "ConcurrentQueue",
-    "Concurrent",
     "ConcurrentStack",
     "ConcurrentBuffer",
     "ConcurrentCollection",

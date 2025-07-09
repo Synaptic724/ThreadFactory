@@ -10,6 +10,11 @@ if "%SPHINXBUILD%" == "" (
 set SOURCEDIR=.
 set BUILDDIR=_build
 
+if /I "%1" == "livehtml" (
+    sphinx-autobuild . _build/html
+    goto end
+)
+
 %SPHINXBUILD% >NUL 2>NUL
 if errorlevel 9009 (
 	echo.

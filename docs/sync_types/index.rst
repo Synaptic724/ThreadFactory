@@ -1,4 +1,4 @@
-Concurrent Types Index
+Synchronized Types Index
 ========================
 
 .. toctree::
