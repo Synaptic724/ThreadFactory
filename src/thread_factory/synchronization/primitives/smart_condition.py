@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.coordination.package import Pack
 
 @dataclass
 class Waiter:

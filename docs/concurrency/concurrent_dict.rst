@@ -1,4 +1,4 @@
-ConcurrentDict
+Concurrent Dict
 ==================
 
 .. automodule:: thread_factory.concurrency.concurrent_dictionary

@@ -12,7 +12,7 @@ from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.synchronization import SignalController
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
 from thread_factory.synchronization.primitives.latch import Gate
-from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
 from thread_factory.agent.thread_pool.records.records import Records, WorkStatus
 
 

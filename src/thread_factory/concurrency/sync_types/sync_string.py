@@ -1,7 +1,7 @@
 from __future__ import annotations    # MUST be first
 import threading
 import copy
-from thread_factory.utils.interfaces.isync import ISync
+from thread_factory.utilities.interfaces.isync import ISync
 
 class SyncString(ISync):
     """

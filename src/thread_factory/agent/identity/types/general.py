@@ -2,7 +2,7 @@ import logging
 from thread_factory.agent.identity.types.agent import Agent, AgentPoolType, AgentState
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.synchronization import SignalController
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.coordination.package import Pack
 from typing import Optional, Callable, Union, Any
 
 class General(Agent):

@@ -1,4 +1,4 @@
-ConcurrentStack
+Concurrent Stack
 ==================
 
 .. automodule:: thread_factory.concurrency.concurrent_stack

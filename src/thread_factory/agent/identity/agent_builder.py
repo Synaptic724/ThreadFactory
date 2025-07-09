@@ -1,8 +1,8 @@
 import threading
 from typing import Callable, Union, List, Any, Type, Optional
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-from thread_factory.utils.coordination.package import Pack
-from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utilities.coordination.package import Pack
+from thread_factory.utilities.interfaces.disposable import IDisposable
 from thread_factory.agent.identity.types.agent import Agent  # Assuming this is a base class for agents
 from thread_factory.agent.identity.types.general import General  # Assuming this is a concrete Agent subclass
 

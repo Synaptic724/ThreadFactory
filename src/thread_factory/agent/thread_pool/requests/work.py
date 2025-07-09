@@ -3,7 +3,7 @@ from concurrent.futures import Future
 from datetime import datetime
 from typing import Optional, Callable, List
 from ulid import ULID
-from thread_factory.utils.interfaces.disposable import IDisposable # Assumed to raise NotImplementedError for dispose()
+from thread_factory.utilities.interfaces.disposable import IDisposable # Assumed to raise NotImplementedError for dispose()
 from thread_factory.agent.thread_pool.records.records import Record, WorkStatus
 import threading
 

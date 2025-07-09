@@ -1,4 +1,4 @@
-ConcurrentCollection
+Concurrent Collection
 ==================
 
 .. automodule:: thread_factory.concurrency.concurrent_collection

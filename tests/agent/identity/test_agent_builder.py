@@ -3,7 +3,7 @@ from unittest.mock import Mock
 from thread_factory.agent.identity.agent_builder import AgentBuilder
 from thread_factory.agent.identity.types.agent import Agent
 from thread_factory.agent.identity.types.general import General
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.coordination.package import Pack
 
 
 class TestAgentBuilder(unittest.TestCase):

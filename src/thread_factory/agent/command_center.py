@@ -6,8 +6,8 @@ from thread_factory.agent.activity.base import BaseActivity, ActivityStatus
 from thread_factory.agent.identity.agent_builder import AgentBuilder
 from thread_factory.agent.identity.types.agent import Agent
 from thread_factory.synchronization.controllers.signal_controller import SignalController
-from thread_factory.utils.coordination.package import Pack
-from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utilities.coordination.package import Pack
+from thread_factory.utilities.interfaces.disposable import IDisposable
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.sync_types.sync_int import SyncInt

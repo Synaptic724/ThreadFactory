@@ -3,7 +3,7 @@ import threading
 from typing import Any, Callable, List, Dict, Tuple, Iterable, Union, Optional
 
 # Assuming Pack is correctly imported from your project
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.coordination.package import Pack
 
 
 # --- Test Functions (the "dolls") ---

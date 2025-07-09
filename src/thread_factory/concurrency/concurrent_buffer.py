@@ -18,8 +18,8 @@ from typing import (
 from array import array
 
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.utils.exceptions import Empty
+from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.exceptions import Empty
 
 _T = TypeVar("_T")
 

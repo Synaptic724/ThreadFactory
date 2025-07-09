@@ -2,7 +2,7 @@ import unittest
 from thread_factory.agent.identity.types.agent import Agent
 from thread_factory.agent.thread_pool.requests.help_request import HelpRequest
 from thread_factory.agent.thread_pool.records import WorkStatus, Record
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.coordination.package import Pack
 
 
 class DummyCommandCenter:

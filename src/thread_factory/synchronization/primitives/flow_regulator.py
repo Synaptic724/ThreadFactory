@@ -1,9 +1,9 @@
 import threading, time, ulid
 from typing import Optional, Union, Iterable, Any, Callable
 from thread_factory.concurrency.concurrent_set import ConcurrentSet
-from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
 from thread_factory.synchronization.primitives.smart_condition import SmartCondition
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.coordination.package import Pack
 
 #FlowRegulator class
 

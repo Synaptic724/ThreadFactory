@@ -16,7 +16,7 @@ import unittest
 from contextlib import ExitStack
 from thread_factory.agent import CommandCenter
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.coordination.package import Pack
 
 
 # --------------------------------------------------------------------------- #
@@ -54,7 +54,7 @@ class TestFlowRegulatorEdgeCases(unittest.TestCase):
         """
         All threads block on acquire() and must be released when dispose() is called.
         """
-        from thread_factory.utils.coordination.package import Pack
+        from thread_factory.utilities.coordination.package import Pack
 
         n_threads = 200
         lock = FlowRegulator(value=0)  # All threads block

@@ -5,7 +5,7 @@ from enum import auto, Enum
 import ulid
 from thread_factory import ConcurrentDict
 from thread_factory.concurrency import ConcurrentSet
-from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
 
 
 class WorkStatus(Enum):

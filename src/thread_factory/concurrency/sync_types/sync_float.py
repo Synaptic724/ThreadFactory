@@ -3,7 +3,7 @@ import threading
 import math
 from copy import deepcopy
 from numbers import Real
-from thread_factory.utils.interfaces.isync import ISync
+from thread_factory.utilities.interfaces.isync import ISync
 
 class SyncFloat(ISync):
     """

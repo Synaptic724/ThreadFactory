@@ -3,7 +3,7 @@ import threading
 import copy
 from contextlib import contextmanager
 from typing import Any, Callable, Generic, Iterator, Optional, TypeVar
-from thread_factory.utils.interfaces.isync import ISync
+from thread_factory.utilities.interfaces.isync import ISync
 
 T = TypeVar("T")
 R = TypeVar("R")

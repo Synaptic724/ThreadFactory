@@ -4,9 +4,9 @@ from thread_factory.synchronization.primitives.signal_barrier import SignalBarri
 from thread_factory.synchronization.primitives.dynaphore import Dynaphore
 from thread_factory.synchronization.coordinators.multi_conductor import MultiConductor
 from thread_factory.synchronization.coordinators.conductor import Conductor
-from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.utils.coordination.router_group import RouterGroup
-from thread_factory.utils.coordination.group import Group
+from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.coordination.router_group import RouterGroup
+from thread_factory.utilities.coordination.group import Group
 
 
 class Router(IDisposable):

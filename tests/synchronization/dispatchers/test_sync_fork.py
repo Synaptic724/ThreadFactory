@@ -3,7 +3,7 @@ import threading
 import time
 from typing import List
 from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.coordination.package import Pack
 
 
 # --- Helper Functions for Testing ---

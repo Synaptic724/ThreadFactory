@@ -1,8 +1,8 @@
 import threading
 from typing import Callable, Optional, Union
 import ulid
-from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.coordination.package import Pack
 
 
 class Scout(IDisposable):

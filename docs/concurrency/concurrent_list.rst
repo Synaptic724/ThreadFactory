@@ -1,4 +1,4 @@
-ConcurrentList
+Concurrent List
 ==================
 
 .. automodule:: thread_factory.concurrency.concurrent_list

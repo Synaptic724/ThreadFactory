@@ -3,8 +3,8 @@ from datetime import datetime
 from ulid import ULID
 from typing import Callable, Union
 from thread_factory.agent.thread_pool.records.records import WorkStatus, Record
-from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.coordination.package import Pack
 
 class HelpRequest(IDisposable):
     """

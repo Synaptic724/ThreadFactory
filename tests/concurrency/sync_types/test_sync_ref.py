@@ -5,7 +5,7 @@ import threading
 import unittest
 from thread_factory.concurrency.sync_types.sync_ref import SyncRef
 from thread_factory.concurrency.sync_types.sync_int import SyncInt   # integration check
-from thread_factory.utils.interfaces.isync import ISync
+from thread_factory.utilities.interfaces.isync import ISync
 
 TIMEOUT = 5      # seconds – join time-outs expose dead-locks quickly
 BIG = 50_000     # used by a few stress tests

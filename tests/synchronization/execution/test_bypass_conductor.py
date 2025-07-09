@@ -4,7 +4,7 @@ import time
 import random
 from typing import Any
 
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.coordination.package import Pack
 
 try:
     from hypothesis import given, settings, strategies as st

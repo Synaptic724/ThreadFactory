@@ -35,10 +35,10 @@ from thread_factory.concurrency.concurrent_stack import ConcurrentStack
 from thread_factory.concurrency.concurrent_collection import ConcurrentCollection
 
 # ---- Utilities ----
-from thread_factory.utils.exceptions.empty import Empty
-from thread_factory.utils.timing_tools.auto_reset_timer import AutoResetTimer
-from thread_factory.utils.timing_tools.stopwatch import Stopwatch
-from thread_factory.utils.concurrent_tools.concurrent_tools import ConcurrentTools
+from thread_factory.utilities.exceptions.empty import Empty
+from thread_factory.utilities.timing_tools.auto_reset_timer import AutoResetTimer
+from thread_factory.utilities.timing_tools.stopwatch import Stopwatch
+from thread_factory.utilities.concurrent_tools.concurrent_tools import ConcurrentTools
 
 from thread_factory.synchronization.primitives import (
     Dynaphore,

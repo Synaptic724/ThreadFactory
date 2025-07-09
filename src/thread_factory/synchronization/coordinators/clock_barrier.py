@@ -1,8 +1,8 @@
 import threading, ulid, time
 from typing import Callable, Optional, Dict, Any, Union
-from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.coordination.package import Pack
 
 class ClockBarrier(IDisposable):
     """

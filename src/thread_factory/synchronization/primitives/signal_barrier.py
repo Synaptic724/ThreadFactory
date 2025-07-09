@@ -1,8 +1,8 @@
 import threading
 from typing import Optional, Callable, Any, Dict, Union
 import ulid
-from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.coordination.package import Pack
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 
 # Assuming Controller is in a file that can be imported

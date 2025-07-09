@@ -1,7 +1,7 @@
 import unittest
 import threading
 from thread_factory.agent.orchestrators.router import Router
-from thread_factory.utils.coordination.router_group import RouterGroup
+from thread_factory.utilities.coordination.router_group import RouterGroup
 
 
 class TestRouter(unittest.TestCase):

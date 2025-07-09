@@ -1,6 +1,6 @@
 import threading
 import time
-from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
 
 
 class Stopwatch(IDisposable):

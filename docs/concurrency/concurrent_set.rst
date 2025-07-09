@@ -1,4 +1,4 @@
-ConcurrentSet
+Concurrent Set
 ==================
 
 .. automodule:: thread_factory.concurrency.concurrent_set

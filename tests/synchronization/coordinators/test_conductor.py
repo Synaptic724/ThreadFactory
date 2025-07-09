@@ -13,7 +13,7 @@ import ulid
 
 from thread_factory.synchronization.coordinators.conductor import Conductor
 from thread_factory.synchronization.controllers.signal_controller import SignalController
-from thread_factory.utils.coordination.outcome import Outcome
+from thread_factory.utilities.coordination.outcome import Outcome
 from thread_factory.concurrency import ConcurrentDict, ConcurrentList
 
 

@@ -1,7 +1,7 @@
 # Re-import necessary modules after code execution state reset
 import unittest
 import time
-from thread_factory.utils.timing_tools.stopwatch import Stopwatch
+from thread_factory.utilities.timing_tools.stopwatch import Stopwatch
 
 # Define unittests
 class TestStopwatch(unittest.TestCase):

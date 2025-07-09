@@ -3,7 +3,7 @@ import threading
 import time
 from typing import List, Any, Optional, Callable
 from thread_factory.synchronization.coordinators.multi_conductor import MultiConductor
-from thread_factory.utils.coordination.group import Group
+from thread_factory.utilities.coordination.group import Group
 
 def _spawn(n: int, fn: callable, thread_names: Optional[List[str]] = None):
     """Spins up n daemon threads and starts them."""

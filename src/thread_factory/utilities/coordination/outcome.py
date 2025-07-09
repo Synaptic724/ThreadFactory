@@ -1,7 +1,7 @@
 import threading
 from typing import Any, Optional, Type
 import ulid
-from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
 class Outcome(IDisposable):
     """
     A lightweight, self-contained, Future-like object to hold the eventual

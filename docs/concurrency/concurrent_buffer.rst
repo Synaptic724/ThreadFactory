@@ -1,4 +1,4 @@
-ConcurrentBuffer
+Concurrent Buffer
 ==================
 
 .. automodule:: thread_factory.concurrency.concurrent_buffer

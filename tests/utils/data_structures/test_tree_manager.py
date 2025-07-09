@@ -1,5 +1,5 @@
 import unittest
-from thread_factory.utils.data_structures.tree_manager import TreeNode, TreeManager
+from thread_factory.utilities.data_structures.tree_manager import TreeNode, TreeManager
 
 class TestTreeNode(unittest.TestCase):
     def test_tree_node_creation(self):

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 from thread_factory.agent.identity.types.general import General
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.coordination.package import Pack
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 
 

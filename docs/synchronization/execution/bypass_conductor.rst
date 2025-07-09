@@ -1,4 +1,4 @@
-Execution Module
+Bypass Conductor
 ==================
 
 .. automodule:: thread_factory.synchronization.execution.bypass_conductor

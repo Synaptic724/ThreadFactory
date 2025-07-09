@@ -3,9 +3,9 @@ from typing import Callable, Optional, List, Any, Union
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.synchronization.primitives.dynaphore import Dynaphore
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
-from thread_factory.utils.coordination.package import Pack
-from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.utils.coordination.outcome import Outcome
+from thread_factory.utilities.coordination.package import Pack
+from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.coordination.outcome import Outcome
 
 
 class BypassConductor(IDisposable):

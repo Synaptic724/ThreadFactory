@@ -4,11 +4,11 @@ from typing import Optional, Callable, List, Union, Any, Dict, Tuple
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.synchronization.dispatchers.signal_fork import SignalFork
 from thread_factory.synchronization.dispatchers.sync_signal_fork import SyncSignalFork
-from thread_factory.utils.coordination.package import Pack
-from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.utils.coordination.group import Group
+from thread_factory.utilities.coordination.package import Pack
+from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.coordination.group import Group
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-from thread_factory.utils.coordination.outcome import Outcome
+from thread_factory.utilities.coordination.outcome import Outcome
 from thread_factory.synchronization.primitives import Dynaphore
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier

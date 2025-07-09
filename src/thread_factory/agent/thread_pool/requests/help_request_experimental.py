@@ -4,8 +4,8 @@ from datetime import datetime
 from ulid import ULID
 from typing import Callable, Optional, TypeVar, Generic
 from thread_factory.agent.thread_pool.records import WorkStatus, Record
-from thread_factory.utils.interfaces.disposable import IDisposable
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.coordination.package import Pack
 
 # Define a TypeVar for generic result handling, allowing HelpRequest to be typed
 T = TypeVar('T')

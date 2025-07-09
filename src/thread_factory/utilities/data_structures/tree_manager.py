@@ -1,7 +1,7 @@
 import abc
 from typing import List, Optional
 import uuid
-from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
 
 
 # TODO 1: Rename "Tree" to "Synaptic" or "Pulse Storage" later.

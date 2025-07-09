@@ -14,7 +14,7 @@ from typing import (
     TypeVar,
     Union,
 )
-from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
 
 _K = TypeVar("_K")
 _V = TypeVar("_V")

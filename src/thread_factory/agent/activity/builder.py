@@ -2,7 +2,7 @@ from typing import Callable, Any, Type, Optional
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.agent.activity.base import BaseActivity
 from thread_factory.agent.activity.job import JobActivity # Ensure this import is correct based on your structure
-from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
 
 class ActivityBuilder(IDisposable):
     """

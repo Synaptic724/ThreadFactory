@@ -1,4 +1,4 @@
-Controllers Module
+Signal Controller
 ==================
 
 .. automodule:: thread_factory.synchronization.controllers.signal_controller

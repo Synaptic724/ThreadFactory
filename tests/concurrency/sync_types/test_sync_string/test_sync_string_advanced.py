@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 # For example, if your SyncString.py is in a 'my_lib' folder, it might be:
 # from my_lib.sync_string import SyncString
 from thread_factory.concurrency.sync_types.sync_string import SyncString
-from thread_factory.utils.interfaces.isync import ISync
+from thread_factory.utilities.interfaces.isync import ISync
 
 
 class TestSyncStringExtended(unittest.TestCase):

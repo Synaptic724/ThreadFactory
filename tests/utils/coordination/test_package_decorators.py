@@ -1,7 +1,7 @@
 import inspect
 import unittest
 from functools import wraps
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.coordination.package import Pack
 
 
 def simple_decorator(f):

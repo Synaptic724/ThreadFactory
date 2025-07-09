@@ -5,7 +5,7 @@ from thread_factory.synchronization.primitives.latch import Gate
 from thread_factory.concurrency.sync_types.sync_bool import SyncBool
 from thread_factory.synchronization.controllers.signal_controller import SignalController
 from thread_factory.agent.identity.types.agent import Agent
-from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from enum import Enum, auto

@@ -4,7 +4,7 @@ import time
 from typing import List, Callable, Optional
 
 # Assuming your classes are in these locations
-from thread_factory.utils.coordination.group import Group
+from thread_factory.utilities.coordination.group import Group
 from thread_factory.synchronization.coordinators.multi_conductor import MultiConductor
 from thread_factory.synchronization.controllers.signal_controller import SignalController
 from thread_factory.synchronization.dispatchers.signal_fork import SignalFork

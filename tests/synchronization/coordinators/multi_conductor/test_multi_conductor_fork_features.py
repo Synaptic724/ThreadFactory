@@ -6,7 +6,7 @@ from collections import Counter
 
 # Assuming your classes are in these locations
 from thread_factory.synchronization.coordinators.multi_conductor import MultiConductor
-from thread_factory.utils.coordination.group import Group
+from thread_factory.utilities.coordination.group import Group
 
 
 def _spawn(n: int, fn: callable):

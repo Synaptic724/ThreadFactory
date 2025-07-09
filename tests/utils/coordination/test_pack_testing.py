@@ -2,7 +2,7 @@ import unittest
 import inspect
 from functools import wraps
 from typing import Callable, Union, Iterable
-from thread_factory.utils.coordination.package import Package
+from thread_factory.utilities.coordination.package import Package
 
 
 
@@ -217,7 +217,7 @@ class TestPackAndPackMany(unittest.TestCase):
 
 
 import unittest
-from thread_factory.utils.coordination.package import Package, Pack
+from thread_factory.utilities.coordination.package import Package, Pack
 
 
 # --- Helper functions for advanced tests ---

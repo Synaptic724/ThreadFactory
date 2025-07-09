@@ -2,8 +2,8 @@ from typing import Callable, Optional, Union
 import threading
 from typing import Callable, Optional, List
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
-from thread_factory.utils.coordination.package import Pack
-from thread_factory.utils.interfaces.disposable import IDisposable
+from thread_factory.utilities.coordination.package import Pack
+from thread_factory.utilities.interfaces.disposable import IDisposable
 
 
 class AgentOrchestrator(IDisposable):

@@ -8,7 +8,7 @@ import time
 import unittest
 from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
 from thread_factory.agent.command_center import CommandCenter
-from thread_factory.utils.coordination.package import Pack
+from thread_factory.utilities.coordination.package import Pack
 
 
 # --------------------------------------------------------------------------- #
