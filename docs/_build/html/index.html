@@ -19,7 +19,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Concurrency Module" href="concurrency/concurrency.html" /> 
+    <link rel="next" title="Concurrent Data Structures" href="concurrency/index.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -43,8 +43,8 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="concurrency/concurrency.html">Concurrency Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="concurrency/sync_types/index.html">Synchronized Types Index</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concurrency/index.html">Concurrent Data Structures</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sync_types/index.html">Synchronized Types</a></li>
 <li class="toctree-l1"><a class="reference internal" href="synchronization/controllers/controllers.html">Controllers Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="synchronization/coordinators/coordination.html">Coordinators Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html">Dispatchers Module</a></li>
@@ -84,188 +84,60 @@
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="concurrency/concurrency.html">Concurrency Module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.add"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.add()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.batch_update"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.batch_update()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.clear"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.clear()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.copy"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.copy()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.count_of"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.count_of()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.discard"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.discard()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.dispose"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.filter"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.filter()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.map"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.map()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.pop"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.pop()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.reduce"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.reduce()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.remove"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.remove()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.to_concurrent_dict"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.to_concurrent_dict()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.unique_items"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.unique_items()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.update"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag.update()</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="concurrency/index.html">Concurrent Data Structures</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_bag.html">ConcurrentBag</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_bag.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.batch_update"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer.batch_update()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.clear"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer.clear()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.copy"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer.copy()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.dequeue"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer.dequeue()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.dispose"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.enqueue"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer.enqueue()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.filter"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer.filter()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.map"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer.map()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.peek"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer.peek()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.peek_oldest"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer.peek_oldest()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.reduce"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer.reduce()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.remove_item"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer.remove_item()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.to_concurrent_list"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer.to_concurrent_list()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_buffer.html">ConcurrentBuffer</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_buffer.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection.add"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection.add()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection.batch_update"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection.batch_update()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection.clear"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection.clear()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection.copy"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection.copy()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection.dispose"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection.filter"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection.filter()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection.map"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection.map()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection.peek"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection.peek()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection.pop"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection.pop()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection.reduce"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection.reduce()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection.remove_item"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection.remove_item()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection.to_concurrent_list"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection.to_concurrent_list()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_collection.html">ConcurrentCollection</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_collection.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_core.Concurrent"><code class="docutils literal notranslate"><span class="pre">Concurrent</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_core.Concurrent.for_each"><code class="docutils literal notranslate"><span class="pre">Concurrent.for_each()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_core.Concurrent.for_loop"><code class="docutils literal notranslate"><span class="pre">Concurrent.for_loop()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_core.Concurrent.invoke"><code class="docutils literal notranslate"><span class="pre">Concurrent.invoke()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_core.Concurrent.map"><code class="docutils literal notranslate"><span class="pre">Concurrent.map()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_dict.html">ConcurrentDict</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_dict.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.batch_update"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.batch_update()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.clear"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.clear()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.copy"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.copy()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.dispose"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.filter"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.filter()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.freeze"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.freeze()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.get"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.get()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.is_frozen"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.is_frozen</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.items"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.items()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.keys"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.keys()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.lockless_get"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.lockless_get()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.map"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.map()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.pop"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.pop()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.popitem"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.popitem()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.reduce"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.reduce()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.setdefault"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.setdefault()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.to_dict"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.to_dict()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.unfreeze"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.unfreeze()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.update"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.update()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.values"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict.values()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_list.html">ConcurrentList</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_list.html#thread_factory.concurrency.concurrent_list.ConcurrentList"><code class="docutils literal notranslate"><span class="pre">ConcurrentList</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList"><code class="docutils literal notranslate"><span class="pre">ConcurrentList</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.append"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.append()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.batch_update"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.batch_update()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.clear"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.clear()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.copy"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.copy()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.count"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.count()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.dispose"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.extend"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.extend()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.filter"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.filter()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.freeze"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.freeze()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.index"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.index()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.insert"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.insert()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.is_frozen"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.is_frozen</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.map"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.map()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.pop"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.pop()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.reduce"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.reduce()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.remove"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.remove()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.reverse"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.reverse()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.sort"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.sort()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.to_list"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.to_list()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.unfreeze"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.unfreeze()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_list.ConcurrentList.update"><code class="docutils literal notranslate"><span class="pre">ConcurrentList.update()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_queue.html">ConcurrentQueue</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_queue.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.batch_update"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.batch_update()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.clear"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.clear()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.copy"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.copy()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.dequeue"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.dequeue()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.dispose"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.empty"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.empty()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.enqueue"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.enqueue()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.filter"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.filter()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.is_empty"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.is_empty()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.map"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.map()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.peek"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.peek()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.reduce"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.reduce()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.remove_item"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.remove_item()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.steal_batch"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.steal_batch()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.to_concurrent_list"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue.to_concurrent_list()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_stack.html">ConcurrentStack</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_stack.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.batch_update"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.batch_update()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.clear"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.clear()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.copy"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.copy()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.dispose"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.filter"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.filter()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.is_empty"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.is_empty()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.map"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.map()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.peek"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.peek()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.pop"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.pop()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.push"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.push()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.reduce"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.reduce()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.remove_item"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.remove_item()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.steal_batch"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.steal_batch()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack.to_concurrent_list"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack.to_concurrent_list()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.add"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.add()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.batch_update"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.batch_update()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.clear"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.clear()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.difference"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.difference()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.discard"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.discard()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.dispose"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.filter"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.filter()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.freeze"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.freeze()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.intersection"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.intersection()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.is_frozen"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.is_frozen</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.map"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.map()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.reduce"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.reduce()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.remove"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.remove()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.symmetric_difference"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.symmetric_difference()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.to_concurrent_list"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.to_concurrent_list()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.to_set"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.to_set()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.unfreeze"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.unfreeze()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.union"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.union()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrency.html#thread_factory.concurrency.concurrent_set.ConcurrentSet.update"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet.update()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_set.html">ConcurrentSet</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_set.html#thread_factory.concurrency.concurrent_set.ConcurrentSet"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet</span></code></a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="concurrency/sync_types/index.html">Synchronized Types Index</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/sync_types/sync_int.html">SyncInt</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/sync_types/sync_int.html#thread_factory.concurrency.sync_types.sync_int.SyncInt"><code class="docutils literal notranslate"><span class="pre">SyncInt</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="sync_types/index.html">Synchronized Types</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="sync_types/sync_int.html">SyncInt</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sync_types/sync_int.html#thread_factory.concurrency.sync_types.sync_int.SyncInt"><code class="docutils literal notranslate"><span class="pre">SyncInt</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/sync_types/sync_float.html">SyncFloat</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/sync_types/sync_float.html#thread_factory.concurrency.sync_types.sync_float.SyncFloat"><code class="docutils literal notranslate"><span class="pre">SyncFloat</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="sync_types/sync_float.html">SyncFloat</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sync_types/sync_float.html#thread_factory.concurrency.sync_types.sync_float.SyncFloat"><code class="docutils literal notranslate"><span class="pre">SyncFloat</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/sync_types/sync_bool.html">SyncBool</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/sync_types/sync_bool.html#thread_factory.concurrency.sync_types.sync_bool.SyncBool"><code class="docutils literal notranslate"><span class="pre">SyncBool</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="sync_types/sync_bool.html">SyncBool</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sync_types/sync_bool.html#thread_factory.concurrency.sync_types.sync_bool.SyncBool"><code class="docutils literal notranslate"><span class="pre">SyncBool</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/sync_types/sync_ref.html">SyncRef</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/sync_types/sync_ref.html#thread_factory.concurrency.sync_types.sync_ref.SyncRef"><code class="docutils literal notranslate"><span class="pre">SyncRef</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="sync_types/sync_ref.html">SyncRef</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sync_types/sync_ref.html#thread_factory.concurrency.sync_types.sync_ref.SyncRef"><code class="docutils literal notranslate"><span class="pre">SyncRef</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/sync_types/sync_string.html">SyncString</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="concurrency/sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString"><code class="docutils literal notranslate"><span class="pre">SyncString</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="sync_types/sync_string.html">SyncString</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString"><code class="docutils literal notranslate"><span class="pre">SyncString</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -585,7 +457,7 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="concurrency/concurrency.html" class="btn btn-neutral float-right" title="Concurrency Module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="concurrency/index.html" class="btn btn-neutral float-right" title="Concurrent Data Structures" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

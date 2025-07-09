@@ -1,9 +1,9 @@
-Synchronized Types Index
+Synchronized Types
 ========================
 
 .. toctree::
    :maxdepth: 1
-   :caption: Sync Types
+   :titlesonly:
 
    sync_int
    sync_float

@@ -1,9 +1,9 @@
-Concurrent Data Structures Index
+Concurrent Data Structures
 ========================
 
 .. toctree::
    :maxdepth: 1
-   :caption: Concurrent Data Structures
+   :titlesonly:
 
    concurrent_bag
    concurrent_buffer
