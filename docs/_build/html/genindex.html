@@ -43,13 +43,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="concurrency/index.html">Concurrent Data Structures</a></li>
 <li class="toctree-l1"><a class="reference internal" href="sync_types/index.html">Synchronized Types</a></li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/controllers/controllers.html">Controllers Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/coordinators/coordination.html">Coordinators Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html">Dispatchers Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/execution/execution.html">Execution Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/primitives/primitives.html">Primitives Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="utilities/coordination/coordination.html">Coordination Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="utilities/timing_tools/timing_tools.html">Timing Tools Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="synchronization/controllers/controllers.html">Signal Controller</a></li>
 </ul>
 
         </div>
@@ -110,9 +104,9 @@
       <li><a href="modules.html#thread_factory.SmartCondition.acquire">acquire (thread_factory.SmartCondition attribute)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.acquire">(thread_factory.synchronization.primitives.smart_condition.SmartCondition attribute)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.acquire">(thread_factory.synchronization.primitives.smart_condition.SmartCondition attribute)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.acquire">(thread_factory.synchronization.primitives.transit_condition.TransitCondition attribute)</a>
+        <li><a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.acquire">(thread_factory.synchronization.primitives.transit_condition.TransitCondition attribute)</a>
 </li>
         <li><a href="modules.html#thread_factory.TransitCondition.acquire">(thread_factory.TransitCondition attribute)</a>
 </li>
@@ -120,7 +114,7 @@
       <li><a href="modules.html#thread_factory.FlowRegulator.acquire">acquire() (thread_factory.FlowRegulator method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.acquire">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.acquire">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
       </ul></li>
       <li><a href="concurrency/concurrent_bag.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.add">add() (thread_factory.concurrency.concurrent_bag.ConcurrentBag method)</a>
@@ -139,7 +133,7 @@
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.add_group">add_group() (thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
+      <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.add_group">add_group() (thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
 </li>
       <li><a href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController.add_post_invoke_hook">add_post_invoke_hook() (thread_factory.synchronization.controllers.signal_controller.SignalController method)</a>
 </li>
@@ -151,6 +145,8 @@
         <li><a href="modules.html#thread_factory.ConcurrentList.append">(thread_factory.ConcurrentList method)</a>
 </li>
       </ul></li>
+      <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package.args">args (thread_factory.utilities.coordination.package.Package property)</a>
+</li>
       <li><a href="sync_types/sync_float.html#thread_factory.concurrency.sync_types.sync_float.SyncFloat.as_integer_ratio">as_integer_ratio() (thread_factory.concurrency.sync_types.sync_float.SyncFloat method)</a>
 
       <ul>
@@ -158,7 +154,11 @@
 </li>
       </ul></li>
       <li><a href="modules.html#thread_factory.AutoResetTimer">AutoResetTimer (class in thread_factory)</a>
+
+      <ul>
+        <li><a href="utilities/timing_tools/auto_reset_timer.html#thread_factory.utilities.timing_tools.auto_reset_timer.AutoResetTimer">(class in thread_factory.utilities.timing_tools.auto_reset_timer)</a>
 </li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
@@ -201,29 +201,35 @@
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package.bind">bind() (thread_factory.utilities.coordination.package.Package method)</a>
+</li>
+      <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package.bind_args">bind_args() (thread_factory.utilities.coordination.package.Package method)</a>
+</li>
       <li><a href="modules.html#thread_factory.SmartCondition.bind_callback">bind_callback() (thread_factory.SmartCondition method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.bind_callback">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.bind_callback">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
 </li>
       </ul></li>
       <li><a href="sync_types/sync_int.html#thread_factory.concurrency.sync_types.sync_int.SyncInt.bit_count">bit_count() (thread_factory.concurrency.sync_types.sync_int.SyncInt method)</a>
 </li>
       <li><a href="sync_types/sync_int.html#thread_factory.concurrency.sync_types.sync_int.SyncInt.bit_length">bit_length() (thread_factory.concurrency.sync_types.sync_int.SyncInt method)</a>
 </li>
+      <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package.bundle">bundle() (thread_factory.utilities.coordination.package.Package static method)</a>
+</li>
       <li><a href="modules.html#thread_factory.FlowRegulator.bypass_bias">bypass_bias() (thread_factory.FlowRegulator method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.bypass_bias">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.bypass_bias">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
       </ul></li>
       <li><a href="modules.html#thread_factory.FlowRegulator.bypass_bias_and_notify">bypass_bias_and_notify() (thread_factory.FlowRegulator method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.bypass_bias_and_notify">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.bypass_bias_and_notify">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor">BypassConductor (class in thread_factory.synchronization.execution.bypass_conductor)</a>
+      <li><a href="synchronization/execution/bypass_conductor.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor">BypassConductor (class in thread_factory.synchronization.execution.bypass_conductor)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -231,10 +237,10 @@
 <h2 id="C">C</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="synchronization/primitives/primitives.html#id0">callback (thread_factory.synchronization.primitives.smart_condition.Waiter attribute)</a>, <a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.Waiter.callback">[1]</a>
+      <li><a href="synchronization/primitives/smart_condition.html#id0">callback (thread_factory.synchronization.primitives.smart_condition.Waiter attribute)</a>, <a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.Waiter.callback">[1]</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#id28">(thread_factory.synchronization.primitives.transit_condition.Waiter attribute)</a>, <a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.Waiter.callback">[1]</a>
+        <li><a href="synchronization/primitives/transit_condition.html#id0">(thread_factory.synchronization.primitives.transit_condition.Waiter attribute)</a>, <a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.Waiter.callback">[1]</a>
 </li>
       </ul></li>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString.capitalize">capitalize() (thread_factory.concurrency.sync_types.sync_string.SyncString method)</a>
@@ -279,17 +285,17 @@
         <li><a href="modules.html#thread_factory.ConcurrentStack.clear">(thread_factory.ConcurrentStack method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier">ClockBarrier (class in thread_factory.synchronization.coordinators.clock_barrier)</a>
+      <li><a href="synchronization/coordinators/clock_barrier.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier">ClockBarrier (class in thread_factory.synchronization.coordinators.clock_barrier)</a>
 </li>
-      <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Latch.close">close() (thread_factory.synchronization.primitives.latch.Latch method)</a>
+      <li><a href="synchronization/primitives/latch.html#thread_factory.synchronization.primitives.latch.Latch.close">close() (thread_factory.synchronization.primitives.latch.Latch method)</a>
 </li>
-      <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Latch.closed">closed() (thread_factory.synchronization.primitives.latch.Latch method)</a>
+      <li><a href="synchronization/primitives/latch.html#thread_factory.synchronization.primitives.latch.Latch.closed">closed() (thread_factory.synchronization.primitives.latch.Latch method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.closed">(thread_factory.synchronization.primitives.signal_latch.SignalLatch method)</a>
+        <li><a href="synchronization/primitives/signal_latch.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.closed">(thread_factory.synchronization.primitives.signal_latch.SignalLatch method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.collapse">collapse() (thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
+      <li><a href="synchronization/execution/bypass_conductor.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.collapse">collapse() (thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
 </li>
       <li><a href="modules.html#thread_factory.ConcurrentBag">ConcurrentBag (class in thread_factory)</a>
 
@@ -315,14 +321,14 @@
         <li><a href="concurrency/concurrent_dict.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict">(class in thread_factory.concurrency.concurrent_dictionary)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules.html#thread_factory.ConcurrentList">ConcurrentList (class in thread_factory)</a>
 
       <ul>
         <li><a href="concurrency/concurrent_list.html#thread_factory.concurrency.concurrent_list.ConcurrentList">(class in thread_factory.concurrency.concurrent_list)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules.html#thread_factory.ConcurrentQueue">ConcurrentQueue (class in thread_factory)</a>
 
       <ul>
@@ -342,18 +348,22 @@
 </li>
       </ul></li>
       <li><a href="modules.html#thread_factory.ConcurrentTools">ConcurrentTools (class in thread_factory)</a>
+
+      <ul>
+        <li><a href="utilities/concurrent_tools/concurrent_tools.html#thread_factory.utilities.concurrent_tools.concurrent_tools.ConcurrentTools">(class in thread_factory.utilities.concurrent_tools.concurrent_tools)</a>
 </li>
+      </ul></li>
       <li><a href="modules.html#thread_factory.Dynaphore.condition">condition (thread_factory.Dynaphore property)</a>
 
       <ul>
         <li><a href="modules.html#thread_factory.FlowRegulator.condition">(thread_factory.FlowRegulator property)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.condition">(thread_factory.synchronization.primitives.dynaphore.Dynaphore property)</a>
+        <li><a href="synchronization/primitives/dynaphore.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.condition">(thread_factory.synchronization.primitives.dynaphore.Dynaphore property)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.condition">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator property)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.condition">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator property)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor">Conductor (class in thread_factory.synchronization.coordinators.conductor)</a>
+      <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor">Conductor (class in thread_factory.synchronization.coordinators.conductor)</a>
 </li>
       <li><a href="sync_types/sync_float.html#thread_factory.concurrency.sync_types.sync_float.SyncFloat.conjugate">conjugate() (thread_factory.concurrency.sync_types.sync_float.SyncFloat method)</a>
 
@@ -361,7 +371,7 @@
         <li><a href="sync_types/sync_int.html#thread_factory.concurrency.sync_types.sync_int.SyncInt.conjugate">(thread_factory.concurrency.sync_types.sync_int.SyncInt method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.controller">controller (thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier attribute)</a>
+      <li><a href="synchronization/coordinators/clock_barrier.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.controller">controller (thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier attribute)</a>
 </li>
       <li><a href="concurrency/concurrent_bag.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.copy">copy() (thread_factory.concurrency.concurrent_bag.ConcurrentBag method)</a>
 
@@ -393,6 +403,8 @@
         <li><a href="modules.html#thread_factory.ConcurrentStack.copy">(thread_factory.ConcurrentStack method)</a>
 </li>
       </ul></li>
+      <li><a href="utilities/coordination/group.html#thread_factory.utilities.coordination.group.Group.count">count (thread_factory.utilities.coordination.group.Group attribute)</a>
+</li>
       <li><a href="concurrency/concurrent_list.html#thread_factory.concurrency.concurrent_list.ConcurrentList.count">count() (thread_factory.concurrency.concurrent_list.ConcurrentList method)</a>
 
       <ul>
@@ -407,22 +419,24 @@
         <li><a href="modules.html#thread_factory.ConcurrentBag.count_of">(thread_factory.ConcurrentBag method)</a>
 </li>
       </ul></li>
+      <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package.curry">curry() (thread_factory.utilities.coordination.package.Package method)</a>
+</li>
   </ul></td>
 </tr></table>
 
 <h2 id="D">D</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.decrease_limit">decrease_limit() (thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
+      <li><a href="synchronization/execution/bypass_conductor.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.decrease_limit">decrease_limit() (thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
 </li>
       <li><a href="modules.html#thread_factory.Dynaphore.decrease_permits">decrease_permits() (thread_factory.Dynaphore method)</a>
 
       <ul>
         <li><a href="modules.html#thread_factory.FlowRegulator.decrease_permits">(thread_factory.FlowRegulator method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.decrease_permits">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
+        <li><a href="synchronization/primitives/dynaphore.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.decrease_permits">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.decrease_permits">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.decrease_permits">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
       </ul></li>
       <li><a href="sync_types/sync_float.html#thread_factory.concurrency.sync_types.sync_float.SyncFloat.decrement">decrement() (thread_factory.concurrency.sync_types.sync_float.SyncFloat method)</a>
@@ -504,57 +518,69 @@
 </li>
         <li><a href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController.dispose">(thread_factory.synchronization.controllers.signal_controller.SignalController method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.dispose">(thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier method)</a>
+        <li><a href="synchronization/coordinators/clock_barrier.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.dispose">(thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.dispose">(thread_factory.synchronization.coordinators.conductor.Conductor method)</a>
+        <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor.dispose">(thread_factory.synchronization.coordinators.conductor.Conductor method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.dispose">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
+        <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.dispose">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout.dispose">(thread_factory.synchronization.coordinators.scout.Scout method)</a>
+        <li><a href="synchronization/coordinators/scout.html#thread_factory.synchronization.coordinators.scout.Scout.dispose">(thread_factory.synchronization.coordinators.scout.Scout method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.dispose">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
+        <li><a href="synchronization/coordinators/transit_barrier.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.dispose">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.Fork.dispose">(thread_factory.synchronization.dispatchers.fork.Fork method)</a>
+        <li><a href="synchronization/dispatchers/fork.html#thread_factory.synchronization.dispatchers.fork.Fork.dispose">(thread_factory.synchronization.dispatchers.fork.Fork method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.dispose">(thread_factory.synchronization.dispatchers.fork.ForkUnit method)</a>
+        <li><a href="synchronization/dispatchers/fork.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.dispose">(thread_factory.synchronization.dispatchers.fork.ForkUnit method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.dispose">(thread_factory.synchronization.dispatchers.signal_fork.ForkUnit method)</a>
+        <li><a href="synchronization/dispatchers/signal_fork.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.dispose">(thread_factory.synchronization.dispatchers.signal_fork.ForkUnit method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork.dispose">(thread_factory.synchronization.dispatchers.signal_fork.SignalFork method)</a>
+        <li><a href="synchronization/dispatchers/signal_fork.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork.dispose">(thread_factory.synchronization.dispatchers.signal_fork.SignalFork method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.dispose">(thread_factory.synchronization.dispatchers.sync_fork.ForkUnit method)</a>
+        <li><a href="synchronization/dispatchers/sync_fork.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.dispose">(thread_factory.synchronization.dispatchers.sync_fork.ForkUnit method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.SyncFork.dispose">(thread_factory.synchronization.dispatchers.sync_fork.SyncFork method)</a>
+        <li><a href="synchronization/dispatchers/sync_fork.html#thread_factory.synchronization.dispatchers.sync_fork.SyncFork.dispose">(thread_factory.synchronization.dispatchers.sync_fork.SyncFork method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.dispose">(thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit method)</a>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.dispose">(thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.dispose">(thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork method)</a>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.dispose">(thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork method)</a>
 </li>
-        <li><a href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.dispose">(thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
+        <li><a href="synchronization/execution/bypass_conductor.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.dispose">(thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.dispose">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
+        <li><a href="synchronization/primitives/dynaphore.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.dispose">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.dispose">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.dispose">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Latch.dispose">(thread_factory.synchronization.primitives.latch.Latch method)</a>
+        <li><a href="synchronization/primitives/latch.html#thread_factory.synchronization.primitives.latch.Latch.dispose">(thread_factory.synchronization.primitives.latch.Latch method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.dispose">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
+        <li><a href="synchronization/primitives/signal_barrier.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.dispose">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.dispose">(thread_factory.synchronization.primitives.signal_latch.SignalLatch method)</a>
+        <li><a href="synchronization/primitives/signal_latch.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.dispose">(thread_factory.synchronization.primitives.signal_latch.SignalLatch method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.dispose">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.dispose">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.dispose">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
+        <li><a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.dispose">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
 </li>
         <li><a href="modules.html#thread_factory.TransitCondition.dispose">(thread_factory.TransitCondition method)</a>
+</li>
+        <li><a href="utilities/coordination/group.html#thread_factory.utilities.coordination.group.Group.dispose">(thread_factory.utilities.coordination.group.Group method)</a>
+</li>
+        <li><a href="utilities/coordination/outcome.html#thread_factory.utilities.coordination.outcome.Outcome.dispose">(thread_factory.utilities.coordination.outcome.Outcome method)</a>
+</li>
+        <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package.dispose">(thread_factory.utilities.coordination.package.Package method)</a>
+</li>
+        <li><a href="utilities/timing_tools/auto_reset_timer.html#thread_factory.utilities.timing_tools.auto_reset_timer.AutoResetTimer.dispose">(thread_factory.utilities.timing_tools.auto_reset_timer.AutoResetTimer method)</a>
+</li>
+        <li><a href="utilities/timing_tools/stopwatch.html#thread_factory.utilities.timing_tools.stopwatch.Stopwatch.dispose">(thread_factory.utilities.timing_tools.stopwatch.Stopwatch method)</a>
 </li>
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="utilities/coordination/outcome.html#thread_factory.utilities.coordination.outcome.Outcome.done">done (thread_factory.utilities.coordination.outcome.Outcome property)</a>
+</li>
       <li><a href="modules.html#thread_factory.Dynaphore">Dynaphore (class in thread_factory)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore">(class in thread_factory.synchronization.primitives.dynaphore)</a>
+        <li><a href="synchronization/primitives/dynaphore.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore">(class in thread_factory.synchronization.primitives.dynaphore)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -564,7 +590,11 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules.html#thread_factory.Stopwatch.elapsed">elapsed() (thread_factory.Stopwatch method)</a>
+
+      <ul>
+        <li><a href="utilities/timing_tools/stopwatch.html#thread_factory.utilities.timing_tools.stopwatch.Stopwatch.elapsed">(thread_factory.utilities.timing_tools.stopwatch.Stopwatch method)</a>
 </li>
+      </ul></li>
       <li><a href="modules.html#thread_factory.Empty">Empty</a>
 </li>
       <li><a href="concurrency/concurrent_queue.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.empty">empty() (thread_factory.concurrency.concurrent_queue.ConcurrentQueue method)</a>
@@ -573,7 +603,7 @@
         <li><a href="modules.html#thread_factory.ConcurrentQueue.empty">(thread_factory.ConcurrentQueue method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.enable">enable() (thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
+      <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.enable">enable() (thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
 </li>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString.encode">encode() (thread_factory.concurrency.sync_types.sync_string.SyncString method)</a>
 </li>
@@ -591,13 +621,17 @@
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.exceptions">exceptions (thread_factory.synchronization.coordinators.conductor.Conductor property)</a>
+      <li><a href="utilities/coordination/outcome.html#thread_factory.utilities.coordination.outcome.Outcome.exception">exception() (thread_factory.utilities.coordination.outcome.Outcome method)</a>
+</li>
+      <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor.exceptions">exceptions (thread_factory.synchronization.coordinators.conductor.Conductor property)</a>
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.exceptions">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor property)</a>
+        <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.exceptions">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor property)</a>
+</li>
+        <li><a href="utilities/coordination/group.html#thread_factory.utilities.coordination.group.Group.exceptions">(thread_factory.utilities.coordination.group.Group property)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout.exit_monitor">exit_monitor() (thread_factory.synchronization.coordinators.scout.Scout method)</a>
+      <li><a href="synchronization/coordinators/scout.html#thread_factory.synchronization.coordinators.scout.Scout.exit_monitor">exit_monitor() (thread_factory.synchronization.coordinators.scout.Scout method)</a>
 </li>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString.expandtabs">expandtabs() (thread_factory.concurrency.sync_types.sync_string.SyncString method)</a>
 </li>
@@ -613,7 +647,7 @@
 <h2 id="F">F</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="synchronization/primitives/primitives.html#id25">factory_id (thread_factory.synchronization.primitives.smart_condition.Waiter attribute)</a>, <a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.Waiter.factory_id">[1]</a>
+      <li><a href="synchronization/primitives/smart_condition.html#id5">factory_id (thread_factory.synchronization.primitives.smart_condition.Waiter attribute)</a>, <a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.Waiter.factory_id">[1]</a>
 </li>
       <li><a href="concurrency/concurrent_bag.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.filter">filter() (thread_factory.concurrency.concurrent_bag.ConcurrentBag method)</a>
 
@@ -654,45 +688,53 @@
       <li><a href="modules.html#thread_factory.SmartCondition.find_waiter_count">find_waiter_count() (thread_factory.SmartCondition method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.find_waiter_count">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.find_waiter_count">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.find_waiter_count">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
+        <li><a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.find_waiter_count">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
 </li>
         <li><a href="modules.html#thread_factory.TransitCondition.find_waiter_count">(thread_factory.TransitCondition method)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules.html#thread_factory.FlowRegulator">FlowRegulator (class in thread_factory)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator">(class in thread_factory.synchronization.primitives.flow_regulator)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator">(class in thread_factory.synchronization.primitives.flow_regulator)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules.html#thread_factory.ConcurrentTools.for_each">for_each() (thread_factory.ConcurrentTools static method)</a>
-</li>
-      <li><a href="modules.html#thread_factory.ConcurrentTools.for_loop">for_loop() (thread_factory.ConcurrentTools static method)</a>
-</li>
-      <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.Fork">Fork (class in thread_factory.synchronization.dispatchers.fork)</a>
-</li>
-      <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.fork_callable">fork_callable (thread_factory.synchronization.dispatchers.fork.ForkUnit attribute)</a>
 
       <ul>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.fork_callable">(thread_factory.synchronization.dispatchers.signal_fork.ForkUnit attribute)</a>
-</li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.fork_callable">(thread_factory.synchronization.dispatchers.sync_fork.ForkUnit attribute)</a>
-</li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#id0">(thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit attribute)</a>, <a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.fork_callable">[1]</a>
+        <li><a href="utilities/concurrent_tools/concurrent_tools.html#thread_factory.utilities.concurrent_tools.concurrent_tools.ConcurrentTools.for_each">(thread_factory.utilities.concurrent_tools.concurrent_tools.ConcurrentTools static method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit">ForkUnit (class in thread_factory.synchronization.dispatchers.fork)</a>
+      <li><a href="modules.html#thread_factory.ConcurrentTools.for_loop">for_loop() (thread_factory.ConcurrentTools static method)</a>
 
       <ul>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit">(class in thread_factory.synchronization.dispatchers.signal_fork)</a>
+        <li><a href="utilities/concurrent_tools/concurrent_tools.html#thread_factory.utilities.concurrent_tools.concurrent_tools.ConcurrentTools.for_loop">(thread_factory.utilities.concurrent_tools.concurrent_tools.ConcurrentTools static method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit">(class in thread_factory.synchronization.dispatchers.sync_fork)</a>
+      </ul></li>
+      <li><a href="synchronization/dispatchers/fork.html#thread_factory.synchronization.dispatchers.fork.Fork">Fork (class in thread_factory.synchronization.dispatchers.fork)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit">(class in thread_factory.synchronization.dispatchers.sync_signal_fork)</a>
+      <li><a href="synchronization/dispatchers/fork.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.fork_callable">fork_callable (thread_factory.synchronization.dispatchers.fork.ForkUnit attribute)</a>
+
+      <ul>
+        <li><a href="synchronization/dispatchers/signal_fork.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.fork_callable">(thread_factory.synchronization.dispatchers.signal_fork.ForkUnit attribute)</a>
+</li>
+        <li><a href="synchronization/dispatchers/sync_fork.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.fork_callable">(thread_factory.synchronization.dispatchers.sync_fork.ForkUnit attribute)</a>
+</li>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#id0">(thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit attribute)</a>, <a href="synchronization/dispatchers/sync_signal_fork.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.fork_callable">[1]</a>
+</li>
+      </ul></li>
+      <li><a href="synchronization/dispatchers/fork.html#thread_factory.synchronization.dispatchers.fork.ForkUnit">ForkUnit (class in thread_factory.synchronization.dispatchers.fork)</a>
+
+      <ul>
+        <li><a href="synchronization/dispatchers/signal_fork.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit">(class in thread_factory.synchronization.dispatchers.signal_fork)</a>
+</li>
+        <li><a href="synchronization/dispatchers/sync_fork.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit">(class in thread_factory.synchronization.dispatchers.sync_fork)</a>
+</li>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit">(class in thread_factory.synchronization.dispatchers.sync_signal_fork)</a>
 </li>
       </ul></li>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString.format">format() (thread_factory.concurrency.sync_types.sync_string.SyncString method)</a>
@@ -712,6 +754,8 @@
 </li>
         <li><a href="modules.html#thread_factory.ConcurrentSet.freeze">(thread_factory.ConcurrentSet method)</a>
 </li>
+        <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package.freeze">(thread_factory.utilities.coordination.package.Package method)</a>
+</li>
       </ul></li>
       <li><a href="sync_types/sync_int.html#thread_factory.concurrency.sync_types.sync_int.SyncInt.from_bytes">from_bytes() (thread_factory.concurrency.sync_types.sync_int.SyncInt class method)</a>
 </li>
@@ -723,26 +767,26 @@
 <h2 id="G">G</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Gate">Gate (in module thread_factory.synchronization.primitives.latch)</a>
+      <li><a href="synchronization/primitives/latch.html#thread_factory.synchronization.primitives.latch.Gate">Gate (in module thread_factory.synchronization.primitives.latch)</a>
 </li>
-      <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.gate">gate (thread_factory.synchronization.dispatchers.fork.ForkUnit attribute)</a>
+      <li><a href="synchronization/dispatchers/fork.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.gate">gate (thread_factory.synchronization.dispatchers.fork.ForkUnit attribute)</a>
 
       <ul>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.gate">(thread_factory.synchronization.dispatchers.signal_fork.ForkUnit attribute)</a>
+        <li><a href="synchronization/dispatchers/signal_fork.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.gate">(thread_factory.synchronization.dispatchers.signal_fork.ForkUnit attribute)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.gate">(thread_factory.synchronization.dispatchers.sync_fork.ForkUnit attribute)</a>
+        <li><a href="synchronization/dispatchers/sync_fork.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.gate">(thread_factory.synchronization.dispatchers.sync_fork.ForkUnit attribute)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#id5">(thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit attribute)</a>, <a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.gate">[1]</a>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#id1">(thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit attribute)</a>, <a href="synchronization/dispatchers/sync_signal_fork.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.gate">[1]</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.gate_uses">gate_uses (thread_factory.synchronization.dispatchers.fork.ForkUnit attribute)</a>
+      <li><a href="synchronization/dispatchers/fork.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.gate_uses">gate_uses (thread_factory.synchronization.dispatchers.fork.ForkUnit attribute)</a>
 
       <ul>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.gate_uses">(thread_factory.synchronization.dispatchers.signal_fork.ForkUnit attribute)</a>
+        <li><a href="synchronization/dispatchers/signal_fork.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.gate_uses">(thread_factory.synchronization.dispatchers.signal_fork.ForkUnit attribute)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.gate_uses">(thread_factory.synchronization.dispatchers.sync_fork.ForkUnit attribute)</a>
+        <li><a href="synchronization/dispatchers/sync_fork.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.gate_uses">(thread_factory.synchronization.dispatchers.sync_fork.ForkUnit attribute)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#id6">(thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit attribute)</a>, <a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.gate_uses">[1]</a>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#id2">(thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit attribute)</a>, <a href="synchronization/dispatchers/sync_signal_fork.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.gate_uses">[1]</a>
 </li>
       </ul></li>
       <li><a href="concurrency/concurrent_dict.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.get">get() (thread_factory.concurrency.concurrent_dictionary.ConcurrentDict method)</a>
@@ -764,23 +808,23 @@
       <li><a href="modules.html#thread_factory.FlowRegulator.get_all_logged_factory_ids">get_all_logged_factory_ids() (thread_factory.FlowRegulator method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.get_all_logged_factory_ids">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.get_all_logged_factory_ids">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.get_all_outcomes">get_all_outcomes() (thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
+      <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.get_all_outcomes">get_all_outcomes() (thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
 </li>
       <li><a href="modules.html#thread_factory.FlowRegulator.get_all_waiters">get_all_waiters() (thread_factory.FlowRegulator method)</a>
 
       <ul>
         <li><a href="modules.html#thread_factory.SmartCondition.get_all_waiters">(thread_factory.SmartCondition method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.get_all_waiters">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.get_all_waiters">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.get_all_waiters">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.get_all_waiters">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.get_all_waiters">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
+        <li><a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.get_all_waiters">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
 </li>
         <li><a href="modules.html#thread_factory.TransitCondition.get_all_waiters">(thread_factory.TransitCondition method)</a>
 </li>
@@ -790,22 +834,24 @@
       <ul>
         <li><a href="modules.html#thread_factory.SmartCondition.get_all_waiting_factory_ids">(thread_factory.SmartCondition method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.get_all_waiting_factory_ids">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.get_all_waiting_factory_ids">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.get_all_waiting_factory_ids">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.get_all_waiting_factory_ids">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
 </li>
       </ul></li>
       <li><a href="modules.html#thread_factory.FlowRegulator.get_waiter_count">get_waiter_count() (thread_factory.FlowRegulator method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.get_waiter_count">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.get_waiter_count">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.get_waiting_count">get_waiting_count() (thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier method)</a>
+      <li><a href="synchronization/coordinators/clock_barrier.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.get_waiting_count">get_waiting_count() (thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier method)</a>
 </li>
       <li><a href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController.get_waiting_objects">get_waiting_objects() (thread_factory.synchronization.controllers.signal_controller.SignalController method)</a>
 </li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.groups">groups (thread_factory.synchronization.coordinators.multi_conductor.MultiConductor attribute)</a>
+      <li><a href="utilities/coordination/group.html#thread_factory.utilities.coordination.group.Group">Group (class in thread_factory.utilities.coordination.group)</a>
+</li>
+      <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.groups">groups (thread_factory.synchronization.coordinators.multi_conductor.MultiConductor attribute)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -816,7 +862,7 @@
       <li><a href="modules.html#thread_factory.FlowRegulator.has_factory_id">has_factory_id() (thread_factory.FlowRegulator method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.has_factory_id">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.has_factory_id">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -832,27 +878,29 @@
       <li><a href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController.id">id (thread_factory.synchronization.controllers.signal_controller.SignalController property)</a>
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.id">(thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier attribute)</a>
+        <li><a href="synchronization/coordinators/clock_barrier.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.id">(thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier attribute)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#id0">(thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier property)</a>
+        <li><a href="synchronization/coordinators/clock_barrier.html#id0">(thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier property)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.id">(thread_factory.synchronization.coordinators.conductor.Conductor property)</a>
+        <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor.id">(thread_factory.synchronization.coordinators.conductor.Conductor property)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.id">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor property)</a>
+        <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.id">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor property)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.id">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier property)</a>
+        <li><a href="synchronization/coordinators/transit_barrier.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.id">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier property)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork.id">(thread_factory.synchronization.dispatchers.signal_fork.SignalFork property)</a>
+        <li><a href="synchronization/dispatchers/signal_fork.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork.id">(thread_factory.synchronization.dispatchers.signal_fork.SignalFork property)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.id">(thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork property)</a>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.id">(thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork property)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.id">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier property)</a>
+        <li><a href="synchronization/primitives/signal_barrier.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.id">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier property)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.id">(thread_factory.synchronization.primitives.signal_latch.SignalLatch property)</a>
+        <li><a href="synchronization/primitives/signal_latch.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.id">(thread_factory.synchronization.primitives.signal_latch.SignalLatch property)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.id">(thread_factory.synchronization.primitives.transit_condition.TransitCondition property)</a>
+        <li><a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.id">(thread_factory.synchronization.primitives.transit_condition.TransitCondition property)</a>
 </li>
         <li><a href="modules.html#thread_factory.TransitCondition.id">(thread_factory.TransitCondition property)</a>
+</li>
+        <li><a href="utilities/coordination/group.html#thread_factory.utilities.coordination.group.Group.id">(thread_factory.utilities.coordination.group.Group attribute)</a>
 </li>
       </ul></li>
       <li><a href="sync_types/sync_float.html#thread_factory.concurrency.sync_types.sync_float.SyncFloat.imag">imag (thread_factory.concurrency.sync_types.sync_float.SyncFloat property)</a>
@@ -861,16 +909,16 @@
         <li><a href="sync_types/sync_int.html#thread_factory.concurrency.sync_types.sync_int.SyncInt.imag">(thread_factory.concurrency.sync_types.sync_int.SyncInt property)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.increase_limit">increase_limit() (thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
+      <li><a href="synchronization/execution/bypass_conductor.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.increase_limit">increase_limit() (thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
 </li>
       <li><a href="modules.html#thread_factory.Dynaphore.increase_permits">increase_permits() (thread_factory.Dynaphore method)</a>
 
       <ul>
         <li><a href="modules.html#thread_factory.FlowRegulator.increase_permits">(thread_factory.FlowRegulator method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.increase_permits">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
+        <li><a href="synchronization/primitives/dynaphore.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.increase_permits">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.increase_permits">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.increase_permits">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
       </ul></li>
       <li><a href="sync_types/sync_float.html#thread_factory.concurrency.sync_types.sync_float.SyncFloat.increment">increment() (thread_factory.concurrency.sync_types.sync_float.SyncFloat method)</a>
@@ -904,13 +952,19 @@
       <ul>
         <li><a href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController.invoke">(thread_factory.synchronization.controllers.signal_controller.SignalController method)</a>
 </li>
+        <li><a href="utilities/concurrent_tools/concurrent_tools.html#thread_factory.utilities.concurrent_tools.concurrent_tools.ConcurrentTools.invoke">(thread_factory.utilities.concurrent_tools.concurrent_tools.ConcurrentTools static method)</a>
+</li>
       </ul></li>
       <li><a href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController.invoke_on_all">invoke_on_all() (thread_factory.synchronization.controllers.signal_controller.SignalController method)</a>
 </li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout.is_active">is_active() (thread_factory.synchronization.coordinators.scout.Scout method)</a>
+      <li><a href="synchronization/coordinators/scout.html#thread_factory.synchronization.coordinators.scout.Scout.is_active">is_active() (thread_factory.synchronization.coordinators.scout.Scout method)</a>
 </li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.is_broken">is_broken() (thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier method)</a>
+      <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package.is_async">is_async (thread_factory.utilities.coordination.package.Package property)</a>
 </li>
+      <li><a href="synchronization/coordinators/clock_barrier.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.is_broken">is_broken() (thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="concurrency/concurrent_queue.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue.is_empty">is_empty() (thread_factory.concurrency.concurrent_queue.ConcurrentQueue method)</a>
 
       <ul>
@@ -921,8 +975,6 @@
         <li><a href="modules.html#thread_factory.ConcurrentStack.is_empty">(thread_factory.ConcurrentStack method)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="concurrency/concurrent_dict.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.is_frozen">is_frozen (thread_factory.concurrency.concurrent_dictionary.ConcurrentDict property)</a>
 
       <ul>
@@ -943,12 +995,12 @@
         <li><a href="sync_types/sync_int.html#thread_factory.concurrency.sync_types.sync_int.SyncInt.is_integer">(thread_factory.concurrency.sync_types.sync_int.SyncInt method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout.is_latched">is_latched() (thread_factory.synchronization.coordinators.scout.Scout method)</a>
+      <li><a href="synchronization/coordinators/scout.html#thread_factory.synchronization.coordinators.scout.Scout.is_latched">is_latched() (thread_factory.synchronization.coordinators.scout.Scout method)</a>
 </li>
-      <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Latch.is_open">is_open() (thread_factory.synchronization.primitives.latch.Latch method)</a>
+      <li><a href="synchronization/primitives/latch.html#thread_factory.synchronization.primitives.latch.Latch.is_open">is_open() (thread_factory.synchronization.primitives.latch.Latch method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.is_open">(thread_factory.synchronization.primitives.signal_latch.SignalLatch method)</a>
+        <li><a href="synchronization/primitives/signal_latch.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.is_open">(thread_factory.synchronization.primitives.signal_latch.SignalLatch method)</a>
 </li>
       </ul></li>
       <li><a href="modules.html#thread_factory.AutoResetTimer.is_running">is_running() (thread_factory.AutoResetTimer method)</a>
@@ -956,15 +1008,19 @@
       <ul>
         <li><a href="modules.html#thread_factory.Stopwatch.is_running">(thread_factory.Stopwatch method)</a>
 </li>
+        <li><a href="utilities/timing_tools/auto_reset_timer.html#thread_factory.utilities.timing_tools.auto_reset_timer.AutoResetTimer.is_running">(thread_factory.utilities.timing_tools.auto_reset_timer.AutoResetTimer method)</a>
+</li>
+        <li><a href="utilities/timing_tools/stopwatch.html#thread_factory.utilities.timing_tools.stopwatch.Stopwatch.is_running">(thread_factory.utilities.timing_tools.stopwatch.Stopwatch method)</a>
+</li>
       </ul></li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.is_spent">is_spent() (thread_factory.synchronization.coordinators.conductor.Conductor method)</a>
+      <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor.is_spent">is_spent() (thread_factory.synchronization.coordinators.conductor.Conductor method)</a>
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.is_spent">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
+        <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.is_spent">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.is_spent">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
+        <li><a href="synchronization/coordinators/transit_barrier.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.is_spent">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.is_spent">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
+        <li><a href="synchronization/primitives/signal_barrier.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.is_spent">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
 </li>
       </ul></li>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString.isalnum">isalnum() (thread_factory.concurrency.sync_types.sync_string.SyncString method)</a>
@@ -1018,29 +1074,33 @@
 </li>
       </ul></li>
   </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package.kwargs">kwargs (thread_factory.utilities.coordination.package.Package property)</a>
+</li>
+  </ul></td>
 </tr></table>
 
 <h2 id="L">L</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Latch">Latch (class in thread_factory.synchronization.primitives.latch)</a>
+      <li><a href="synchronization/primitives/latch.html#thread_factory.synchronization.primitives.latch.Latch">Latch (class in thread_factory.synchronization.primitives.latch)</a>
 </li>
       <li><a href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController.list_objects">list_objects() (thread_factory.synchronization.controllers.signal_controller.SignalController method)</a>
 </li>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString.ljust">ljust() (thread_factory.concurrency.sync_types.sync_string.SyncString method)</a>
 </li>
-      <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.lock">lock (thread_factory.synchronization.dispatchers.fork.ForkUnit attribute)</a>
+      <li><a href="synchronization/dispatchers/fork.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.lock">lock (thread_factory.synchronization.dispatchers.fork.ForkUnit attribute)</a>
 
       <ul>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.lock">(thread_factory.synchronization.dispatchers.signal_fork.ForkUnit attribute)</a>
+        <li><a href="synchronization/dispatchers/signal_fork.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.lock">(thread_factory.synchronization.dispatchers.signal_fork.ForkUnit attribute)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.lock">(thread_factory.synchronization.dispatchers.sync_fork.ForkUnit attribute)</a>
+        <li><a href="synchronization/dispatchers/sync_fork.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.lock">(thread_factory.synchronization.dispatchers.sync_fork.ForkUnit attribute)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#id7">(thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit attribute)</a>, <a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.lock">[1]</a>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#id3">(thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit attribute)</a>, <a href="synchronization/dispatchers/sync_signal_fork.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.lock">[1]</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#id26">(thread_factory.synchronization.primitives.smart_condition.Waiter attribute)</a>, <a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.Waiter.lock">[1]</a>
+        <li><a href="synchronization/primitives/smart_condition.html#id6">(thread_factory.synchronization.primitives.smart_condition.Waiter attribute)</a>, <a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.Waiter.lock">[1]</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#id29">(thread_factory.synchronization.primitives.transit_condition.Waiter attribute)</a>, <a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.Waiter.lock">[1]</a>
+        <li><a href="synchronization/primitives/transit_condition.html#id1">(thread_factory.synchronization.primitives.transit_condition.Waiter attribute)</a>, <a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.Waiter.lock">[1]</a>
 </li>
       </ul></li>
   </ul></td>
@@ -1065,10 +1125,10 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString.maketrans">maketrans() (thread_factory.concurrency.sync_types.sync_string.SyncString method)</a>
 </li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.manual_release">manual_release (thread_factory.synchronization.coordinators.conductor.Conductor attribute)</a>
+      <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor.manual_release">manual_release (thread_factory.synchronization.coordinators.conductor.Conductor attribute)</a>
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.manual_release">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor attribute)</a>
+        <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.manual_release">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor attribute)</a>
 </li>
       </ul></li>
       <li><a href="concurrency/concurrent_bag.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.map">map() (thread_factory.concurrency.concurrent_bag.ConcurrentBag method)</a>
@@ -1108,7 +1168,11 @@
 </li>
         <li><a href="modules.html#thread_factory.ConcurrentTools.map">(thread_factory.ConcurrentTools static method)</a>
 </li>
+        <li><a href="utilities/concurrent_tools/concurrent_tools.html#thread_factory.utilities.concurrent_tools.concurrent_tools.ConcurrentTools.map">(thread_factory.utilities.concurrent_tools.concurrent_tools.ConcurrentTools static method)</a>
+</li>
       </ul></li>
+      <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package.merge_many">merge_many() (thread_factory.utilities.coordination.package.Package static method)</a>
+</li>
       <li><a href="sync_types/sync_ref.html#thread_factory.concurrency.sync_types.sync_ref.SyncRef.modify">modify() (thread_factory.concurrency.sync_types.sync_ref.SyncRef method)</a>
 </li>
       <li>
@@ -1145,46 +1209,58 @@
 </li>
         <li><a href="synchronization/controllers/controllers.html#module-thread_factory.synchronization.controllers.signal_controller">thread_factory.synchronization.controllers.signal_controller</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#module-thread_factory.synchronization.coordinators.clock_barrier">thread_factory.synchronization.coordinators.clock_barrier</a>
+        <li><a href="synchronization/coordinators/clock_barrier.html#module-thread_factory.synchronization.coordinators.clock_barrier">thread_factory.synchronization.coordinators.clock_barrier</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#module-thread_factory.synchronization.coordinators.conductor">thread_factory.synchronization.coordinators.conductor</a>
+        <li><a href="synchronization/coordinators/conductor.html#module-thread_factory.synchronization.coordinators.conductor">thread_factory.synchronization.coordinators.conductor</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#module-thread_factory.synchronization.coordinators.multi_conductor">thread_factory.synchronization.coordinators.multi_conductor</a>
+        <li><a href="synchronization/coordinators/multi_conductor.html#module-thread_factory.synchronization.coordinators.multi_conductor">thread_factory.synchronization.coordinators.multi_conductor</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#module-thread_factory.synchronization.coordinators.scout">thread_factory.synchronization.coordinators.scout</a>
+        <li><a href="synchronization/coordinators/scout.html#module-thread_factory.synchronization.coordinators.scout">thread_factory.synchronization.coordinators.scout</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#module-thread_factory.synchronization.coordinators.transit_barrier">thread_factory.synchronization.coordinators.transit_barrier</a>
+        <li><a href="synchronization/coordinators/transit_barrier.html#module-thread_factory.synchronization.coordinators.transit_barrier">thread_factory.synchronization.coordinators.transit_barrier</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#module-thread_factory.synchronization.dispatchers.fork">thread_factory.synchronization.dispatchers.fork</a>
+        <li><a href="synchronization/dispatchers/fork.html#module-thread_factory.synchronization.dispatchers.fork">thread_factory.synchronization.dispatchers.fork</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#module-thread_factory.synchronization.dispatchers.signal_fork">thread_factory.synchronization.dispatchers.signal_fork</a>
+        <li><a href="synchronization/dispatchers/signal_fork.html#module-thread_factory.synchronization.dispatchers.signal_fork">thread_factory.synchronization.dispatchers.signal_fork</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#module-thread_factory.synchronization.dispatchers.sync_fork">thread_factory.synchronization.dispatchers.sync_fork</a>
+        <li><a href="synchronization/dispatchers/sync_fork.html#module-thread_factory.synchronization.dispatchers.sync_fork">thread_factory.synchronization.dispatchers.sync_fork</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#module-thread_factory.synchronization.dispatchers.sync_signal_fork">thread_factory.synchronization.dispatchers.sync_signal_fork</a>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#module-thread_factory.synchronization.dispatchers.sync_signal_fork">thread_factory.synchronization.dispatchers.sync_signal_fork</a>
 </li>
-        <li><a href="synchronization/execution/execution.html#module-thread_factory.synchronization.execution.bypass_conductor">thread_factory.synchronization.execution.bypass_conductor</a>
+        <li><a href="synchronization/execution/bypass_conductor.html#module-thread_factory.synchronization.execution.bypass_conductor">thread_factory.synchronization.execution.bypass_conductor</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.dynaphore">thread_factory.synchronization.primitives.dynaphore</a>
+        <li><a href="synchronization/primitives/dynaphore.html#module-thread_factory.synchronization.primitives.dynaphore">thread_factory.synchronization.primitives.dynaphore</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.flow_regulator">thread_factory.synchronization.primitives.flow_regulator</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#module-thread_factory.synchronization.primitives.flow_regulator">thread_factory.synchronization.primitives.flow_regulator</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.latch">thread_factory.synchronization.primitives.latch</a>
+        <li><a href="synchronization/primitives/latch.html#module-thread_factory.synchronization.primitives.latch">thread_factory.synchronization.primitives.latch</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.signal_barrier">thread_factory.synchronization.primitives.signal_barrier</a>
+        <li><a href="synchronization/primitives/signal_barrier.html#module-thread_factory.synchronization.primitives.signal_barrier">thread_factory.synchronization.primitives.signal_barrier</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.signal_latch">thread_factory.synchronization.primitives.signal_latch</a>
+        <li><a href="synchronization/primitives/signal_latch.html#module-thread_factory.synchronization.primitives.signal_latch">thread_factory.synchronization.primitives.signal_latch</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.smart_condition">thread_factory.synchronization.primitives.smart_condition</a>
+        <li><a href="synchronization/primitives/smart_condition.html#module-thread_factory.synchronization.primitives.smart_condition">thread_factory.synchronization.primitives.smart_condition</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.transit_condition">thread_factory.synchronization.primitives.transit_condition</a>
+        <li><a href="synchronization/primitives/transit_condition.html#module-thread_factory.synchronization.primitives.transit_condition">thread_factory.synchronization.primitives.transit_condition</a>
+</li>
+        <li><a href="utilities/concurrent_tools/concurrent_tools.html#module-thread_factory.utilities.concurrent_tools.concurrent_tools">thread_factory.utilities.concurrent_tools.concurrent_tools</a>
+</li>
+        <li><a href="utilities/coordination/group.html#module-thread_factory.utilities.coordination.group">thread_factory.utilities.coordination.group</a>
+</li>
+        <li><a href="utilities/coordination/outcome.html#module-thread_factory.utilities.coordination.outcome">thread_factory.utilities.coordination.outcome</a>
+</li>
+        <li><a href="utilities/coordination/package.html#module-thread_factory.utilities.coordination.package">thread_factory.utilities.coordination.package</a>
+</li>
+        <li><a href="utilities/timing_tools/auto_reset_timer.html#module-thread_factory.utilities.timing_tools.auto_reset_timer">thread_factory.utilities.timing_tools.auto_reset_timer</a>
+</li>
+        <li><a href="utilities/timing_tools/stopwatch.html#module-thread_factory.utilities.timing_tools.stopwatch">thread_factory.utilities.timing_tools.stopwatch</a>
 </li>
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout.monitor">monitor() (thread_factory.synchronization.coordinators.scout.Scout method)</a>
+      <li><a href="synchronization/coordinators/scout.html#thread_factory.synchronization.coordinators.scout.Scout.monitor">monitor() (thread_factory.synchronization.coordinators.scout.Scout method)</a>
 </li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor">MultiConductor (class in thread_factory.synchronization.coordinators.multi_conductor)</a>
+      <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor">MultiConductor (class in thread_factory.synchronization.coordinators.multi_conductor)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -1192,6 +1268,8 @@
 <h2 id="N">N</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="utilities/coordination/group.html#thread_factory.utilities.coordination.group.Group.name">name (thread_factory.utilities.coordination.group.Group attribute)</a>
+</li>
       <li><a href="modules.html#thread_factory.FlowRegulator.notify">notify() (thread_factory.FlowRegulator method)</a>
 
       <ul>
@@ -1199,11 +1277,11 @@
 </li>
         <li><a href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController.notify">(thread_factory.synchronization.controllers.signal_controller.SignalController method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.notify">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.notify">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.notify">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.notify">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.notify">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
+        <li><a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.notify">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
 </li>
         <li><a href="modules.html#thread_factory.TransitCondition.notify">(thread_factory.TransitCondition method)</a>
 </li>
@@ -1213,11 +1291,11 @@
       <ul>
         <li><a href="modules.html#thread_factory.SmartCondition.notify_all">(thread_factory.SmartCondition method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.notify_all">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.notify_all">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.notify_all">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.notify_all">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.notify_all">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
+        <li><a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.notify_all">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
 </li>
         <li><a href="modules.html#thread_factory.TransitCondition.notify_all">(thread_factory.TransitCondition method)</a>
 </li>
@@ -1227,23 +1305,23 @@
       <li><a href="modules.html#thread_factory.SmartCondition.notify_all_and_call">notify_all_and_call() (thread_factory.SmartCondition method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.notify_all_and_call">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.notify_all_and_call">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.notify_all_override">notify_all_override() (thread_factory.synchronization.coordinators.conductor.Conductor method)</a>
+      <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor.notify_all_override">notify_all_override() (thread_factory.synchronization.coordinators.conductor.Conductor method)</a>
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.notify_all_override">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
+        <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.notify_all_override">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.notify_all_override">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
+        <li><a href="synchronization/coordinators/transit_barrier.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.notify_all_override">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.notify_all_override">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
+        <li><a href="synchronization/primitives/signal_barrier.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.notify_all_override">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
 </li>
       </ul></li>
       <li><a href="modules.html#thread_factory.SmartCondition.notify_and_call">notify_and_call() (thread_factory.SmartCondition method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.notify_and_call">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.notify_and_call">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
 </li>
       </ul></li>
       <li><a href="sync_types/sync_int.html#thread_factory.concurrency.sync_types.sync_int.SyncInt.numerator">numerator (thread_factory.concurrency.sync_types.sync_int.SyncInt property)</a>
@@ -1254,25 +1332,31 @@
 <h2 id="O">O</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.on_broken">on_broken (thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier attribute)</a>
+      <li><a href="synchronization/coordinators/clock_barrier.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.on_broken">on_broken (thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier attribute)</a>
 </li>
       <li><a href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController.on_wait_starting">on_wait_starting() (thread_factory.synchronization.controllers.signal_controller.SignalController method)</a>
 </li>
-      <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Latch.open">open() (thread_factory.synchronization.primitives.latch.Latch method)</a>
+      <li><a href="synchronization/primitives/latch.html#thread_factory.synchronization.primitives.latch.Latch.open">open() (thread_factory.synchronization.primitives.latch.Latch method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.open">(thread_factory.synchronization.primitives.signal_latch.SignalLatch method)</a>
+        <li><a href="synchronization/primitives/signal_latch.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.open">(thread_factory.synchronization.primitives.signal_latch.SignalLatch method)</a>
 </li>
       </ul></li>
+      <li><a href="utilities/coordination/outcome.html#thread_factory.utilities.coordination.outcome.Outcome">Outcome (class in thread_factory.utilities.coordination.outcome)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.outcomes">outcomes (thread_factory.synchronization.coordinators.conductor.Conductor attribute)</a>
+      <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor.outcomes">outcomes (thread_factory.synchronization.coordinators.conductor.Conductor attribute)</a>
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.outcomes">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor attribute)</a>
+        <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.outcomes">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor attribute)</a>
+</li>
+        <li><a href="utilities/coordination/group.html#thread_factory.utilities.coordination.group.Group.outcomes">(thread_factory.utilities.coordination.group.Group attribute)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.outcomes">outcomes() (thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
+      <li><a href="synchronization/execution/bypass_conductor.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.outcomes">outcomes() (thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
+</li>
+      <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package.override">override() (thread_factory.utilities.coordination.package.Package method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -1280,6 +1364,10 @@
 <h2 id="P">P</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Pack">Pack (in module thread_factory.utilities.coordination.package)</a>
+</li>
+      <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package">Package (class in thread_factory.utilities.coordination.package)</a>
+</li>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString.partition">partition() (thread_factory.concurrency.sync_types.sync_string.SyncString method)</a>
 </li>
       <li><a href="concurrency/concurrent_buffer.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.peek">peek() (thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer method)</a>
@@ -1306,6 +1394,8 @@
         <li><a href="modules.html#thread_factory.ConcurrentBuffer.peek_oldest">(thread_factory.ConcurrentBuffer method)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="concurrency/concurrent_bag.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.pop">pop() (thread_factory.concurrency.concurrent_bag.ConcurrentBag method)</a>
 
       <ul>
@@ -1328,8 +1418,6 @@
         <li><a href="modules.html#thread_factory.ConcurrentStack.pop">(thread_factory.ConcurrentStack method)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="concurrency/concurrent_dict.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.popitem">popitem() (thread_factory.concurrency.concurrent_dictionary.ConcurrentDict method)</a>
 
       <ul>
@@ -1348,6 +1436,8 @@
 <h2 id="R">R</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="utilities/coordination/group.html#thread_factory.utilities.coordination.group.Group.ready">ready (thread_factory.utilities.coordination.group.Group attribute)</a>
+</li>
       <li><a href="sync_types/sync_float.html#thread_factory.concurrency.sync_types.sync_float.SyncFloat.real">real (thread_factory.concurrency.sync_types.sync_float.SyncFloat property)</a>
 
       <ul>
@@ -1389,13 +1479,17 @@
 </li>
       </ul></li>
       <li><a href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController.register">register() (thread_factory.synchronization.controllers.signal_controller.SignalController method)</a>
+
+      <ul>
+        <li><a href="utilities/coordination/group.html#thread_factory.utilities.coordination.group.Group.register">(thread_factory.utilities.coordination.group.Group method)</a>
 </li>
+      </ul></li>
       <li><a href="modules.html#thread_factory.SmartCondition.release">release (thread_factory.SmartCondition attribute)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.release">(thread_factory.synchronization.primitives.smart_condition.SmartCondition attribute)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.release">(thread_factory.synchronization.primitives.smart_condition.SmartCondition attribute)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.release">(thread_factory.synchronization.primitives.transit_condition.TransitCondition attribute)</a>
+        <li><a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.release">(thread_factory.synchronization.primitives.transit_condition.TransitCondition attribute)</a>
 </li>
         <li><a href="modules.html#thread_factory.TransitCondition.release">(thread_factory.TransitCondition attribute)</a>
 </li>
@@ -1403,25 +1497,25 @@
       <li><a href="modules.html#thread_factory.FlowRegulator.release">release() (thread_factory.FlowRegulator method)</a>
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.release">(thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier method)</a>
+        <li><a href="synchronization/coordinators/clock_barrier.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.release">(thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.release">(thread_factory.synchronization.coordinators.conductor.Conductor method)</a>
+        <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor.release">(thread_factory.synchronization.coordinators.conductor.Conductor method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.release">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
+        <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.release">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.release">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
+        <li><a href="synchronization/coordinators/transit_barrier.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.release">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.release">(thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork method)</a>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.release">(thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.release">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.release">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.release">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
+        <li><a href="synchronization/primitives/signal_barrier.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.release">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
 </li>
       </ul></li>
       <li><a href="modules.html#thread_factory.Dynaphore.release_all">release_all() (thread_factory.Dynaphore method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.release_all">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
+        <li><a href="synchronization/primitives/dynaphore.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.release_all">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
 </li>
       </ul></li>
       <li><a href="modules.html#thread_factory.Dynaphore.release_permit">release_permit() (thread_factory.Dynaphore method)</a>
@@ -1429,12 +1523,12 @@
       <ul>
         <li><a href="modules.html#thread_factory.FlowRegulator.release_permit">(thread_factory.FlowRegulator method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.release_permit">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
+        <li><a href="synchronization/primitives/dynaphore.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.release_permit">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.release_permit">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.release_permit">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.release_with_action">release_with_action() (thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
+      <li><a href="synchronization/coordinators/transit_barrier.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.release_with_action">release_with_action() (thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
 </li>
       <li><a href="concurrency/concurrent_bag.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag.remove">remove() (thread_factory.concurrency.concurrent_bag.ConcurrentBag method)</a>
 
@@ -1452,7 +1546,7 @@
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.remove_group">remove_group() (thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
+      <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.remove_group">remove_group() (thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
 </li>
       <li><a href="concurrency/concurrent_buffer.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer.remove_item">remove_item() (thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer method)</a>
 
@@ -1481,43 +1575,55 @@
       <li><a href="modules.html#thread_factory.Stopwatch.reset">reset() (thread_factory.Stopwatch method)</a>
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.reset">(thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier method)</a>
+        <li><a href="synchronization/coordinators/clock_barrier.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.reset">(thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.reset">(thread_factory.synchronization.coordinators.conductor.Conductor method)</a>
+        <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor.reset">(thread_factory.synchronization.coordinators.conductor.Conductor method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.reset">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
+        <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.reset">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout.reset">(thread_factory.synchronization.coordinators.scout.Scout method)</a>
+        <li><a href="synchronization/coordinators/scout.html#thread_factory.synchronization.coordinators.scout.Scout.reset">(thread_factory.synchronization.coordinators.scout.Scout method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.reset">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
+        <li><a href="synchronization/coordinators/transit_barrier.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.reset">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.Fork.reset">(thread_factory.synchronization.dispatchers.fork.Fork method)</a>
+        <li><a href="synchronization/dispatchers/fork.html#thread_factory.synchronization.dispatchers.fork.Fork.reset">(thread_factory.synchronization.dispatchers.fork.Fork method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork.reset">(thread_factory.synchronization.dispatchers.signal_fork.SignalFork method)</a>
+        <li><a href="synchronization/dispatchers/signal_fork.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork.reset">(thread_factory.synchronization.dispatchers.signal_fork.SignalFork method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.SyncFork.reset">(thread_factory.synchronization.dispatchers.sync_fork.SyncFork method)</a>
+        <li><a href="synchronization/dispatchers/sync_fork.html#thread_factory.synchronization.dispatchers.sync_fork.SyncFork.reset">(thread_factory.synchronization.dispatchers.sync_fork.SyncFork method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.reset">(thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork method)</a>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.reset">(thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork method)</a>
 </li>
-        <li><a href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.reset">(thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
+        <li><a href="synchronization/execution/bypass_conductor.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.reset">(thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.reset">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
+        <li><a href="synchronization/primitives/signal_barrier.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.reset">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.reset">(thread_factory.synchronization.primitives.signal_latch.SignalLatch method)</a>
+        <li><a href="synchronization/primitives/signal_latch.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.reset">(thread_factory.synchronization.primitives.signal_latch.SignalLatch method)</a>
+</li>
+        <li><a href="utilities/coordination/group.html#thread_factory.utilities.coordination.group.Group.reset">(thread_factory.utilities.coordination.group.Group method)</a>
+</li>
+        <li><a href="utilities/timing_tools/stopwatch.html#thread_factory.utilities.timing_tools.stopwatch.Stopwatch.reset">(thread_factory.utilities.timing_tools.stopwatch.Stopwatch method)</a>
 </li>
       </ul></li>
       <li><a href="modules.html#thread_factory.AutoResetTimer.restart">restart() (thread_factory.AutoResetTimer method)</a>
-</li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.results">results (thread_factory.synchronization.coordinators.conductor.Conductor property)</a>
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.results">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor property)</a>
+        <li><a href="utilities/timing_tools/auto_reset_timer.html#thread_factory.utilities.timing_tools.auto_reset_timer.AutoResetTimer.restart">(thread_factory.utilities.timing_tools.auto_reset_timer.AutoResetTimer method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.reusable">reusable (thread_factory.synchronization.coordinators.conductor.Conductor attribute)</a>
+      <li><a href="utilities/coordination/outcome.html#thread_factory.utilities.coordination.outcome.Outcome.result">result() (thread_factory.utilities.coordination.outcome.Outcome method)</a>
+</li>
+      <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor.results">results (thread_factory.synchronization.coordinators.conductor.Conductor property)</a>
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.reusable">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor attribute)</a>
+        <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.results">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor property)</a>
+</li>
+        <li><a href="utilities/coordination/group.html#thread_factory.utilities.coordination.group.Group.results">(thread_factory.utilities.coordination.group.Group property)</a>
+</li>
+      </ul></li>
+      <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor.reusable">reusable (thread_factory.synchronization.coordinators.conductor.Conductor attribute)</a>
+
+      <ul>
+        <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.reusable">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor attribute)</a>
 </li>
       </ul></li>
       <li><a href="concurrency/concurrent_list.html#thread_factory.concurrency.concurrent_list.ConcurrentList.reverse">reverse() (thread_factory.concurrency.concurrent_list.ConcurrentList method)</a>
@@ -1546,7 +1652,7 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="sync_types/sync_int.html#thread_factory.concurrency.sync_types.sync_int.SyncInt.safe_pow">safe_pow() (thread_factory.concurrency.sync_types.sync_int.SyncInt static method)</a>
 </li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout">Scout (class in thread_factory.synchronization.coordinators.scout)</a>
+      <li><a href="synchronization/coordinators/scout.html#thread_factory.synchronization.coordinators.scout.Scout">Scout (class in thread_factory.synchronization.coordinators.scout)</a>
 </li>
       <li><a href="sync_types/sync_bool.html#thread_factory.concurrency.sync_types.sync_bool.SyncBool.set">set() (thread_factory.concurrency.sync_types.sync_bool.SyncBool method)</a>
 
@@ -1563,13 +1669,13 @@
       <li><a href="modules.html#thread_factory.FlowRegulator.set_bias_threshold">set_bias_threshold() (thread_factory.FlowRegulator method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.set_bias_threshold">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.set_bias_threshold">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
       </ul></li>
       <li><a href="modules.html#thread_factory.FlowRegulator.set_callback">set_callback() (thread_factory.FlowRegulator method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.set_callback">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.set_callback">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
       </ul></li>
       <li><a href="modules.html#thread_factory.FlowRegulator.set_default_callback">set_default_callback() (thread_factory.FlowRegulator method)</a>
@@ -1577,24 +1683,28 @@
       <ul>
         <li><a href="modules.html#thread_factory.SmartCondition.set_default_callback">(thread_factory.SmartCondition method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.set_default_callback">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.set_default_callback">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.set_default_callback">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.set_default_callback">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.set_default_callback">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
+        <li><a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.set_default_callback">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
 </li>
         <li><a href="modules.html#thread_factory.TransitCondition.set_default_callback">(thread_factory.TransitCondition method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.set_external_controller">set_external_controller() (thread_factory.synchronization.primitives.signal_latch.SignalLatch method)</a>
+      <li><a href="utilities/coordination/outcome.html#thread_factory.utilities.coordination.outcome.Outcome.set_exception">set_exception() (thread_factory.utilities.coordination.outcome.Outcome method)</a>
+</li>
+      <li><a href="synchronization/primitives/signal_latch.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.set_external_controller">set_external_controller() (thread_factory.synchronization.primitives.signal_latch.SignalLatch method)</a>
 </li>
       <li><a href="modules.html#thread_factory.Dynaphore.set_permits">set_permits() (thread_factory.Dynaphore method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.set_permits">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
+        <li><a href="synchronization/primitives/dynaphore.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.set_permits">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.set_threshold">set_threshold() (thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
+      <li><a href="utilities/coordination/outcome.html#thread_factory.utilities.coordination.outcome.Outcome.set_result">set_result() (thread_factory.utilities.coordination.outcome.Outcome method)</a>
+</li>
+      <li><a href="synchronization/primitives/signal_barrier.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.set_threshold">set_threshold() (thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
 </li>
       <li><a href="concurrency/concurrent_dict.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict.setdefault">setdefault() (thread_factory.concurrency.concurrent_dictionary.ConcurrentDict method)</a>
 
@@ -1602,26 +1712,28 @@
         <li><a href="modules.html#thread_factory.ConcurrentDict.setdefault">(thread_factory.ConcurrentDict method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier">SignalBarrier (class in thread_factory.synchronization.primitives.signal_barrier)</a>
+      <li><a href="synchronization/primitives/signal_barrier.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier">SignalBarrier (class in thread_factory.synchronization.primitives.signal_barrier)</a>
 </li>
       <li><a href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController">SignalController (class in thread_factory.synchronization.controllers.signal_controller)</a>
 </li>
-      <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork">SignalFork (class in thread_factory.synchronization.dispatchers.signal_fork)</a>
+      <li><a href="synchronization/dispatchers/signal_fork.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork">SignalFork (class in thread_factory.synchronization.dispatchers.signal_fork)</a>
 </li>
-      <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalGate">SignalGate (in module thread_factory.synchronization.primitives.signal_latch)</a>
+      <li><a href="synchronization/primitives/signal_latch.html#thread_factory.synchronization.primitives.signal_latch.SignalGate">SignalGate (in module thread_factory.synchronization.primitives.signal_latch)</a>
 </li>
-      <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch">SignalLatch (class in thread_factory.synchronization.primitives.signal_latch)</a>
+      <li><a href="synchronization/primitives/signal_latch.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch">SignalLatch (class in thread_factory.synchronization.primitives.signal_latch)</a>
+</li>
+      <li><a href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package.signature">signature (thread_factory.utilities.coordination.package.Package property)</a>
 </li>
       <li><a href="modules.html#thread_factory.SmartCondition">SmartCondition (class in thread_factory)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition">(class in thread_factory.synchronization.primitives.smart_condition)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition">(class in thread_factory.synchronization.primitives.smart_condition)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="sync_types/sync_ref.html#thread_factory.concurrency.sync_types.sync_ref.SyncRef.snapshot">snapshot (thread_factory.concurrency.sync_types.sync_ref.SyncRef property)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="concurrency/concurrent_list.html#thread_factory.concurrency.concurrent_list.ConcurrentList.sort">sort() (thread_factory.concurrency.concurrent_list.ConcurrentList method)</a>
 
       <ul>
@@ -1637,9 +1749,13 @@
       <ul>
         <li><a href="modules.html#thread_factory.Stopwatch.start">(thread_factory.Stopwatch method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.start">(thread_factory.synchronization.coordinators.conductor.Conductor method)</a>
+        <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor.start">(thread_factory.synchronization.coordinators.conductor.Conductor method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.start">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
+        <li><a href="synchronization/coordinators/multi_conductor.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.start">(thread_factory.synchronization.coordinators.multi_conductor.MultiConductor method)</a>
+</li>
+        <li><a href="utilities/timing_tools/auto_reset_timer.html#thread_factory.utilities.timing_tools.auto_reset_timer.AutoResetTimer.start">(thread_factory.utilities.timing_tools.auto_reset_timer.AutoResetTimer method)</a>
+</li>
+        <li><a href="utilities/timing_tools/stopwatch.html#thread_factory.utilities.timing_tools.stopwatch.Stopwatch.start">(thread_factory.utilities.timing_tools.stopwatch.Stopwatch method)</a>
 </li>
       </ul></li>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString.startswith">startswith() (thread_factory.concurrency.sync_types.sync_string.SyncString method)</a>
@@ -1659,9 +1775,17 @@
       <ul>
         <li><a href="modules.html#thread_factory.Stopwatch.stop">(thread_factory.Stopwatch method)</a>
 </li>
+        <li><a href="utilities/timing_tools/auto_reset_timer.html#thread_factory.utilities.timing_tools.auto_reset_timer.AutoResetTimer.stop">(thread_factory.utilities.timing_tools.auto_reset_timer.AutoResetTimer method)</a>
+</li>
+        <li><a href="utilities/timing_tools/stopwatch.html#thread_factory.utilities.timing_tools.stopwatch.Stopwatch.stop">(thread_factory.utilities.timing_tools.stopwatch.Stopwatch method)</a>
+</li>
       </ul></li>
       <li><a href="modules.html#thread_factory.Stopwatch">Stopwatch (class in thread_factory)</a>
+
+      <ul>
+        <li><a href="utilities/timing_tools/stopwatch.html#thread_factory.utilities.timing_tools.stopwatch.Stopwatch">(class in thread_factory.utilities.timing_tools.stopwatch)</a>
 </li>
+      </ul></li>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString.strip">strip() (thread_factory.concurrency.sync_types.sync_string.SyncString method)</a>
 </li>
       <li><a href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController.subscribe">subscribe() (thread_factory.synchronization.controllers.signal_controller.SignalController method)</a>
@@ -1680,13 +1804,13 @@
 </li>
       <li><a href="sync_types/sync_float.html#thread_factory.concurrency.sync_types.sync_float.SyncFloat">SyncFloat (class in thread_factory.concurrency.sync_types.sync_float)</a>
 </li>
-      <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.SyncFork">SyncFork (class in thread_factory.synchronization.dispatchers.sync_fork)</a>
+      <li><a href="synchronization/dispatchers/sync_fork.html#thread_factory.synchronization.dispatchers.sync_fork.SyncFork">SyncFork (class in thread_factory.synchronization.dispatchers.sync_fork)</a>
 </li>
       <li><a href="sync_types/sync_int.html#thread_factory.concurrency.sync_types.sync_int.SyncInt">SyncInt (class in thread_factory.concurrency.sync_types.sync_int)</a>
 </li>
       <li><a href="sync_types/sync_ref.html#thread_factory.concurrency.sync_types.sync_ref.SyncRef">SyncRef (class in thread_factory.concurrency.sync_types.sync_ref)</a>
 </li>
-      <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork">SyncSignalFork (class in thread_factory.synchronization.dispatchers.sync_signal_fork)</a>
+      <li><a href="synchronization/dispatchers/sync_signal_fork.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork">SyncSignalFork (class in thread_factory.synchronization.dispatchers.sync_signal_fork)</a>
 </li>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString">SyncString (class in thread_factory.concurrency.sync_types.sync_string)</a>
 </li>
@@ -1696,12 +1820,16 @@
 <h2 id="T">T</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.tasks">tasks (thread_factory.synchronization.coordinators.conductor.Conductor attribute)</a>
-</li>
-      <li><a href="synchronization/primitives/primitives.html#id27">thread (thread_factory.synchronization.primitives.smart_condition.Waiter attribute)</a>, <a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.Waiter.thread">[1]</a>
+      <li><a href="synchronization/coordinators/conductor.html#thread_factory.synchronization.coordinators.conductor.Conductor.tasks">tasks (thread_factory.synchronization.coordinators.conductor.Conductor attribute)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#id30">(thread_factory.synchronization.primitives.transit_condition.Waiter attribute)</a>, <a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.Waiter.thread">[1]</a>
+        <li><a href="utilities/coordination/group.html#thread_factory.utilities.coordination.group.Group.tasks">(thread_factory.utilities.coordination.group.Group attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="synchronization/primitives/smart_condition.html#id7">thread (thread_factory.synchronization.primitives.smart_condition.Waiter attribute)</a>, <a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.Waiter.thread">[1]</a>
+
+      <ul>
+        <li><a href="synchronization/primitives/transit_condition.html#id2">(thread_factory.synchronization.primitives.transit_condition.Waiter attribute)</a>, <a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.Waiter.thread">[1]</a>
 </li>
       </ul></li>
       <li>
@@ -1813,126 +1941,172 @@
     thread_factory.synchronization.coordinators.clock_barrier
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#module-thread_factory.synchronization.coordinators.clock_barrier">module</a>
+        <li><a href="synchronization/coordinators/clock_barrier.html#module-thread_factory.synchronization.coordinators.clock_barrier">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.coordinators.conductor
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#module-thread_factory.synchronization.coordinators.conductor">module</a>
+        <li><a href="synchronization/coordinators/conductor.html#module-thread_factory.synchronization.coordinators.conductor">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.coordinators.multi_conductor
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#module-thread_factory.synchronization.coordinators.multi_conductor">module</a>
+        <li><a href="synchronization/coordinators/multi_conductor.html#module-thread_factory.synchronization.coordinators.multi_conductor">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.coordinators.scout
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#module-thread_factory.synchronization.coordinators.scout">module</a>
+        <li><a href="synchronization/coordinators/scout.html#module-thread_factory.synchronization.coordinators.scout">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.coordinators.transit_barrier
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#module-thread_factory.synchronization.coordinators.transit_barrier">module</a>
+        <li><a href="synchronization/coordinators/transit_barrier.html#module-thread_factory.synchronization.coordinators.transit_barrier">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.dispatchers.fork
 
       <ul>
-        <li><a href="synchronization/dispatchers/dispatchers.html#module-thread_factory.synchronization.dispatchers.fork">module</a>
+        <li><a href="synchronization/dispatchers/fork.html#module-thread_factory.synchronization.dispatchers.fork">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.dispatchers.signal_fork
 
       <ul>
-        <li><a href="synchronization/dispatchers/dispatchers.html#module-thread_factory.synchronization.dispatchers.signal_fork">module</a>
+        <li><a href="synchronization/dispatchers/signal_fork.html#module-thread_factory.synchronization.dispatchers.signal_fork">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.dispatchers.sync_fork
 
       <ul>
-        <li><a href="synchronization/dispatchers/dispatchers.html#module-thread_factory.synchronization.dispatchers.sync_fork">module</a>
+        <li><a href="synchronization/dispatchers/sync_fork.html#module-thread_factory.synchronization.dispatchers.sync_fork">module</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li>
     thread_factory.synchronization.dispatchers.sync_signal_fork
 
       <ul>
-        <li><a href="synchronization/dispatchers/dispatchers.html#module-thread_factory.synchronization.dispatchers.sync_signal_fork">module</a>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#module-thread_factory.synchronization.dispatchers.sync_signal_fork">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.execution.bypass_conductor
 
       <ul>
-        <li><a href="synchronization/execution/execution.html#module-thread_factory.synchronization.execution.bypass_conductor">module</a>
+        <li><a href="synchronization/execution/bypass_conductor.html#module-thread_factory.synchronization.execution.bypass_conductor">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.primitives.dynaphore
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.dynaphore">module</a>
+        <li><a href="synchronization/primitives/dynaphore.html#module-thread_factory.synchronization.primitives.dynaphore">module</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li>
     thread_factory.synchronization.primitives.flow_regulator
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.flow_regulator">module</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#module-thread_factory.synchronization.primitives.flow_regulator">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.primitives.latch
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.latch">module</a>
+        <li><a href="synchronization/primitives/latch.html#module-thread_factory.synchronization.primitives.latch">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.primitives.signal_barrier
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.signal_barrier">module</a>
+        <li><a href="synchronization/primitives/signal_barrier.html#module-thread_factory.synchronization.primitives.signal_barrier">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.primitives.signal_latch
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.signal_latch">module</a>
+        <li><a href="synchronization/primitives/signal_latch.html#module-thread_factory.synchronization.primitives.signal_latch">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.primitives.smart_condition
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.smart_condition">module</a>
+        <li><a href="synchronization/primitives/smart_condition.html#module-thread_factory.synchronization.primitives.smart_condition">module</a>
 </li>
       </ul></li>
       <li>
     thread_factory.synchronization.primitives.transit_condition
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#module-thread_factory.synchronization.primitives.transit_condition">module</a>
+        <li><a href="synchronization/primitives/transit_condition.html#module-thread_factory.synchronization.primitives.transit_condition">module</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.threshold">threshold (thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier attribute)</a>
+      <li>
+    thread_factory.utilities.concurrent_tools.concurrent_tools
+
+      <ul>
+        <li><a href="utilities/concurrent_tools/concurrent_tools.html#module-thread_factory.utilities.concurrent_tools.concurrent_tools">module</a>
 </li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.timeout">timeout (thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier attribute)</a>
+      </ul></li>
+      <li>
+    thread_factory.utilities.coordination.group
+
+      <ul>
+        <li><a href="utilities/coordination/group.html#module-thread_factory.utilities.coordination.group">module</a>
+</li>
+      </ul></li>
+      <li>
+    thread_factory.utilities.coordination.outcome
+
+      <ul>
+        <li><a href="utilities/coordination/outcome.html#module-thread_factory.utilities.coordination.outcome">module</a>
+</li>
+      </ul></li>
+      <li>
+    thread_factory.utilities.coordination.package
+
+      <ul>
+        <li><a href="utilities/coordination/package.html#module-thread_factory.utilities.coordination.package">module</a>
+</li>
+      </ul></li>
+      <li>
+    thread_factory.utilities.timing_tools.auto_reset_timer
+
+      <ul>
+        <li><a href="utilities/timing_tools/auto_reset_timer.html#module-thread_factory.utilities.timing_tools.auto_reset_timer">module</a>
+</li>
+      </ul></li>
+      <li>
+    thread_factory.utilities.timing_tools.stopwatch
+
+      <ul>
+        <li><a href="utilities/timing_tools/stopwatch.html#module-thread_factory.utilities.timing_tools.stopwatch">module</a>
+</li>
+      </ul></li>
+      <li><a href="synchronization/coordinators/clock_barrier.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.threshold">threshold (thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier attribute)</a>
+
+      <ul>
+        <li><a href="utilities/coordination/group.html#thread_factory.utilities.coordination.group.Group.threshold">(thread_factory.utilities.coordination.group.Group attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="synchronization/coordinators/clock_barrier.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.timeout">timeout (thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier attribute)</a>
 </li>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString.title">title() (thread_factory.concurrency.sync_types.sync_string.SyncString method)</a>
 </li>
@@ -1988,14 +2162,14 @@
 </li>
       <li><a href="sync_types/sync_ref.html#thread_factory.concurrency.sync_types.sync_ref.SyncRef.transform">transform() (thread_factory.concurrency.sync_types.sync_ref.SyncRef method)</a>
 </li>
-      <li><a href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.transit">transit() (thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
+      <li><a href="synchronization/execution/bypass_conductor.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.transit">transit() (thread_factory.synchronization.execution.bypass_conductor.BypassConductor method)</a>
 </li>
-      <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier">TransitBarrier (class in thread_factory.synchronization.coordinators.transit_barrier)</a>
+      <li><a href="synchronization/coordinators/transit_barrier.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier">TransitBarrier (class in thread_factory.synchronization.coordinators.transit_barrier)</a>
 </li>
       <li><a href="modules.html#thread_factory.TransitCondition">TransitCondition (class in thread_factory)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition">(class in thread_factory.synchronization.primitives.transit_condition)</a>
+        <li><a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition">(class in thread_factory.synchronization.primitives.transit_condition)</a>
 </li>
       </ul></li>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString.translate">translate() (thread_factory.concurrency.sync_types.sync_string.SyncString method)</a>
@@ -2060,24 +2234,24 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="sync_types/sync_string.html#thread_factory.concurrency.sync_types.sync_string.SyncString.upper">upper() (thread_factory.concurrency.sync_types.sync_string.SyncString method)</a>
 </li>
-      <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.usage_cap">usage_cap (thread_factory.synchronization.dispatchers.fork.ForkUnit attribute)</a>
+      <li><a href="synchronization/dispatchers/fork.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.usage_cap">usage_cap (thread_factory.synchronization.dispatchers.fork.ForkUnit attribute)</a>
 
       <ul>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.usage_cap">(thread_factory.synchronization.dispatchers.signal_fork.ForkUnit attribute)</a>
+        <li><a href="synchronization/dispatchers/signal_fork.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.usage_cap">(thread_factory.synchronization.dispatchers.signal_fork.ForkUnit attribute)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.usage_cap">(thread_factory.synchronization.dispatchers.sync_fork.ForkUnit attribute)</a>
+        <li><a href="synchronization/dispatchers/sync_fork.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.usage_cap">(thread_factory.synchronization.dispatchers.sync_fork.ForkUnit attribute)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#id8">(thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit attribute)</a>, <a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.usage_cap">[1]</a>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#id4">(thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit attribute)</a>, <a href="synchronization/dispatchers/sync_signal_fork.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.usage_cap">[1]</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.Fork.use_fork">use_fork() (thread_factory.synchronization.dispatchers.fork.Fork method)</a>
+      <li><a href="synchronization/dispatchers/fork.html#thread_factory.synchronization.dispatchers.fork.Fork.use_fork">use_fork() (thread_factory.synchronization.dispatchers.fork.Fork method)</a>
 
       <ul>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork.use_fork">(thread_factory.synchronization.dispatchers.signal_fork.SignalFork method)</a>
+        <li><a href="synchronization/dispatchers/signal_fork.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork.use_fork">(thread_factory.synchronization.dispatchers.signal_fork.SignalFork method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.SyncFork.use_fork">(thread_factory.synchronization.dispatchers.sync_fork.SyncFork method)</a>
+        <li><a href="synchronization/dispatchers/sync_fork.html#thread_factory.synchronization.dispatchers.sync_fork.SyncFork.use_fork">(thread_factory.synchronization.dispatchers.sync_fork.SyncFork method)</a>
 </li>
-        <li><a href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.use_fork">(thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork method)</a>
+        <li><a href="synchronization/dispatchers/sync_signal_fork.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.use_fork">(thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork method)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -2101,15 +2275,15 @@
       <li><a href="modules.html#thread_factory.SmartCondition.wait">wait() (thread_factory.SmartCondition method)</a>
 
       <ul>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.wait">(thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier method)</a>
+        <li><a href="synchronization/coordinators/clock_barrier.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.wait">(thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier method)</a>
 </li>
-        <li><a href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.wait">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
+        <li><a href="synchronization/coordinators/transit_barrier.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.wait">(thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.wait">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
+        <li><a href="synchronization/primitives/signal_barrier.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.wait">(thread_factory.synchronization.primitives.signal_barrier.SignalBarrier method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.wait">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.wait">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.wait">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
+        <li><a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.wait">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
 </li>
         <li><a href="modules.html#thread_factory.TransitCondition.wait">(thread_factory.TransitCondition method)</a>
 </li>
@@ -2117,9 +2291,9 @@
       <li><a href="modules.html#thread_factory.SmartCondition.wait_for">wait_for() (thread_factory.SmartCondition method)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.wait_for">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
+        <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.wait_for">(thread_factory.synchronization.primitives.smart_condition.SmartCondition method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.wait_for">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
+        <li><a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.wait_for">(thread_factory.synchronization.primitives.transit_condition.TransitCondition method)</a>
 </li>
         <li><a href="modules.html#thread_factory.TransitCondition.wait_for">(thread_factory.TransitCondition method)</a>
 </li>
@@ -2131,15 +2305,15 @@
       <ul>
         <li><a href="modules.html#thread_factory.FlowRegulator.wait_for_permit">(thread_factory.FlowRegulator method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.wait_for_permit">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
+        <li><a href="synchronization/primitives/dynaphore.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.wait_for_permit">(thread_factory.synchronization.primitives.dynaphore.Dynaphore method)</a>
 </li>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.wait_for_permit">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
+        <li><a href="synchronization/primitives/flow_regulator.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.wait_for_permit">(thread_factory.synchronization.primitives.flow_regulator.FlowRegulator method)</a>
 </li>
       </ul></li>
-      <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.Waiter">Waiter (class in thread_factory.synchronization.primitives.smart_condition)</a>
+      <li><a href="synchronization/primitives/smart_condition.html#thread_factory.synchronization.primitives.smart_condition.Waiter">Waiter (class in thread_factory.synchronization.primitives.smart_condition)</a>
 
       <ul>
-        <li><a href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.Waiter">(class in thread_factory.synchronization.primitives.transit_condition)</a>
+        <li><a href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.Waiter">(class in thread_factory.synchronization.primitives.transit_condition)</a>
 </li>
       </ul></li>
   </ul></td>

@@ -45,13 +45,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="concurrency/index.html">Concurrent Data Structures</a></li>
 <li class="toctree-l1"><a class="reference internal" href="sync_types/index.html">Synchronized Types</a></li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/controllers/controllers.html">Controllers Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/coordinators/coordination.html">Coordinators Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html">Dispatchers Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/execution/execution.html">Execution Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/primitives/primitives.html">Primitives Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="utilities/coordination/coordination.html">Coordination Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="utilities/timing_tools/timing_tools.html">Timing Tools Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="synchronization/controllers/controllers.html">Signal Controller</a></li>
 </ul>
 
         </div>
@@ -85,35 +79,35 @@
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="concurrency/index.html">Concurrent Data Structures</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_bag.html">ConcurrentBag</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_bag.html">Concurrent Bag</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_bag.html#thread_factory.concurrency.concurrent_bag.ConcurrentBag"><code class="docutils literal notranslate"><span class="pre">ConcurrentBag</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_buffer.html">ConcurrentBuffer</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_buffer.html">Concurrent Buffer</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_buffer.html#thread_factory.concurrency.concurrent_buffer.ConcurrentBuffer"><code class="docutils literal notranslate"><span class="pre">ConcurrentBuffer</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_collection.html">ConcurrentCollection</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_collection.html">Concurrent Collection</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_collection.html#thread_factory.concurrency.concurrent_collection.ConcurrentCollection"><code class="docutils literal notranslate"><span class="pre">ConcurrentCollection</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_dict.html">ConcurrentDict</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_dict.html">Concurrent Dict</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_dict.html#thread_factory.concurrency.concurrent_dictionary.ConcurrentDict"><code class="docutils literal notranslate"><span class="pre">ConcurrentDict</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_list.html">ConcurrentList</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_list.html">Concurrent List</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_list.html#thread_factory.concurrency.concurrent_list.ConcurrentList"><code class="docutils literal notranslate"><span class="pre">ConcurrentList</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_queue.html">ConcurrentQueue</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_queue.html">Concurrent Queue</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_queue.html#thread_factory.concurrency.concurrent_queue.ConcurrentQueue"><code class="docutils literal notranslate"><span class="pre">ConcurrentQueue</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_stack.html">ConcurrentStack</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_stack.html">Concurrent Stack</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_stack.html#thread_factory.concurrency.concurrent_stack.ConcurrentStack"><code class="docutils literal notranslate"><span class="pre">ConcurrentStack</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_set.html">ConcurrentSet</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concurrency/concurrent_set.html">Concurrent Set</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="concurrency/concurrent_set.html#thread_factory.concurrency.concurrent_set.ConcurrentSet"><code class="docutils literal notranslate"><span class="pre">ConcurrentSet</span></code></a></li>
 </ul>
 </li>
@@ -142,7 +136,7 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/controllers/controllers.html">Controllers Module</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="synchronization/controllers/controllers.html">Signal Controller</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController"><code class="docutils literal notranslate"><span class="pre">SignalController</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController.add_post_invoke_hook"><code class="docutils literal notranslate"><span class="pre">SignalController.add_post_invoke_hook()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="synchronization/controllers/controllers.html#thread_factory.synchronization.controllers.signal_controller.SignalController.add_pre_invoke_hook"><code class="docutils literal notranslate"><span class="pre">SignalController.add_pre_invoke_hook()</span></code></a></li>
@@ -162,285 +156,6 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/coordinators/coordination.html">Coordinators Module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier"><code class="docutils literal notranslate"><span class="pre">ClockBarrier</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.id"><code class="docutils literal notranslate"><span class="pre">ClockBarrier.id</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.threshold"><code class="docutils literal notranslate"><span class="pre">ClockBarrier.threshold</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.timeout"><code class="docutils literal notranslate"><span class="pre">ClockBarrier.timeout</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.on_broken"><code class="docutils literal notranslate"><span class="pre">ClockBarrier.on_broken</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.controller"><code class="docutils literal notranslate"><span class="pre">ClockBarrier.controller</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.dispose"><code class="docutils literal notranslate"><span class="pre">ClockBarrier.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.get_waiting_count"><code class="docutils literal notranslate"><span class="pre">ClockBarrier.get_waiting_count()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#id0"><code class="docutils literal notranslate"><span class="pre">ClockBarrier.id</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.is_broken"><code class="docutils literal notranslate"><span class="pre">ClockBarrier.is_broken()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.release"><code class="docutils literal notranslate"><span class="pre">ClockBarrier.release()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.reset"><code class="docutils literal notranslate"><span class="pre">ClockBarrier.reset()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.clock_barrier.ClockBarrier.wait"><code class="docutils literal notranslate"><span class="pre">ClockBarrier.wait()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor"><code class="docutils literal notranslate"><span class="pre">Conductor</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.dispose"><code class="docutils literal notranslate"><span class="pre">Conductor.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.exceptions"><code class="docutils literal notranslate"><span class="pre">Conductor.exceptions</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.id"><code class="docutils literal notranslate"><span class="pre">Conductor.id</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.is_spent"><code class="docutils literal notranslate"><span class="pre">Conductor.is_spent()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.manual_release"><code class="docutils literal notranslate"><span class="pre">Conductor.manual_release</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.notify_all_override"><code class="docutils literal notranslate"><span class="pre">Conductor.notify_all_override()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.outcomes"><code class="docutils literal notranslate"><span class="pre">Conductor.outcomes</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.release"><code class="docutils literal notranslate"><span class="pre">Conductor.release()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.reset"><code class="docutils literal notranslate"><span class="pre">Conductor.reset()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.results"><code class="docutils literal notranslate"><span class="pre">Conductor.results</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.reusable"><code class="docutils literal notranslate"><span class="pre">Conductor.reusable</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.start"><code class="docutils literal notranslate"><span class="pre">Conductor.start()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.conductor.Conductor.tasks"><code class="docutils literal notranslate"><span class="pre">Conductor.tasks</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor"><code class="docutils literal notranslate"><span class="pre">MultiConductor</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.add_group"><code class="docutils literal notranslate"><span class="pre">MultiConductor.add_group()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.dispose"><code class="docutils literal notranslate"><span class="pre">MultiConductor.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.enable"><code class="docutils literal notranslate"><span class="pre">MultiConductor.enable()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.exceptions"><code class="docutils literal notranslate"><span class="pre">MultiConductor.exceptions</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.get_all_outcomes"><code class="docutils literal notranslate"><span class="pre">MultiConductor.get_all_outcomes()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.groups"><code class="docutils literal notranslate"><span class="pre">MultiConductor.groups</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.id"><code class="docutils literal notranslate"><span class="pre">MultiConductor.id</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.is_spent"><code class="docutils literal notranslate"><span class="pre">MultiConductor.is_spent()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.manual_release"><code class="docutils literal notranslate"><span class="pre">MultiConductor.manual_release</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.notify_all_override"><code class="docutils literal notranslate"><span class="pre">MultiConductor.notify_all_override()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.outcomes"><code class="docutils literal notranslate"><span class="pre">MultiConductor.outcomes</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.release"><code class="docutils literal notranslate"><span class="pre">MultiConductor.release()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.remove_group"><code class="docutils literal notranslate"><span class="pre">MultiConductor.remove_group()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.reset"><code class="docutils literal notranslate"><span class="pre">MultiConductor.reset()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.results"><code class="docutils literal notranslate"><span class="pre">MultiConductor.results</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.reusable"><code class="docutils literal notranslate"><span class="pre">MultiConductor.reusable</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.multi_conductor.MultiConductor.start"><code class="docutils literal notranslate"><span class="pre">MultiConductor.start()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout"><code class="docutils literal notranslate"><span class="pre">Scout</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout.dispose"><code class="docutils literal notranslate"><span class="pre">Scout.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout.exit_monitor"><code class="docutils literal notranslate"><span class="pre">Scout.exit_monitor()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout.is_active"><code class="docutils literal notranslate"><span class="pre">Scout.is_active()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout.is_latched"><code class="docutils literal notranslate"><span class="pre">Scout.is_latched()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout.monitor"><code class="docutils literal notranslate"><span class="pre">Scout.monitor()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.scout.Scout.reset"><code class="docutils literal notranslate"><span class="pre">Scout.reset()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier"><code class="docutils literal notranslate"><span class="pre">TransitBarrier</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.dispose"><code class="docutils literal notranslate"><span class="pre">TransitBarrier.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.id"><code class="docutils literal notranslate"><span class="pre">TransitBarrier.id</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.is_spent"><code class="docutils literal notranslate"><span class="pre">TransitBarrier.is_spent()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.notify_all_override"><code class="docutils literal notranslate"><span class="pre">TransitBarrier.notify_all_override()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.release"><code class="docutils literal notranslate"><span class="pre">TransitBarrier.release()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.release_with_action"><code class="docutils literal notranslate"><span class="pre">TransitBarrier.release_with_action()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.reset"><code class="docutils literal notranslate"><span class="pre">TransitBarrier.reset()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/coordinators/coordination.html#thread_factory.synchronization.coordinators.transit_barrier.TransitBarrier.wait"><code class="docutils literal notranslate"><span class="pre">TransitBarrier.wait()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html">Dispatchers Module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.Fork"><code class="docutils literal notranslate"><span class="pre">Fork</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.Fork.dispose"><code class="docutils literal notranslate"><span class="pre">Fork.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.Fork.reset"><code class="docutils literal notranslate"><span class="pre">Fork.reset()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.Fork.use_fork"><code class="docutils literal notranslate"><span class="pre">Fork.use_fork()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit"><code class="docutils literal notranslate"><span class="pre">ForkUnit</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.dispose"><code class="docutils literal notranslate"><span class="pre">ForkUnit.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.fork_callable"><code class="docutils literal notranslate"><span class="pre">ForkUnit.fork_callable</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.gate"><code class="docutils literal notranslate"><span class="pre">ForkUnit.gate</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.gate_uses"><code class="docutils literal notranslate"><span class="pre">ForkUnit.gate_uses</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.lock"><code class="docutils literal notranslate"><span class="pre">ForkUnit.lock</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.fork.ForkUnit.usage_cap"><code class="docutils literal notranslate"><span class="pre">ForkUnit.usage_cap</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit"><code class="docutils literal notranslate"><span class="pre">ForkUnit</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.dispose"><code class="docutils literal notranslate"><span class="pre">ForkUnit.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.fork_callable"><code class="docutils literal notranslate"><span class="pre">ForkUnit.fork_callable</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.gate"><code class="docutils literal notranslate"><span class="pre">ForkUnit.gate</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.gate_uses"><code class="docutils literal notranslate"><span class="pre">ForkUnit.gate_uses</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.lock"><code class="docutils literal notranslate"><span class="pre">ForkUnit.lock</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.ForkUnit.usage_cap"><code class="docutils literal notranslate"><span class="pre">ForkUnit.usage_cap</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork"><code class="docutils literal notranslate"><span class="pre">SignalFork</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork.dispose"><code class="docutils literal notranslate"><span class="pre">SignalFork.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork.id"><code class="docutils literal notranslate"><span class="pre">SignalFork.id</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork.reset"><code class="docutils literal notranslate"><span class="pre">SignalFork.reset()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.signal_fork.SignalFork.use_fork"><code class="docutils literal notranslate"><span class="pre">SignalFork.use_fork()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit"><code class="docutils literal notranslate"><span class="pre">ForkUnit</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.dispose"><code class="docutils literal notranslate"><span class="pre">ForkUnit.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.fork_callable"><code class="docutils literal notranslate"><span class="pre">ForkUnit.fork_callable</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.gate"><code class="docutils literal notranslate"><span class="pre">ForkUnit.gate</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.gate_uses"><code class="docutils literal notranslate"><span class="pre">ForkUnit.gate_uses</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.lock"><code class="docutils literal notranslate"><span class="pre">ForkUnit.lock</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.ForkUnit.usage_cap"><code class="docutils literal notranslate"><span class="pre">ForkUnit.usage_cap</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.SyncFork"><code class="docutils literal notranslate"><span class="pre">SyncFork</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.SyncFork.dispose"><code class="docutils literal notranslate"><span class="pre">SyncFork.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.SyncFork.reset"><code class="docutils literal notranslate"><span class="pre">SyncFork.reset()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_fork.SyncFork.use_fork"><code class="docutils literal notranslate"><span class="pre">SyncFork.use_fork()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit"><code class="docutils literal notranslate"><span class="pre">ForkUnit</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.fork_callable"><code class="docutils literal notranslate"><span class="pre">ForkUnit.fork_callable</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.usage_cap"><code class="docutils literal notranslate"><span class="pre">ForkUnit.usage_cap</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.lock"><code class="docutils literal notranslate"><span class="pre">ForkUnit.lock</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.gate"><code class="docutils literal notranslate"><span class="pre">ForkUnit.gate</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.gate_uses"><code class="docutils literal notranslate"><span class="pre">ForkUnit.gate_uses</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.ForkUnit.dispose"><code class="docutils literal notranslate"><span class="pre">ForkUnit.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#id0"><code class="docutils literal notranslate"><span class="pre">ForkUnit.fork_callable</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#id5"><code class="docutils literal notranslate"><span class="pre">ForkUnit.gate</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#id6"><code class="docutils literal notranslate"><span class="pre">ForkUnit.gate_uses</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#id7"><code class="docutils literal notranslate"><span class="pre">ForkUnit.lock</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#id8"><code class="docutils literal notranslate"><span class="pre">ForkUnit.usage_cap</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork"><code class="docutils literal notranslate"><span class="pre">SyncSignalFork</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.dispose"><code class="docutils literal notranslate"><span class="pre">SyncSignalFork.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.id"><code class="docutils literal notranslate"><span class="pre">SyncSignalFork.id</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.release"><code class="docutils literal notranslate"><span class="pre">SyncSignalFork.release()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.reset"><code class="docutils literal notranslate"><span class="pre">SyncSignalFork.reset()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/dispatchers/dispatchers.html#thread_factory.synchronization.dispatchers.sync_signal_fork.SyncSignalFork.use_fork"><code class="docutils literal notranslate"><span class="pre">SyncSignalFork.use_fork()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/execution/execution.html">Execution Module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor"><code class="docutils literal notranslate"><span class="pre">BypassConductor</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.collapse"><code class="docutils literal notranslate"><span class="pre">BypassConductor.collapse()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.decrease_limit"><code class="docutils literal notranslate"><span class="pre">BypassConductor.decrease_limit()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.dispose"><code class="docutils literal notranslate"><span class="pre">BypassConductor.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.increase_limit"><code class="docutils literal notranslate"><span class="pre">BypassConductor.increase_limit()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.outcomes"><code class="docutils literal notranslate"><span class="pre">BypassConductor.outcomes()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.reset"><code class="docutils literal notranslate"><span class="pre">BypassConductor.reset()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/execution/execution.html#thread_factory.synchronization.execution.bypass_conductor.BypassConductor.transit"><code class="docutils literal notranslate"><span class="pre">BypassConductor.transit()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="synchronization/primitives/primitives.html">Primitives Module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore"><code class="docutils literal notranslate"><span class="pre">Dynaphore</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.condition"><code class="docutils literal notranslate"><span class="pre">Dynaphore.condition</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.decrease_permits"><code class="docutils literal notranslate"><span class="pre">Dynaphore.decrease_permits()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.dispose"><code class="docutils literal notranslate"><span class="pre">Dynaphore.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.increase_permits"><code class="docutils literal notranslate"><span class="pre">Dynaphore.increase_permits()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.release_all"><code class="docutils literal notranslate"><span class="pre">Dynaphore.release_all()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.release_permit"><code class="docutils literal notranslate"><span class="pre">Dynaphore.release_permit()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.set_permits"><code class="docutils literal notranslate"><span class="pre">Dynaphore.set_permits()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.dynaphore.Dynaphore.wait_for_permit"><code class="docutils literal notranslate"><span class="pre">Dynaphore.wait_for_permit()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator"><code class="docutils literal notranslate"><span class="pre">FlowRegulator</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.acquire"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.acquire()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.bypass_bias"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.bypass_bias()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.bypass_bias_and_notify"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.bypass_bias_and_notify()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.condition"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.condition</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.decrease_permits"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.decrease_permits()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.dispose"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.get_all_logged_factory_ids"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.get_all_logged_factory_ids()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.get_all_waiters"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.get_all_waiters()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.get_all_waiting_factory_ids"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.get_all_waiting_factory_ids()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.get_waiter_count"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.get_waiter_count()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.has_factory_id"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.has_factory_id()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.increase_permits"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.increase_permits()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.notify"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.notify()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.notify_all"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.notify_all()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.release"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.release()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.release_permit"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.release_permit()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.set_bias_threshold"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.set_bias_threshold()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.set_callback"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.set_callback()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.set_default_callback"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.set_default_callback()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.flow_regulator.FlowRegulator.wait_for_permit"><code class="docutils literal notranslate"><span class="pre">FlowRegulator.wait_for_permit()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Gate"><code class="docutils literal notranslate"><span class="pre">Gate</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Latch"><code class="docutils literal notranslate"><span class="pre">Latch</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Latch.close"><code class="docutils literal notranslate"><span class="pre">Latch.close()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Latch.closed"><code class="docutils literal notranslate"><span class="pre">Latch.closed()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Latch.dispose"><code class="docutils literal notranslate"><span class="pre">Latch.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Latch.is_open"><code class="docutils literal notranslate"><span class="pre">Latch.is_open()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.latch.Latch.open"><code class="docutils literal notranslate"><span class="pre">Latch.open()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier"><code class="docutils literal notranslate"><span class="pre">SignalBarrier</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.dispose"><code class="docutils literal notranslate"><span class="pre">SignalBarrier.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.id"><code class="docutils literal notranslate"><span class="pre">SignalBarrier.id</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.is_spent"><code class="docutils literal notranslate"><span class="pre">SignalBarrier.is_spent()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.notify_all_override"><code class="docutils literal notranslate"><span class="pre">SignalBarrier.notify_all_override()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.release"><code class="docutils literal notranslate"><span class="pre">SignalBarrier.release()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.reset"><code class="docutils literal notranslate"><span class="pre">SignalBarrier.reset()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.set_threshold"><code class="docutils literal notranslate"><span class="pre">SignalBarrier.set_threshold()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_barrier.SignalBarrier.wait"><code class="docutils literal notranslate"><span class="pre">SignalBarrier.wait()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalGate"><code class="docutils literal notranslate"><span class="pre">SignalGate</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch"><code class="docutils literal notranslate"><span class="pre">SignalLatch</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.closed"><code class="docutils literal notranslate"><span class="pre">SignalLatch.closed()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.dispose"><code class="docutils literal notranslate"><span class="pre">SignalLatch.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.id"><code class="docutils literal notranslate"><span class="pre">SignalLatch.id</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.is_open"><code class="docutils literal notranslate"><span class="pre">SignalLatch.is_open()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.open"><code class="docutils literal notranslate"><span class="pre">SignalLatch.open()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.reset"><code class="docutils literal notranslate"><span class="pre">SignalLatch.reset()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.signal_latch.SignalLatch.set_external_controller"><code class="docutils literal notranslate"><span class="pre">SignalLatch.set_external_controller()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition"><code class="docutils literal notranslate"><span class="pre">SmartCondition</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.acquire"><code class="docutils literal notranslate"><span class="pre">SmartCondition.acquire</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.bind_callback"><code class="docutils literal notranslate"><span class="pre">SmartCondition.bind_callback()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.dispose"><code class="docutils literal notranslate"><span class="pre">SmartCondition.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.find_waiter_count"><code class="docutils literal notranslate"><span class="pre">SmartCondition.find_waiter_count()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.get_all_waiters"><code class="docutils literal notranslate"><span class="pre">SmartCondition.get_all_waiters()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.get_all_waiting_factory_ids"><code class="docutils literal notranslate"><span class="pre">SmartCondition.get_all_waiting_factory_ids()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.notify"><code class="docutils literal notranslate"><span class="pre">SmartCondition.notify()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.notify_all"><code class="docutils literal notranslate"><span class="pre">SmartCondition.notify_all()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.notify_all_and_call"><code class="docutils literal notranslate"><span class="pre">SmartCondition.notify_all_and_call()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.notify_and_call"><code class="docutils literal notranslate"><span class="pre">SmartCondition.notify_and_call()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.release"><code class="docutils literal notranslate"><span class="pre">SmartCondition.release</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.set_default_callback"><code class="docutils literal notranslate"><span class="pre">SmartCondition.set_default_callback()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.wait"><code class="docutils literal notranslate"><span class="pre">SmartCondition.wait()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.SmartCondition.wait_for"><code class="docutils literal notranslate"><span class="pre">SmartCondition.wait_for()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.Waiter"><code class="docutils literal notranslate"><span class="pre">Waiter</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.Waiter.factory_id"><code class="docutils literal notranslate"><span class="pre">Waiter.factory_id</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.Waiter.lock"><code class="docutils literal notranslate"><span class="pre">Waiter.lock</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.Waiter.thread"><code class="docutils literal notranslate"><span class="pre">Waiter.thread</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.smart_condition.Waiter.callback"><code class="docutils literal notranslate"><span class="pre">Waiter.callback</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#id0"><code class="docutils literal notranslate"><span class="pre">Waiter.callback</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#id25"><code class="docutils literal notranslate"><span class="pre">Waiter.factory_id</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#id26"><code class="docutils literal notranslate"><span class="pre">Waiter.lock</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#id27"><code class="docutils literal notranslate"><span class="pre">Waiter.thread</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition"><code class="docutils literal notranslate"><span class="pre">TransitCondition</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.acquire"><code class="docutils literal notranslate"><span class="pre">TransitCondition.acquire</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.dispose"><code class="docutils literal notranslate"><span class="pre">TransitCondition.dispose()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.find_waiter_count"><code class="docutils literal notranslate"><span class="pre">TransitCondition.find_waiter_count()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.get_all_waiters"><code class="docutils literal notranslate"><span class="pre">TransitCondition.get_all_waiters()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.id"><code class="docutils literal notranslate"><span class="pre">TransitCondition.id</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.notify"><code class="docutils literal notranslate"><span class="pre">TransitCondition.notify()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.notify_all"><code class="docutils literal notranslate"><span class="pre">TransitCondition.notify_all()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.release"><code class="docutils literal notranslate"><span class="pre">TransitCondition.release</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.set_default_callback"><code class="docutils literal notranslate"><span class="pre">TransitCondition.set_default_callback()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.wait"><code class="docutils literal notranslate"><span class="pre">TransitCondition.wait()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition.wait_for"><code class="docutils literal notranslate"><span class="pre">TransitCondition.wait_for()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.Waiter"><code class="docutils literal notranslate"><span class="pre">Waiter</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.Waiter.lock"><code class="docutils literal notranslate"><span class="pre">Waiter.lock</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.Waiter.thread"><code class="docutils literal notranslate"><span class="pre">Waiter.thread</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#thread_factory.synchronization.primitives.transit_condition.Waiter.callback"><code class="docutils literal notranslate"><span class="pre">Waiter.callback</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#id28"><code class="docutils literal notranslate"><span class="pre">Waiter.callback</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#id29"><code class="docutils literal notranslate"><span class="pre">Waiter.lock</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="synchronization/primitives/primitives.html#id30"><code class="docutils literal notranslate"><span class="pre">Waiter.thread</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="utilities/coordination/coordination.html">Coordination Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="utilities/timing_tools/timing_tools.html">Timing Tools Module</a></li>
 </ul>
 </div>
 </section>

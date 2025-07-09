@@ -5,7 +5,6 @@ Primitives
    :maxdepth: 1
    :titlesonly:
 
-   concurrent_bag
    dynaphore
    flow_regulator
    latch
