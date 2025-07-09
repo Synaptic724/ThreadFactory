@@ -1,8 +1,8 @@
-Concurrent Data Structures
+Concurrent Tools
 ========================
 
 .. toctree::
    :maxdepth: 1
    :titlesonly:
 
-   concurrent_bag
+   concurrent_tools

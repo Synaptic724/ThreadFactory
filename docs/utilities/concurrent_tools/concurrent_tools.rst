@@ -1,4 +1,4 @@
-Flow Regulator
+Concurrent Tools
 ==================
 
 .. automodule:: thread_factory.utilities.concurrent_tools.concurrent_tools

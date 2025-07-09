@@ -5,11 +5,5 @@ Concurrent Data Structures
    :maxdepth: 1
    :titlesonly:
 
-   concurrent_bag
-   concurrent_buffer
-   concurrent_collection
-   concurrent_dict
-   concurrent_list
-   concurrent_queue
-   concurrent_stack
-   concurrent_set
+   auto_reset_timer
+   stopwatch
