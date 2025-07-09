@@ -1,8 +1,6 @@
-import logging, threading, time
+import logging, threading, time, ulid
 from dataclasses import dataclass
 from typing import Callable, Union, Optional
-import ulid
-
 from thread_factory.agent.identity.types.agent import AgentPoolType, Agent
 from thread_factory.agent.thread_pool import HelpRequest
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
@@ -16,30 +14,6 @@ from thread_factory.synchronization.primitives.flow_regulator import FlowRegulat
 from thread_factory.synchronization.primitives.latch import Gate
 from thread_factory.utils.interfaces.disposable import IDisposable
 from thread_factory.agent.thread_pool.records.records import Records, WorkStatus
-
-
-@dataclass(slots=True)
-class ClaimedAgentRef:
-    """
-    Represents a temporarily claimed agent for pre-dispatch coordination.
-    """
-    agent_id: str
-    template_name: str
-    claimed: SyncBool
-    pool_id: str
-    available: bool
-
-    def release(self):
-        """
-        Releases this claim, making it available again.
-        """
-        self.claimed.set(False)
-
-    def is_active(self) -> bool:
-        """
-        Checks if the agent is still claimed.
-        """
-        return self.claimed.get()
 
 
 class AgentContainer(IDisposable):
@@ -111,7 +85,6 @@ class AgentContainer(IDisposable):
 
         # FlowRegulator for managing thread signaling
         self._reserved_dispatch_flow_regulator = FlowRegulator(0)  # Untargeted flow regulator for non-targeted dispatch
-        self._claimed_agents: ConcurrentDict[str, ClaimedAgentRef] = ConcurrentDict()
 
         # General Purpose Flow Regulators
         self._dispatch_flow_regulator = FlowRegulator(0)  # Targeted flow regulator for targeted dispatch
@@ -162,16 +135,10 @@ class AgentContainer(IDisposable):
             for records in self._registered_agents.values():
                 records.dispose()
 
-
-
-
-
             # Clear references to CommandGroup
             self._command_group_worker_count = None  # Clear reference to CommandGroup
             self._command_group_max_worker_count = None  # Clear reference to CommandGroup
             self._command_group_id = None  # Clear reference to CommandGroup
-            self._claimed_agents.dispose()  # Dispose of claimed agents
-            self._claimed_agents = None  # Clear reference to claimed agents
             self._logger.info(f"Disposed AgentContainer for CommandGroup: {self._command_group_id}")
             self._logger = None  # Clear logger reference
 
