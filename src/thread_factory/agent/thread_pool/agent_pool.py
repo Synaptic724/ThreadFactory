@@ -1,7 +1,7 @@
 import logging, threading, time, ulid
 from dataclasses import dataclass
 from typing import Callable, Union, Optional
-from thread_factory.agent.identity.types.agent import AgentPoolType, Agent
+from thread_factory.agent.thread_pool.utilities.agent_pool_type import AgentPoolType
 from thread_factory.agent.thread_pool import HelpRequest
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from thread_factory.concurrency.sync_types.sync_bool import SyncBool
@@ -55,7 +55,7 @@ class AgentContainer(IDisposable):
         self._command_group_max_worker_count = command_group._max_workers
 
         # Agent Tracking Details
-        self._all_agents: ConcurrentDict[ulid.ULID, Agent] = ConcurrentDict[ulid.ULID, Agent]()
+        self._all_agents: ConcurrentDict[ulid.ULID, 'Agent'] = ConcurrentDict()
         self._sleep_agents: ConcurrentSet[ulid.ULID] = ConcurrentSet[ulid.ULID]()
 
         # Track threads either as a simple set (if no tracking) or as a dict mapping to Records

@@ -1,16 +1,19 @@
 import logging, ulid, ctypes, threading
 from enum import Enum, auto
 from datetime import datetime, timedelta
-from typing import Optional, Callable, Union, Any
-from thread_factory.concurrency.concurrent_list import ConcurrentList
+from typing import Optional, Callable, Union, Any, List
 from thread_factory.agent.thread_pool.records.records import Records, Record, WorkStatus
 from thread_factory.agent.thread_pool.requests.work import Work
+from thread_factory.agent.thread_pool.utilities.agent_pool_type import AgentPoolType
 from thread_factory.synchronization.controllers.signal_controller import SignalController
 from thread_factory.agent.thread_pool.requests.help_request import HelpRequest
 from thread_factory.agent.thread_pool.records.records import WorkStatus, Record
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utilities.coordination.package import Pack
 from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.concurrency.concurrent_stack import ConcurrentStack
+from thread_factory.concurrency.concurrent_list import ConcurrentList
+from thread_factory.agent.identity.utilities.location_map import LocationMap
 
 class AgentState(Enum):
     """
@@ -30,18 +33,6 @@ class AgentState(Enum):
     REBALANCING = auto()
     TERMINATING = auto()
     SWITCHED = auto()
-
-
-class AgentPoolType(Enum):
-    """
-    Enum representing the type of agent.
-    """
-    NOTSET = auto()  # Represents an agent that has not been set to a specific type
-    DISMISS = auto()  # Represents a worker that is set to be dismissed
-    DISPATCHER = auto()  # Represents a worker focused on dispatching tasks
-    RESERVED_DISPATCHER = auto()  # Represents a worker focused on dispatching tasks where they can be claimed
-    THROUGHPUT = auto()   # Represents a worker focused on high throughput
-    SLEEP = auto()  # Represents a worker focused on high throughput with sleep behavior
 
 
 class Agent(threading.Thread, IDisposable):
@@ -122,6 +113,11 @@ class Agent(threading.Thread, IDisposable):
         self.shutdown_flag = threading.Event()
         self.death_event = threading.Event()
         self._data_center = None
+        self._template_name = None  # This can be set to a specific template name if needed
+        self._worker_type = "agentic" # Overrides Worker's default "mainpool"
+        self._pool_agent: bool = False # This flag might be set by a pool manager
+        self._return_home: bool = False # Controls behavior after task completion
+        self._agent_reset: bool = False  # Indicates if the agent has been reset recently
 
         # Activity Management
         self._group_name = None
@@ -149,17 +145,12 @@ class Agent(threading.Thread, IDisposable):
         else:
             self._target = Pack.bundle(target) if target else None
 
-        # Internal State Management
-        self._template_name = None  # This can be set to a specific template name if needed
-        self._worker_type = "agentic" # Overrides Worker's default "mainpool"
-        self._pool_agent: bool = False # This flag might be set by a pool manager
-        self._return_home: bool = False # Controls behavior after task completion
-        self._agent_reset: bool = False  # Indicates if the agent has been reset recently
         # Loop and Event Pool Management
         self._dismiss_agent: bool = False # Flag to indicate if the agent should be dismissed
         self._pool_type = AgentPoolType.NOTSET
         self._help_request: Optional['HelpRequest'] = None # Example: For binding specific work
-
+        self._call_stack = ConcurrentStack()
+        self.location_map = LocationMap(self, logger=self._logger) # Centralized location management
 
         # Auto-register with controller (best-effort)
         if self._signal_controller:
@@ -212,6 +203,10 @@ class Agent(threading.Thread, IDisposable):
             if self.records:
                 self.records.dispose()
             self.records = None
+
+            if self.location_map:
+                self.location_map.dispose()
+                self.location_map = None
 
             # Unregister from SignalController and nullify its reference
             if self._signal_controller:
@@ -317,6 +312,8 @@ class Agent(threading.Thread, IDisposable):
             "name": self.__class__.__name__,
             "commands": ConcurrentDict({
                 "get_name": self.get_name,
+                "register_location": self.location_map.register_location,
+                "get_locations_dict": self.location_map.get_locations,
                 "get_description": self.get_description,
                 "set_return_home": self.set_return_home,
                 "get_bound_work_state": self._get_work_state,
@@ -327,12 +324,17 @@ class Agent(threading.Thread, IDisposable):
                 "get_worker_state": self.get_state,  # Need to add this getter
                 "get_units_per_minute": self.get_units_per_minute,  # Need to add this getter
                 "get_total_processed": self.get_work_unit_counter,  # Need to add this getter
+
+                # Stack Introspection Tools
+                "trace_stack": self.location_map.trace_stack,
+                "stack_depth": self.location_map.stack_depth,
+                "get_stack": self.location_map.get_stack,
             })
         })
 
 #endregion Signal Controller Methods
 #region Generic Agent System Methods
-#region Command Center Management Methods
+    #region Command Center Management Methods
     def _unregister(self) -> None:
         """
         Unregisters the agent from the command center, if applicable.

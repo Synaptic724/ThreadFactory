@@ -19,7 +19,7 @@ class EnumHelpers:
     def convert_enum_and_check(value: str | Enum, enum: Type[T]) -> T:
         """
         Converts a string input into the correct Enum member.
-        Raises ValueError if the string doesn't match an enum name.
+        Case-insensitive match is performed. Raises ValueError if the string doesn't match.
 
         If value is already an Enum member of the correct type, it is returned as-is.
         """
@@ -27,14 +27,18 @@ class EnumHelpers:
             return value
 
         if isinstance(value, str):
-            try:
-                return enum[value.lower()]
-            except KeyError:
-                valid_options = [e.name for e in enum]
-                raise ValueError(
-                    f"Invalid value '{value}' for enum {enum.__name__}. "
-                    f"Expected one of: {valid_options}."
-                )
+            # Case-insensitive mapping
+            lookup = {e.name.lower(): e for e in enum}
+            result = lookup.get(value.lower())
+
+            if result is not None:
+                return result
+
+            valid_options = [e.name for e in enum]
+            raise ValueError(
+                f"Invalid value '{value}' for enum {enum.__name__}. "
+                f"Expected one of: {valid_options}."
+            )
 
         raise ValueError(
             f"Expected a string or {enum.__name__} member, got {type(value).__name__}."

@@ -1,9 +1,11 @@
 import logging
-from thread_factory.agent.identity.types.agent import Agent, AgentPoolType, AgentState
+from thread_factory.agent.identity.types.agent import Agent, AgentState
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.synchronization import SignalController
+from thread_factory.agent.thread_pool.utilities.agent_pool_type import AgentPoolType
 from thread_factory.utilities.coordination.package import Pack
 from typing import Optional, Callable, Union, Any
+from thread_factory.utilities.general_helpers.enum_helpers import EnumHelpers
 
 class General(Agent):
     """
@@ -88,9 +90,8 @@ class General(Agent):
 
         # Initialize General-specific routing registries as ConcurrentDicts.
         # Assuming ConcurrentDict is IDisposable and needs to be initialized.
-        self.save_points: Optional[str, Pack] = ConcurrentDict() #Callables that can be executed for small work or activity
-        self.data_transfer: Optional[str, Pack] = ConcurrentDict() # Important data transfer areas
-        self.locations: Optional[str, Pack] = ConcurrentDict() # Concrete location of interest
+        self.save_points: ConcurrentDict[str, Pack] = ConcurrentDict() #Callables that can be executed for small work or activity
+        self.data_transfer: ConcurrentDict[str, Pack] = ConcurrentDict() # Important data transfer areas
 
         # Agentic State Management
         self._private_inventory = ConcurrentDict() # Local Inventory for this agent, only accessible by the agent itself.
@@ -107,6 +108,10 @@ class General(Agent):
             *args,
             **kwargs
         )
+
+        self.location_map.register_locations({
+            "dispatcher": self._dispatcher_loop,
+        })
 
     def dispose(self):
         """
@@ -128,16 +133,12 @@ class General(Agent):
             if self.data_transfer:
                 self.data_transfer.dispose()
                 self.data_transfer = None
-
             if self._private_inventory:
                 self._private_inventory.dispose()
                 self._private_inventory = None
             if self.public_inventory:
                 self.public_inventory.dispose()
                 self.public_inventory = None
-            if self.locations:
-                self.locations.dispose()
-                self.locations = None
 
             # Call the dispose method of the parent class
             super().dispose()
@@ -157,8 +158,6 @@ class General(Agent):
         if self._disposed:
             raise RuntimeError("Cannot reset a disposed agent.")
 
-        if self.locations:
-            self.locations.clear()
         if self.save_points:
             self.save_points.clear()
         if self.data_transfer:
@@ -168,7 +167,6 @@ class General(Agent):
             self._private_inventory.clear()
         if self.public_inventory:
             self.public_inventory.clear()
-
 
         self.public_id = None
         self.public_name = None
@@ -204,8 +202,6 @@ class General(Agent):
             "get_job_title": self.get_job_title,
 
             # Behavior routing management
-            "register_location": self.register_location,
-            "get_locations_dict": self.get_locations_dict,
             "register_save_point": self.register_save_point,
             "get_save_points_dict": self.get_save_points_dict,
             "register_data_transfer": self.register_data_transfer,
@@ -250,114 +246,48 @@ class General(Agent):
 
     def _life_loop(self):
         """
-        This is the main life loop for the agentic thread.
+        Main execution loop for the agentic thread.
 
-        It allows the agentic agent to travel through many states and
-        locations when required it provides a robust way to manage its life
-        cycle by going through the various states of the agentic thread.
+        Based on the agent's pool type, it dynamically transitions into appropriate
+        registered locations like dispatcher, throughput, or sleep. If no such behavior
+        is required, it returns to idle or home state.
         """
         self._notify(f"Agentic thread started {self.factory_id}.")
+
         while not self._dismiss_agent:
-            if not self._dismiss_agent:
-                if self._pool_agent and self._pool_type == AgentPoolType.DISPATCHER and not self._return_home:
-                    # If this is a pool agent, run the dispatcher loop
-                    self._dispatcher_loop()
-                elif self._pool_agent and self._pool_type == AgentPoolType.THROUGHPUT and not self._return_home:
-                    self._throughput_loop()
-                elif self._pool_agent and self._pool_type == AgentPoolType.SLEEP and not self._return_home:
-                    self.locations["sleep"]()
-                else:
-                    self._return_home = False
+            if self._dismiss_agent:
+                break
+
+            if self._pool_agent and not self._return_home:
+                if self._pool_type == AgentPoolType.DISPATCHER:
+                    self.location_map.transit_to("dispatcher")
+                elif self._pool_type == AgentPoolType.THROUGHPUT:
+                    self.location_map.transit_to("throughput")
+                elif self._pool_type == AgentPoolType.SLEEP:
+                    self.location_map.transit_to("sleep")
             else:
-                self.dispose()
+                self._return_home = False
+
+        self._logger.info(f"Agent '{self.factory_id}' lifeloop terminated.")
+        self.dispose()
 
     def _dispatcher_loop(self) -> None:
         """
-        This is the dispatcher loop for the agentic thread.
+        The dispatcher logic registered as a named location.
 
-        It will attempt to finish the target and if it can't, it'll attempt to
-        return to the event loop if it exists. If the agent is a pool agent,
-        it will run the event loop set via `set_home()`. If it is a standalone agent,
-        it will execute the `_target` function if provided.
+        Attempts to run the target, then the dispatcher behavior.
         """
         try:
-            if self.locations["target"]:
-                return self.locations["target"]()  # Run the target if it's a standalone agent
+            if self.location_map.get("target"):
+                self.location_map.transit_to("target")
 
-            if self.locations["dispatcher"]:
-                self.locations["dispatcher"]()
-        except Exception as e:
-            # Optionally, log the exception if needed
-            pass
-        finally:
-            if self._return_home:
-                return
-            self._logger.info(f"Agent '{self.factory_id}' dispatcher loop terminated.")
-            # Ensure agent is disposed properly even after an exception
-            self.dispose()
-
-    def _throughput_loop(self):
-        """
-        This is the dispatcher loop for the agentic thread.
-
-        It will attempt to finish the target and if it can't, it'll attempt to
-        return to the event loop if it exists. If the agent is a pool agent,
-        it will run the event loop set via `set_home()`. If it is a standalone agent,
-        it will execute the `_target` function if provided.
-        """
-        try:
-            if self._pool_type == AgentPoolType.THROUGHPUT and not self._return_home:
-                self.locations["throughput"]()
+            if self.location_map.get("dispatcher"):
+                self.location_map.transit_to("dispatcher")
 
         except Exception as e:
-            # Optionally, log the exception if needed
+            # You may want to log here
             pass
-        finally:
-            if self._return_home:
-                return
-            self._logger.info(f"Agent '{self.factory_id}' dispatcher loop terminated.")
-            # Ensure agent is disposed properly even after an exception
-            self.dispose()
 
-    def assign_throughput_to_sleep(self):
-        """
-        Assigns the agent to a sleep loop, which is a specialized behavior for
-        agents that need to manage their execution in a controlled manner.
-
-        This method sets the `_pool_type` to `AgentPoolType.THROUGHPUT_SLEEP`
-        and assigns the `_sleep_loop` to the agent's event loop.
-        """
-        self._pool_type = AgentPoolType.SLEEP
-
-    def assign_sleep_to_throughput(self):
-        """
-        Assigns the agent to a throughput loop, which is a specialized behavior for
-        agents that need to manage their execution in a high-throughput manner.
-
-        This method sets the `_pool_type` to `AgentPoolType.THROUGHPUT`
-        and assigns the `_event_loop` to the agent's event loop.
-        """
-        self._pool_type = AgentPoolType.THROUGHPUT
-
-    def assign_dispatcher(self):
-        """
-        Assigns the agent to a dispatcher loop, which is a specialized behavior for
-        agents that need to manage their execution in a dispatching manner.
-
-        This method sets the `_pool_type` to `AgentPoolType.DISPATCHER`
-        and assigns the `_event_loop` to the agent's event loop.
-        """
-        self._pool_type = AgentPoolType.DISPATCHER
-
-    def assign_dispatcher_targeted(self):
-        """
-        Assigns the agent to a targeted dispatcher loop, which is a specialized behavior for
-        agents that need to manage their execution in a dispatching manner where they can be claimed.
-
-        This method sets the `_pool_type` to `AgentPoolType.DISPATCHER_TARGETED`
-        and assigns the `_event_loop` to the agent's event loop.
-        """
-        self._pool_type = AgentPoolType.RESERVED_DISPATCHER
 
     def set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
         """
@@ -370,31 +300,38 @@ class General(Agent):
             fn (Union[Callable[..., None], Pack]): A parameterless callable or `Pack`
                 that represents the agent's main execution loop.
         """
-        self.locations["dispatcher"] = Pack.bundle(fn) if fn else None
-
-    def set_sleep_location(self, fn: Union[Callable[..., None], Pack]) -> None:
-        """
-        Sets the primary, default execution loop or "home behavior" for the agent.
-
-        This function defines the agent's main operational loop, which is executed
-        when `run()` is called for a pool-bound agent.
-
-        Args:
-            fn (Union[Callable[..., None], Pack]): A parameterless callable or `Pack`
-                that represents the agent's main execution loop.
-        """
-        self.locations["sleep"] = Pack.bundle(fn) if fn else None
+        self.location_map.register_location("dispatcher", Pack.bundle(fn) if fn else None)
 
     def set_target(self, target: Union[Callable[..., Any], Pack]) -> None:
         """
-        This method sets the target function or `Pack` for the agent.
+        Sets the target function for this agent, which is typically invoked in standalone or direct execution mode.
+
+        Args:
+            target (Union[Callable[..., Any], Pack]): The target function or wrapped `Pack`.
+
+        Raises:
+            TypeError: If the target is not a callable or Pack.
         """
-        if target and (isinstance(target, Callable) or isinstance(target, Pack)):
-            self.locations["target"] = Pack.bundle(target)
-        elif target is not None:
+        if target is not None and not isinstance(target, (Callable, Pack)):
             raise TypeError("Target must be a Callable or Pack instance.")
-        else:
-            self.locations["target"] = None
+
+        fn = Pack.bundle(target) if target else None
+        self.location_map.register_location("target", fn)
+
+    def assign_new_state(self, state: str) -> None:
+        """
+        Assigns a new state to the agent, updating its internal state and notifying
+        the command center of the change.
+
+        Args:
+            state (str): The new state name (case-insensitive) or an AgentState instance.
+        """
+        with self._lock:
+            if self._disposed:
+                raise RuntimeError("Cannot assign state to a disposed agent.")
+
+            self.state = EnumHelpers.convert_enum_and_check(state, AgentState)
+            self._notify(f"Agent {self.factory_id} changed state to {self.state.name}.")
 
     #endregion Agentic Activity
 #region General-specific Identity Getters
@@ -563,34 +500,3 @@ class General(Agent):
         if self.save_points is None:
             return ConcurrentDict()
         return self.save_points.copy()
-
-    def register_location(self, name: str, fn: Union[Callable[..., None], Pack]):
-        """
-        Registers a named callable as a distinct "location" or execution zone.
-        This allows the agent to dynamically switch between different behaviors.
-
-        Args:
-            name (str): The unique name for the location.
-            fn (Union[Callable[..., None], Pack]): The callable function or `Pack`
-                defining the location's behavior.
-        """
-        if self._disposed:
-            raise RuntimeError("Cannot register location on a disposed agent.")
-        if self.locations is None:
-            self.locations = ConcurrentDict({name: Pack.bundle(fn) if fn else None})
-        else:
-            if self.locations[name] is not None:
-                self._logger.warning(f"Overwriting existing location '{name}' with new function.")
-            self.locations[name] = Pack.bundle(fn) if fn else None
-
-    def get_locations_dict(self) -> ConcurrentDict[str, Union[Callable[..., None], Pack]]:
-        """
-        Retrieves a copy of the dictionary of all registered location functions.
-
-        Returns:
-            ConcurrentDict[str, Union[Callable[..., None], Pack]]: A shallow copy of
-                the locations dictionary.
-        """
-        if self.locations is None:
-            return ConcurrentDict()
-        return self.locations.copy()
