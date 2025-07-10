@@ -551,6 +551,9 @@ class CommandCenter(IDisposable):
 
 #region Destructor
     def dispose(self):
+        """
+        Disposes of the CommandCenter, cleaning up all resources, agents, activities,
+        """
         with self._lock:
             if self._disposed:
                 return

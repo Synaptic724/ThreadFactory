@@ -207,7 +207,6 @@ class General(Agent):
             "register_data_transfer": self.register_data_transfer,
             "execute_transfer": self.execute_transfer,
             "get_data_transfer_dict": self.get_data_transfer_dict,
-            "set_home": self.set_home,
             # The get_name and get_description are overridden in General,
             # so these calls will now reflect the General profile's implementation.
             "get_name": self.get_name,
@@ -260,11 +259,17 @@ class General(Agent):
 
             if self._pool_agent and not self._return_home:
                 if self._pool_type == AgentPoolType.DISPATCHER:
-                    self.location_map.transit_to("dispatcher")
+                    if self.location_map.get("dispatcher"):
+                        self.location_map.transit_to("dispatcher")
+                elif self._pool_type == AgentPoolType.RESERVED_DISPATCHER:
+                    if self.location_map.get("reserved_dispatcher"):
+                        self.location_map.transit_to("reserved_dispatcher")
                 elif self._pool_type == AgentPoolType.THROUGHPUT:
-                    self.location_map.transit_to("throughput")
+                    if self.location_map.get("throughput"):
+                        self.location_map.transit_to("throughput")
                 elif self._pool_type == AgentPoolType.SLEEP:
-                    self.location_map.transit_to("sleep")
+                    if self.location_map.get("sleep"):
+                        self.location_map.transit_to("sleep")
             else:
                 self._return_home = False
 
@@ -277,16 +282,11 @@ class General(Agent):
 
         Attempts to run the target, then the dispatcher behavior.
         """
-        try:
-            if self.location_map.get("target"):
-                self.location_map.transit_to("target")
+        if self.location_map.get("target"):
+            self.location_map.transit_to("target")
 
-            if self.location_map.get("dispatcher"):
-                self.location_map.transit_to("dispatcher")
-
-        except Exception as e:
-            # You may want to log here
-            pass
+        if self.location_map.get("dispatcher"):
+            self.location_map.transit_to("dispatcher")
 
     def assign_new_state(self, state: str) -> None:
         """

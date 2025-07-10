@@ -95,12 +95,13 @@ class LocationMap(IDisposable):
         """
         return self._locations.get(name)
 
-    def transit_to(self, name: str) -> Any:
+    def transit_to(self, name: str, should_raise: bool = False) -> Any:
         """
         Enters a user-defined location and pushes it to the call stack.
 
         Args:
             name (str): Name of the registered location to enter.
+            should_raise (bool): If True, exceptions will propagate; otherwise, they are logged.
 
         Returns:
             Any: Result of executing the location's function.
@@ -111,16 +112,22 @@ class LocationMap(IDisposable):
             if fn is None:
                 raise KeyError(f"Location '{name}' is not registered.")
             return fn()
+        except Exception as e:
+            self._logger.exception(f"Error while executing location '{name}'. Exception: {e}")
+            if should_raise:
+                raise e
+            pass
         finally:
             self._stack.pop()
 
-    def transit_internal(self, name: str, fn: Callable) -> Any:
+    def transit_internal(self, name: str, fn: Callable, should_rase: bool= False) -> Any:
         """
         Executes an internal system function with call stack tagging.
 
         Args:
             name (str): System tag for this transition.
             fn (Callable): Function to execute.
+            should_rase (bool): If True, exceptions will propagate; otherwise, they are logged.
 
         Returns:
             Any: The result of the internal function's execution.
@@ -129,6 +136,11 @@ class LocationMap(IDisposable):
         self._stack.push(tag)
         try:
             return fn()
+        except Exception as e:
+            self._logger.exception(f"Error while executing internal function '{name}'. Exception: {e}")
+            if should_rase:
+                raise
+            pass
         finally:
             self._stack.pop()
 

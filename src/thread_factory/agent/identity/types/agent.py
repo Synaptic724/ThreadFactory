@@ -227,6 +227,7 @@ class Agent(threading.Thread, IDisposable):
             self.last_completed_work = None
             self.shutdown_flag = None
             self.death_event = None
+            self._command_center = None
 
             # Log final disposal message, then nullify logger
             if hasattr(self, '_logger') and self._logger: # Check before using/nullifying
