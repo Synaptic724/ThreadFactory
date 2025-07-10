@@ -36,7 +36,7 @@ class CommandGroup(IDisposable):
         An optional classification for the group (e.g., "ETL", "Modeling", etc.).
     """
 
-    def __init__(self, command_center: 'CommandCenter', group_name: str, max_workers: int, logger: Optional[logging.Logger] = None, group_type: str = None):
+    def __init__(self, command_center: 'CommandCenter', group_name: str, max_workers: int, agents_per_container: int = 30, logger: Optional[logging.Logger] = None, group_type: str = None):
         """
         Initializes a new CommandGroup instance.
 
@@ -93,6 +93,7 @@ class CommandGroup(IDisposable):
         # --- Internal Components ---
         # Pool Internals
         self._worker_count = SyncInt(0)
+        self._agents_per_container = SyncInt(agents_per_container)
         self._max_workers = SyncInt(max_workers)
 
         # Create Agent Pool Container
@@ -459,9 +460,11 @@ class CommandCenter(IDisposable):
     """
 
     def __init__(self,
-                 group_max_workers: int = 30,
+                 group_max_workers: int = 60,
+                 agents_per_container: int = 30,
                  total_max_workers: int = 300,
                  command_group_name: str = "default",
+                 command_group_type: Optional[str] = None,
                  logger: Optional[logging.Logger] = None,
                  external_signal_controller: Optional[SignalController] = None,
                  agent_pool_singleton: bool = True):
@@ -536,7 +539,7 @@ class CommandCenter(IDisposable):
 
         # --- Group Management ---
         self._command_groups: ConcurrentDict[str, CommandGroup] = ConcurrentDict()
-        self.create_command_group(command_group_name, group_max_workers) # creates initial command group
+        self.create_command_group(command_group_name=command_group_name, max_workers=group_max_workers, agents_per_container=agents_per_container, logger=logger, command_group_type=command_group_type) # creates initial command group
 
         # --- External Controller Integration ---
         self._id: str = str(ulid.ULID())
@@ -660,7 +663,7 @@ class CommandCenter(IDisposable):
             self._total_max_workers = new_global_limit
             self._logger.info(f"Global max workers limit increased to {new_global_limit}.")
 
-    def create_command_group(self, command_group_name: str, max_workers, command_group_type:str = None) -> None:
+    def create_command_group(self, command_group_name: str, max_workers: int, agents_per_container: int = 30, logger: Optional[logging.Logger] = None, command_group_type: str = None) -> None:
         """
         Internal method to create and register the default group.
         """
@@ -676,7 +679,7 @@ class CommandCenter(IDisposable):
             raise RuntimeError(f"Cannot create CommandGroup '{command_group_name}'. Total active workers would exceed global limit of {self._total_max_workers}, increase new total limit to create a new group.")
 
         # Create the CommandGroup instance and register it
-        group = CommandGroup(group_name=command_group_name, max_workers=max_workers, command_center=self, group_type=command_group_type)
+        group = CommandGroup(command_center=self, group_name=command_group_name, max_workers=max_workers, agents_per_container=agents_per_container, logger=logger, group_type=command_group_type)
         self._command_groups[command_group_name] = group
 
     def get_command_group(self, group_name: str) -> Optional[CommandGroup]:
