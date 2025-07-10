@@ -430,41 +430,6 @@ class Agent(threading.Thread, IDisposable):
                 raise RuntimeError("Cannot set return home status after agent is disposed.")
             self._return_home = return_home
 
-    def set_home(self, event_loop: Union[Callable[..., Any], 'Pack']) -> None:
-        """
-        Sets the primary event loop for the agent.
-
-        This method allows the agent to define its main execution logic,
-        which can be a callable or a Pack instance.
-
-        Args:
-            event_loop (Union[Callable[..., Any], Pack]): The primary event loop to set.
-
-        Raises:
-            RuntimeError: If the agent has been disposed.
-        """
-        raise NotImplementedError(
-            "The set_home method must be implemented by subclasses of Agent. "
-            "This method defines the primary event loop for the agent."
-        )
-
-    def set_target(self, target: Union[Callable[..., Any], 'Pack']) -> None:
-        """
-        Sets the target callable or Pack for the agent's thread execution.
-
-        This method allows the agent to define what it will execute when run.
-
-        Args:
-            target (Union[Callable[..., Any], Pack]): The target callable or Pack to set.
-
-        Raises:
-            RuntimeError: If the agent has been disposed.
-        """
-        raise NotImplementedError(
-            "The set_target method must be implemented by subclasses of Agent. "
-            "This method defines the target for the agent's thread execution."
-        )
-
     def run(self):
         """
         The main execution method for the agent.

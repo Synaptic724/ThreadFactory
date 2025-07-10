@@ -288,36 +288,6 @@ class General(Agent):
             # You may want to log here
             pass
 
-
-    def set_home(self, fn: Union[Callable[..., None], Pack]) -> None:
-        """
-        Sets the primary, default execution loop or "home behavior" for the agent.
-
-        This function defines the agent's main operational loop, which is executed
-        when `run()` is called for a pool-bound agent.
-
-        Args:
-            fn (Union[Callable[..., None], Pack]): A parameterless callable or `Pack`
-                that represents the agent's main execution loop.
-        """
-        self.location_map.register_location("dispatcher", Pack.bundle(fn) if fn else None)
-
-    def set_target(self, target: Union[Callable[..., Any], Pack]) -> None:
-        """
-        Sets the target function for this agent, which is typically invoked in standalone or direct execution mode.
-
-        Args:
-            target (Union[Callable[..., Any], Pack]): The target function or wrapped `Pack`.
-
-        Raises:
-            TypeError: If the target is not a callable or Pack.
-        """
-        if target is not None and not isinstance(target, (Callable, Pack)):
-            raise TypeError("Target must be a Callable or Pack instance.")
-
-        fn = Pack.bundle(target) if target else None
-        self.location_map.register_location("target", fn)
-
     def assign_new_state(self, state: str) -> None:
         """
         Assigns a new state to the agent, updating its internal state and notifying
