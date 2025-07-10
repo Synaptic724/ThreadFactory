@@ -1,7 +1,6 @@
 import time
 import unittest
-
-from thread_factory import Concurrent
+from thread_factory.utilities.concurrent_tools.concurrent_tools import ConcurrentTools
 
 
 class TestParallel(unittest.TestCase):
@@ -17,7 +16,7 @@ class TestParallel(unittest.TestCase):
             nonlocal total
             total += i  # Not thread-safe on purpose
 
-        Concurrent.for_loop(0, 100, add_number)
+        ConcurrentTools.for_loop(0, 100, add_number)
 
         # Allow 5% tolerance (as it's a race-prone test)
         tolerance = 0.05 * expected
@@ -41,7 +40,7 @@ class TestParallel(unittest.TestCase):
             nonlocal actual
             actual += 1
 
-        Concurrent.for_loop(0, expected, increment)
+        ConcurrentTools.for_loop(0, expected, increment)
 
         # Allow 2% tolerance
         tolerance = 0.05 * max(abs(actual), abs(expected))
@@ -62,7 +61,7 @@ class TestParallel(unittest.TestCase):
             nonlocal total
             total += i
 
-        Concurrent.for_loop(0, 50, add_number, chunk_size=10)
+        ConcurrentTools.for_loop(0, 50, add_number, chunk_size=10)
         self.assertEqual(total, sum(range(50)), "Sum of 0..49 should match sequential result")
 
     def test_for_with_local_state(self):
@@ -81,7 +80,7 @@ class TestParallel(unittest.TestCase):
         def local_finalize(local_list):
             sums.append(local_list[0])
 
-        Concurrent.for_loop(
+        ConcurrentTools.for_loop(
             0,
             10,
             body=None,
@@ -107,7 +106,7 @@ class TestParallel(unittest.TestCase):
 
         # Force sequential to ensure we truly stop when i=5 raises
         with self.assertRaises(ValueError):
-            Concurrent.for_loop(
+            ConcurrentTools.for_loop(
                 0,
                 10,
                 body,
@@ -131,7 +130,7 @@ class TestParallel(unittest.TestCase):
         def action(x):
             squared_results.append(x * x)
 
-        Concurrent.for_each(data, action)
+        ConcurrentTools.for_each(data, action)
         self.assertCountEqual(squared_results, [1, 4, 9, 16, 25], "Squares should match for each item")
 
     def test_foreach_empty_iterable(self):
@@ -145,7 +144,7 @@ class TestParallel(unittest.TestCase):
             nonlocal counter
             counter += 1
 
-        Concurrent.for_each([], action)
+        ConcurrentTools.for_each([], action)
         self.assertEqual(counter, 0)
 
     def test_foreach_explicit_chunk_size(self):
@@ -158,7 +157,7 @@ class TestParallel(unittest.TestCase):
         def action(x):
             results.append(x + 1)  # just a simple transformation
 
-        Concurrent.for_each(data, action, chunk_size=2)
+        ConcurrentTools.for_each(data, action, chunk_size=2)
         self.assertCountEqual(results, [11, 21, 31, 41, 51])
 
     def test_foreach_stop_on_exception(self):
@@ -176,7 +175,7 @@ class TestParallel(unittest.TestCase):
             processed.append(x)
 
         with self.assertRaises(RuntimeError):
-            Concurrent.for_each(data, action, stop_on_exception=True, chunk_size=1, max_workers=1)
+            ConcurrentTools.for_each(data, action, stop_on_exception=True, chunk_size=1, max_workers=1)
 
         # We expect [1] processed, but not 2 or anything beyond
         self.assertNotIn(2, processed, "2 should have triggered exception, not appended")
@@ -196,7 +195,7 @@ class TestParallel(unittest.TestCase):
             results.append(x * x)
 
         # We'll do chunk_size=3 just for demonstration
-        Concurrent.for_each(generator(), action, streaming=True, chunk_size=3)
+        ConcurrentTools.for_each(generator(), action, streaming=True, chunk_size=3)
         self.assertCountEqual(results, [i * i for i in range(1, 11)])
 
     def test_invoke_basic(self):
@@ -212,7 +211,7 @@ class TestParallel(unittest.TestCase):
         def f2():
             outputs.append("Task2")
 
-        Concurrent.invoke(f1, f2)
+        ConcurrentTools.invoke(f1, f2)
         self.assertEqual(len(outputs), 2, "Should have appended two items (Task1, Task2).")
         self.assertIn("Task1", outputs)
         self.assertIn("Task2", outputs)
@@ -222,7 +221,7 @@ class TestParallel(unittest.TestCase):
         Test parallel_invoke with no functions passed. Should return an empty list of futures
         and do nothing.
         """
-        futures = Concurrent.invoke()
+        futures = ConcurrentTools.invoke()
         self.assertEqual(len(futures), 0, "No tasks means empty futures list")
 
     def test_invoke_wait_false(self):
@@ -239,7 +238,7 @@ class TestParallel(unittest.TestCase):
         def f2():
             outputs.append("f2")
 
-        futures = Concurrent.invoke(f1, f2, wait=False)
+        futures = ConcurrentTools.invoke(f1, f2, wait=False)
         self.assertEqual(len(futures), 2, "Two tasks should be submitted.")
         # We cannot guarantee whether 'outputs' is updated, due to immediate shutdown.
 
@@ -257,7 +256,7 @@ class TestParallel(unittest.TestCase):
             raise ValueError("Boom")
 
         with self.assertRaises(ValueError):
-            Concurrent.invoke(good_func, bad_func, wait=True)
+            ConcurrentTools.invoke(good_func, bad_func, wait=True)
 
         # We just care that the exception is re-raised. The good_func may or may not have run.
 
@@ -266,7 +265,7 @@ class TestParallel(unittest.TestCase):
         Test parallel_map with a simple function that doubles each item.
         """
         data = [1, 2, 3, 4]
-        result = Concurrent.map(data, lambda x: x * 2)
+        result = ConcurrentTools.map(data, lambda x: x * 2)
         self.assertEqual(result, [2, 4, 6, 8], "Should double each input item")
 
     def test_map_empty(self):
@@ -274,7 +273,7 @@ class TestParallel(unittest.TestCase):
         Test parallel_map with an empty iterable.
         Should return an empty list.
         """
-        result = Concurrent.map([], lambda x: x * 2)
+        result = ConcurrentTools.map([], lambda x: x * 2)
         self.assertEqual(result, [])
 
     def test_map_explicit_chunk_size(self):
@@ -282,7 +281,7 @@ class TestParallel(unittest.TestCase):
         Test parallel_map with an explicit chunk size.
         """
         data = [1, 2, 3, 4, 5, 6]
-        result = Concurrent.map(data, lambda x: x + 10, chunk_size=2)
+        result = ConcurrentTools.map(data, lambda x: x + 10, chunk_size=2)
         expected = [11, 12, 13, 14, 15, 16]
         self.assertEqual(result, expected)
 
@@ -300,7 +299,7 @@ class TestParallel(unittest.TestCase):
             time.sleep((10 - x) * 0.0005)  # bigger sleep for smaller x
             return x * x
 
-        result = Concurrent.map(data, transform, max_workers=4)
+        result = ConcurrentTools.map(data, transform, max_workers=4)
         self.assertEqual(result, [x * x for x in data])
 
     def test_map_exception(self):
@@ -315,7 +314,7 @@ class TestParallel(unittest.TestCase):
             return x
 
         with self.assertRaises(ValueError):
-            Concurrent.map(data, transform)
+            ConcurrentTools.map(data, transform)
 
     def test_map_large_input(self):
         """
@@ -323,7 +322,7 @@ class TestParallel(unittest.TestCase):
         We'll do a simple transform. It's mainly to ensure it doesn't crash / freeze.
         """
         data = list(range(20000))
-        result = Concurrent.map(data, lambda x: x + 1)
+        result = ConcurrentTools.map(data, lambda x: x + 1)
         # Spot check
         self.assertEqual(result[0], 1)
         self.assertEqual(result[-1], 20000)
@@ -357,7 +356,7 @@ class TestParallelEdgeCases(unittest.TestCase):
             sums.append(local_sum_list[0])
 
         # Summation 0..999 is 499500
-        Concurrent.for_loop(
+        ConcurrentTools.for_loop(
             0, 1000,
             body=None,  # we rely on local_body
             local_init=local_init,
@@ -393,7 +392,7 @@ class TestParallelEdgeCases(unittest.TestCase):
 
         # chunk_size=1: each item is its own chunk
         # This might be slow, but let's see if it completes.
-        Concurrent.for_each(
+        ConcurrentTools.for_each(
             data_generator(n_items),
             action,
             streaming=True,
@@ -424,7 +423,7 @@ class TestParallelEdgeCases(unittest.TestCase):
         # Because concurrency might let i=2,4,6 happen near-simultaneously,
         # we only expect the FIRST one to be re-raised.
         with self.assertRaises(ValueError) as ctx:
-            Concurrent.for_loop(
+            ConcurrentTools.for_loop(
                 0, 10,
                 error_prone_body,
                 max_workers=4,
@@ -453,7 +452,7 @@ class TestParallelEdgeCases(unittest.TestCase):
             time.sleep(0.1)
             results.append("finished")
 
-        futures = Concurrent.invoke(
+        futures = ConcurrentTools.invoke(
             slow_task,
             wait=False,
             max_workers=2

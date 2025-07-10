@@ -5,7 +5,7 @@ import threading
 import ulid
 import queue
 from thread_factory.synchronization.primitives.smart_condition import SmartCondition, Waiter
-from thread_factory.runtime.worker.worker import Worker
+from thread_factory.agent.identity.types.general import General
 
 class GenericTestThread(threading.Thread):
     def __init__(self, target=None, args=(), kwargs=None):
@@ -24,7 +24,7 @@ class TestSmartCondition(unittest.TestCase):
         results = []
         lock = threading.Lock()
 
-        class MyWorker(Worker):
+        class MyWorker(General):
             def __init__(self, name, fid):
                 super().__init__()
                 self.name = name
