@@ -69,7 +69,7 @@ from thread_factory.synchronization.primitives.transit_condition import TransitC
 from thread_factory.utilities.exceptions.empty import Empty
 from thread_factory.utilities.coordination.group import Group
 from thread_factory.utilities.coordination.outcome import Outcome
-from thread_factory.utilities.coordination.package import Pack
+from thread_factory.utilities.coordination.package import Pack, Package
 from thread_factory.utilities.timing_tools.auto_reset_timer import AutoResetTimer
 from thread_factory.utilities.timing_tools.stopwatch import Stopwatch
 from thread_factory.utilities.concurrent_tools.concurrent_tools import ConcurrentTools
@@ -120,6 +120,7 @@ __all__ = [
     "Group",
     "Outcome",
     "Pack",
+    "Package",
     "Empty",
     "Stopwatch",
     "AutoResetTimer",
