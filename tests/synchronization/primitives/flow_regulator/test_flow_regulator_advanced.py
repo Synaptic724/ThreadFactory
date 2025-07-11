@@ -8,8 +8,7 @@ from typing import Callable, Optional
 import ulid
 
 # Assuming FlowRegulator and other necessary imports are available
-from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
-from thread_factory.utilities.coordination.package import Pack
+from thread_factory import FlowRegulator, Pack
 
 # --- Agent and CommandCenter classes (as provided by you) ---
 # (Paste your Agent and CommandCenter class definitions here)

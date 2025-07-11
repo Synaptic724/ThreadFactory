@@ -2,7 +2,7 @@ import unittest
 import inspect
 from functools import wraps
 from typing import Callable, Union, Iterable
-from thread_factory.utilities.coordination.package import Package
+from thread_factory import Pack
 
 
 

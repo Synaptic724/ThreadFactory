@@ -1,9 +1,5 @@
 import unittest
-
-from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.utilities.coordination.group import Group
-from thread_factory.utilities.coordination.outcome import Outcome
-from thread_factory.utilities.coordination.package import Pack
+from thread_factory import ConcurrentList, Group, Outcome, Pack
 
 
 class TestGroup(unittest.TestCase):

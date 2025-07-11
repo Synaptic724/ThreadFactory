@@ -4,9 +4,7 @@
 # -------------------------------------------------------------------
 import threading, time, unittest, logging
 from typing import List, Any, Dict, Optional
-
-from thread_factory.synchronization.coordinators.conductor        import Conductor
-from thread_factory.synchronization.controllers.signal_controller import SignalController
+from thread_factory     import Conductor , SignalController
 
 
 # ---------- helpers -------------------------------------------------

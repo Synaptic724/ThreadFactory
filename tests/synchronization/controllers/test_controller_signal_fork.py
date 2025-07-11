@@ -6,8 +6,7 @@ from typing import List
 from unittest.mock import MagicMock
 
 # Assuming your classes are in these locations
-from thread_factory.synchronization.controllers.signal_controller import SignalController
-from thread_factory.synchronization.dispatchers.signal_fork import SignalFork
+from thread_factory import SignalController, SignalFork
 
 
 # --- Test Utilities ---

@@ -2,8 +2,7 @@ import threading
 import time
 import unittest
 from unittest.mock import Mock
-
-from thread_factory.synchronization.coordinators.scout import Scout
+from thread_factory import Scout
 
 
 class TestScout(unittest.TestCase):

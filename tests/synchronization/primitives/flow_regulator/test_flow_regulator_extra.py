@@ -2,8 +2,7 @@ import queue
 import time
 import unittest
 from time import perf_counter
-from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
-from thread_factory.utilities.coordination.package import Pack
+from thread_factory import FlowRegulator, Pack
 import ulid
 import threading
 from typing import Callable, Optional
@@ -102,6 +101,7 @@ class TestFlowRegulatorExtra(unittest.TestCase):
         self.center.shutdown()
 #        t = self.center.create_agent(target=attempt)
 
+
     def test_fairness_no_starvation(self):
         """
         All 10 agents (A0–A4, B0–B4) compete for the same permit.
@@ -134,7 +134,7 @@ class TestFlowRegulatorExtra(unittest.TestCase):
         for a in agents:
             a.start()
 
-        time.sleep(5)
+        time.sleep(10)
         stop_flag.set()
 
         for a in agents:

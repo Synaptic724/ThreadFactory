@@ -5,7 +5,7 @@ from collections import Counter
 from unittest.mock import MagicMock
 
 # Assuming SignalFork is in this location.
-from thread_factory.synchronization.dispatchers.signal_fork import SignalFork
+from thread_factory import SignalFork
 
 
 # --- Test Utilities ---

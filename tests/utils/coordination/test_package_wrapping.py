@@ -2,7 +2,7 @@ import unittest
 import time
 import threading
 from functools import partial
-from thread_factory.utilities.coordination.package import Package, Pack
+from thread_factory import Package, Pack
 
 # Helper functions
 def _square(x): return x * x

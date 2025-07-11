@@ -4,7 +4,7 @@ import time
 from collections import Counter
 
 # Assuming the Fork class is in this location
-from thread_factory.synchronization.dispatchers.fork import Fork
+from thread_factory import Fork
 
 
 # =================================================================

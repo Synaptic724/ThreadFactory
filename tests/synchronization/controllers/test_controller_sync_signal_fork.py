@@ -4,8 +4,7 @@ import time
 import unittest
 from typing import List
 from unittest.mock import MagicMock
-from thread_factory.synchronization.controllers.signal_controller import SignalController
-from thread_factory.synchronization.dispatchers.sync_signal_fork import SyncSignalFork
+from thread_factory import SignalController, SyncSignalFork
 
 
 # ────────────────────────────────────────────────────────────────────────────

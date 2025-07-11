@@ -4,8 +4,7 @@ import unittest
 from typing import Any
 
 # Import the new, refactored SignalLatch
-from thread_factory.synchronization.primitives.signal_latch import SignalLatch, TransitCondition
-from thread_factory.utilities.coordination.package import Pack
+from thread_factory import SignalLatch, TransitCondition, Pack
 
 
 # Assuming a placeholder IDisposable for testing context

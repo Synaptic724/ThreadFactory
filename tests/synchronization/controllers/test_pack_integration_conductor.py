@@ -1,7 +1,6 @@
 import unittest
 import threading
-from thread_factory.synchronization.coordinators.conductor import Conductor
-from thread_factory.utilities.coordination.package import Pack
+from thread_factory import Conductor, Pack
 
 def _spawn(n, fn):
     threads = []

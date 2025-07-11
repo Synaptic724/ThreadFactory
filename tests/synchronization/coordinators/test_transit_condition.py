@@ -2,7 +2,7 @@ import threading
 import time
 import unittest
 from typing import List
-from thread_factory.synchronization.primitives.transit_condition import TransitCondition
+from thread_factory import TransitCondition
 
 # ---------------------------------------------------------------------------
 # Helper thread classes

@@ -1,9 +1,8 @@
 import math
 from functools import partial
-from thread_factory.utilities.coordination.package import Package, Pack
+from thread_factory import Package, Pack
 import unittest
 import threading
-from thread_factory.utilities.coordination.package import Package
 import time
 
 

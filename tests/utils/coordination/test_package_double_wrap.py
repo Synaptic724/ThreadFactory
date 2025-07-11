@@ -1,5 +1,5 @@
 import unittest
-from thread_factory.utilities.coordination.package import Package, Pack
+from thread_factory import Package, Pack
 
 
 # Assuming ConcurrentList and ConcurrentDict are correctly imported in your Package module

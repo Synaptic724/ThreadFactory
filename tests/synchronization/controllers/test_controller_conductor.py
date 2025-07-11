@@ -3,8 +3,7 @@ import threading
 import time
 import logging
 from typing import List, Any, Dict
-from thread_factory.synchronization.coordinators.conductor import Conductor
-from thread_factory.synchronization.controllers.signal_controller import SignalController
+from thread_factory import Conductor, SignalController
 
 def _spawn(n: int, fn: callable):
     threads = [threading.Thread(target=fn, daemon=True) for _ in range(n)]

@@ -1,8 +1,7 @@
 import threading
 import time
 import unittest
-import ulid # Assuming ulid is installed and available
-from thread_factory.utilities.coordination.outcome import Outcome
+from thread_factory import Outcome
 
 
 # Assuming the Outcome class is in a file named 'outcome.py'

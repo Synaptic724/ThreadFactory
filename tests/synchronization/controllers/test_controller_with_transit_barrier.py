@@ -2,9 +2,7 @@ import unittest
 from unittest.mock import MagicMock
 import threading
 import time
-
-from thread_factory.synchronization.controllers.signal_controller import SignalController
-from thread_factory.synchronization.coordinators.transit_barrier import TransitBarrier
+from thread_factory import SignalController, TransitBarrier
 
 
 class TestControllerWithTransitBarrier(unittest.TestCase):

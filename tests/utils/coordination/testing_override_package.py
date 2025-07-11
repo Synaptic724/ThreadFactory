@@ -1,5 +1,5 @@
 import unittest
-from thread_factory.utilities.coordination.package import Package
+from thread_factory import Package
 
 
 def sample_func(a, b=0, c=0):

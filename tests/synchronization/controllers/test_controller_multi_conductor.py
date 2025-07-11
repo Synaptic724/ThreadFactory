@@ -4,9 +4,7 @@ import time
 from typing import List, Callable, Optional
 
 # Assuming your project structure allows these imports
-from thread_factory.utilities.coordination.group import Group
-from thread_factory.synchronization.coordinators.multi_conductor import MultiConductor
-from thread_factory.synchronization.controllers.signal_controller import SignalController
+from thread_factory import Group, MultiConductor, SignalController
 
 
 # Helper function from your previous tests

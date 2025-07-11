@@ -20,12 +20,8 @@ import time
 import unittest
 import ulid
 from typing import Any, Dict, Callable
-from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
+from thread_factory import SignalController, ClockBarrier, ConcurrentDict
 
-
-# --- SUT imports ----------------------------------------------------------
-from thread_factory.synchronization.controllers import SignalController
-from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
 # -------------------------------------------------------------------------
 
 class CallbackRecorder:

@@ -3,7 +3,7 @@ import threading
 import time
 from typing import List, Dict, Tuple, Callable, Any
 
-from thread_factory.synchronization.dispatchers.sync_signal_fork import SyncSignalFork
+from thread_factory import SyncSignalFork
 
 
 # ────────────────────────────────────────────────────────────────────────────

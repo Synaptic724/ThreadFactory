@@ -5,12 +5,7 @@
 # -------------------------------------------------------------------
 import threading, time, logging, unittest
 from typing import List, Any, Dict, Optional
-
-from thread_factory.synchronization.coordinators.conductor          import Conductor
-from thread_factory.synchronization.controllers.signal_controller   import SignalController
-from thread_factory.synchronization.primitives.signal_barrier       import SignalBarrier
-from thread_factory.synchronization.primitives.dynaphore            import Dynaphore
-from thread_factory.synchronization.coordinators.clock_barrier      import ClockBarrier
+from thread_factory import Conductor, SignalController, SignalBarrier, Dynaphore, ClockBarrier
 
 
 # ---------- helpers -------------------------------------------------

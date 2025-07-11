@@ -7,8 +7,7 @@ import time
 import unittest
 from typing import Callable, Optional
 import ulid
-from thread_factory.synchronization.primitives.flow_regulator import FlowRegulator
-from thread_factory.utilities.coordination.package import Pack
+from thread_factory import FlowRegulator, Pack
 
 
 # --- Agent compatibility layer ---

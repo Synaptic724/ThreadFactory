@@ -2,7 +2,7 @@ import threading
 import time
 import unittest
 
-from thread_factory.synchronization import TransitBarrier
+from thread_factory import TransitBarrier
 
 
 class TestTransitBarrier(unittest.TestCase):

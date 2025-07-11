@@ -1,7 +1,7 @@
 import unittest
 import threading
 import time
-from thread_factory.synchronization.primitives.latch import Latch
+from thread_factory import Latch
 
 
 class TestSimpleLatch(unittest.TestCase):

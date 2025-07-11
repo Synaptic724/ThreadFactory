@@ -4,7 +4,7 @@ import random
 import threading
 import ulid
 import queue
-from thread_factory.synchronization.primitives.smart_condition import SmartCondition, Waiter
+from thread_factory import SmartCondition, Waiter
 
 # Define a simple General class if it's no longer imported
 class General(object):
