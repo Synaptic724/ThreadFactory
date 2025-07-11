@@ -1091,6 +1091,52 @@ class CommandCenter(IDisposable):
                 break
         return new_agents # This method should return a list of agents that already exist in the pool based on the caps or else the pool makes them
 
+    def create_agent(self,
+                     command_group_name: str,
+                     template_name: str = "default",
+                     **kwargs) -> Agent:
+        """
+        Creates a single general-purpose agent for pool-managed tasks.
+        Primarily used internally by activities or other high-level methods.
+        """
+        raise NotImplementedError("This method has not been implemented yet.")
+
+    def create_agents(self,
+                      count: int,
+                      command_group_name: str,
+                      template_name: str = "default",
+                      **kwargs) -> List[Agent]:
+        """
+        Creates a batch of general-purpose agents for pool-managed tasks.
+        """
+        raise NotImplementedError("This method has not been implemented yet.")
+
+    def create_specialist(self,
+                          command_group_name: str,
+                          specialist_name: str,
+                          template_name: str,
+                          **kwargs) -> str:
+        """
+        Creates, deploys, and registers a long-lived specialist agent.
+
+        These target reserved agents that are specialized for dispatching tasks.
+
+        Returns:
+            str: The unique name (`specialist_name`) to use for retrieval.
+        """
+        raise NotImplementedError("This method has not been implemented yet.")
+
+    def get_specialist(self, specialist_name: str) -> 'Agent':
+        """
+        Retrieves a safe handle to an existing, active specialist.
+
+        These target reserved agents that are specialized for dispatching tasks.
+
+        Returns:
+            SpecialistHandle: A proxy object used to interact with the specialist.
+        """
+        raise NotImplementedError("This method has not been implemented yet.")
+
     def create_task(
         self,
         target: Union[Callable[..., Any], Pack],
@@ -1157,8 +1203,21 @@ class CommandCenter(IDisposable):
                 agent = self.create_agent(template_name, target=target, define_home=define_home, command_group_name= command_group_name, reset_agent=reset_agents,  *args, **kwargs)
                 agent.deploy()
 
-#endregion Agent Work Management
+#endregion Agent Management
 #region Agent Creation and Registration
+    def build_command_group_pool(self,
+                                 command_group_name: str = "default",
+                                 template_name: str = "default",
+                                 *args,
+                                 **kwargs):
+        """
+        Pre-warms a command group's agent pool by creating a set number of agents.
+        This ensures agents are immediately available for tasks without creation delay.
+        The number of agents to create should be passed via kwargs.
+        """
+        raise NotImplementedError("This method has not been implemented yet.")
+
+
     def _register_agent(self, agent: Agent, command: CommandGroup) -> None:
         """
         Internal helper to register an agent in the active list.

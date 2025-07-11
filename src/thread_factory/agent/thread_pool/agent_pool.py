@@ -1296,6 +1296,7 @@ class AgentPool(IDisposable):
 
     def _create_maintenance_worker(self) -> 'Agent':
         """Creates the dedicated agent responsible for all pool scaling."""
+        raise NotImplementedError("Maintenance agent creation is not implemented yet.")
         agent = self._command_center.create_agent(
             template_name="default",  # A simple, internal agent
             target=self._maintenance_loop,
@@ -1305,6 +1306,7 @@ class AgentPool(IDisposable):
 
     def _maintenance_loop(self):
         """The main logic for the maintenance agent, managing all pools."""
+        raise NotImplementedError("Maintenance loop is not implemented yet.")
         while self._shutdown_gate.is_open():
             time.sleep(5)  # Maintenance check interval
             try:
@@ -1329,6 +1331,7 @@ class AgentPool(IDisposable):
 
     def _add_worker(self, group_name: str):
         """Requests a new worker from the CommandCenter for a specific group's pool."""
+        raise NotImplementedError("Maintenance agent creation is not implemented yet.")
         container = self._containers[group_name]
 
         if group._worker_count >= config['max']:
@@ -1346,6 +1349,7 @@ class AgentPool(IDisposable):
 
     def _retire_worker(self, agent: 'Agent'):
         """Retires a specific worker from the pool."""
+        raise NotImplementedError("Maintenance agent creation is not implemented yet.")
         if agent and not agent.shutdown_flag.is_set():
             agent.shutdown_flag.set()
             # Wake the agent up so it can process its shutdown signal
