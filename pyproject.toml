@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "threadfactory"
-version = "1.5.0"
+version = "1.5.2"
 description = "High-performance thread-safe (No-GIL–friendly) data structures and parallel operations for Python 3.13+."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.13"
