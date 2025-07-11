@@ -117,7 +117,7 @@ class ConcurrentTools:
             for chunk_start in range(start, stop, chunk_size):
                 chunk_end = min(chunk_start + chunk_size, stop)
                 future = executor.submit(
-                    Concurrent._for_loop_worker_chunk,
+                    ConcurrentTools._for_loop_worker_chunk,
                     chunk_start,
                     chunk_end,
                     body,
@@ -228,7 +228,7 @@ class ConcurrentTools:
                     if stop_event and stop_event.is_set():
                         break
                     future = executor.submit(
-                        Concurrent._foreach_worker_chunk,
+                        ConcurrentTools._foreach_worker_chunk,
                         sublist,
                         action,
                         stop_event
@@ -265,7 +265,7 @@ class ConcurrentTools:
                     end_index = min(start_index + chunk_size, total)
                     sublist = items[start_index:end_index]
                     future = executor.submit(
-                        Concurrent._foreach_worker_chunk,
+                        ConcurrentTools._foreach_worker_chunk,
                         sublist,
                         action,
                         stop_event
@@ -329,7 +329,7 @@ class ConcurrentTools:
         with ThreadPoolExecutor(max_workers=mw) as executor:
             # Submit each function to the pool. _invoke_wrapper is a helper to handle exceptions uniformly.
             for fn in functions:
-                futures.append(executor.submit(Concurrent._invoke_wrapper, fn))
+                futures.append(executor.submit(ConcurrentTools._invoke_wrapper, fn))
 
             if wait:
                 # If the user wants to wait, we use as_completed to raise any exceptions.
@@ -392,7 +392,7 @@ class ConcurrentTools:
                 end_index = min(start_index + chunk_size, total)
                 futures.append(
                     executor.submit(
-                        Concurrent._map_worker_chunk,
+                        ConcurrentTools._map_worker_chunk,
                         items,
                         results,
                         transform,
