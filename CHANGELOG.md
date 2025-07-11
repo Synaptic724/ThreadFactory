@@ -15,7 +15,7 @@ This release splits the system into high-performance primitives, orchestrators, 
 
 ---
 
-## 🔒 Sync Types – `concurrency.value_types`
+## 🔒 Sync Types – `concurrency.sync_types`
 
 Thread-safe wrappers for Python’s core data types. Built for deterministic, low-contention, concurrent access across threads.
 These types are also now reference types and are no longer treated like simple values (Use them cautiously).
@@ -53,7 +53,7 @@ Classic reusable latch. Once opened, all threads are released permanently until 
 
 ---
 
-## ⚡ New Coordinators – `synchronization.orchestrators`
+## ⚡ New Coordinators – `synchronization.coordinators`
 
 ### 🎯 `TransitBarrier`
 Reusable barrier with threshold coordination and optional callable execution once threshold is met.
@@ -126,7 +126,7 @@ It forms the backbone for global coordination, status tracking, and command disp
 
 ---
 
-## ⏱️ Timing Utilities – `thread_factory.utils.timing`
+## ⏱️ Timing Utilities – `thread_factory.utilities.timing_tools`
 
 ### ⏲️ `AutoResetTimer`
 Timer that auto-resets after use. Useful for cyclic backoff, loop pacing, and heartbeat monitoring.
