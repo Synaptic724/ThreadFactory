@@ -1,5 +1,3 @@
-[//]: # (#  Threadfactory: It's time to step into a parallel reality 
-
 [![PyPI version](https://badge.fury.io/py/threadfactory.svg)](https://badge.fury.io/py/threadfactory)
 [![License](https://img.shields.io/github/license/Synaptic724/threadfactory)](https://github.com/Synaptic724/threadfactory/blob/production/LICENSE)
 [![Python Version](https://img.shields.io/pypi/pyversions/threadfactory)](https://pypi.org/project/threadfactory)
