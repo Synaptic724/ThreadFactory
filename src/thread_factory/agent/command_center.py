@@ -503,6 +503,13 @@ class CommandCenter(IDisposable):
         None
         """
         super().__init__()
+        if not isinstance(group_max_workers, int) or group_max_workers < 1:
+            raise ValueError("group_max_workers must be a positive integer.")
+        if not isinstance(agents_per_container, int) or agents_per_container < 1:
+            raise ValueError("group_max_workers must be a positive integer.")
+        if not isinstance(total_max_workers, int) or total_max_workers < 1:
+            raise ValueError("group_max_workers must be a positive integer.")
+
         # --- Core Components ---
         self._logger: Logger = logger or logging.getLogger(__name__)
         self._id = str(ulid.ULID())
@@ -519,13 +526,8 @@ class CommandCenter(IDisposable):
                 self._agent_pool = AgentPool.initialize_singleton(command_center=self, logger=self._logger)
                 self._logger.debug("Initialized new AgentPool singleton.")
         else:
-            self._agent_pool = AgentPool(command_center=self, logger=self._logger)
+            self._command_center_cluster = self._agent_pool.get_or_create_cluster(command_center=self, max_workers=total_max_workers)
             self._logger.debug("Initialized standalone AgentPool instance.")
-
-
-        if not isinstance(group_max_workers, int) or group_max_workers < 1:
-            raise ValueError("group_max_workers must be a positive integer.")
-        self._total_max_workers = SyncInt(total_max_workers)
 
         # --- Group Management ---
         self._command_groups: ConcurrentDict[str, CommandGroup] = ConcurrentDict()
@@ -566,7 +568,9 @@ class CommandCenter(IDisposable):
 
             self._agent_pool.dispose()
             self._agent_pool = None
-            self._total_max_workers = None
+            self._command_center_cluster.dispose()
+            self._command_center_cluster = None
+
             if self._external_signal_controller:
                 self._external_signal_controller.notify(self.id, "DISPOSED")
             if self._external_signal_controller and hasattr(self._external_signal_controller, 'unregister'):
@@ -642,13 +646,13 @@ class CommandCenter(IDisposable):
         self._check_disposed()
 
         with self._lock:
-            if new_global_limit < self._total_max_workers:
+            if new_global_limit < self._command_center_cluster._max_size:
                 raise ValueError(
-                    f"New limit ({new_global_limit}) cannot be less than the current global max worker limit ({self._total_max_workers}). "
+                    f"New limit ({new_global_limit}) cannot be less than the current global max worker limit ({self._command_center_cluster._max_size}). "
                     f"Use 'decrease_max_workers' on individual groups to lower capacity."
                 )
 
-            self._total_max_workers = new_global_limit
+            self._command_center_cluster._max_size = new_global_limit
             self._logger.info(f"Global max workers limit increased to {new_global_limit}.")
 
     def create_command_group(self, command_group_name: str, max_workers: int, agents_per_container: int = 30, logger: Optional[logging.Logger] = None, command_group_type: str = None) -> None:
@@ -663,8 +667,8 @@ class CommandCenter(IDisposable):
         if command_group_name in self._command_groups:
             raise ValueError(f"A CommandGroup with the name '{command_group_name}' already exists.")
 
-        if self.get_total_active_workers() + max_workers > self._total_max_workers:
-            raise RuntimeError(f"Cannot create CommandGroup '{command_group_name}'. Total active workers would exceed global limit of {self._total_max_workers}, increase new total limit to create a new group.")
+        if self.get_total_active_workers() + max_workers > self._command_center_cluster._max_size:
+            raise RuntimeError(f"Cannot create CommandGroup '{command_group_name}'. Total active workers would exceed global limit of {self._command_center_cluster._max_size}, increase new total limit to create a new group.")
 
         # Create the CommandGroup instance and register it
         group = CommandGroup(command_center=self, group_name=command_group_name, max_workers=max_workers, agents_per_container=agents_per_container, logger=logger, group_type=command_group_type)
@@ -1195,8 +1199,8 @@ class CommandCenter(IDisposable):
         command = self.get_command_group(command_group_name)
         if not isinstance(amount, int) or amount < 1:
             raise ValueError("Amount must be a positive integer.")
-        if self.get_total_active_workers() + amount > self._total_max_workers:
-            raise RuntimeError(f"Cannot create CommandGroup '{command_group_name}'. Total active workers would exceed global limit of {self._total_max_workers}, increase new total limit to create a new group.")
+        if self.get_total_active_workers() + amount > self._command_center_cluster._max_size:
+            raise RuntimeError(f"Cannot create CommandGroup '{command_group_name}'. Total active workers would exceed global limit of {self._command_center_cluster._max_size}, increase new total limit to create a new group.")
         with self._lock:
             command._group_pool_container._max_workers += amount
             self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._group_pool_container._max_workers, 'command_group': command})
