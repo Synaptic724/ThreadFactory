@@ -76,7 +76,7 @@ If you really love my work please connect with me on [LinkedIn](https://www.link
 
 ## 🚀 Features
 
-## 🔒 Sync Types – `thread_factory.concurrency.value_types`
+## 🔒 Sync Types – `thread_factory.concurrency.sync_types`
 
 ThreadFactory's **Sync Types** are thread-safe wrappers for Python’s core data types. They're built for deterministic, low-contention, concurrent access across threads, making them perfect for shared state in threaded environments, worker pools, and agent execution contexts.
 
