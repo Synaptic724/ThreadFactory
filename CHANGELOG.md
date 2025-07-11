@@ -8,7 +8,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-# 🧵 ThreadFactory v1.5.0 – Massive Concurrency Upgrade
+# 🧵 ThreadFactory v1.5.2 – Massive Concurrency Upgrade
 
 ThreadFactory now introduces a modular concurrency stack built from first principles.  
 This release splits the system into high-performance primitives, orchestrators, dispatchers, sync types, and agentic thread tools.
