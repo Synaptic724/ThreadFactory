@@ -53,7 +53,7 @@ Classic reusable latch. Once opened, all threads are released permanently until 
 
 ---
 
-## ⚡ New Coordinators – `synchronization.orchestrators`
+## ⚡ New Coordinators – `synchronization.coordinators`
 
 ### 🎯 `TransitBarrier`
 Reusable barrier with threshold coordination and optional callable execution once threshold is met.
@@ -126,7 +126,7 @@ It forms the backbone for global coordination, status tracking, and command disp
 
 ---
 
-## ⏱️ Timing Utilities – `thread_factory.utils.timing`
+## ⏱️ Timing Utilities – `thread_factory.utilities.timing_tools`
 
 ### ⏲️ `AutoResetTimer`
 Timer that auto-resets after use. Useful for cyclic backoff, loop pacing, and heartbeat monitoring.
