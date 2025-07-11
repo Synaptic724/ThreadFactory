@@ -2,7 +2,7 @@
 factory
 High-performance concurrency collections and parallel operations for Python 3.13+.
 """
-DEBUG_MODE = False
+DEBUG_MODE = True
 import sys
 import warnings
 from thread_factory.__version__ import __version__ as version
