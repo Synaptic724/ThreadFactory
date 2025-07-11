@@ -1,8 +1,10 @@
 import logging, threading, time, ulid
 from dataclasses import dataclass
 from typing import Callable, Union, Optional
+from thread_factory.agent.identity.types.agent import Agent
+from thread_factory.agent.identity.agent_builder import AgentBuilder
 from thread_factory.agent.thread_pool.utilities.agent_pool_type import AgentPoolType
-from thread_factory.agent.thread_pool import HelpRequest
+from thread_factory.agent.thread_pool.requests.help_request import HelpRequest
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from thread_factory.concurrency.sync_types.sync_bool import SyncBool
 from thread_factory.concurrency.sync_types.sync_int import SyncInt
@@ -855,6 +857,7 @@ class AgentPool(IDisposable):
         self._command_center = command_center
         self._logger = logger or logging.getLogger(__name__)
         self._shutdown_gate = Gate(True)
+        self._builder = AgentBuilder()
         self._data_center = DataCenter(logger=self._logger)  # Centralized data center for records and metadata
 
         # Create and deploy the maintenance agent
@@ -886,6 +889,9 @@ class AgentPool(IDisposable):
             self._data_center.dispose()
             self._data_center = None
             self._shutdown_gate.close()  # Signal shutdown to the maintenance agent
+            if self._builder:
+                self._builder.dispose()
+                self._builder = None  # Clear reference to AgentBuilder
 
             if self._maintenance_agent:
                 self._maintenance_agent.shutdown_flag.set()
@@ -965,7 +971,24 @@ class AgentPool(IDisposable):
 
             return self._command_group_containers[command_group_id]
 
+#region Agent Creation
+    def _create_agent_from_template(self, template_name: str, command_group_id: str, *args, **kwargs) -> Agent:
+        """
+        Internal helper to create an agent from a registered template.
+        This is used by the CommandCenter to create agents from templates.
+        """
+        try:
+            kwargs["command_center"] = self
+            agent = self._builder.create_agent(template_name, *args, **kwargs)
+            agent.template_name = template_name
+            #TODO: Register agent with pool
+            return agent
+        except Exception as e:
+            self._logger.error(f"Failed to create agent from template '{template_name}': {e}", exc_info=True)
+            self._notify('AGENT_CREATION_FAILED', {'template_name': template_name, 'error': str(e)})
+            raise RuntimeError(f"Agent creation failed: {str(e)}") from e
 
+#endregion Agent Creation
 #region Maintenance Agent
     def _manage_worker_count_per_group(self):
         """

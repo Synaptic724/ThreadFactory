@@ -3,7 +3,6 @@ from logging import Logger
 from typing import Optional, List, Callable, Any, Union, Dict, Type
 from thread_factory.agent.activity.builder import ActivityBuilder
 from thread_factory.agent.activity.base import BaseActivity, ActivityStatus
-from thread_factory.agent.identity.agent_builder import AgentBuilder
 from thread_factory.agent.identity.types.agent import Agent
 from thread_factory.synchronization.controllers.signal_controller import SignalController
 from thread_factory.utilities.coordination.package import Pack
@@ -519,7 +518,6 @@ class CommandCenter(IDisposable):
         self._logger: Logger = logger or logging.getLogger(__name__)
         self._id = str(ulid.ULID())
         self._lock = threading.RLock()
-        self._builder = AgentBuilder()
         self._activity_builder = ActivityBuilder()
         self._singleton_agent_pool = agent_pool_singleton
         # --- Pool Management ---
@@ -576,8 +574,6 @@ class CommandCenter(IDisposable):
             # --- Dispose Builders ---
             if self._activity_builder:
                 self._activity_builder.dispose()
-            if self._builder:
-                self._builder.dispose()
 
             self._agent_pool.dispose()
             self._agent_pool = None
@@ -1231,7 +1227,6 @@ class CommandCenter(IDisposable):
             raise RuntimeError(f"Cannot create CommandGroup '{command_group_name}'. Total active workers would exceed global limit of {self._total_max_workers}, increase new total limit to create a new group.")
         with self._lock:
             command._max_workers += amount
-            command._group_pool_container.increase_max_worker_count(amount)
             self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._max_workers, 'command_group': command})
 
     def decrease_max_workers(self, amount: int = 1, command_group_name: str = "default"):
@@ -1254,7 +1249,6 @@ class CommandCenter(IDisposable):
             if command._worker_count > command._max_workers - amount:
                 raise RuntimeError("Cannot decrease below current active worker count.")
             command._max_workers -= amount
-            command._group_pool_container.decrease_max_worker_count(amount)
             self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._max_workers, 'command_group': command.id})
 
     def _create_and_register_agent(self, template_name: str, define_home: Optional[Union[Callable[..., None], Pack]] = None,
@@ -1314,22 +1308,6 @@ class CommandCenter(IDisposable):
             self._notify('POOL_GET_FAILED', {'template_name': template_name, 'command_group': command_group_id})
 
 
-    def _create_agent_from_template(self, template_name: str, command_group_id: str, *args, **kwargs) -> Agent:
-        """
-        Internal helper to create an agent from a registered template.
-        This is used by the CommandCenter to create agents from templates.
-        """
-        try:
-            kwargs["command_center"] = self
-            agent = self._builder.create_agent(template_name, *args, **kwargs)
-            agent.template_name = template_name
-            #TODO: Register agent with pool
-            return agent
-        except Exception as e:
-            self._logger.error(f"Failed to create agent from template '{template_name}': {e}", exc_info=True)
-            self._notify('AGENT_CREATION_FAILED', {'template_name': template_name, 'error': str(e)})
-            raise RuntimeError(f"Agent creation failed: {str(e)}") from e
-
     def _post_agent_creation(self, agent: Agent, define_home: Optional[Union[Callable[..., None], Pack]] = None,
             target: Optional[Union[Callable[..., None], Pack]] = None, reset_agent: bool = False, *args, **kwargs) -> None:
         """
@@ -1354,7 +1332,7 @@ class CommandCenter(IDisposable):
         """
         if self._disposed:
             raise RuntimeError("Cannot register templates after CommandCenter is disposed.")
-        self._builder.register_template(template_name, factory_fn)
+        self._agent_pool._builder.register_template(template_name, factory_fn)
         self._notify('TEMPLATE_REGISTERED', {'template_name': template_name})
 
     def unregister_template(self, template_name: str) -> bool:
@@ -1368,7 +1346,7 @@ class CommandCenter(IDisposable):
             bool: True if removed successfully, False if not found.
         """
         self._check_disposed()
-        was_unregistered = self._builder.unregister_template(template_name)
+        was_unregistered = self._agent_pool._builder.unregister_template(template_name)
         if was_unregistered:
             self._notify('TEMPLATE_UNREGISTERED', {'template_name': template_name})
         return was_unregistered
@@ -1381,7 +1359,7 @@ class CommandCenter(IDisposable):
             List[str]: A list of symbolic template names.
         """
         self._check_disposed()
-        return self._builder.list_templates()
+        return self._agent_pool._builder.list_templates()
 
     def get_active_agents(self, command_group_name: str = "default") -> List[Agent]:
         """
