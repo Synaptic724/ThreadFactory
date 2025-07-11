@@ -137,12 +137,15 @@ class CommandGroup(IDisposable):
                     logging.error(f"Error disposing Activity '{activity.id}': {e}", exc_info=True)
             self._active_activities.dispose()
 
+            # SyncInt and other internal state cleanup
             self._worker_count = None
             self._max_workers = None
+            self._agents_per_container = None
             self._logger.info(f"CommandGroup '{self.name}' disposed.")
             self._logger = None
 
             # region CommandGroup Methods
+
     def add_agent(self, template_name: str = "default", reset_agent: bool = False, *args, **kwargs) -> Optional[Agent]:
         """
         Creates and registers a new agent under this CommandGroup.
@@ -977,6 +980,25 @@ class CommandCenter(IDisposable):
 #endregion Controller Contract
 
 #region Agent Pool Management
+    def increase_agents_per_container(self, number_of_agents: int, command_group_name: str = "default"):
+        """
+        Increases the number of agents per container in the specified command group.
+
+        Args:
+            number_of_agents (int): The number of additional agents to add to each container.
+            command_group_name (str): The name of the command group to adjust.
+        """
+        self._check_disposed()
+        if not isinstance(number_of_agents, int) or number_of_agents < 0:
+            raise ValueError("Additional agents must be a non-negative integer.")
+
+        command = self.get_command_group(command_group_name)
+        command._agents_per_container += number_of_agents
+
+        self._logger.info(f"Increased agents per container by {number_of_agents} in CommandGroup '{command.name}'")
+        self._notify('AGENTS_PER_CONTAINER_INCREASED', {'additional_agents': number_of_agents})
+
+
     def set_agent_pool_distribution(self, throughput_agents: int = 60, dispatch_agents: int= 40, targeted_dispatch_agents: int = 0, command_group_name: str = "default"):
         """
         Sets the distribution parameters for the AgentPool.
@@ -998,7 +1020,7 @@ class CommandCenter(IDisposable):
             raise ValueError("Total distribution cannot exceed 100% of the agent pool capacity.")
 
         command = self.get_command_group(command_group_name)
-        command._group_pool_container.set_distribution(throughput_agents, dispatch_agents, targeted_dispatch_agents)
+        command._group_pool_container.set_agent_pool_distribution(throughput_agents, dispatch_agents, targeted_dispatch_agents)
         self._logger.info(f"AgentPool distribution set: throughput={throughput_agents}, dispatched_agents={dispatch_agents}, dispatch_targeted={targeted_dispatch_agents}")
         self._notify('AGENT_POOL_DISTRIBUTION_SET', {
             'throughput_agents': throughput_agents,

@@ -564,7 +564,7 @@ class CommandGroupContainer(IDisposable):
         # Container Management
         self._containers: Optional[ConcurrentDict[str, AgentContainer]] = ConcurrentDict[str, AgentContainer]() # UUID and Agent Container
         self._agents_in_container: ConcurrentDict[str, ConcurrentSet] =  ConcurrentDict[str, ConcurrentSet]()  # UUID and Agent Container
-        self._max_size: Optional[SyncInt] = command_group._max_workers# Optional: max agents per container #TODO: IMplement features with this later per work containers
+        self._max_size: Optional[SyncInt] = command_group._max_workers# Optional: max agents per container
         self._agents_per_container: SyncInt = command_group.agents_per_container
 
         self._logger.info(f"Initialized CommandGroupContainer for group ID: {self._group_id}")
@@ -596,6 +596,7 @@ class CommandGroupContainer(IDisposable):
             self._logger = None
 
 #region Container Management
+
     def create_container(self) -> AgentContainer:
         """
         Creates and registers a new AgentContainer for this group.
@@ -612,11 +613,34 @@ class CommandGroupContainer(IDisposable):
             ignore_tracking=False
         )
 
-        self.register_container(
-            container=container,
-            max_size=self._agents_per_container.value
-        )
+        self.register_container(container)
         return container
+
+    def register_container(self, container: AgentContainer):
+        """
+        Registers a new AgentContainer into the internal container registry.
+
+        Args:
+            container (AgentContainer): The container to register.
+        """
+        if self._disposed:
+            raise RuntimeError("CommandGroupContainer has been disposed.")
+
+        self._containers[container._id] = container
+        self._agents_in_container[container._id] = ConcurrentSet()
+
+    def unregister_container(self, container: AgentContainer):
+        """
+        Unregisters and removes a container from the internal registry.
+
+        Args:
+            container (AgentContainer): The container to remove.
+        """
+        if self._disposed:
+            raise RuntimeError("CommandGroupContainer has been disposed.")
+
+        self._containers.pop(container._id, None)
+        self._agents_in_container.pop(container._id, None)
 
     def remove_container(self, container: AgentContainer) -> bool:
         """
@@ -639,33 +663,6 @@ class CommandGroupContainer(IDisposable):
             self._logger.warning(f"Failed to remove container: {e}")
             return False
 
-    def register_container(self, container: AgentContainer, max_size: int):
-        """
-        Registers a new AgentContainer.
-
-        Args:
-            container (AgentContainer): The container to register.
-            max_size (int): The maximum number of agents this container supports.
-        """
-        if self._container_cluster is None:
-            self._container_cluster = ContainerCluster(
-                containers=ConcurrentList[AgentContainer](),
-                max_size=SyncInt(max_size)
-            )
-        self._container_cluster.register_container(container)
-
-    def unregister_container(self, container: AgentContainer):
-        """
-        Unregisters a container.
-
-        Args:
-            container (AgentContainer): The container to remove.
-        """
-        if self._container_cluster:
-            self._container_cluster.unregister_container(container)
-            if not self._container_cluster.containers:
-                self._container_cluster = None
-
     def get_or_create_container(self) -> AgentContainer:
         """
         Retrieves an available container or creates a new one if needed.
@@ -673,17 +670,22 @@ class CommandGroupContainer(IDisposable):
         Returns:
             AgentContainer: A container with space for new agents.
         """
-        if self._container_cluster:
-            container = self._container_cluster.get_available_container()
-            if container:
+        if self._disposed:
+            raise RuntimeError("CommandGroupContainer has been disposed.")
+
+        for container_id, container in self._containers.items():
+            agent_count = len(self._agents_in_container[container_id])
+            if agent_count < self._agents_per_container.value:
                 return container
 
         return self.create_container()
 
     #endregion Container Management
 #region Targeted Retrieval System
+
 #endregion Targeted Retrieval System
-#region Worker Management
+#region Agent Management
+
     def set_agent_pool_distribution(self, throughput_agents: int = 60, dispatch_agents: int= 40, targeted_dispatch_agents: int = 0):
         """
         Sets the distribution of agents across different pools.
@@ -697,64 +699,13 @@ class CommandGroupContainer(IDisposable):
             raise RuntimeError("AgentPool has been disposed and cannot set distribution.")
 
         with self._lock:
-            self._throughput_worker_count = throughput_agents
-            self._dispatch_worker_count = dispatch_agents
-            self._targeted_dispatch_worker_count = targeted_dispatch_agents
+            self._throughput_worker_count.set(throughput_agents)
+            self._dispatch_worker_count.set(dispatch_agents)
+            self._targeted_dispatch_worker_count.set(targeted_dispatch_agents)
 
-    def increase_max_worker_count(self, number: int):
-        """
-        Notify the pool to increase its maximum worker count.
-        This sends a signal to the maintenance agent to scale up
-        the number of workers in the pool, allowing it to handle more
-        concurrent requests.
+#endregion Agent Management
 
-        Args:
-            number (int): The number of workers to add to the pool.
-        """
-        if self._disposed:
-            raise RuntimeError("AgentPool has been disposed and cannot notify distribution change.")
-
-        # Notify the maintenance agent to increased worker count
-        if self._maintenance_agent: #TODO: Decide if we change something or if the system does
-            self._maintenance_agent.increase_max_worker_count(number)
-        raise NotImplemented("Method increase_max_worker_count is not implemented yet.")
-
-    def decrease_max_worker_count(self, number: int):
-        """
-        Notify the pool to decrease its maximum worker count.
-        This sends a signal to the maintenance agent to scale down
-        the number of workers in the pool, reducing resource usage
-        when demand is low.
-
-        Args:
-            number (int): The number of workers to remove from the pool.
-        """
-        if self._disposed:
-            raise RuntimeError("AgentPool has been disposed and cannot notify distribution change.")
-
-        # Notify the maintenance agent to adjust worker distribution
-        if self._maintenance_agent: #TODO: Decide if we change something or if the system does
-            self._maintenance_agent.decrease_max_worker_count(number)
-        raise NotImplemented("Method decrease_max_worker_count is not implemented yet.")
-
-
-    def _notify_distribution_change_event(self):
-        """
-        Notifies the maintenance agent of a change in worker distribution.
-        This is used to trigger a re-evaluation of the current worker allocation
-        based on the new distribution settings.
-        """
-        if self._disposed:
-            raise RuntimeError("AgentPool has been disposed and cannot notify distribution change.")
-        raise NotImplemented("Method _notify_distribution_change_event is not implemented yet.")
-
-        # Notify the maintenance agent to adjust worker distribution
-        if self._maintenance_agent: #TODO: Decide if we change something or if the system does
-            self._maintenance_agent.notify_distribution_change(self._throughput_worker_count,
-                                                               self._dispatch_worker_count,
-                                                               self._targeted_dispatch_worker_count)
-
-
+#region Work Management
     def submit(self, help_request: 'HelpRequest', group_name: str, num_workers: int):
         """
         Submits a parallel job to a specific group's pool.
@@ -777,7 +728,7 @@ class CommandGroupContainer(IDisposable):
         help_request.record.status = WorkStatus.IN_PROGRESS
         self._containers[group_name].dispatch_work(help_request, num_workers)
 
-#endregion Worker Management
+#endregion Work Management
 
 class DataCenter(IDisposable):
     """
