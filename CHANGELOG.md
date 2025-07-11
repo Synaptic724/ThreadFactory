@@ -6,76 +6,197 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
-- **`Work`**  
-  A future-compatible, extensible task container designed for expressive async and threaded workloads. Acts as a core unit in the execution system.
+---
 
-- **`AutoResetTimer`**  
-  A utility class that resets automatically after expiration. Ideal for retry loops or lightweight state machines.
+# 🧵 ThreadFactory v1.5.0 – Massive Concurrency Upgrade
 
-- **`Stopwatch`**  
-  A high-resolution timing utility for measuring task durations with minimal overhead.
-
-- **`SmartCondition`**  
-  A thread synchronization primitive similar to `threading.Condition`, but enhanced with *targeted wakeups* via `factory_ids`.  
-  Supports selective `notify`, `notify_all`, and predicate-based `wait_for` with ID filtering.  
-  Built from scratch for full transparency and fine-grained thread control.
-
-- **`SwitchLock`**  
-  A dynamic semaphore built atop `SmartCondition`, enabling runtime-adjustable permits and ID-targeted thread blocking/unblocking.  
-  Serves as the foundation for trap-and-release execution models and room-based thread routing.
-- 
-### Added Features
-- Integrated time-tracking capabilities through `Stopwatch` and `AutoResetTimer` to support precise performance metrics and scheduled operations.
-- Introduced the first version of the `Work` abstraction for structured task submission, response handling, and optional callbacks.
-- Added targeted thread trapping and wakeup mechanisms via `SmartCondition`, allowing threads to wait on logical `factory_ids` and be selectively released based on those IDs.
-- Introduced `SwitchLock` to orchestrate semaphore-like control with dynamic permit scaling and smart ID-based synchronization.  
-  Supports granular release control, timed thread suspension, and future-safe thread disposal coordination.
-- Added batch steal support to `ConcurrentQueue` and `ConcurrentStack`, allowing for efficient bulk operations and improved performance in high-contention scenarios.
-- 
-#### 🧠 Work Object
-- Introduced the `Work` class: a disposable, hook-enabled, metadata-rich extension of `Future`.
-- Features:
-  - Native `await` support through `__await__` for seamless asyncio compatibility.
-  - `auto_dispose` flag to enable automatic cleanup after result or exception retrieval.
-  - Lifecycle hook system (`before`, `after`) for execution tracing and side-effect orchestration.
-  - Full metadata tracking (task ID, timing metrics, worker/queue binding, retry count).
-  - Graceful cancellation with `CancelledError` injection.
-  - Thread-safe via internal `_condition` object override.
-
-#### 🧵 Worker Prototype
-- Introduced a minimal `Worker` class for executing `Work` instances on background threads.
-- Provides early structure for future task orchestration under `ThreadFactory`.
-
-#### 🏗️ ThreadFactory Framework (WIP)
-- Scaffolded architecture for the `ThreadFactory` execution system.
-- Early goals include:
-  - Modular producer-consumer management.
-  - Queue-to-worker routing logic.
-  - Support for scaling policies and diagnostics interfaces.
-- Will form the backbone of both sync and async thread execution systems.
-
-#### 🎫 QueueAllocator
-- Added `QueueAllocator`: a ticket-based ID allocator using `ConcurrentQueue`.
-- Designed for managing worker/task/thread IDs in a pool-based system.
-- Features:
-  - Fast, thread-safe ticket acquisition and release.
-  - Validates returned IDs for correctness and range.
-  - Integrates `Disposable` lifecycle management.
-  - Full context manager support with `with` blocks.
-  - Enforces internal reuse of ticket IDs for efficient resource control.
-
-### Planned
-- `AsyncThreadFactory`: Fully `asyncio`-integrated version of `ThreadFactory`.
-- `DiagnosticsInterface`: Real-time throughput, queue, and performance tracking.
-- `Orchestrator`: Dynamic coordination of thread lifecycles, workloads, and contention resolution.
-
-
-### Changes
-- `ConcurrentDict` implemented an optimized version of pop.
+ThreadFactory now introduces a modular concurrency stack built from first principles.  
+This release splits the system into high-performance primitives, orchestrators, dispatchers, sync types, and agentic thread tools.
 
 ---
-# Changelog
+
+## 🔒 Sync Types – `concurrency.value_types`
+
+Thread-safe wrappers for Python’s core data types. Built for deterministic, low-contention, concurrent access across threads.
+These types are also now reference types and are no longer treated like simple values (Use them cautiously).
+
+- `SyncInt`: Atomic integer wrapper with arithmetic and bitwise support.
+- `SyncBool`: Thread-safe boolean with full logical operation support.
+- `SyncString`: Thread-safe mutable wrapper around Python’s `str`, with full dunder and method coverage.
+- `SyncFloat`: Atomic float wrapper with arithmetic and bitwise support.
+- `SyncRef`: Thread-safe, atomic reference to any object — enables safe read/write access and conditional updates.
+
+These types are ideal for shared state in threaded environments, worker pools, and agent execution contexts.
+
+---
+
+## 🧠 New Primitives – `synchronization.primitives`
+
+### 🎛 `Dynaphore`
+A dynamically resizable permit gate. Ideal for adaptive queues, resource throttling, and elastic thread pools.
+
+### 🔁 `FlowRegulator`
+Smart semaphore with factory ID targeting, callback routing, and bias buffering. Great for agentic workers and dynamic wakeups.
+
+### 🧠 `SmartCondition`
+Thread-aware `Condition` alternative. Allows targeted wakeups, ULID tracking, and callback delivery to waiting threads.
+
+### 🔔 `TransitCondition`
+Minimalist wait/notify condition. Callback always executes inside the waiting thread. Lightweight and FIFO-safe.
+
+### 🛑 `SignalLatch`
+Latch with observer signaling support. Can notify a controller before blocking. Uses `SignalCondition` internally.
+This object can natively connect to a `SignalController` for lifecycle management.
+
+### 🔒 `Latch`
+Classic reusable latch. Once opened, all threads are released permanently until reset.
+
+---
+
+## ⚡ New Coordinators – `synchronization.orchestrators`
+
+### 🎯 `TransitBarrier`
+Reusable barrier with threshold coordination and optional callable execution once threshold is met.
+
+### 🚦 `SignalBarrier`
+Reusable barrier with signal-based coordination. Supports threshold, timeout, and failure states.
+This object can natively connect to a `SignalController` for lifecycle management.
+
+### ⏰ `ClockBarrier`
+Barrier with global timeout. If not all threads arrive before timeout, the barrier breaks and raises.
+This object can natively connect to a `SignalController` for lifecycle management.
+
+### 🚦 `Conductor`
+Reusable group synchronizer. Executes tasks after a threshold is met. Supports timeout and failure states.
+This object can natively connect to a `SignalController` for lifecycle management.
+
+### 🧠 `MultiConductor`  
+Manages multiple `Group` objects with per-group tasks and a global thread threshold. Supports lock-step execution, distributed forked execution (`Fork`), and synchronized forked execution (`SyncFork`). 
+Each task can produce multiple outcomes. Reusable across cycles and fully controllable via a `SignalController`.
+
+### 🔍 `Scout`
+Predicate-based monitor. One thread blocks while evaluating a predicate with timeout and success/failure callbacks.
+
+---
+
+## 🚉 New Execution Gates – `synchronization.execution`
+
+### 🔀 `TransitGate`
+Allows up to `N` threads to execute a pre-bound callable pipeline. Captures results via `Outcome`. Collapses once the cap is reached. Great for controlled bootstraps or one-time initializers.
+
+---
+
+## 🎛 New Dispatchers – `synchronization.dispatchers`
+
+### 🔧 `Fork`
+Thread dispatcher that assigns callables based on usage caps. Ensures each callable executes a fixed number of times. Good for simple routing or round-robin-like workloads.
+
+### 🚦 `SignalFork`  
+Thread dispatcher that routes threads to callables with usage caps. Executes immediately on arrival. Triggers a callback and notifies a controller when all slots are consumed.
+This object can natively connect to a `SignalController` for lifecycle management.
+
+### 🔄 `SyncFork`
+Dispatcher that coordinates N threads into callable groups. All callables execute simultaneously once all slots are filled. Supports timeouts and reuse.
+
+### 🔄 `SyncSignalFork`
+Dispatcher that coordinates N threads into callable groups just like the SyncFork. It can also execute a callable as a signal.
+This object can natively connect to a `SignalController` for lifecycle management.
+---
+
+## 🧠 New Controllers – `synchronization.controller`
+
+### 🎮 `SignalController`
+Central registry for lifecycle-managed objects. Supports:
+- `register()` / `unregister()`
+- `invoke()` with pre/post hooks
+- Event notification (`notify`)
+- Full-thread-safe `dispose()` that recursively tears down all managed objects
+
+It forms the backbone for global coordination, status tracking, and command dispatch.
+
+[//]: # (---)
+
+[//]: # ()
+[//]: # (## 🧱 Work Abstractions – `thread_factory.core.work`)
+
+[//]: # ()
+[//]: # (### 🪄 `Help_request`)
+
+[//]: # (Inverted `Future` managed by threads themselves. Tracks status &#40;`pending`, `running`, `completed`, `cancelled`, `failed`&#41; and timestamps. Can be used with dynamic workers for agentic execution and result orchestration.)
+
+---
+
+## ⏱️ Timing Utilities – `thread_factory.utils.timing`
+
+### ⏲️ `AutoResetTimer`
+Timer that auto-resets after use. Useful for cyclic backoff, loop pacing, and heartbeat monitoring.
+
+### 🕰️ `Stopwatch`
+Simple nanosecond-precision profiler. Used for queue stats, lock contention tracking, and execution spans.
+
+---
+
+## ⏱️ Utilities – `thread_factory.utils.coordination.package`
+
+### ⏲️ `Package`
+Thread-safe delegate style wrapper for callables.
+
+---
+
+## 📦 Queues and Stacks – `thread_factory.concurrency`
+
+### 🪜 `ConcurrentQueue` / `ConcurrentStack`
+New features:
+- `is_empty()` added for shutdown checks
+- `batch_steal()` support for optimized consumer loops
+- Thread-safe with no-lock peek/guard patterns
+
+---
+
+## ✅ Structural Improvements
+
+- 🔐 **All concurrency classes now use `__slots__`**
+  - Reduced memory footprint
+  - Faster attribute access
+  - Less GC churn under stress
+
+- 📁 **New Folder Structure**
+- synchronization/
+- ├── primitives/
+- ├── orchestrators/
+- ├── dispatchers/
+- ├── execution/
+- └── controller/
+
+
+Each category maps directly to purpose:
+- `primitives`: Low-level synchronization building blocks
+- `orchestrators`: Group coordination & flow control
+- `dispatchers`: Thread-callable routing logic
+- `execution`: Execution gates & work-limited runners
+- `controller`: Lifecycle and command management
+
+---
+
+## 📌 Developer Notes
+
+- Prefer `FlowRegulator` + `SmartCondition` for worker-oriented design.
+- Use `ValueWork` as the new core unit of thread-initiated tasks.
+- For fork-like behavior, use `Fork` or `SyncFork`.
+- Adopt `Stopwatch` and `AutoResetTimer` for instrumentation.
+- Use `SignalCondition` for simplicity, `SmartCondition` for targeting.
+- Use `ConcurrentQueue.is_empty()` to manage graceful shutdowns.
+- 
+
+---
+
+## Important Changes
+
+- *ActionBarrier* renamed to 'TransitBarrier' to better reflect its purpose.
+- *SignalCondition* renamed to 'TransitCondition' for consistency with the new naming scheme.
+
+---
+
 
 ## [1.2.4] - 2025-05-02
 

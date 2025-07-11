@@ -1,6 +1,4 @@
-import functools
-import threading
-import warnings
+import functools, threading, warnings
 from copy import deepcopy
 from typing import (
     Any,
@@ -16,7 +14,7 @@ from typing import (
     TypeVar,
     Union,
 )
-from thread_factory.utils.disposable import IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
 
 _K = TypeVar("_K")
 _V = TypeVar("_V")
@@ -38,7 +36,7 @@ class ConcurrentDict(Generic[_K, _V], IDisposable):
     The dictionary can be frozen to prevent further modifications unless
     internal contents of dictionary are objects that are mutable.
     """
-
+    __slots__ = IDisposable.__slots__ + ["_dict", "_lock", "_freeze"]
     def __init__(
         self,
         initial: Optional[Union[Mapping[_K, _V], Iterable[Tuple[_K, _V]]]] = None
@@ -60,6 +58,26 @@ class ConcurrentDict(Generic[_K, _V], IDisposable):
         self._dict: Dict[_K, _V] = dict(initial)
         self._lock: threading.RLock = threading.RLock()
         self._freeze = False
+
+    def dispose(self) -> None:
+        """
+        Dispose (clear) this ConcurrentDict, releasing its contents.
+
+        Once disposed, `disposed` becomes True and the internal dict is cleared.
+        No further usage checks are enforced, so the user must avoid calling
+        other methods after disposal.
+
+        This method is idempotent — multiple calls won't cause errors.
+        """
+        if not self._disposed:
+            with self._lock:
+                self._dict.clear()
+            self._disposed = True
+        warnings.warn(
+            "Your ConcurrentDictionary has been disposed and should not be used further. ",
+            UserWarning
+        )
+
 
     def freeze(self) -> None:
         """
@@ -288,26 +306,11 @@ class ConcurrentDict(Generic[_K, _V], IDisposable):
         """
         Remove the specified key and return its value.
         If the key is not found, return default if given, otherwise raise KeyError.
-
-        Args:
-            key (_K): The key to pop.
-            default (_V, optional): The value to return if key is missing.
-
-        Returns:
-            _V: The popped value.
-
-        Raises:
-            KeyError: If the key is missing and no default was provided.
         """
         if self._freeze:
             raise TypeError("Cannot modify a frozen ConcurrentDict.")
         with self._lock:
-            try:
-                return self._dict.pop(key)
-            except KeyError:
-                if default is not None:
-                    return default
-                raise
+            return self._dict.pop(key, default)
 
     def popitem(self) -> Tuple[_K, _V]:
         """
@@ -643,23 +646,3 @@ class ConcurrentDict(Generic[_K, _V], IDisposable):
         """
         self._lock.release()
         self.dispose()
-
-    def dispose(self) -> None:
-        """
-        Dispose (clear) this ConcurrentDict, releasing its contents.
-
-        Once disposed, `disposed` becomes True and the internal dict is cleared.
-        No further usage checks are enforced, so the user must avoid calling
-        other methods after disposal.
-
-        This method is idempotent — multiple calls won't cause errors.
-        """
-        if not self.disposed:
-            with self._lock:
-                self._dict.clear()
-            self.disposed = True
-        warnings.warn(
-            "Your ConcurrentDictionary has been disposed and should not be used further. ",
-            UserWarning
-        )
-

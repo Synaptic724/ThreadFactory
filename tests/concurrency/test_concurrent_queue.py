@@ -32,6 +32,19 @@ class TestConcurrentQueue(unittest.TestCase):
         with self.assertRaises(Exception):
             q.dequeue()
 
+    def test_is_empty(self):
+        """
+        Test the is_empty method.
+        """
+        q = ConcurrentQueue()
+        self.assertTrue(q.is_empty(), "New queue should be empty.")
+
+        q.enqueue(1)
+        self.assertFalse(q.is_empty(), "Queue with one item should not be empty.")
+
+        q.dequeue()
+        self.assertTrue(q.is_empty(), "Queue should be empty after dequeueing the only item.")
+
     def test_remove_item_by_identity(self):
         """
         Test removing a specific item by identity from the queue.

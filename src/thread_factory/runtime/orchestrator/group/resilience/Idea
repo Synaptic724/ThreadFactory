@@ -1,8 +1,0 @@
-Maybe these are just features given to work when configured.
-
-
-
-#1. the idea for this is circuit breaker i.e retrying too many times and failing can maybe stop submissions from a specific thread and force them to wait?
-I'm not sure the best strategy here
-
-#2. fault tolerance is giving a work item the ability to try again if it fails.

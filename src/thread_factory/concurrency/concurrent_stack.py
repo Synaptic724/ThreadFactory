@@ -13,9 +13,9 @@ from typing import (
     Optional,
     TypeVar,
 )
-
 from thread_factory.concurrency import ConcurrentList
-from thread_factory.utils import Empty, IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.exceptions import Empty
 
 _T = TypeVar("_T")
 
@@ -29,7 +29,7 @@ class ConcurrentStack(Generic[_T], IDisposable):
     It is designed for Python 3.13+ No-GIL environments (though it will
     work fine in standard Python as well).
     """
-
+    __slots__ = IDisposable.__slots__ + ["_lock", "_deque"]
     def __init__(
             self,
             initial: Optional[Iterable[_T]] = None
@@ -46,6 +46,26 @@ class ConcurrentStack(Generic[_T], IDisposable):
             initial = []
         self._lock: threading.RLock = threading.RLock()
         self._deque: Deque[_T] = deque(initial)
+
+    def dispose(self) -> None:
+        """
+        Dispose (clear) this ConcurrentStack, releasing its contents.
+
+        Once disposed, `_disposed` becomes True and the internal dict is cleared.
+        No further usage checks are enforced, so the user must avoid calling
+        other methods after disposal.
+
+        This method is idempotent — multiple calls won't cause errors.
+        """
+        if not self._disposed:
+            with self._lock:
+                self._deque.clear()
+            self._disposed = True
+        warnings.warn(
+            "Your ConcurrentStack has been disposed and should not be used further. ",
+            UserWarning
+        )
+
 
     def push(self, item: _T) -> None:
         """
@@ -158,6 +178,17 @@ class ConcurrentStack(Generic[_T], IDisposable):
             ConcurrentStack[_T]: A copy of this ConcurrentStack.
         """
         return self.copy()
+
+
+    def is_empty(self) -> bool:
+        """
+        Check if the stack is empty.
+
+        Returns:
+            bool: True if the stack is empty, False otherwise.
+        """
+        with self._lock:
+            return len(self._deque) == 0
 
     def __deepcopy__(self, memo: dict) -> "ConcurrentStack[_T]":
         """
@@ -339,23 +370,3 @@ class ConcurrentStack(Generic[_T], IDisposable):
         """
         self._lock.release()
         self.dispose()
-
-    def dispose(self) -> None:
-        """
-        Dispose (clear) this ConcurrentStack, releasing its contents.
-
-        Once disposed, `_disposed` becomes True and the internal dict is cleared.
-        No further usage checks are enforced, so the user must avoid calling
-        other methods after disposal.
-
-        This method is idempotent — multiple calls won't cause errors.
-        """
-        if not self.disposed:
-            with self._lock:
-                self._deque.clear()
-            self.disposed = True
-        warnings.warn(
-            "Your ConcurrentStack has been disposed and should not be used further. ",
-            UserWarning
-        )
-

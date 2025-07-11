@@ -4,13 +4,13 @@ import warnings
 from copy import deepcopy
 from typing import Any, Callable, Generic, Iterable, Iterator, Optional, Set, TypeVar
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.utils import IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
 
 # Type variable _T is used for generic type hinting. This allows the ConcurrentSet
 # to hold elements of any single type, maintaining type safety.
 _T = TypeVar("_T")
 
-
+#region ConcurrentSet
 class ConcurrentSet(Generic[_T], IDisposable):
     """Thread‑safe, optionally *freezeable* hash‑set implementation.
 
@@ -41,9 +41,8 @@ class ConcurrentSet(Generic[_T], IDisposable):
       is for advanced scenarios or explicit resource management patterns.
     """
 
-    # ---------------------------------------------------------------------
-    # Construction & state helpers
-    # ---------------------------------------------------------------------
+    __slots__ = IDisposable.__slots__ + ["_lock", "_set", "_freeze"]
+# region Construction & state helpers
     def __init__(self, initial: Optional[Iterable[_T]] = None) -> None:
         """Initialize a new ConcurrentSet instance.
 
@@ -73,8 +72,32 @@ class ConcurrentSet(Generic[_T], IDisposable):
         # read operations can skip locking.
         self._freeze: bool = False
 
+    def dispose(self) -> None:
+        """Clear internal data and mark the ConcurrentSet as disposed.
 
-    # --------------------------- freeze control -------------------------
+        This method releases the resources held by the set, primarily by clearing
+        the underlying built-in set. Once disposed, the set should not be used
+        further.
+
+        This method is idempotent; calling it multiple times has no additional effect
+        after the first call. It is also thread-safe, using the internal lock
+        to protect the clearing operation and the `disposed` flag update.
+        """
+        # Check if the set has already been disposed. The `getattr` with a default
+        # handles the case where the `disposed` attribute might not exist yet
+        # during initialization or in error scenarios, although it's set in __init__.
+        if not getattr(self, "_disposed", False):
+            # Acquire the lock before clearing the internal set and updating the flag.
+            with self._lock:
+                # Clear the underlying built-in set, releasing references to its elements.
+                self._set.clear()
+                # Mark the set as disposed. This flag is checked in the outer `if`.
+                self._disposed = True
+            # Issue a warning to inform the user that the set has been disposed.
+            # This is a helpful indicator if the set is accidentally used after disposal.
+            warnings.warn("Your ConcurrentSet has been disposed and should not be used further.", UserWarning)
+# endregion
+# region Freeze control
     def freeze(self) -> None:
         """**Freeze** the set.
 
@@ -122,10 +145,8 @@ class ConcurrentSet(Generic[_T], IDisposable):
         `unfreeze()`. Thus, checking the flag itself is safe without a lock.
         """
         return self._freeze
-
-    # ---------------------------------------------------------------------
-    # Core CRUD operations
-    # ---------------------------------------------------------------------
+# endregion
+# region Core CRUD operations
     def _ensure_mutable(self) -> None:
         """Internal helper to check if the set is frozen and raise TypeError if it is.
 
@@ -202,10 +223,9 @@ class ConcurrentSet(Generic[_T], IDisposable):
         with self._lock:
             # Perform the clear operation on the underlying built-in set.
             self._set.clear()
+#endregion
+#region Bulk operations & transformations
 
-    # ------------------------------------------------------------------
-    # Bulk operations & transformations
-    # ------------------------------------------------------------------
     def update(self, other: Iterable[_T]) -> None:
         """In‑place union with *other*.
 
@@ -222,7 +242,7 @@ class ConcurrentSet(Generic[_T], IDisposable):
             # Perform the update operation on the underlying built-in set.
             self._set.update(other)
 
-    # ------------------------------- algebra helpers -------------------
+#region algebra helpers
     def _binary_new(self, op: Callable[[Set[_T], Set[_T]], Set[_T]], other: Iterable[_T]) -> "ConcurrentSet[_T]":
         """Internal helper for binary set operations that return a new ConcurrentSet.
 
@@ -281,8 +301,8 @@ class ConcurrentSet(Generic[_T], IDisposable):
             op(self._set, other_set)
         # Return self to support the typical behavior of in-place operators in Python.
         return self
-
-    # ---------- standard operators ----------
+# endregion
+# region standard operators
     def union(self, *others: Iterable[_T]) -> "ConcurrentSet[_T]":
         """Return the union (``|``) of all provided iterables and *self*.
 
@@ -370,8 +390,8 @@ class ConcurrentSet(Generic[_T], IDisposable):
         # Leverage the internal helper `_binary_new` which handles the copying
         # and locking logic for operations that return a new set.
         return self._binary_new(lambda a, b: a.symmetric_difference(b), other)
-
-    # ---------- dunder algebra (new objects) ----------
+#endregion
+#region dunder algebra (new objects)
     def __eq__(self, other: Any) -> bool:
         """
         Check for equality with another object.
@@ -490,8 +510,8 @@ class ConcurrentSet(Generic[_T], IDisposable):
             A new ConcurrentSet containing the symmetric difference.
         """
         return self.symmetric_difference(other)
-
-    # ---------- in‑place dunder algebra ----------
+#endregion
+#region in‑place dunder algebra
     def __ior__(self, other: Iterable[_T]) -> "ConcurrentSet[_T]":
         """
         Implement the `|=` in-place union operator.
@@ -555,10 +575,10 @@ class ConcurrentSet(Generic[_T], IDisposable):
             self: The modified ConcurrentSet.
         """
         return self._binary_inplace(Set.symmetric_difference_update, other)
+#endregion
+#endregion
+# region Higher‑order helpers (map / filter / reduce)
 
-    # ------------------------------------------------------------------
-    # Higher‑order helpers (map / filter / reduce)
-    # ------------------------------------------------------------------
     def map(self, func: Callable[[_T], Any]) -> "ConcurrentSet[Any]":
         """Apply a function to each element in the set and return a new ConcurrentSet.
 
@@ -685,10 +705,9 @@ class ConcurrentSet(Generic[_T], IDisposable):
             # Execute the user-provided function, passing the raw internal set.
             func(self._set)
         # The lock is automatically released upon exiting the `with` block.
+#endregion
+# region Conversions
 
-    # ------------------------------------------------------------------
-    # Conversions
-    # ------------------------------------------------------------------
     def to_set(self) -> Set[_T]:
         """Return a **shallow copy** of the underlying ``set``.
 
@@ -730,10 +749,9 @@ class ConcurrentSet(Generic[_T], IDisposable):
         # Convert the set copy to a list and initialize a new ConcurrentList with it.
         # The list conversion handles the arbitrary ordering.
         return ConcurrentList(initial=list(set_copy))
+#endregion
+# region Introspection / dunder helpers
 
-    # ------------------------------------------------------------------
-    # Introspection / dunder helpers
-    # ------------------------------------------------------------------
     def __contains__(self, item: Any) -> bool:
         """Implement the `in` operator to check for membership.
 
@@ -842,10 +860,9 @@ class ConcurrentSet(Generic[_T], IDisposable):
         # `self.to_set()` gets a shallow copy of the internal set structure.
         # `deepcopy` then handles the deep copying of the elements within that set copy.
         return ConcurrentSet(deepcopy(self.to_set(), memo))
+#endregion
+#region Private helpers & resource lifecycle
 
-    # ------------------------------------------------------------------
-    # Private helpers & resource lifecycle
-    # ------------------------------------------------------------------
     def _copy_locked(self) -> Set[_T]:
         """Internal helper to return a shallow copy of the internal set while holding the lock.
 
@@ -859,11 +876,8 @@ class ConcurrentSet(Generic[_T], IDisposable):
         with self._lock:
             # Return a shallow copy of the underlying built-in set.
             return self._set.copy()
-
-    # ------------------- IDisposable / context manager -----------------
-    # These methods implement the context manager protocol (`with ...:`).
-    # As noted in the class docstring and the warning, direct use of the
-    # context manager to access internals is discouraged for typical usage.
+#endregion
+#region With Statement
 
     def __enter__(self):  # noqa: D401 – simple docstring
         """Context manager entry. Acquires the internal lock.
@@ -904,27 +918,5 @@ class ConcurrentSet(Generic[_T], IDisposable):
         # Note that dispose() itself is idempotent and thread-safe.
         self.dispose()
 
-    def dispose(self) -> None:
-        """Clear internal data and mark the ConcurrentSet as disposed.
-
-        This method releases the resources held by the set, primarily by clearing
-        the underlying built-in set. Once disposed, the set should not be used
-        further.
-
-        This method is idempotent; calling it multiple times has no additional effect
-        after the first call. It is also thread-safe, using the internal lock
-        to protect the clearing operation and the `disposed` flag update.
-        """
-        # Check if the set has already been disposed. The `getattr` with a default
-        # handles the case where the `disposed` attribute might not exist yet
-        # during initialization or in error scenarios, although it's set in __init__.
-        if not getattr(self, "disposed", False):
-            # Acquire the lock before clearing the internal set and updating the flag.
-            with self._lock:
-                # Clear the underlying built-in set, releasing references to its elements.
-                self._set.clear()
-                # Mark the set as disposed. This flag is checked in the outer `if`.
-                self.disposed = True
-            # Issue a warning to inform the user that the set has been disposed.
-            # This is a helpful indicator if the set is accidentally used after disposal.
-            warnings.warn("Your ConcurrentSet has been disposed and should not be used further.", UserWarning)
+#endregion
+#endregion

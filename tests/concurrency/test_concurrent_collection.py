@@ -515,7 +515,7 @@ class HighPerformanceConcurrentCollectionTest(unittest.TestCase):
         for t in threads:
             t.start()
         for t in threads:
-            t.join()
+            t.join(5)
 
         end = time.perf_counter()
 

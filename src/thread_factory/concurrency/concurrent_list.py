@@ -4,7 +4,7 @@ import warnings
 from copy import deepcopy
 from typing import Any, Callable, Optional, List, TypeVar, Generic
 from collections.abc import Iterable, Iterator
-from thread_factory.utils import IDisposable
+from thread_factory.utilities.interfaces.disposable import IDisposable
 
 _T = TypeVar('_T')
 
@@ -18,7 +18,7 @@ class ConcurrentList(Generic[_T], IDisposable):
     including slicing, in-place operators, and common utility methods.
     It is designed for Python 3.13+ No-GIL environments.
     """
-
+    __slots__ = IDisposable.__slots__ + ["_lock", "_list", "_freeze"]
     def __init__(self, initial: Optional[Iterable[_T]] = None) -> None:
         """
         Initialize the ConcurrentList.
@@ -30,6 +30,26 @@ class ConcurrentList(Generic[_T], IDisposable):
         self._lock = threading.RLock()
         self._list: List[_T] = list(initial) if initial else []
         self._freeze = False
+
+    def dispose(self) -> None:
+        """
+        Dispose (clear) this ConcurrentList, releasing its contents.
+
+        Once disposed, `_disposed` becomes True and the internal dict is cleared.
+        No further usage checks are enforced, so the user must avoid calling
+        other methods after disposal.
+
+        This method is idempotent — multiple calls won't cause errors.
+        """
+        if not self._disposed:
+            with self._lock:
+                self._list.clear()
+            self._disposed = True
+        warnings.warn(
+            "Your ConcurrentList has been disposed and should not be used further. ",
+            UserWarning
+        )
+
 
     def freeze(self) -> None:
         """
@@ -681,23 +701,3 @@ class ConcurrentList(Generic[_T], IDisposable):
         """
         self._lock.release()
         self.dispose()
-
-    def dispose(self) -> None:
-        """
-        Dispose (clear) this ConcurrentList, releasing its contents.
-
-        Once disposed, `_disposed` becomes True and the internal dict is cleared.
-        No further usage checks are enforced, so the user must avoid calling
-        other methods after disposal.
-
-        This method is idempotent — multiple calls won't cause errors.
-        """
-        if not self.disposed:
-            with self._lock:
-                self._list.clear()
-            self.disposed = True
-        warnings.warn(
-            "Your ConcurrentList has been disposed and should not be used further. ",
-            UserWarning
-        )
-

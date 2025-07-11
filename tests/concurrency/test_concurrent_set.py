@@ -4,8 +4,7 @@ import unittest
 import random
 import time
 import copy
-from thread_factory.concurrency.concurrent_set import ConcurrentSet
-from thread_factory.concurrency.concurrent_list import ConcurrentList
+from thread_factory import ConcurrentSet, ConcurrentList
 
 
 class TestConcurrentSet(unittest.TestCase):
@@ -192,7 +191,7 @@ class TestConcurrentSet(unittest.TestCase):
         threads = [threading.Thread(target=actor) for _ in range(t_count)]
         start = time.perf_counter()
         for t in threads: t.start()
-        for t in threads: t.join()
+        for t in threads: t.join(15)
         duration = time.perf_counter() - start
         print(f"\nConcurrentSet stress test finished in {duration:.2f}s with size {len(cs)}")
         self.assertGreaterEqual(len(cs), 0)  # just ensure no crash/negative
