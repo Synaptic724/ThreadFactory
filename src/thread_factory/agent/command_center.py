@@ -89,14 +89,8 @@ class CommandGroup(IDisposable):
         self._logger: Logger = logger or logging.getLogger(__name__)
         self._command_center = command_center  # Reference to its creator
 
-        # --- Internal Components ---
-        # Pool Internals
-        self._worker_count = SyncInt(0)
-        self._agents_per_container = SyncInt(agents_per_container)
-        self._max_workers = SyncInt(max_workers)
-
         # Create Agent Pool Container
-        self._group_pool_container: 'CommandGroupContainer' = command_center._agent_pool.create_command_group_container(self.id, self._logger)
+        self._group_pool_container: 'CommandGroupContainer' = command_center._agent_pool.create_command_group_container(command_group=self, logger=self._logger, max_workers=max_workers, agents_per_container=agents_per_container)
 
         # Internal registries for its members
         self._active_agents: ConcurrentDict[str, Agent] = ConcurrentDict()
@@ -135,11 +129,6 @@ class CommandGroup(IDisposable):
                 except Exception as e:
                     logging.error(f"Error disposing Activity '{activity.id}': {e}", exc_info=True)
             self._active_activities.dispose()
-
-            # SyncInt and other internal state cleanup
-            self._worker_count = None
-            self._max_workers = None
-            self._agents_per_container = None
             self._logger.info(f"CommandGroup '{self.name}' disposed.")
             self._logger = None
 
@@ -168,8 +157,8 @@ class CommandGroup(IDisposable):
         Optional[Agent]
             The created Agent object, or None if the group is at max capacity.
         """
-        if self._worker_count >= self._max_workers:
-            logging.warning(f"CommandGroup '{self.name}' has reached its max worker limit of {self._max_workers}.")
+        if self._group_pool_container._worker_count >= self._group_pool_container._max_workers:
+            logging.warning(f"CommandGroup '{self.name}' has reached its max worker limit of {self._group_pool_container._max_workers}.")
             return None
 
         # The command_center's create_agent method already handles registration and worker count.
@@ -362,8 +351,8 @@ class CommandGroup(IDisposable):
         Dict[str, Union[int, float]]
             Includes 'active' (current count), 'max' (allowed workers), and 'utilization' (percentage).
         """
-        active = self._worker_count
-        max_w = self._max_workers
+        active = self._group_pool_container._worker_count
+        max_w = self._group_pool_container._max_workers
         utilization = (active / max_w * 100) if max_w > 0 else 0
         return {'active': active, 'max': max_w, 'utilization': utilization}
 
@@ -591,7 +580,7 @@ class CommandCenter(IDisposable):
             self._logger = None
 
     @property
-    def id(self) -> str:  # noqa: D401
+    def id(self) -> str:
         """
         ULID that uniquely identifies this latch.
         """
@@ -622,7 +611,7 @@ class CommandCenter(IDisposable):
         self._check_disposed()
         total = 0
         for group in self._command_groups.values():
-            total += group._max_workers
+            total += group._group_pool_container._max_workers
         return total
 
     def get_total_active_workers(self) -> int:
@@ -632,7 +621,7 @@ class CommandCenter(IDisposable):
         self._check_disposed()
         total = 0
         for group in self._command_groups.values():
-            total += group._worker_count
+            total += group._group_pool_container._worker_count
         return total
 
     # Add this method to the CommandCenter class
@@ -885,7 +874,7 @@ class CommandCenter(IDisposable):
                 hasattr(activity, attr) for attr in ['perform_activity', 'start']):
             raise TypeError("The provided activity is not a valid JobActivity with the required methods.")
 
-        available_slots = command._max_workers - command._worker_count
+        available_slots = command._group_pool_container._max_workers - command._group_pool_container._worker_count
         if worker_count > available_slots:
             raise RuntimeError(f"Cannot deploy {worker_count} workers. Only {available_slots} slots are available.")
 
@@ -898,7 +887,7 @@ class CommandCenter(IDisposable):
         # Create and deploy the team of agents
         for _ in range(worker_count):
             # Create an agent whose target is the activity's main work loop
-            agent = self.create_agent(command_group_name=command_group_name, target=activity.perform_activity, reset_agent=reset_agents)
+            agent = self.get_agent(command_group_name=command_group_name, target=activity.perform_activity, reset_agent=reset_agents)
 
             # Formally register the agent with the activity
             activity.register_agent(agent)
@@ -974,8 +963,7 @@ class CommandCenter(IDisposable):
                 self._logger.error(f"Error notifying external SignalController: {e}", exc_info=True)
 
 #endregion Controller Contract
-
-#region Agent Pool Management
+#region Agent Command Group Container Management
     def increase_agents_per_container(self, number_of_agents: int, command_group_name: str = "default"):
         """
         Increases the number of agents per container in the specified command group.
@@ -989,7 +977,7 @@ class CommandCenter(IDisposable):
             raise ValueError("Additional agents must be a non-negative integer.")
 
         command = self.get_command_group(command_group_name)
-        command._agents_per_container += number_of_agents
+        command._group_pool_container._agents_per_container += number_of_agents
 
         self._logger.info(f"Increased agents per container by {number_of_agents} in CommandGroup '{command.name}'")
         self._notify('AGENTS_PER_CONTAINER_INCREASED', {'additional_agents': number_of_agents})
@@ -1026,27 +1014,8 @@ class CommandCenter(IDisposable):
 
 #endregion Agent Pool Management
 #region Agent Management
-    def find_agent_by_id(self, factory_id: str, command_group_name: str = "default") -> Optional[Agent]:
-        """
-        This will iterate over command groups to look for the agent if it cannot be found in default.
-
-        Args:
-            factory_id (str): The ULID or unique string used to identify the agent.
-            command_group_name (str): The name of the command group to search in.
-        """
-        self._check_disposed()
-        command = self.get_command_group(command_group_name)
-        agent = command._active_agents.get(factory_id)
-        if agent:
-            return agent
-        # If not found in the specified group, search all groups
-        for group in self._command_groups.values():
-            agent = group._active_agents.get(factory_id)
-            if agent:
-                return agent
-        return None
-
-    def create_agent(
+#region Agent Work Management
+    def get_agent(
             self,
             template_name: str = "default",
             define_home: Optional[Union[Callable[..., None], Pack]] = None,
@@ -1070,13 +1039,13 @@ class CommandCenter(IDisposable):
         Returns:
             Agent: The created agent instance.
         """
-        self._check_disposed()
+        self._check_disposed()             # This method should return a list of agents that already exist in the pool based on the caps or else the pool makes them
 
         if define_home is None and target is None:
             raise ValueError("At least one of define_home or target must be provided.")
         return self._create_and_register_agent(template_name=template_name, define_home=define_home,target=target, command_group=command_group_name, reset_agent=reset_agent,*args, **kwargs)
 
-    def create_agents(
+    def get_agents(
         self,
         count: int,
         template_name: str = "default",
@@ -1115,9 +1084,9 @@ class CommandCenter(IDisposable):
             except RuntimeError:
                 warnings.warn(f"Worker cap reached. Created {i} of {count} requested agents.", UserWarning)
                 break
-        return new_agents
+        return new_agents # This method should return a list of agents that already exist in the pool based on the caps or else the pool makes them
 
-    def submit(
+    def create_task(
         self,
         target: Union[Callable[..., Any], Pack],
         define_home: Optional[Union[Callable[..., None], Pack]] = None,
@@ -1142,9 +1111,10 @@ class CommandCenter(IDisposable):
         """
         agent = self.create_agent(command_group_name=command_group_name, template_name=template_name,
                                   target=target, define_home=define_home, reset_agent=reset_agent, *args, **kwargs)
-        agent.deploy()
+        agent.deploy()             #This method should drop the work into the command group required
 
-    def group_submit(
+    # This method should drop the work into the command group required
+    def create_tasks(
             self,
             agents: int,
             target: Union[Callable[..., Any], Pack],
@@ -1172,15 +1142,17 @@ class CommandCenter(IDisposable):
         if not isinstance(agents, int) or agents < 1:
             raise ValueError("number_of_agents must be a positive integer.")
         command = self.get_command_group(command_group_name)
-        if agents + command._worker_count > command._max_workers:
-            raise RuntimeError(f"Cannot create {agents} agents. Worker cap of {command._max_workers} reached in command group '{command_group_name}'.")
+        if agents + command._group_pool_container._worker_count > command._group_pool_container._max_workers:
+            raise RuntimeError(f"Cannot create {agents} agents. Worker cap of {command._group_pool_container._max_workers} reached in command group '{command_group_name}'.")
 
         with self._lock:
             #Create and start the specified number of agents
+            #This method should drop the work into the command group required
             for _ in range(agents):
                 agent = self.create_agent(template_name, target=target, define_home=define_home, command_group_name= command_group_name, reset_agent=reset_agents,  *args, **kwargs)
                 agent.deploy()
-
+#endregion Agent Work Management
+#region Agent Creation and Registration
     def _register_agent(self, agent: Agent, command: CommandGroup) -> None:
         """
         Internal helper to register an agent in the active list.
@@ -1189,7 +1161,7 @@ class CommandCenter(IDisposable):
             with self._lock:
                 agent._group_name = command.name
                 agent._group_id = command.id
-                command._worker_count.increment()
+                command._group_pool_container._worker_count.increment()
                 command._active_agents[agent.factory_id] = agent
                 self._notify('AGENT_CREATED', {'agent_id': agent.factory_id, 'template_name': agent.name, 'command_group': command.id, 'command_group_name': command.name})
 
@@ -1205,7 +1177,7 @@ class CommandCenter(IDisposable):
                 agent._group_name = None
                 agent._group_id = None
                 if command._active_agents.pop(agent.factory_id, None):
-                    command._worker_count.decrement()
+                    command._group_pool_container._worker_count.decrement()
                     self._notify('AGENT_UNREGISTERED', {'agent_id': agent.factory_id, 'command_group': command.id, 'command_group_name': command.name})
 
     def increase_max_workers(self, amount: int = 1, command_group_name: str = "default"):
@@ -1226,8 +1198,8 @@ class CommandCenter(IDisposable):
         if self.get_total_active_workers() + amount > self._total_max_workers:
             raise RuntimeError(f"Cannot create CommandGroup '{command_group_name}'. Total active workers would exceed global limit of {self._total_max_workers}, increase new total limit to create a new group.")
         with self._lock:
-            command._max_workers += amount
-            self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._max_workers, 'command_group': command})
+            command._group_pool_container._max_workers += amount
+            self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._group_pool_container._max_workers, 'command_group': command})
 
     def decrease_max_workers(self, amount: int = 1, command_group_name: str = "default"):
         """
@@ -1246,10 +1218,10 @@ class CommandCenter(IDisposable):
             raise ValueError("Amount must be a positive integer.")
         command = self.get_command_group(command_group_name)
         with self._lock:
-            if command._worker_count > command._max_workers - amount:
+            if command._group_pool_container._worker_count > command._group_pool_container._max_workers - amount:
                 raise RuntimeError("Cannot decrease below current active worker count.")
-            command._max_workers -= amount
-            self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._max_workers, 'command_group': command.id})
+            command._group_pool_container._max_workers -= amount
+            self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._group_pool_container._max_workers, 'command_group': command.id})
 
     def _create_and_register_agent(self, template_name: str, define_home: Optional[Union[Callable[..., None], Pack]] = None,
             target: Optional[Union[Callable[..., None], Pack]] = None, command_group:str = "default", reset_agent: bool = False,*args, **kwargs) -> Agent:
@@ -1277,10 +1249,10 @@ class CommandCenter(IDisposable):
 
         command = self.get_command_group(command_group)
 
-        if command._worker_count >= command._max_workers:
-            self._notify('WORKER_CAP_REACHED', {'max_workers': command._max_workers, 'command_group': command.id})
-            self._logger.warning(f"Cannot create agent. Worker cap of {command._max_workers} reached in command group '{command_group}'.")
-            raise RuntimeError(f"Cannot create agent. Worker cap of {command._max_workers} reached.")
+        if command._group_pool_container._worker_count >= command._group_pool_container._max_workers:
+            self._notify('WORKER_CAP_REACHED', {'max_workers': command._group_pool_container._max_workers, 'command_group': command.id})
+            self._logger.warning(f"Cannot create agent. Worker cap of {command._group_pool_container._max_workers} reached in command group '{command_group}'.")
+            raise RuntimeError(f"Cannot create agent. Worker cap of {command._group_pool_container._max_workers} reached.")
 
         # Attempt to get an agent from the pool first
         agent = self._attempt_pool_get_agent(template_name=template_name, command_group_id=command.id)
@@ -1289,7 +1261,7 @@ class CommandCenter(IDisposable):
         #we need to fill the pool immediately upon creation
         # Fallback to factory if needed
         if agent is None:
-            agent = self._create_agent_from_template(template_name=template_name, command_group_id=command.id)
+            agent = self._agent_pool._create_agent_from_template(template_name=template_name, command_group_id=command.id)
 
         # Ensure the agent is properly configured
         self._post_agent_creation(agent=agent, define_home=define_home, target=target, reset_agent=reset_agent, *args, **kwargs)
@@ -1321,45 +1293,27 @@ class CommandCenter(IDisposable):
         if define_home:
             agent.set_home(define_home)
 
-
-    def register_template(self, template_name: str, factory_fn: Union[Callable[..., Agent], Pack]):
+#endregion Agent Creation and Registration
+#region Agent Lookup Tools
+    def find_agent_by_id(self, factory_id: str, command_group_name: str = "default") -> Optional[Agent]:
         """
-        Registers a new agent creation template.
+        This will iterate over command groups to look for the agent if it cannot be found in default.
 
         Args:
-            template_name (str): Symbolic name of the template.
-            factory_fn (Callable | Pack): Factory function or Pack object used to construct the agent.
-        """
-        if self._disposed:
-            raise RuntimeError("Cannot register templates after CommandCenter is disposed.")
-        self._agent_pool._builder.register_template(template_name, factory_fn)
-        self._notify('TEMPLATE_REGISTERED', {'template_name': template_name})
-
-    def unregister_template(self, template_name: str) -> bool:
-        """
-        Removes a previously registered agent template.
-
-        Args:
-            template_name (str): Symbolic name of the template to remove.
-
-        Returns:
-            bool: True if removed successfully, False if not found.
+            factory_id (str): The ULID or unique string used to identify the agent.
+            command_group_name (str): The name of the command group to search in.
         """
         self._check_disposed()
-        was_unregistered = self._agent_pool._builder.unregister_template(template_name)
-        if was_unregistered:
-            self._notify('TEMPLATE_UNREGISTERED', {'template_name': template_name})
-        return was_unregistered
-
-    def list_templates(self) -> List[str]:
-        """
-        Lists all registered agent templates.
-
-        Returns:
-            List[str]: A list of symbolic template names.
-        """
-        self._check_disposed()
-        return self._agent_pool._builder.list_templates()
+        command = self.get_command_group(command_group_name)
+        agent = command._active_agents.get(factory_id)
+        if agent:
+            return agent
+        # If not found in the specified group, search all groups
+        for group in self._command_groups.values():
+            agent = group._active_agents.get(factory_id)
+            if agent:
+                return agent
+        return None
 
     def get_active_agents(self, command_group_name: str = "default") -> List[Agent]:
         """
@@ -1437,6 +1391,48 @@ class CommandCenter(IDisposable):
                 return group
         return None
 
+#endregion Agent Lookup Tools
+#region Agent Builder Management
+    def register_template(self, template_name: str, factory_fn: Union[Callable[..., Agent], Pack]):
+        """
+        Registers a new agent creation template.
+
+        Args:
+            template_name (str): Symbolic name of the template.
+            factory_fn (Callable | Pack): Factory function or Pack object used to construct the agent.
+        """
+        if self._disposed:
+            raise RuntimeError("Cannot register templates after CommandCenter is disposed.")
+        self._agent_pool._builder.register_template(template_name, factory_fn)
+        self._notify('TEMPLATE_REGISTERED', {'template_name': template_name})
+
+    def unregister_template(self, template_name: str) -> bool:
+        """
+        Removes a previously registered agent template.
+
+        Args:
+            template_name (str): Symbolic name of the template to remove.
+
+        Returns:
+            bool: True if removed successfully, False if not found.
+        """
+        self._check_disposed()
+        was_unregistered = self._agent_pool._builder.unregister_template(template_name)
+        if was_unregistered:
+            self._notify('TEMPLATE_UNREGISTERED', {'template_name': template_name})
+        return was_unregistered
+
+    def list_templates(self) -> List[str]:
+        """
+        Lists all registered agent templates.
+
+        Returns:
+            List[str]: A list of symbolic template names.
+        """
+        self._check_disposed()
+        return self._agent_pool._builder.list_templates()
+
+#endregion Agent Builder Management
 #endregion Agent Management
 #region SignalController Management
     def add_signal_controller(self, name: str, controller: Optional[SignalController] = None, command_group_name: str = "default") -> SignalController:
