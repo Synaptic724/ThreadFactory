@@ -174,7 +174,7 @@ ThreadFactory goes beyond collections, offering finely engineered synchronizatio
 
 ### 🚉 Execution Gates – `thread_factory.synchronization.execution`
 
-* 🔀 `TransitGate`: Allows up to `N` threads to **execute a pre-bound callable pipeline**, capturing results via `Outcome`. It collapses once the execution cap is reached, making it ideal for controlled bootstraps or one-time initializers.
+* 🔀 `BypassConductor`: Allows up to `N` threads to **execute a pre-bound callable pipeline**, capturing results via `Outcome`. It collapses once the execution cap is reached, making it ideal for controlled bootstraps or one-time initializers.
 
 ### 🎛 Dispatchers – `thread_factory.synchronization.dispatchers`
 
