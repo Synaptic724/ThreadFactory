@@ -162,7 +162,7 @@ ThreadFactory goes beyond collections, offering finely engineered synchronizatio
 * 🛑 `SignalLatch`: A **latch with observer signaling support**, capable of notifying a controller before blocking. It natively connects to a `SignalController` for streamlined lifecycle management.
 * 🔒 `Latch`: A classic **reusable latch** that, once opened, permanently releases all waiting threads until explicitly reset.
 * 
-### ⚡ Coordinators & Barriers – `thread_factory.synchronization.orchestrators`
+### ⚡ Coordinators & Barriers – `thread_factory.synchronization.coordinators`
 
 * 🎯 `TransitBarrier`: A **reusable barrier** for sophisticated threshold coordination, with the option to execute a callable once all threads arrive.
 * 🚦 `SignalBarrier`: A **reusable, signal-based barrier** that supports thresholds, timeouts, and failure states, natively connecting to a `SignalController` for integrated lifecycle management.
@@ -218,7 +218,7 @@ ThreadFactory provides a powerful collection of **parallel programming utilities
 
 ---
 
-## ⏱️ Utilities – `thread_factory.utils`
+## ⏱️ Utilities – `thread_factory.utilities`
 
 ThreadFactory includes precise **utility tools** for orchestration, diagnostics, and thread-safe execution in concurrent applications.
 
