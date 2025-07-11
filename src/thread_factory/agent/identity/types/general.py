@@ -256,7 +256,7 @@ class General(Agent):
         while not self._dismiss_agent:
             if self._dismiss_agent:
                 break
-
+#TODO: Investigate a dictionary design instead to create O(1) lookups for locations instead of loops for if statements
             if self._pool_agent and not self._return_home:
                 if self._pool_type == AgentPoolType.DISPATCHER:
                     if self.location_map.get("dispatcher"):

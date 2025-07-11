@@ -590,8 +590,11 @@ class CommandGroupContainer(IDisposable):
             # Dispose all containers in this group
             for container in self._containers.values():
                 container.dispose()
-
             self._containers.dispose()
+            self._containers = None  # Clear reference to containers
+            self._agents_in_container.dispose()
+            self._agents_in_container = None  # Clear reference to agent sets
+
             self._logger.warning(f"Disposed CommandGroupContainer for group ID: {self._group_id}")
             self._logger = None
 
@@ -680,12 +683,6 @@ class CommandGroupContainer(IDisposable):
 
         return self.create_container()
 
-    #endregion Container Management
-#region Targeted Retrieval System
-
-#endregion Targeted Retrieval System
-#region Agent Management
-
     def set_agent_pool_distribution(self, throughput_agents: int = 60, dispatch_agents: int= 40, targeted_dispatch_agents: int = 0):
         """
         Sets the distribution of agents across different pools.
@@ -702,6 +699,13 @@ class CommandGroupContainer(IDisposable):
             self._throughput_worker_count.set(throughput_agents)
             self._dispatch_worker_count.set(dispatch_agents)
             self._targeted_dispatch_worker_count.set(targeted_dispatch_agents)
+
+
+#endregion Container Management
+#region Targeted Retrieval System
+
+#endregion Targeted Retrieval System
+#region Agent Management
 
 #endregion Agent Management
 
