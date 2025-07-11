@@ -22,6 +22,37 @@ class AgentBuilder(IDisposable):
 
     It implements the `IDisposable` interface for proper resource cleanup.
     """
+    _singleton_instance: Optional["AgentBuilder"] = None
+    _singleton_lock = threading.RLock()
+
+    @classmethod
+    def get_instance(cls) -> "AgentBuilder":
+        """
+        Retrieves the singleton instance of AgentBuilder.
+        """
+        with cls._singleton_lock:
+            if cls._singleton_instance is None:
+                raise RuntimeError("AgentBuilder has not been initialized in singleton mode.")
+            return cls._singleton_instance
+
+    @classmethod
+    def initialize_singleton(cls) -> "AgentBuilder":
+        """
+        Initializes the AgentBuilder singleton instance.
+        """
+        with cls._singleton_lock:
+            if cls._singleton_instance is not None:
+                raise RuntimeError("AgentBuilder singleton already initialized.")
+            cls._singleton_instance = cls()
+            return cls._singleton_instance
+
+    @classmethod
+    def _reset_singleton(cls):
+        """
+        For testing purposes.
+        """
+        with cls._singleton_lock:
+            cls._singleton_instance = None
 
     __slots__ = IDisposable.__slots__ + ["_registry", "_disposed"]  # Removed _registered as it's not used consistently
 

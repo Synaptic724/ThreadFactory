@@ -523,7 +523,8 @@ class CommandCenter(IDisposable):
                 self._agent_pool = AgentPool.get_instance()
                 self._logger.debug("Reusing AgentPool singleton.")
             except RuntimeError:
-                self._agent_pool = AgentPool.initialize_singleton(command_center=self, logger=self._logger)
+                AgentPool.initialize_singleton(command_center=self, logger=self._logger)
+                self._agent_pool = AgentPool.get_instance()
                 self._logger.debug("Initialized new AgentPool singleton.")
         else:
             self._command_center_cluster = self._agent_pool.get_or_create_cluster(command_center=self, max_workers=total_max_workers)
@@ -987,7 +988,7 @@ class CommandCenter(IDisposable):
         self._notify('AGENTS_PER_CONTAINER_INCREASED', {'additional_agents': number_of_agents})
 
 
-    def set_agent_pool_distribution(self, throughput_agents: int = 60, dispatch_agents: int= 40, targeted_dispatch_agents: int = 0, command_group_name: str = "default"):
+    def set_command_group_distribution(self, throughput_agents: int = 70, dispatch_agents: int= 30, targeted_dispatch_agents: int = 0, command_group_name: str = "default"):
         """
         Sets the distribution parameters for the AgentPool.
 
@@ -1008,7 +1009,7 @@ class CommandCenter(IDisposable):
             raise ValueError("Total distribution cannot exceed 100% of the agent pool capacity.")
 
         command = self.get_command_group(command_group_name)
-        command._group_pool_container.set_agent_pool_distribution(throughput_agents, dispatch_agents, targeted_dispatch_agents)
+        command._group_pool_container.set_group_pool_distribution(throughput_agents, dispatch_agents, targeted_dispatch_agents)
         self._logger.info(f"AgentPool distribution set: throughput={throughput_agents}, dispatched_agents={dispatch_agents}, dispatch_targeted={targeted_dispatch_agents}")
         self._notify('AGENT_POOL_DISTRIBUTION_SET', {
             'throughput_agents': throughput_agents,
@@ -1155,6 +1156,7 @@ class CommandCenter(IDisposable):
             for _ in range(agents):
                 agent = self.create_agent(template_name, target=target, define_home=define_home, command_group_name= command_group_name, reset_agent=reset_agents,  *args, **kwargs)
                 agent.deploy()
+
 #endregion Agent Work Management
 #region Agent Creation and Registration
     def _register_agent(self, agent: Agent, command: CommandGroup) -> None:
@@ -1227,75 +1229,6 @@ class CommandCenter(IDisposable):
             command._group_pool_container._max_workers -= amount
             self._notify('CONFIG_CHANGED', {'setting': 'max_workers', 'new_value': command._group_pool_container._max_workers, 'command_group': command.id})
 
-    def _create_and_register_agent(self, template_name: str, define_home: Optional[Union[Callable[..., None], Pack]] = None,
-            target: Optional[Union[Callable[..., None], Pack]] = None, command_group:str = "default", reset_agent: bool = False,*args, **kwargs) -> Agent:
-        """
-        Internal method to create and register an agent under the global worker cap.
-
-        Args:
-            template_name (str): The symbolic name of the registered agent template.
-            define_home (Callable | Pack, optional): A function representing the agent's long-lived event loop.
-            target (Callable | Pack, optional): A one-time task to run before the main loop.
-            command_group (str): The name of the command group to register the agent in.
-            reset_agent (bool): If True, the agent will be reset before execution.
-            *args: Optional positional overrides for the factory.
-            **kwargs: Optional keyword overrides for the factory.
-
-        Returns:
-            Agent: The newly constructed and registered agent instance.
-
-        Raises:
-            RuntimeError: If the worker cap is exceeded or the CommandCenter is disposed.
-            Exception: Any exceptions raised by the template factory.
-        """
-        if self._disposed:
-            raise RuntimeError("CommandCenter is disposed.")
-
-        command = self.get_command_group(command_group)
-
-        if command._group_pool_container._worker_count >= command._group_pool_container._max_workers:
-            self._notify('WORKER_CAP_REACHED', {'max_workers': command._group_pool_container._max_workers, 'command_group': command.id})
-            self._logger.warning(f"Cannot create agent. Worker cap of {command._group_pool_container._max_workers} reached in command group '{command_group}'.")
-            raise RuntimeError(f"Cannot create agent. Worker cap of {command._group_pool_container._max_workers} reached.")
-
-        # Attempt to get an agent from the pool first
-        agent = self._attempt_pool_get_agent(template_name=template_name, command_group_id=command.id)
-
-        #TODO: WE need to handle the case where the pool returns None, which means we need to apply backpressure if the pool is maxed they wont' be able tom ake workers anyways
-        #we need to fill the pool immediately upon creation
-        # Fallback to factory if needed
-        if agent is None:
-            agent = self._agent_pool._create_agent_from_template(template_name=template_name, command_group_id=command.id)
-
-        # Ensure the agent is properly configured
-        self._post_agent_creation(agent=agent, define_home=define_home, target=target, reset_agent=reset_agent, *args, **kwargs)
-        # Final registration
-        self._register_agent(agent, command)
-        return agent
-
-    def _attempt_pool_get_agent(self, template_name: str, command_group_id: str) -> Optional[Agent]:
-        """
-        Attempts to retrieve an agent from the AgentPool if available.
-        """
-        try:
-            return self._agent_pool.try_get_agent(template_name=template_name, group_name_id=command_group_id)
-        except Exception as e:
-            self._logger.error(f"AgentPool failed to provide pooled agent: {e}. Falling back to factory.")
-            self._notify('POOL_GET_FAILED', {'template_name': template_name, 'command_group': command_group_id})
-
-
-    def _post_agent_creation(self, agent: Agent, define_home: Optional[Union[Callable[..., None], Pack]] = None,
-            target: Optional[Union[Callable[..., None], Pack]] = None, reset_agent: bool = False, *args, **kwargs) -> None:
-        """
-        Internal helper to finalize agent creation and setup.
-        """
-        #TODO: Implement kwargs onto agent somehow
-        if reset_agent:
-            agent.reset() #TODO: This reset still needs to be fleshed out
-        if target:
-            agent.set_target(target)
-        if define_home:
-            agent.set_home(define_home)
 
 #endregion Agent Creation and Registration
 #region Agent Lookup Tools
