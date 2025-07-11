@@ -1,5 +1,7 @@
 import threading, ulid
 from typing import Optional, Callable, Any, Dict, Union
+
+from thread_factory.synchronization import SignalController
 from thread_factory.utilities.interfaces.disposable import IDisposable
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
@@ -50,13 +52,15 @@ class TransitBarrier(IDisposable):
         "_id", "_controller"
     ]
 
+    # In your TransitBarrier class in transit_barrier.py
+
     def __init__(
             self,
             threshold: int,
             transit: Optional[Union[Callable[..., None], Pack]] = None,
             reusable: bool = False,
             manual_release: bool = False,
-            controller: Optional['Controller'] = None
+            controller: Optional['SignalController'] = None
     ):
         super().__init__()
         if threshold <= 0:
@@ -72,15 +76,16 @@ class TransitBarrier(IDisposable):
         self._condition: TransitCondition = TransitCondition(self._lock)
         self._count: int = 0
         self._released: bool = False
-        self._transit_fired: bool  = False
+        self._transit_fired: bool = False
 
-        self._controller: 'Controller' = controller
+        self._controller: 'SignalController' = controller
         if self._controller:
             try:
-                self._controller.register(self.id)
+                # FIX: Register the object instance 'self', not its ID string.
+                self._controller.register(self)
             except Exception:
+                # In a real app, you would log this failure.
                 pass
-
     def dispose(self):
         """
         Disposes the TransitBarrier and unblocks all waiting threads.
@@ -108,7 +113,7 @@ class TransitBarrier(IDisposable):
         self._transit = None
         if self._controller and hasattr(self._controller, 'unregister'):
             try:
-                self._controller.unregister(self)
+                self._controller.unregister(self.id)
             except Exception:
                 pass
         self._controller = None

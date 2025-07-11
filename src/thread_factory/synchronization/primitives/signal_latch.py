@@ -133,13 +133,17 @@ class SignalLatch(IDisposable):
         self._cond.dispose()
         self._signal_callback = None
         if self._controller:
-            self._controller.notify(self.id, "DISPOSED")
-        if self._controller and hasattr(self._controller, 'unregister'):
             try:
-                self._controller.unregister(self.id)
+                self._controller.notify(self.id, "DISPOSED")
+                if hasattr(self._controller, 'unregister'):
+                    self._controller.unregister(self.id)
             except Exception:
+                # It's good practice to never let cleanup fail silently
+                # In a real app, you might log this error.
                 pass
-            self._controller = None
+            finally:
+                # Ensure the reference is cleared even if notify/unregister fails
+                self._controller = None
 
 
     # ──────────────────────────────────────────────────────────────────

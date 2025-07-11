@@ -34,6 +34,17 @@ class MockController(IDisposable):
         self.notifications.append({'id': object_id, 'event': 'WAIT_STARTING'})
         self.notification_event.set()
 
+    # FIX: Add the missing 'notify' method
+    def notify(self, object_id: str, event_type: str, *args, **kwargs):
+        """Mocks the notification mechanism of the real controller."""
+        self.notifications.append({
+            'id': object_id,
+            'event': event_type,
+            'args': args,
+            'kwargs': kwargs
+        })
+        self.notification_event.set()
+
     def invoke(self, object_id: str, command: str, *args, **kwargs):
         if object_id not in self.registry:
             raise KeyError(f"Object {object_id} not registered.")

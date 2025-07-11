@@ -180,7 +180,7 @@ Each category maps directly to purpose:
 
 ## 📌 Developer Notes
 
-- Prefer `SwitchLock` + `SmartCondition` for agent-oriented design.
+- Prefer `FlowRegulator` + `SmartCondition` for worker-oriented design.
 - Use `ValueWork` as the new core unit of thread-initiated tasks.
 - For fork-like behavior, use `Fork` or `SyncFork`.
 - Adopt `Stopwatch` and `AutoResetTimer` for instrumentation.

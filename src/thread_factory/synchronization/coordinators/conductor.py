@@ -200,9 +200,11 @@ class Conductor(IDisposable):
 
             self.outcomes.dispose()
             self.outcomes = None
-            if self.tasks:
-                self.tasks.dispose()
-                self.tasks = None
+            if isinstance(self.tasks, list):
+                self.tasks.clear()
+            elif isinstance(self.tasks, ConcurrentList):
+                    self.tasks.dispose()
+            self.tasks = None
             self._broken = True
             self._released = True
             if self._controller:

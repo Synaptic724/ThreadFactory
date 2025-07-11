@@ -89,13 +89,15 @@ class FlowRegulator(IDisposable):
         """
         if self.disposed:  # Check if the lock has already been disposed
             return
-        self._disposed = True  # Mark the lock as disposed
-        self._cond.notify_all()
-        self._cond.dispose()
-        self._cond = None
-        self._log_ids.clear()
-        self._log_ids.dispose()
-        self._log_ids = None
+        # Acquire the internal condition lock before performing disposal operations
+        with self._cond:
+            self._disposed = True  # Mark the lock as disposed
+            self._cond.notify_all() # Now this is called with the lock acquired
+            self._cond.dispose()
+            self._cond = None # Set to None after disposal
+            self._log_ids.clear()
+            self._log_ids.dispose()
+            self._log_ids = None
 
     @property
     def condition(self) -> SmartCondition:

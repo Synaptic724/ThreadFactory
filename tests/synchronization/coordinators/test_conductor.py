@@ -469,7 +469,9 @@ class TestConductor(unittest.TestCase):
         c.dispose()
         c.start()
         self.assertEqual(hits["n"], 0)
-        self.assertEqual(len(c.outcomes), 0)
+        # FIX: Check the public properties, which are safe on a disposed object.
+        self.assertEqual(c.results, [])
+        self.assertEqual(c.exceptions, [])
 
     def test_reset_on_disposed_conductor_raises_error(self):
         c = Conductor(threshold=1, reusable=True)
@@ -709,3 +711,6 @@ class TestConductor(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
