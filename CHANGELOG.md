@@ -15,7 +15,7 @@ This release splits the system into high-performance primitives, orchestrators, 
 
 ---
 
-## 🔒 Sync Types – `concurrency.value_types`
+## 🔒 Sync Types – `concurrency.sync_types`
 
 Thread-safe wrappers for Python’s core data types. Built for deterministic, low-contention, concurrent access across threads.
 These types are also now reference types and are no longer treated like simple values (Use them cautiously).
