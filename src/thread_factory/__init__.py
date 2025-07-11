@@ -62,11 +62,14 @@ from thread_factory.synchronization.primitives.dynaphore import Dynaphore
 from thread_factory.synchronization.primitives.latch import Latch
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
 from thread_factory.synchronization.primitives.signal_latch import SignalLatch
-from thread_factory.synchronization.primitives.smart_condition import SmartCondition
+from thread_factory.synchronization.primitives.smart_condition import SmartCondition, Waiter
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 
 # ---- Utilities ----
 from thread_factory.utilities.exceptions.empty import Empty
+from thread_factory.utilities.coordination.group import Group
+from thread_factory.utilities.coordination.outcome import Outcome
+from thread_factory.utilities.coordination.package import Pack
 from thread_factory.utilities.timing_tools.auto_reset_timer import AutoResetTimer
 from thread_factory.utilities.timing_tools.stopwatch import Stopwatch
 from thread_factory.utilities.concurrent_tools.concurrent_tools import ConcurrentTools
@@ -110,9 +113,13 @@ __all__ = [
     "SignalBarrier",
     "SignalLatch",
     "SmartCondition",
+    "Waiter",
     "TransitCondition",
     # Utilities
     "ConcurrentTools",
+    "Group",
+    "Outcome",
+    "Pack",
     "Empty",
     "Stopwatch",
     "AutoResetTimer",
