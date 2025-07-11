@@ -81,7 +81,7 @@ Predicate-based monitor. One thread blocks while evaluating a predicate with tim
 
 ## 🚉 New Execution Gates – `synchronization.execution`
 
-### 🔀 `TransitGate`
+### 🔀 `BypassConductor`
 Allows up to `N` threads to execute a pre-bound callable pipeline. Captures results via `Outcome`. Collapses once the cap is reached. Great for controlled bootstraps or one-time initializers.
 
 ---
@@ -113,16 +113,6 @@ Central registry for lifecycle-managed objects. Supports:
 - Full-thread-safe `dispose()` that recursively tears down all managed objects
 
 It forms the backbone for global coordination, status tracking, and command dispatch.
-
-[//]: # (---)
-
-[//]: # ()
-[//]: # (## 🧱 Work Abstractions – `thread_factory.core.work`)
-
-[//]: # ()
-[//]: # (### 🪄 `Help_request`)
-
-[//]: # (Inverted `Future` managed by threads themselves. Tracks status &#40;`pending`, `running`, `completed`, `cancelled`, `failed`&#41; and timestamps. Can be used with dynamic workers for agentic execution and result orchestration.)
 
 ---
 
