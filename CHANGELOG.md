@@ -153,11 +153,10 @@ New features:
 - 📁 **New Folder Structure**
 - synchronization/
 - ├── primitives/
-- ├── orchestrators/
+- ├── coordinators/
 - ├── dispatchers/
 - ├── execution/
-- └── controller/
-
+- └── controllers/
 
 Each category maps directly to purpose:
 - `primitives`: Low-level synchronization building blocks
