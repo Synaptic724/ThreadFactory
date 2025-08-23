@@ -24,17 +24,12 @@ class Conductor(IDisposable):
     manual release triggers for fine-grained control, timeouts to prevent
     indefinite blocking, and centralized, thread-safe management of task outcomes
     (both results and exceptions).
-
-    It can integrate with a `SignalController` to emit lifecycle events, enabling
-    monitoring and external coordination based on its internal state, such as when
-    the barrier is passed, when task execution begins, or when it is reset or
-    disposed.
     """
     __slots__ = IDisposable.__slots__ + [
         "_threshold", "tasks", "reusable", "manual_release", "_timeout", "_raise_on_timeout",
         "_id", "outcomes", "_released", "_broken", "_multiple_outcomes_per_task",
         "_lock", "_clock_barrier", "_signal_barrier", "_dynaphore", "_internal_threshold_barrier",
-        "_manual_release_gate", "_controller", "_callback",
+        "_manual_release_gate", "_callback",
         "_callback_executed_flags", "_barrier_passed_notified", "_execution_started_notified",
         "_execution_completed_notified","_main_barrier",
     ]
@@ -47,8 +42,7 @@ class Conductor(IDisposable):
             timeout: Optional[float] = None,
             raise_on_timeout: bool = False,
             multiple_outcomes_per_task: bool = False,
-            callback: Optional[Callable[[], None]] = None,
-            controller: Optional['SignalController'] = None
+            callback: Optional[Callable[[], None]] = None
     ):
         """
         Initializes a new Conductor instance.
@@ -88,10 +82,6 @@ class Conductor(IDisposable):
             callback (Optional[Callable[[], None]]):
                 An optional function to be called immediately after each task in the
                 `tasks` list completes its execution.
-            controller (Optional['SignalController']):
-                An optional `SignalController` instance to which this Conductor will
-                register. The controller will receive notifications about the
-                conductor's state changes (e.g., "DISPOSED", "RESET", "BARRIER_PASSED").
         """
         super().__init__()
         if threshold <= 0:
@@ -138,24 +128,16 @@ class Conductor(IDisposable):
         self._dynaphore: Dynaphore = Dynaphore(self._threshold)
         self._manual_release_gate: Optional[threading.Event] = threading.Event() if self.manual_release else None
 
-        # Controller management
-        self._controller: 'Controller' = controller
-        if self._controller:
-            try:
-                self._controller.register(self)
-            except Exception:
-                pass
-
         # Set up the main barrier based on timeout
         if timeout is not None:
             if timeout <= 0: raise ValueError("Timeout must be a positive number.")
             self._clock_barrier = ClockBarrier(
                 threshold=self._threshold, timeout=timeout,
-                on_broken=self.notify_all_override, controller=self._controller
+                on_broken=self.notify_all_override
             )
         else:
             self._signal_barrier = SignalBarrier(
-                self._threshold, reusable=reusable, controller=self._controller
+                self._threshold, reusable=reusable
             )
         self._set_main_barrier()
 
@@ -167,9 +149,9 @@ class Conductor(IDisposable):
         Disposes of the Conductor, cleaning up all associated resources.
 
         This method performs a full teardown of the Conductor. It marks the
-        instance as disposed, notifies the controller (if any), and releases all
-        internal synchronization primitives (barriers, locks, events). This action
-        effectively unblocks any threads currently waiting on the Conductor.
+        instance as disposed and releases all internal synchronization primitives
+        (barriers, locks, events). This action effectively unblocks any threads
+        currently waiting on the Conductor.
 
         Once disposed, a Conductor cannot be used or reset. Any subsequent calls
         to its methods will have no effect or raise a `RuntimeError`. This method
@@ -207,14 +189,6 @@ class Conductor(IDisposable):
             self.tasks = None
             self._broken = True
             self._released = True
-            if self._controller:
-                self._controller.notify(self.id, "DISPOSED")
-            if self._controller and hasattr(self._controller, 'unregister'):
-                try:
-                    self._controller.unregister(self.id)
-                except Exception:
-                    pass
-                self._controller = None
 
     @property
     def id(self) -> str:
@@ -223,48 +197,21 @@ class Conductor(IDisposable):
 
         This property returns a ULID (Universally Unique Lexicographically
         Sortable Identifier) generated when the Conductor is initialized. This ID
-        serves as a primary key for this specific instance, used for tracking,
-        logging, and uniquely identifying it when communicating with a
-        `SignalController`.
+        serves as a primary key for this specific instance, used for tracking and
+        logging.
 
         Returns:
             str: The unique ULID string.
         """
         return self._id
 
-    def _get_object_details(self) -> ConcurrentDict[str, Any]:
-        """
-        Prepares a summary of the instance for controller registration.
-
-        This internal method provides a structured dictionary containing key
-        information about the Conductor. It is part of the contract used by the
-        `SignalController` during registration.
-
-        The dictionary includes the object's name ('conductor') and a map of
-        publicly invokable command methods. This allows the controller (or a
-        downstream system) to dynamically discover and interact with the
-        Conductor's core functionalities.
-
-        Returns:
-            Dict[str, Any]: A dictionary containing the object's name and
-                            callable command methods.
-        """
-        return ConcurrentDict({
-            'name': 'conductor',
-            'commands': ConcurrentDict({
-                'dispose': self.dispose, 'reset': self.reset, 'release': self.release,
-                'notify_all_override': self.notify_all_override, 'is_spent': self.is_spent,
-            })
-        })
-
     def reset(self):
         """
         Resets the Conductor to its initial state for reuse.
 
         This method is only effective if the Conductor was initialized with
-        `reusable=True`. It clears all previously collected outcomes, resets
-        internal barriers and gates to their initial counts and states, and
-        notifies the controller that a "RESET" event has occurred.
+        `reusable=True`. It clears all previously collected outcomes and resets
+        internal barriers and gates to their initial counts and states.
 
         This allows the Conductor to be used for another complete synchronization
         cycle. If the Conductor is not reusable, this method does nothing.
@@ -291,8 +238,6 @@ class Conductor(IDisposable):
             if self._internal_threshold_barrier: self._internal_threshold_barrier.reset()
             if self._manual_release_gate: self._manual_release_gate.clear()
             self._dynaphore.set_permits(self._threshold)
-            if self._controller:
-                self._controller.notify(self.id, "RESET")
 
     @property
     def results(self) -> List[Any]:
@@ -388,7 +333,6 @@ class Conductor(IDisposable):
             if self._disposed or not self.manual_release or self._released: return
             self._released = True
             if self._manual_release_gate: self._manual_release_gate.set()
-            if self._controller: self._controller.notify(self.id, "MANUALLY_RELEASED")
 
     def notify_all_override(self) -> None:
         """
@@ -422,10 +366,6 @@ class Conductor(IDisposable):
             if self._manual_release_gate:
                 self._manual_release_gate.set()
 
-            if self._controller and not self._barrier_passed_notified:
-                self._barrier_passed_notified = True
-                self._controller.notify(self.id, "BARRIER_BROKEN")
-
     def _execute_operation(self, task: Callable, index: int) -> None:
         """
         Executes a single task and captures its outcome.
@@ -453,8 +393,7 @@ class Conductor(IDisposable):
         Orchestrates the entire task execution and callback sequence.
 
         This method is the control loop for all post-barrier work. It first checks
-        if any tasks are defined. If so, it notifies the controller that execution
-        has started.
+        if any tasks are defined.
 
         It then iterates through the list of tasks, calling `_execute_operation`
         for each one. The loop includes a check to terminate early if the
@@ -462,17 +401,11 @@ class Conductor(IDisposable):
         execution of the optional, shared callback, ensuring the callback is
         invoked only once per task completion.
 
-        After all tasks are processed, it notifies the controller that execution
-        is complete. Finally, it handles the release logic: it either blocks until
+        After all tasks are processed, it handles the release logic: it either blocks until
         `release()` is called (if `manual_release` is True) or immediately marks
         the Conductor as released.
         """
         if self.tasks:
-            with self._lock:
-                if self._controller and not self._execution_started_notified:
-                    self._execution_started_notified = True
-                    self._controller.notify(self.id, "EXECUTION_STARTED")
-
             for index, task in enumerate(self.tasks):
                 if self._broken or self._disposed: break
 
@@ -485,16 +418,8 @@ class Conductor(IDisposable):
                             self._callback_executed_flags[index] = True
                             try:
                                 self._callback()
-                            except Exception as e:
-                                logger = self._controller._logger if self._controller else None
-                                if logger: logger.error(f"Error in Conductor callback: {e}", exc_info=True)
-
-
-            with self._lock:
-                if self._controller and not self._execution_completed_notified and not (self._broken or self._disposed):
-                    self._execution_completed_notified = True
-                    self._controller.notify(self.id, "EXECUTION_COMPLETED")
-
+                            except Exception:
+                                pass # Silently ignore callback errors
 
         if self.manual_release:
             self._manual_release_gate.wait()
@@ -595,10 +520,6 @@ class Conductor(IDisposable):
             self._main_barrier.wait()
             if self._broken:
                 return
-            with self._lock:
-                if self._controller and not self._barrier_passed_notified:
-                    self._barrier_passed_notified = True
-                    self._controller.notify(self.id, "BARRIER_PASSED")
 
             if not self._dynaphore.wait_for_permit(timeout):
                 return
