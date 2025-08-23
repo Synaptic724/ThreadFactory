@@ -7,7 +7,7 @@ import threading
 import time
 import unittest
 from typing import List, Any, Dict, Union, Optional
-from thread_factory import Conductor, SignalController
+from thread_factory import Conductor
 
 
 # --- Supporting functions ---

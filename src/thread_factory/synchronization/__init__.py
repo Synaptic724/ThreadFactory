@@ -1,6 +1,3 @@
-# Controllers
-from thread_factory.synchronization.controllers.signal_controller import SignalController
-
 # Dispatchers
 from thread_factory.synchronization.dispatchers.fork import Fork
 from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
@@ -22,7 +19,6 @@ from thread_factory.synchronization.primitives.signal_barrier import SignalBarri
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 from thread_factory.synchronization.primitives.smart_condition import SmartCondition
 from thread_factory.synchronization.primitives.latch import Latch
-from thread_factory.synchronization.primitives.signal_latch import SignalLatch
 
 __all__ = [
 # Primitives
@@ -32,7 +28,6 @@ __all__ = [
     'TransitCondition',
     'SmartCondition',
     'Latch',
-    'SignalLatch',
 # Orchestrators
     'Conductor',
     'MultiConductor',
@@ -44,6 +39,4 @@ __all__ = [
 # Dispatchers
     'Fork',
     'SyncFork',
-# Controllers
-    "SignalController",
     ]

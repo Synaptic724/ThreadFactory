@@ -41,8 +41,6 @@ from thread_factory.concurrency.sync_types.sync_bool import SyncBool
 from thread_factory.concurrency.sync_types.sync_string import SyncString
 from thread_factory.concurrency.sync_types.sync_ref import SyncRef
 # ---- Synchronization Classes ----
-# Controllers
-from thread_factory.synchronization.controllers.signal_controller import SignalController
 # Coordinators
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
 from thread_factory.synchronization.coordinators.conductor import Conductor
@@ -51,9 +49,7 @@ from thread_factory.synchronization.coordinators.scout import Scout
 from thread_factory.synchronization.coordinators.transit_barrier import TransitBarrier
 # Dispatchers
 from thread_factory.synchronization.dispatchers.fork import Fork
-from thread_factory.synchronization.dispatchers.signal_fork import SignalFork
 from thread_factory.synchronization.dispatchers.sync_fork import SyncFork
-from thread_factory.synchronization.dispatchers.sync_signal_fork import SyncSignalFork
 # Execution
 from thread_factory.synchronization.execution.bypass_conductor import BypassConductor
 # Primitives
@@ -61,7 +57,6 @@ from thread_factory.synchronization.primitives.flow_regulator import FlowRegulat
 from thread_factory.synchronization.primitives.dynaphore import Dynaphore
 from thread_factory.synchronization.primitives.latch import Latch
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
-from thread_factory.synchronization.primitives.signal_latch import SignalLatch
 from thread_factory.synchronization.primitives.smart_condition import SmartCondition, Waiter
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 
