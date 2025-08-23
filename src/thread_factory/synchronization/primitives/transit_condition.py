@@ -200,7 +200,7 @@ class TransitCondition(IDisposable):
             RuntimeError: If the internal lock is not acquired prior to calling.
         """
         if self._disposed:
-            raise RuntimeError("TransitCondition has been disposed")
+            raise RuntimeError("SignalCondition has been disposed")
         if not self._is_owned():
             raise RuntimeError("cannot wait on un-acquired lock")
 

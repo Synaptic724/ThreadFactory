@@ -1,6 +1,7 @@
 import threading, ulid
 from typing import Optional, Callable, Any, Dict, Union
 
+from thread_factory.synchronization import SignalController
 from thread_factory.utilities.interfaces.disposable import IDisposable
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
@@ -13,13 +14,14 @@ class TransitBarrier(IDisposable):
     A reusable, controllable barrier that synchronizes threads based on a predefined threshold.
     Once the threshold number of threads has called `wait()`, the barrier releases all waiting threads simultaneously.
 
-    When in manual mode, the barrier waits for a command to proceed after reaching its threshold.
-    The barrier can also trigger a custom action (referred to as `transit`) once the threshold is met.
+    When in manual mode and managed by a Controller, the barrier signals the Controller upon reaching its threshold and
+    waits for a command to proceed. The barrier can also trigger a custom action (referred to as `transit`) once the threshold is met.
 
     Key Features:
     -------------
     • **Threshold-Based Synchronization**: Threads wait until the threshold number of threads have reached the barrier.
     • **Auto-Release or Manual Release**: The barrier can either auto-release threads once the threshold is met or wait for an explicit `release()` call.
+    • **Controller Integration**: Supports integration with a Controller for remote management and event broadcasting.
     • **Custom Transit Action**: A custom `transit` action can be executed when the threshold is met, or a one-time action can be provided.
     • **Reusability**: If `reusable=True`, the barrier resets automatically after each complete release cycle.
     • **Timeout Support**: Threads can specify a timeout for waiting at the barrier.
@@ -34,6 +36,8 @@ class TransitBarrier(IDisposable):
         If `True`, the barrier will reset after the release, making it reusable for subsequent groups of threads. Default is `False`.
     manual_release (bool):
         If `True`, the barrier requires an explicit call to `release()` after the threshold is met. Default is `False` (auto-release).
+    controller (Optional['Controller']):
+        An optional `Controller` instance for managing the barrier and broadcasting events.
 
     Notes:
     ------
@@ -45,15 +49,18 @@ class TransitBarrier(IDisposable):
     __slots__ = IDisposable.__slots__ + [
         "_threshold", "_transit", "_reusable", "_manual_release",
         "_lock", "_condition", "_count", "_released", "_transit_fired",
-        "_id"
+        "_id", "_controller"
     ]
+
+    # In your TransitBarrier class in transit_barrier.py
 
     def __init__(
             self,
             threshold: int,
             transit: Optional[Union[Callable[..., None], Pack]] = None,
             reusable: bool = False,
-            manual_release: bool = False
+            manual_release: bool = False,
+            controller: Optional['SignalController'] = None
     ):
         super().__init__()
         if threshold <= 0:
@@ -71,12 +78,21 @@ class TransitBarrier(IDisposable):
         self._released: bool = False
         self._transit_fired: bool = False
 
+        self._controller: 'SignalController' = controller
+        if self._controller:
+            try:
+                # FIX: Register the object instance 'self', not its ID string.
+                self._controller.register(self)
+            except Exception:
+                # In a real app, you would log this failure.
+                pass
     def dispose(self):
         """
         Disposes the TransitBarrier and unblocks all waiting threads.
 
         After disposal:
         - All future `wait()` calls will immediately return False.
+        - The internal controller reference is cleared.
         - All pending threads are notified and released.
         - Callable references (`_transit`) are nulled for GC friendliness.
         - The object is marked as disposed and is no longer usable.
@@ -95,6 +111,12 @@ class TransitBarrier(IDisposable):
 
         # Null out any strong reference types
         self._transit = None
+        if self._controller and hasattr(self._controller, 'unregister'):
+            try:
+                self._controller.unregister(self.id)
+            except Exception:
+                pass
+        self._controller = None
 
     @property
     def id(self) -> str:
@@ -102,6 +124,28 @@ class TransitBarrier(IDisposable):
         The unique identifier for this component.
         """
         return self._id
+
+    def _get_object_details(self) -> ConcurrentDict[str, Any]:
+        """
+        Provides metadata and command hooks for integration with a controller.
+
+        Returns:
+            A dictionary containing:
+                - name: Logical name of this component.
+                - commands: Callable controller-accessible methods.
+        """
+        return ConcurrentDict({
+            'name': 'transit_barrier',
+            'commands': ConcurrentDict({
+                'release': self.release,
+                'reset': self.reset,
+                'is_spent': self.is_spent,
+                'get_waiter_count': self._condition.find_waiter_count,
+                'release_with_action': self.release_with_action,
+                # Re-added for production compatibility
+                'notify_all_override': self.notify_all_override,
+            })
+        })
 
     def release_with_action(self, callback: Optional[Union[Callable[..., None], Pack]] = None) -> None:
         """
@@ -129,7 +173,7 @@ class TransitBarrier(IDisposable):
         Immediately releases all threads without waiting for the threshold.
 
         Uses the default transit action if it hasn't already been fired. This
-        method is intended for emergency overrides or resets.
+        method is intended for emergency overrides or controller-level resets.
         """
         with self._lock:
             if self._disposed or self._released:
@@ -163,6 +207,8 @@ class TransitBarrier(IDisposable):
                 else:
                     self._condition.notify_all()
 
+    # In your TransitBarrier class
+
     def wait(self, timeout: Optional[float] = None) -> bool:
         """
         Waits at the barrier until the release condition is met or timeout occurs.
@@ -170,7 +216,8 @@ class TransitBarrier(IDisposable):
         Behavior:
         - If `manual_release` is False and the threshold is met, the first thread
           triggers release and runs the transit action (if any).
-        - If `manual_release` is True, threads remain blocked until `.release()` is called externally.
+        - If `manual_release` is True, the controller is notified on threshold,
+          but threads remain blocked until `.release()` is called externally.
         - If `reusable` is True, the barrier resets after the last thread exits.
 
         Args:
@@ -182,6 +229,10 @@ class TransitBarrier(IDisposable):
         if self.is_spent():
             return False
 
+        if self._count < self._threshold and not self._released:
+            if self._controller:
+                self._controller.notify(self.id, "WAIT_STARTING")
+
         with self._condition:
             if self._released:
                 return True
@@ -191,7 +242,10 @@ class TransitBarrier(IDisposable):
             self._count += 1
 
             if self._count == self._threshold:
-                if not self._manual_release:
+                if self._manual_release:
+                    if self._controller:
+                        self._controller.notify(self.id, "THRESHOLD_MET")
+                else:
                     # This is the auto-release path
                     if not self._released:
                         self._released = True

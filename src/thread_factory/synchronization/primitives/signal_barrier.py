@@ -5,6 +5,10 @@ from thread_factory.utilities.interfaces.disposable import IDisposable
 from thread_factory.utilities.coordination.package import Pack
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 
+# Assuming Controller is in a file that can be imported
+# from thread_factory.controller import Controller
+
+
 class SignalBarrier(IDisposable):
     """
     SignalBarrier
@@ -18,8 +22,8 @@ class SignalBarrier(IDisposable):
     -----------------
     • **Count-based Trigger**: Threads block until the `threshold` number of waiters is reached.
     • **Optional Reusability**: Can be configured to reset after releasing all threads.
-    • **Manual Release Option**: Allows an external caller to trigger the release manually.
-    • **Callback Hooks**: Provides callbacks for when a thread is about to wait and when the threshold is met.
+    • **Manual Release Option**: Allows controller or external caller to trigger release manually.
+    • **Controller Integration**: Emits lifecycle events and supports remote invocation.
     • **Timeout-aware**: Threads can specify a timeout for `wait()`.
 
     🔁 Reusable Behavior:
@@ -33,18 +37,31 @@ class SignalBarrier(IDisposable):
     If `manual_release=True`, the barrier is *not* released automatically when the threshold is met.
     Instead, a manual call to `release()` is required to proceed.
 
+    🔧 Controller Integration:
+    --------------------------
+    When integrated with a Controller instance:
+    • Self-registers on creation.
+    • Emits the following events:
+        - "THRESHOLD_MET": When the threshold is first reached.
+        - "SEMAPHORE_RELEASED": When threads are actually unblocked.
+    • Supports command-based control via:
+        - `release()`, `reset()`, `set_threshold()`, `is_spent()`, `notify_all_override()`, `dispose()`
+    • Provides a `signal_callback` hook (e.g., `controller.on_wait_starting`) to signal blocking activity.
+
     ⚙ Parameters:
     -------------
     threshold (int):
         Number of threads required to reach the release point.
-    signal_callback (Optional[Union[Callable[..., None], Pack]]):
-        A hook called just before a thread blocks in `wait()`.
+    callback (Optional[Union[Callable[..., None], Pack]]):
+        A function invoked once when the threshold is reached (before releasing threads).
     reusable (bool):
         If True, the semaphore resets itself after each full release cycle. Default is False.
     manual_release (bool):
         If True, prevents automatic release and requires an explicit call to `release()`.
-    transit_callback (Optional[Union[Callable[..., None], Pack]]):
-        A function invoked once when the threshold is reached (before releasing threads).
+    controller (Optional[Controller]):
+        A `Controller` instance used for central management and event emission.
+    signal_callback (Optional[Union[Callable[..., None], Pack]]):
+        A hook called just before a thread blocks in `wait()`. Typically used to notify a controller.
 
     🚨 Exceptions:
     --------------
@@ -67,7 +84,7 @@ class SignalBarrier(IDisposable):
     __slots__ = IDisposable.__slots__ + [
         "_threshold", "_transit_callback", "_reusable", "_manual_release",
         "_lock", "_condition", "_count", "_released", "_id",
-        "_signal_callback"
+        "_controller", "_signal_callback", "_wait_notification"
     ]
 
     def __init__(
@@ -76,6 +93,7 @@ class SignalBarrier(IDisposable):
             signal_callback: Optional[Union[Callable[..., None], Pack]] = None,
             reusable: bool = False,
             manual_release: bool = False,
+            controller: Optional['Controller'] = None,
             transit_callback: Optional[Union[Callable[..., None], Pack]] = None
     ):
         super().__init__()
@@ -89,19 +107,30 @@ class SignalBarrier(IDisposable):
         # --- State Management ---
         self._count: int = 0
         self._released: bool = False
+        self._wait_notification: bool = False
         self._reusable: bool = reusable
         self._manual_release: bool = manual_release
         self._id = str(ulid.ULID())
         self._threshold: int = threshold
         self._signal_callback = signal_callback if signal_callback is None else Pack.bundle(signal_callback)
+
+        # --- Controller Integration ---
+        self._controller: 'Controller' = controller
         self._transit_callback: Union[Callable[..., None], Pack] = transit_callback if transit_callback is None else Pack.bundle(transit_callback)
+
+        if self._controller:
+            try:
+                self._controller.register(self)
+            except Exception:
+                # Fail silently if registration fails, maintaining standalone functionality.
+                pass
 
     def dispose(self):
         """
         Releases all resources and unblocks waiting threads.
 
         This method marks the semaphore as disposed and removes references
-        to callbacks. All currently waiting threads are notified
+        to callbacks and controllers. All currently waiting threads are notified
         and allowed to exit.
 
         This method is idempotent and safe to call multiple times.
@@ -116,16 +145,54 @@ class SignalBarrier(IDisposable):
 
         with self._condition:
             self._condition.notify_all()
+        if self._controller:
+            self._controller.notify(self.id, "DISPOSED")
+        if self._controller and hasattr(self._controller, 'unregister'):
+            try:
+                self._controller.unregister(self.id)
+            except Exception:
+                pass
+            self._controller = None
+
+    # --- Controller Contract Properties ---
 
     @property
     def id(self) -> str:
         """
         Returns the unique ULID identifier for this semaphore.
 
+        This ID is used for identification during controller integration,
+        event tracking, and external control through the command interface.
+
         Returns:
             str: A globally unique ULID string.
         """
         return self._id
+
+    def _get_object_details(self) -> ConcurrentDict[str, Any]:
+        """
+        Provides controller-compatible metadata and command bindings.
+
+        This allows the `Controller` to register the object, invoke its
+        commands remotely, and subscribe to events.
+
+        Returns:
+            Dict[str, Any]: A dictionary with keys:
+                - 'name': A string descriptor of the object ("threshold_semaphore").
+                - 'commands': A dictionary mapping command names to bound methods.
+        """
+        return ConcurrentDict({
+            'name': 'signal_barrier',
+            'commands': ConcurrentDict({
+                'release': self.release,
+                'reset': self.reset,
+                'set_threshold': self.set_threshold,
+                'is_spent': self.is_spent,
+                'notify_all_override': self.notify_all_override,
+                'dispose': self.dispose
+            })
+        })
+
 
     def is_spent(self) -> bool:
         """
@@ -142,8 +209,11 @@ class SignalBarrier(IDisposable):
         """
         Forcibly releases all threads currently waiting on the semaphore.
 
-        This bypasses the threshold logic. It's typically used for an
-        external system to override the normal wait logic.
+        This bypasses the threshold logic. It's typically used by the
+        controller or external system to override the normal wait logic.
+
+        Emits:
+            Controller event: "SEMAPHORE_RELEASED"
 
         Notes:
             If reusable=True, resets the counter after releasing.
@@ -153,6 +223,8 @@ class SignalBarrier(IDisposable):
                 return
 
             self._released = True
+            if self._controller:
+                self._controller.notify(self.id, "SEMAPHORE_RELEASED")
 
             if self._reusable:
                 self._count = 0
@@ -165,6 +237,9 @@ class SignalBarrier(IDisposable):
 
         This should be called *after* the threshold has been met.
 
+        Emits:
+            Controller event: "SEMAPHORE_RELEASED"
+
         Notes:
             Has no effect unless `manual_release=True` and the internal
             count has reached the configured threshold.
@@ -176,6 +251,8 @@ class SignalBarrier(IDisposable):
             # Only release if in manual mode and the threshold has been met
             if self._manual_release and self._count >= self._threshold:
                 self._released = True
+                if self._controller:
+                    self._controller.notify(self.id, "SEMAPHORE_RELEASED")
                 self._condition.notify_all()
 
     def set_threshold(self, new_threshold: int):
@@ -201,6 +278,8 @@ class SignalBarrier(IDisposable):
 
             if self._count >= self._threshold and not self._manual_release and not self._released:
                 self._released = True
+                if self._controller:
+                    self._controller.notify(self.id, "SEMAPHORE_RELEASED")
                 self._condition.notify_all()
 
     def reset(self):
@@ -213,7 +292,10 @@ class SignalBarrier(IDisposable):
         """
         with self._condition:
             self._count = 0
+            self._wait_notification = False
             self._released = False
+
+    # In the SignalBarrier class...
 
     def wait(self, timeout: Optional[float] = None) -> bool:
         """
@@ -231,42 +313,54 @@ class SignalBarrier(IDisposable):
         Behavior:
             - Increments the internal count on entry.
             - If the threshold is reached:
-                • Invokes `transit_callback` (if provided).
+                • Invokes `callback` (if provided).
+                • Emits "THRESHOLD_MET" event to the controller.
                 • Either auto-releases or waits for `release()`, depending on configuration.
-            - If `signal_callback` is defined and the thread is about to block, it is invoked.
+            - If `signal_callback` is defined and the thread will block, it is invoked.
             - If reusable=True, the last thread to exit resets the state for the next cycle.
 
         Notes:
             - If the semaphore has already been released and is not reusable, the call returns immediately.
             - If disposed, the thread unblocks with a return value of False.
+
+        Exceptions:
+            - All internal exceptions in callbacks or controller logic are caught and logged silently.
         """
         if self.is_spent():
-            return False
+            return False  # Corrected from our last session
+
+        if not self._released and not self._wait_notification:
+            self._wait_notification = True
+            if self._controller:
+                self._controller.notify(self.id, "WAIT_STARTING")
 
         with self._condition:
             if self._disposed:
                 return False
 
-            # This is the correct place for the signal_callback, invoked just before a thread might wait.
-            if not self._released and self._signal_callback:
-                try:
-                    self._signal_callback(self.id)
-                except Exception:
-                    pass  # Never let callback kill the barrier
-
             self._count += 1
 
             if self._count == self._threshold:
-                # Threshold is met, execute the one-time transit action
-                if self._transit_callback:
+                if self._signal_callback:
                     try:
-                        self._transit_callback()
+                        self._signal_callback()
                     except Exception:
-                        pass  # Never let callback kill the barrier
+                        pass
+
+                if self._controller:
+                    self._controller.notify(self.id, "THRESHOLD_MET")
 
                 if not self._manual_release:
                     self._released = True
+                    if self._controller:
+                        self._controller.notify(self.id, "SEMAPHORE_RELEASED")
                     self._condition.notify_all()
+
+            if self._transit_callback:
+                try:
+                    self._transit_callback(self.id)
+                except Exception:
+                    pass
 
             was_released = self._condition.wait_for(lambda: self._released or self._disposed, timeout=timeout)
 
@@ -276,6 +370,7 @@ class SignalBarrier(IDisposable):
                 # The very last thread to pass is responsible for resetting the
                 # semaphore for the next group.
                 if self._count == 0:
+                    self._wait_notification = False
                     self._released = False
 
             return was_released and not self._disposed
