@@ -138,7 +138,7 @@ class TestConcurrentSet(unittest.TestCase):
         self.assertIn("ConcurrentSet", repr(cs))
 
 
-    def test_context_manager_and_dispose(self):
+    def test_context_manager_and_cleanup(self):
         cs = ConcurrentSet([1, 2])
         with self.assertWarns(UserWarning):
             with cs as raw:

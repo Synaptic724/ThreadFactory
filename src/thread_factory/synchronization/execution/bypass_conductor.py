@@ -74,7 +74,7 @@ class BypassConductor(Cleanable):
 
     def cleanup(self):
         """
-        Disposes internal structures and clears all state.
+        cleanups internal structures and clears all state.
 
         Behavior:
             - Disables further access.
@@ -88,10 +88,10 @@ class BypassConductor(Cleanable):
             self._collapsed = True
             self._outcomes.clear()
             if self._dynaphore:
-                self._dynaphore.dispose()
+                self._dynaphore.cleanup()
                 self._dynaphore = None
             if self._threshold_sema:
-                self._threshold_sema.dispose()
+                self._threshold_sema.cleanup()
                 self._threshold_sema = None
 
     def _try_claim_slot(self) -> bool:

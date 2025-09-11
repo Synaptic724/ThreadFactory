@@ -69,7 +69,7 @@ class TestConductor(unittest.TestCase):
             t.join(1)
         self.assertEqual(_collect_results(c.outcomes), ["done"])
         self.assertTrue(c.is_spent())
-        c.dispose()
+        c.cleanup()
 
     def test_exception_capture(self):
         class Boom(Exception): pass
@@ -80,7 +80,7 @@ class TestConductor(unittest.TestCase):
         excs = _collect_excs(c.outcomes)
         self.assertEqual(len(excs), 1)
         self.assertIsInstance(excs[0], Boom)
-        c.dispose()
+        c.cleanup()
     # ----------------------------------------------------------
     #  EXTRA CONCURRENCY & PERMIT-HANDLING TESTS
     # ----------------------------------------------------------
@@ -93,7 +93,7 @@ class TestConductor(unittest.TestCase):
             t.join(5)
         self.assertTrue(all(not t.is_alive() for t in threads))
         self.assertTrue(c.is_spent())
-        c.dispose()
+        c.cleanup()
 
 
     def test_exception_releases_permit_and_other_threads_continue(self):
@@ -129,7 +129,7 @@ class TestConductor(unittest.TestCase):
         self.assertEqual(successes, ["ok"] * 2)
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], ValueError)
-        c.dispose()
+        c.cleanup()
 
     # 1 ─ results() only returns successful results, never exceptions
     def test_results_property_filters_exceptions(self):
@@ -145,7 +145,7 @@ class TestConductor(unittest.TestCase):
 
         self.assertEqual(c.results, ["ok"] * 2)
         self.assertEqual(len(c.exceptions), 2)
-        c.dispose()
+        c.cleanup()
 
     def test_reset_after_success_allows_fresh_outcomes(self):
         """After reset(), old outcomes must be gone and new ones recorded."""
@@ -164,7 +164,7 @@ class TestConductor(unittest.TestCase):
         c._callback_executed_flags = [False]  # reset callback tracking
         _spawn(2, c.start)[0].join()
         self.assertEqual([o.result() for o in c.outcomes[0]], ["cycle2"] * 2)
-        c.dispose()
+        c.cleanup()
 
     def test_internal_barrier_synchronises_between_tasks(self):
         """
@@ -194,7 +194,7 @@ class TestConductor(unittest.TestCase):
         # All three threads should have reached phase-1 before any phase-2 runs
         self.assertEqual(first_phase_hits["cnt"], 3)
         self.assertEqual(snapshot_values, [3, 3, 3])
-        c.dispose()
+        c.cleanup()
 
     def test_surplus_threads_are_handled_gracefully(self):
         """
@@ -221,11 +221,11 @@ class TestConductor(unittest.TestCase):
         # The task should have been executed exactly `threshold` times.
         self.assertEqual(task_executions["count"], 3)
         self.assertTrue(c.is_spent())
-        c.dispose()
+        c.cleanup()
 
-    def test_concurrent_dispose_unblocks_all_waiters(self):
+    def test_concurrent_cleanup_unblocks_all_waiters(self):
         """
-        Verify that calling dispose() unblocks all threads currently
+        Verify that calling cleanup() unblocks all threads currently
         waiting in start().
         """
         # High threshold that won't be met.
@@ -238,7 +238,7 @@ class TestConductor(unittest.TestCase):
         def blocking_waiter():
             # Let the main thread know this waiter is about to block.
             waiters_are_blocked.set()
-            # This call should block until dispose() is called.
+            # This call should block until cleanup() is called.
             c.start()
 
         # Spawn 3 threads that will all block on the barrier.
@@ -250,25 +250,25 @@ class TestConductor(unittest.TestCase):
         # Wait until at least one thread is confirmed to be at the barrier.
         self.assertTrue(waiters_are_blocked.wait(timeout=1), "Waiters never blocked.")
 
-        # Give a moment for all waiters to block, then dispose.
+        # Give a moment for all waiters to block, then cleanup.
         time.sleep(0.1)
         self.assertTrue(any(t.is_alive() for t in waiting_threads))
-        c.dispose()
+        c.cleanup()
 
-        # All threads should have been unblocked by dispose() and terminated.
+        # All threads should have been unblocked by cleanup() and terminated.
         for t in waiting_threads:
             t.join(timeout=1)
 
-        self.assertFalse(any(t.is_alive() for t in waiting_threads), "Not all waiters were unblocked by dispose.")
-    # 2 ─ exceptions() never returns disposals / internal runtime errors
+        self.assertFalse(any(t.is_alive() for t in waiting_threads), "Not all waiters were unblocked by cleanup.")
+    # 2 ─ exceptions() never returns cleanings / internal runtime errors
     def test_exceptions_property_ignores_cleaned_noise(self):
         def nop(): return None
 
         c = Conductor(threshold=1, tasks=[nop])
         _spawn(1, c.start)[0].join()
-        c.dispose()  # dispose triggers RuntimeError in outcomes
+        c.cleanup()  # cleanup triggers RuntimeError in outcomes
         self.assertEqual(c.exceptions, [])  # should filter them
-        c.dispose()
+        c.cleanup()
 
     # 3 ─ manual_release does not unblock until release() is called
     def test_manual_release_waits_for_explicit_call(self):
@@ -279,7 +279,7 @@ class TestConductor(unittest.TestCase):
         self.assertFalse(flag.is_set())  # still blocked
         c.release()
         self.assertTrue(flag.wait(1))  # unblocked after release()
-        c.dispose()
+        c.cleanup()
     #
     # def test_callback_exception_is_handled_without_crashing(self):
     #     class CallbackError(Exception):
@@ -328,8 +328,8 @@ class TestConductor(unittest.TestCase):
     #     self.assertTrue(task_completed.is_set())
     #     self.assertEqual(c.results, ["done"])
     #
-    #     c.dispose()
-    #     controller.dispose()
+    #     c.cleanup()
+    #     controller.cleanup()
     # 4 ─ release() has no effect if threshold not yet met
     def test_release_before_threshold_is_noop(self):
         c = Conductor(threshold=2, manual_release=True)
@@ -340,7 +340,7 @@ class TestConductor(unittest.TestCase):
         self.assertTrue(waiter.is_alive())  # thread still waiting
         c.notify_all_override()  # unblock so test ends
         waiter.join(1)
-        c.dispose()
+        c.cleanup()
 
     # 5 ─ reusable Conductor can be reset twice in a row
     def test_double_reset_on_reusable(self):
@@ -350,7 +350,7 @@ class TestConductor(unittest.TestCase):
         _spawn(1, c.start)[0].join()
         c.reset()  # second reset must not raise
         self.assertFalse(c._broken)
-        c.dispose()
+        c.cleanup()
 
     # 6 ─ surplus threads call start() after barrier already spent
     def test_surplus_threads_return_immediately(self):
@@ -358,7 +358,7 @@ class TestConductor(unittest.TestCase):
         threads = _spawn(5, c.start)  # 2 surplus callers
         for t in threads: t.join(2)
         self.assertEqual(len(c.results), 0)  # no tasks so no outcomes
-        c.dispose()
+        c.cleanup()
 
     # 7 ─ Dynaphore never allows more than threshold concurrent executions
     def test_dynaphore_permit_limit(self):
@@ -379,7 +379,7 @@ class TestConductor(unittest.TestCase):
         _spawn(3, c.start)  # exactly threshold threads
         time.sleep(0.2)
         self.assertLessEqual(max_seen["v"], 3)  # ≤ threshold OK
-        c.dispose()
+        c.cleanup()
 
     # 8 ─ callback is NOT fired when tasks list is empty
     def test_callback_not_called_without_tasks(self):
@@ -390,10 +390,10 @@ class TestConductor(unittest.TestCase):
         c = Conductor(threshold=1, callback=cb)  # no tasks
         _spawn(1, c.start)[0].join()
         self.assertFalse(flag["called"])
-        c.dispose()
+        c.cleanup()
 
-    # 9 ─ dispose() during wait unblocks all threads without exceptions propagated
-    def test_dispose_mid_wait_unblocks_threads(self):
+    # 9 ─ cleanup() during wait unblocks all threads without exceptions propagated
+    def test_cleanup_mid_wait_unblocks_threads(self):
         c = Conductor(threshold=5)
         started = threading.Event()
 
@@ -404,7 +404,7 @@ class TestConductor(unittest.TestCase):
         ts = _spawn(3, waiter)
         started.wait()
         time.sleep(0.05)
-        c.dispose()  # should unblock
+        c.cleanup()  # should unblock
         for t in ts: t.join(1)
         self.assertTrue(all(not t.is_alive() for t in ts))
         self.assertTrue(c._cleaned)
@@ -421,8 +421,8 @@ class TestConductor(unittest.TestCase):
         c.notify_all_override()
         c.notify_all_override()  # second call should be ignored
         self.assertEqual(events.count("BARRIER_BROKEN"), 1)
-        c.dispose()
-        controller.dispose()
+        c.cleanup()
+        controller.cleanup()
 
     # ----------------------------------------------------------
     # Reusable lifecycle
@@ -440,7 +440,7 @@ class TestConductor(unittest.TestCase):
                 t.join(5)
             c.reset()
         self.assertEqual(hits["n"], 4)
-        c.dispose()
+        c.cleanup()
 
     def test_is_spent(self):
         one = Conductor(threshold=1)
@@ -448,18 +448,18 @@ class TestConductor(unittest.TestCase):
         for t in threads_one:
             t.join(1)
         self.assertTrue(one.is_spent())
-        one.dispose()
+        one.cleanup()
         loop = Conductor(threshold=1, reusable=True)
         threads_loop_1 = _spawn(1, loop.start)
         for t in threads_loop_1:
             t.join(1)
         self.assertFalse(loop.is_spent())
-        loop.dispose()
+        loop.cleanup()
 
     def test_start_on_cleaned_conductor_is_noop(self):
         hits = {"n": 0}
         c = Conductor(threshold=1, tasks=lambda: hits.update(n=1))
-        c.dispose()
+        c.cleanup()
         c.start()
         self.assertEqual(hits["n"], 0)
         # FIX: Check the public properties, which are safe on a cleaned object.
@@ -468,7 +468,7 @@ class TestConductor(unittest.TestCase):
 
     def test_reset_on_cleaned_conductor_raises_error(self):
         c = Conductor(threshold=1, reusable=True)
-        c.dispose()
+        c.cleanup()
         with self.assertRaises(RuntimeError):
             c.reset()
 
@@ -482,7 +482,7 @@ class TestConductor(unittest.TestCase):
         waiter_thread.join(timeout=0.1)
         self.assertFalse(waiter_thread.is_alive())
         self.assertTrue(c._broken)
-        c.dispose()
+        c.cleanup()
 
     # ----------------------------------------------------------
     # FIX FOR `test_reusable_conductor_timeout_then_success`
@@ -523,9 +523,9 @@ class TestConductor(unittest.TestCase):
         # Both threads execute the task, so we expect 2 hits.
         self.assertEqual(hits["n"], 2, "Task should run on the successful second cycle.")
         self.assertFalse(c._broken)
-        c.dispose()
+        c.cleanup()
 
-    # ... (Manual release, dispose, other timeout tests remain the same) ...
+    # ... (Manual release, cleanup, other timeout tests remain the same) ...
     def test_manual_release_blocks_until_called(self):
         c = Conductor(threshold=2, manual_release=True)
         flag = threading.Event()
@@ -534,27 +534,27 @@ class TestConductor(unittest.TestCase):
         self.assertFalse(flag.is_set())
         c.release()
         self.assertTrue(flag.wait(1))
-        c.dispose()
+        c.cleanup()
 
-    def test_dispose_unblocks_waiter(self):
+    def test_cleanup_unblocks_waiter(self):
         c = Conductor(threshold=2)
         thread_finished_event = threading.Event()
         t = threading.Thread(target=lambda: (c.start(), thread_finished_event.set()), daemon=True)
         t.start()
         time.sleep(0.05)
         self.assertFalse(thread_finished_event.is_set())
-        c.dispose()
+        c.cleanup()
         t.join(1)
         self.assertFalse(t.is_alive())
         self.assertTrue(thread_finished_event.is_set())
-        c.dispose()
+        c.cleanup()
 
     def test_global_timeout_raises_exception(self):
         c = Conductor(threshold=2, timeout=0.1, raise_on_timeout=True)
         with self.assertRaises(TimeoutError):
             c.start()
         self.assertTrue(c._broken)
-        c.dispose()
+        c.cleanup()
 
     def test_global_timeout_returns_normally(self):
         c = Conductor(threshold=2, timeout=0.1, raise_on_timeout=False)
@@ -565,7 +565,7 @@ class TestConductor(unittest.TestCase):
         self.assertGreaterEqual(duration, 0.1)
         self.assertLess(duration, 0.2)
         self.assertTrue(c._broken)
-        c.dispose()
+        c.cleanup()
 
     def test_start_on_spent_returns_immediately(self):
         c = Conductor(threshold=1)
@@ -581,7 +581,7 @@ class TestConductor(unittest.TestCase):
         end_time = time.monotonic()
         self.assertFalse(t2.is_alive())
         self.assertLess(end_time - start_time, 0.05)
-        c.dispose()
+        c.cleanup()
 
     def test_no_tasks_means_no_outcomes(self):
         c = Conductor(threshold=1)
@@ -591,7 +591,7 @@ class TestConductor(unittest.TestCase):
         self.assertEqual(len(c.outcomes), 0)
         self.assertEqual(_collect_results(c.outcomes), [])
         self.assertEqual(_collect_excs(c.outcomes), [])
-        c.dispose()
+        c.cleanup()
 
     # ... (all multiple_outcomes tests remain the same) ...
     def test_single_thread_multiple_outcomes_per_task_result(self):
@@ -599,7 +599,7 @@ class TestConductor(unittest.TestCase):
         _spawn(1, c.start)[0].join(1)
         self.assertEqual(len(c.outcomes[0]), 1)
         self.assertEqual(c.outcomes[0][0].result(), "result")
-        c.dispose()
+        c.cleanup()
 
     def test_single_thread_multiple_outcomes_per_task_exception(self):
         class TestError(Exception): pass
@@ -608,7 +608,7 @@ class TestConductor(unittest.TestCase):
         _spawn(1, c.start)[0].join(1)
         self.assertEqual(len(c.outcomes[0]), 1)
         self.assertIsInstance(c.outcomes[0][0].exception(), TestError)
-        c.dispose()
+        c.cleanup()
 
     def test_multiple_threads_multiple_outcomes_per_task_result(self):
         c = Conductor(threshold=3, tasks=[lambda: "result"], multiple_outcomes_per_task=True)
@@ -616,7 +616,7 @@ class TestConductor(unittest.TestCase):
         for t in threads: t.join(5)
         self.assertEqual(len(c.outcomes[0]), 3)
         self.assertEqual([o.result() for o in c.outcomes[0]], ["result"] * 3)
-        c.dispose()
+        c.cleanup()
 
     def test_multiple_threads_multiple_outcomes_per_task_exception(self):
         class ThreadSpecificError(Exception): pass
@@ -626,7 +626,7 @@ class TestConductor(unittest.TestCase):
         for t in threads: t.join(5)
         self.assertEqual(len(c.outcomes[0]), 3)
         self.assertTrue(all(isinstance(e.exception(), ThreadSpecificError) for e in c.outcomes[0]))
-        c.dispose()
+        c.cleanup()
 
     # ----------------------------------------------------------
     # NEW TESTS for Callback and Controller Integration
@@ -648,7 +648,7 @@ class TestConductor(unittest.TestCase):
 
         # The callback should have been fired once for task1 and once for task2.
         self.assertEqual(callback_counts["count"], 2, "Callback should be fired once per task.")
-        c.dispose()
+        c.cleanup()
 
     def test_conductor_registers_with_controller(self):
         """Verify the Conductor registers itself with the controller on creation."""
@@ -658,8 +658,8 @@ class TestConductor(unittest.TestCase):
         registered_objects = controller.list_objects(name_filter="conductor")
         self.assertEqual(len(registered_objects), 1, "Conductor should be registered.")
         self.assertEqual(registered_objects[0]['id'], c.id, "Registered ID should match conductor's ID.")
-        c.dispose()
-        controller.dispose()
+        c.cleanup()
+        controller.cleanup()
 
     def test_controller_receives_events(self):
         """Verify the controller receives lifecycle events from the Conductor."""
@@ -681,8 +681,8 @@ class TestConductor(unittest.TestCase):
 
         expected_events = ["BARRIER_PASSED", "EXECUTION_STARTED", "EXECUTION_COMPLETED"]
         self.assertListEqual(received_events, expected_events, "Controller did not receive the correct sequence of events.")
-        c.dispose()
-        controller.dispose()
+        c.cleanup()
+        controller.cleanup()
 
     def test_controller_invokes_command(self):
         """Verify the controller can invoke a command on the Conductor."""
@@ -698,8 +698,8 @@ class TestConductor(unittest.TestCase):
 
         self.assertFalse(c._released, "Conductor should be reset to a non-released state.")
         self.assertFalse(c._broken, "Conductor should not be broken after reset.")
-        c.dispose()
-        controller.dispose()
+        c.cleanup()
+        controller.cleanup()
 
 
 if __name__ == "__main__":

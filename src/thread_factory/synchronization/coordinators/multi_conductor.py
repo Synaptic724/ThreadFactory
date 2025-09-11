@@ -217,15 +217,15 @@ class MultiConductor(Cleanable):
 
     def cleanup(self):
         """
-        Disposes of the MultiConductor and all associated resources.
+        cleanups of the MultiConductor and all associated resources.
 
-        This method releases all synchronization primitives, disposes of any barriers and groups,
+        This method releases all synchronization primitives, cleanups of any barriers and groups,
         and marks the conductor as cleaned. Once cleaned, the conductor is no longer usable.
 
         The following actions occur:
         - Releases all waiters to prevent deadlocks.
         - Notifies the controller (if provided) that the conductor has been cleaned.
-        - Disposes of any internal barriers such as the `ClockBarrier`, `SignalBarrier`, and `Dynaphore`.
+        - cleanups of any internal barriers such as the `ClockBarrier`, `SignalBarrier`, and `Dynaphore`.
         - Clears the groups and outcomes data structures, ensuring no references remain.
 
         If called multiple times, this method will safely exit without performing any additional work.
@@ -248,25 +248,25 @@ class MultiConductor(Cleanable):
             # It ensures any thread waiting on THIS object is unblocked before
             # we proceed with any other cleanup.
             if self._clock_barrier:
-                self._clock_barrier.dispose()
+                self._clock_barrier.cleanup()
             if self._signal_barrier:
-                self._signal_barrier.dispose()
+                self._signal_barrier.cleanup()
             if self._internal_threshold_barrier:
-                self._internal_threshold_barrier.dispose()
+                self._internal_threshold_barrier.cleanup()
             if self._dynaphore:
-                self._dynaphore.dispose()
+                self._dynaphore.cleanup()
             if self._manual_release_gate:
                 self._manual_release_gate.set()
 
             for group in self.groups:
-                group.dispose()
+                group.cleanup()
 
-            self.groups.dispose()
+            self.groups.cleanup()
             self.groups = None
-            self.outcomes.dispose()
+            self.outcomes.cleanup()
             self.outcomes = None
             if self._fork_processor:
-                self._fork_processor.dispose()
+                self._fork_processor.cleanup()
                 self._fork_processor = None
 
             # --- Step 2: Perform secondary cleanup of child objects and data ---
@@ -816,7 +816,7 @@ class MultiConductor(Cleanable):
         return ConcurrentDict({
             'name': 'multiconductor',
             'commands': ConcurrentDict({
-                'dispose': self.dispose, 'reset': self.reset, 'release': self.release,
+                'cleanup': self.cleanup, 'reset': self.reset, 'release': self.release,
                 'notify_all_override': self.notify_all_override, 'is_spent': self.is_spent,
             })
         })

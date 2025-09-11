@@ -45,7 +45,7 @@ class SignalBarrier(Cleanable):
         - "THRESHOLD_MET": When the threshold is first reached.
         - "SEMAPHORE_RELEASED": When threads are actually unblocked.
     • Supports command-based control via:
-        - `release()`, `reset()`, `set_threshold()`, `is_spent()`, `notify_all_override()`, `dispose()`
+        - `release()`, `reset()`, `set_threshold()`, `is_spent()`, `notify_all_override()`, `cleanup()`
     • Provides a `signal_callback` hook (e.g., `controller.on_wait_starting`) to signal blocking activity.
 
     ⚙ Parameters:
@@ -189,7 +189,7 @@ class SignalBarrier(Cleanable):
                 'set_threshold': self.set_threshold,
                 'is_spent': self.is_spent,
                 'notify_all_override': self.notify_all_override,
-                'dispose': self.dispose
+                'cleanup': self.cleanup
             })
         })
 

@@ -21,7 +21,7 @@ class TestScout(unittest.TestCase):
     def tearDown(self):
         # Ensure any leftover Scout instances are cleaned
         if hasattr(self, 'scout') and self.scout and not self.scout._cleaned:
-            self.scout.dispose()
+            self.scout.cleanup()
 
     # --- Initialization Tests ---
     def test_init_invalid_predicate(self):
@@ -269,8 +269,8 @@ class TestScout(unittest.TestCase):
         self.assertFalse(self.scout.is_active())  # No thread should be active now
         self.assertTrue(self.scout.is_latched())  # Scout should be latched (default mode)
 
-    # --- Disposal Tests ---
-    def test_dispose_prevents_further_use(self):
+    # --- cleaning Tests ---
+    def test_cleanup_prevents_further_use(self):
         self.scout = Scout(
             predicate=self.predicate,
             timeout_duration=0.1,
@@ -278,15 +278,15 @@ class TestScout(unittest.TestCase):
         )
         self.assertFalse(self.scout._cleaned)
 
-        self.scout.dispose()
+        self.scout.cleanup()
         self.assertTrue(self.scout._cleaned)
 
-        # Attempt to monitor after dispose
+        # Attempt to monitor after cleanup
         result = self.scout.monitor()
         self.assertFalse(result)  # Should immediately return False
         self.mock_on_timeout.assert_not_called()  # No callbacks should fire
 
-        # Attempt to reset after dispose
+        # Attempt to reset after cleanup
         with self.assertRaises(RuntimeError):
             self.scout.reset()
 

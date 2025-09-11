@@ -68,7 +68,7 @@ class TestSyncFork(unittest.TestCase):
 
         self.assertEqual(self.log.count("A"), 50)
         self.assertEqual(len([s for s in self.log if "executed callable" in s]), total_cap)
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
     def test_selector_wraparound(self):
         callables = [(4, dummy_func_factory(f"U{i}", self.log)) for i in range(3)]
@@ -85,7 +85,7 @@ class TestSyncFork(unittest.TestCase):
 
         for i in range(3):
             self.assertEqual(self.log.count(f"U{i}"), 4)
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
     def test_barrier_release_at_capacity(self):
         callables_list = [
@@ -128,7 +128,7 @@ class TestSyncFork(unittest.TestCase):
         for unit in fork._list_of_forks:
             self.assertTrue(unit.gate)
             self.assertEqual(unit.gate_uses, unit.usage_cap)
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
     def test_callable_exception_does_not_deadlock(self):
         def boom():
@@ -149,7 +149,7 @@ class TestSyncFork(unittest.TestCase):
 
         self.assertIn("BOOM", self.log)
         self.assertIn("SAFE", self.log)
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
     def test_rapid_reset_cycles(self):
         callables = [(1, dummy_func_factory("C", self.log))]
@@ -163,7 +163,7 @@ class TestSyncFork(unittest.TestCase):
             fork.reset()
 
         self.assertEqual(self.log.count("C"), 100)
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
     def test_nested_forks(self):
         inner_calls = [(2, Pack(dummy_func_factory("INNER", self.log)))]
@@ -183,8 +183,8 @@ class TestSyncFork(unittest.TestCase):
 
         self.assertEqual(self.log.count("OUTER"), 2)
         self.assertEqual(self.log.count("INNER"), 2)
-        outer_fork.dispose()  # Clean up
-        inner_fork.dispose()  # Clean up
+        outer_fork.cleanup()  # Clean up
+        inner_fork.cleanup()  # Clean up
 
     def test_fairness_variance(self):
         callables = [(5, dummy_func_factory(f"F{i}", self.log)) for i in range(4)]
@@ -200,7 +200,7 @@ class TestSyncFork(unittest.TestCase):
         counts = [self.log.count(f"F{i}") for i in range(4)]
         self.assertTrue(max(counts) - min(counts) <= 1,
                         msg=f"Unfair distribution: {counts}")
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
     # Corrected the error message for exhaustion and behavior
     def test_fork_exhaustion_after_one_cycle(self):
@@ -224,7 +224,7 @@ class TestSyncFork(unittest.TestCase):
         self.assertIn("Thread-2 raised RuntimeError: All forks are at capacity or barrier has already closed.",
                       self.log)
         self.assertEqual(self.log.count("Single_Use"), 1)
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
     def test_reusable_fork_with_reset_without_reusable_param(self):
         callables_list = [(2, dummy_func_factory("A", self.log)), (2, dummy_func_factory("B", self.log))]
@@ -259,7 +259,7 @@ class TestSyncFork(unittest.TestCase):
         self.assertEqual(self.log.count("A"), 2)
         self.assertEqual(self.log.count("B"), 2)
         self.assertEqual(len([s for s in self.log if "executed callable" in s]), 4)
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
     def test_single_fork_contention_barrier(self):
         callable_name = "Single_Fork"
@@ -278,7 +278,7 @@ class TestSyncFork(unittest.TestCase):
 
         self.assertEqual(self.log.count(callable_name), 10)
         self.assertEqual(len([s for s in self.log if "executed callable" in s]), num_threads)
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
     def test_selector_step_distribution(self):
         callables_list = [(3, dummy_func_factory("F0", self.log)), (3, dummy_func_factory("F1", self.log)),
@@ -298,7 +298,7 @@ class TestSyncFork(unittest.TestCase):
         self.assertEqual(self.log.count("F1"), 3)
         self.assertEqual(self.log.count("F2"), 3)
         self.assertEqual(len([s for s in self.log if "executed callable" in s]), num_threads)
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
     def test_selector_step_with_custom_stride(self):
         callables_list = [(2, dummy_func_factory("F0", self.log)), (2, dummy_func_factory("F1", self.log)),
@@ -319,7 +319,7 @@ class TestSyncFork(unittest.TestCase):
         self.assertEqual(self.log.count("F2"), 2)
         self.assertEqual(self.log.count("F3"), 2)
         self.assertEqual(len([s for s in self.log if "executed callable" in s]), num_threads)
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
     def test_race_condition_contention(self):
         callable_name = "Contended_Fork"
@@ -344,7 +344,7 @@ class TestSyncFork(unittest.TestCase):
 
         self.assertEqual(fork._blocked_thread_count, 5)
         self.assertEqual(fork._list_of_forks[0].gate_uses, 5)
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
     def test_improper_initialization(self):
         with self.assertRaises(ValueError):
@@ -408,7 +408,7 @@ class TestSyncFork(unittest.TestCase):
         self.assertTrue(fork._timed_out)
         self.assertTrue(fork._forks_closed)
         self.assertTrue(fork._threading_event.is_set())  # Event set by timeout handler
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
     def test_barrier_success_with_timeout_configured(self):
         # Configure a timeout, but ensure barrier is met before it expires
@@ -444,9 +444,9 @@ class TestSyncFork(unittest.TestCase):
         self.assertFalse(fork._timed_out)
         self.assertTrue(fork._forks_closed)  # Fork should still close after meeting barrier
         self.assertTrue(fork._threading_event.is_set())
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
-    def test_dispose_syncfork(self):
+    def test_cleanup_syncfork(self):
         callables_list = [(1, dummy_func_factory("A", self.log))]
         # Use a timeout duration to ensure Scout is initialized by use_fork
         fork = SyncFork(number_of_forks=1, callables=callables_list, timeout_duration=0.1)
@@ -467,10 +467,10 @@ class TestSyncFork(unittest.TestCase):
         self.assertTrue(fork._scout.is_active())
         self.assertFalse(fork._scout._cleaned)  # Scout should not be cleaned yet
 
-        # Capture the Scout instance before SyncFork disposes it
+        # Capture the Scout instance before SyncFork cleanups it
         captured_scout = fork._scout
 
-        fork.dispose()  # Dispose the SyncFork, which should also dispose the Scout
+        fork.cleanup()  # cleanup the SyncFork, which should also cleanup the Scout
         self.assertTrue(fork._cleaned)
 
         # Verify the captured Scout instance is now cleaned
@@ -478,18 +478,18 @@ class TestSyncFork(unittest.TestCase):
         # And that SyncFork's reference to it is cleared
         self.assertIsNone(fork._scout)
 
-        # Attempt to use SyncFork after dispose
-        t_after_dispose = threading.Thread(target=thread_use_fork, args=(fork, self.log, "cleanedThread"))
-        t_after_dispose.start()
-        t_after_dispose.join(timeout=5)
-        self.assertFalse(t_after_dispose.is_alive())
+        # Attempt to use SyncFork after cleanup
+        t_after_cleanup = threading.Thread(target=thread_use_fork, args=(fork, self.log, "cleanedThread"))
+        t_after_cleanup.start()
+        t_after_cleanup.join(timeout=5)
+        self.assertFalse(t_after_cleanup.is_alive())
 
         self.assertIn("cleanedThread raised RuntimeError: Cannot use a cleaned SyncFork.", self.log)
-        # We might have a timeout error from the scout init thread if it timed out before dispose,
+        # We might have a timeout error from the scout init thread if it timed out before cleanup,
         # but no 'A' should be in the log from the callable.
         self.assertEqual(self.log.count("A"), 0)
 
-        # Attempt to reset after dispose
+        # Attempt to reset after cleanup
         with self.assertRaises(RuntimeError):
             fork.reset()
 
@@ -533,7 +533,7 @@ class TestSyncFork(unittest.TestCase):
 
             self.log.clear()
 
-        fork.dispose()
+        fork.cleanup()
 
     def test_threads_arriving_after_timeout(self):
         """
@@ -561,11 +561,11 @@ class TestSyncFork(unittest.TestCase):
         self.assertTrue(all("barrier timed out" in s for s in self.log))
         self.assertEqual(self.log.count("LATE_A"), 0)
         self.assertEqual(self.log.count("LATE_B"), 0)
-        fork.dispose()
+        fork.cleanup()
 
-    def test_dispose_while_threads_wait(self):
+    def test_cleanup_while_threads_wait(self):
         """
-        Dispose the SyncFork while threads are blocked at the barrier and
+        cleanup the SyncFork while threads are blocked at the barrier and
         verify all threads exit quickly with RuntimeError.
         """
         callables = [(2, dummy_func_factory("D", self.log))]
@@ -576,7 +576,7 @@ class TestSyncFork(unittest.TestCase):
         t_blocked.start()
         time.sleep(0.02)  # ensure it's inside use_fork() waiting
 
-        fork.dispose()    # nuke while barrier isn't full
+        fork.cleanup()    # nuke while barrier isn't full
 
         t_blocked.join(timeout=5)
         self.assertFalse(t_blocked.is_alive())
@@ -611,7 +611,7 @@ class TestSyncFork(unittest.TestCase):
         self.assertEqual(self.log.count("Race_B"), 1)
         # No timeout messages should exist
         self.assertFalse(any("timed out" in s for s in self.log))
-        fork.dispose()
+        fork.cleanup()
 
     def test_non_uniform_capacity_distribution(self):
         """
@@ -632,7 +632,7 @@ class TestSyncFork(unittest.TestCase):
         self.assertEqual(self.log.count("Tiny"), 1)
         self.assertEqual(self.log.count("Huge"), 10)
         self.assertEqual(len([s for s in self.log if "executed callable" in s]), 11)
-        fork.dispose()
+        fork.cleanup()
 
     def test_reset_clears_timeout_state(self):
         # Configured for 2 slots, so sending 1 thread will cause timeout
@@ -683,7 +683,7 @@ class TestSyncFork(unittest.TestCase):
         self.assertFalse(fork._timed_out)  # No timeout this time
         self.assertTrue(fork._forks_closed)  # Should be closed due to natural completion
         self.assertTrue(fork._threading_event.is_set())  # Event should be set
-        fork.dispose()  # Clean up
+        fork.cleanup()  # Clean up
 
 if __name__ == '__main__':
     unittest.main()

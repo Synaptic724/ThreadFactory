@@ -34,7 +34,7 @@ class TestMultiConductor(unittest.TestCase):
         # Check outcomes are correctly nested by group name and task index
         self.assertEqual(mc.outcomes["alpha"][0].result(), "a1")
         self.assertEqual(mc.outcomes["alpha"][1].result(), "a2")
-        mc.dispose()
+        mc.cleanup()
 
 #
 # #TODO: THIS TEST FAILS DURING ENTIRE SUITE RUN
@@ -86,7 +86,7 @@ class TestMultiConductor(unittest.TestCase):
 #         finally:
 #             # Prevent stuck threads from lingering
 #             mc.notify_all_override()
-#             mc.dispose()
+#             mc.cleanup()
 
     def test_reusable_multiconductor_with_reset(self):
         """Ensure reset clears outcomes in all groups for a second run."""
@@ -108,7 +108,7 @@ class TestMultiConductor(unittest.TestCase):
         # Second cycle
         _spawn(2, mc.start)[0].join(1)
         self.assertEqual(mc.results, [2])
-        mc.dispose()
+        mc.cleanup()
 
     def test_dynamic_add_and_remove_groups_before_start(self):
         """
@@ -133,7 +133,7 @@ class TestMultiConductor(unittest.TestCase):
         self.assertNotIn("beta", mc.outcomes, "Beta group should not have any outcomes.")
         self.assertEqual(len(mc.groups), 1)
         self.assertIs(mc.groups[0], group_alpha)
-        mc.dispose()
+        mc.cleanup()
 
     def test_outcomes_dictionary_reference_integrity(self):
         """
@@ -155,12 +155,12 @@ class TestMultiConductor(unittest.TestCase):
 
         # Now confirm the same result can be seen through the conductor's reference
         self.assertEqual(mc.outcomes["alpha"][0].result(), "a1")
-        mc.dispose()
+        mc.cleanup()
 
     @unittest.skip("Cancellation tokens not ready yet")
-    def test_dispose_during_manual_release_wait(self):
+    def test_cleanup_during_manual_release_wait(self):
         """
-        Verify that calling dispose() unblocks threads waiting on the
+        Verify that calling cleanup() unblocks threads waiting on the
         manual_release_gate.
         """
         group = Group(name="wait_group", tasks=[lambda: True])
@@ -182,13 +182,13 @@ class TestMultiConductor(unittest.TestCase):
         # Wait until we are sure the worker reached the manual gate
         self.assertTrue(entered_manual_gate.wait(1), "Worker never reached manual release wait.")
 
-        # Now dispose the conductor
-        mc.dispose()
+        # Now cleanup the conductor
+        mc.cleanup()
 
         # The worker should now immediately unblock and terminate
-        self.assertTrue(worker_finished.wait(1), "Worker was not unblocked by dispose().")
+        self.assertTrue(worker_finished.wait(1), "Worker was not unblocked by cleanup().")
         worker.join(timeout=1)
-        self.assertFalse(worker.is_alive(), "Worker thread should have exited after dispose().")
+        self.assertFalse(worker.is_alive(), "Worker thread should have exited after cleanup().")
 
     def test_reset_after_timeout_allows_successful_rerun(self):
         """Verify a reusable conductor can succeed after a timeout and reset."""
@@ -217,7 +217,7 @@ class TestMultiConductor(unittest.TestCase):
 
         self.assertFalse(mc._broken, "Second run should succeed without breaking.")
         self.assertEqual(mc.results, [100])
-        mc.dispose()
+        mc.cleanup()
 
     def test_start_with_no_groups_is_graceful(self):
         """Ensure starting a MultiConductor with no groups completes without error."""
@@ -233,7 +233,7 @@ class TestMultiConductor(unittest.TestCase):
         self.assertTrue(mc.is_spent())
         self.assertEqual(mc.results, [])
         self.assertEqual(mc.exceptions, [])
-        mc.dispose()
+        mc.cleanup()
     def test_manual_release_and_reset_cycle(self):
         """Verify a reusable conductor with manual_release can be cycled."""
         group = Group(name="cycle", tasks=[lambda: "run"])
@@ -274,7 +274,7 @@ class TestMultiConductor(unittest.TestCase):
 
         mc.release()
         self.assertTrue(worker_finished.wait(1))
-        mc.dispose()
+        mc.cleanup()
     def test_mixed_outcomes_across_groups(self):
         """Verify results and exceptions are correctly captured from different groups."""
 
@@ -294,7 +294,7 @@ class TestMultiConductor(unittest.TestCase):
         # Check nested outcome structure
         self.assertEqual(mc.outcomes["good_tasks"][0].result(), "success")
         self.assertIsInstance(mc.outcomes["bad_tasks"][0].exception(), TestError)
-        mc.dispose()
+        mc.cleanup()
 
     def test_add_group_after_start_raises_error(self):
         """Verify that modifying groups after the conductor is active is forbidden."""
@@ -307,7 +307,7 @@ class TestMultiConductor(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             mc.add_group(group_new)
 
-        mc.dispose()
+        mc.cleanup()
 
 
 if __name__ == "__main__":

@@ -44,7 +44,7 @@ class TestMultiConductorForkFeatures(unittest.TestCase):
             distributed_execution=True,
             manual_release=True
         )
-        self.addCleanup(mc.dispose)
+        self.addCleanup(mc.cleanup)
 
         threads = _spawn(num_workers, mc.start)
 
@@ -87,7 +87,7 @@ class TestMultiConductorForkFeatures(unittest.TestCase):
             groups=[group],
             distributed_execution=True
         )
-        self.addCleanup(mc.dispose)
+        self.addCleanup(mc.cleanup)
 
         threads = _spawn(num_workers, mc.start)
         for t in threads:
@@ -125,7 +125,7 @@ class TestMultiConductorForkFeatures(unittest.TestCase):
             sync_distributed_execution=True,
             multiple_outcomes_per_task=True
         )
-        self.addCleanup(mc.dispose)
+        self.addCleanup(mc.cleanup)
 
         threads = _spawn(num_workers, mc.start)
         for t in threads:
@@ -155,7 +155,7 @@ class TestMultiConductorForkFeatures(unittest.TestCase):
             timeout=0.2,
             raise_on_timeout=True
         )
-        self.addCleanup(mc.dispose)
+        self.addCleanup(mc.cleanup)
 
         # Spawn only 3 threads, which is less than the threshold of 5
         threads = _spawn(3, worker_task_with_catch)

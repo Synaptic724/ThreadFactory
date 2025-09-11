@@ -115,9 +115,9 @@ class TestFlowRegulatorEdgeCases(unittest.TestCase):
     # ----------------------------------------------------------------------- #
     # 1. Ultra-contention shutdown                                            #
     # ----------------------------------------------------------------------- #
-    def test_ultra_contention_dispose(self):
+    def test_ultra_contention_cleanup(self):
         """
-        All threads block on acquire() and must be released when dispose() is called.
+        All threads block on acquire() and must be released when cleanup() is called.
         """
         from thread_factory.utilities.coordination.package import Pack
 
@@ -137,9 +137,9 @@ class TestFlowRegulatorEdgeCases(unittest.TestCase):
             agent.start()
 
         wait_for_waiters(lock, n_threads)
-        lock.dispose()
+        lock.cleanup()
 
-        self.assertTrue(all(e.wait(2) for e in done), "Some waiters were not released on dispose()")
+        self.assertTrue(all(e.wait(2) for e in done), "Some waiters were not released on cleanup()")
 
         for agent in agents:
             agent.join(timeout=1)
@@ -246,9 +246,9 @@ class TestFlowRegulatorEdgeCases(unittest.TestCase):
         self.assertTrue(all(ev.wait(1) for ev in evs))
 
     # ----------------------------------------------------------------------- #
-    # 5. Double-dispose idempotence                                           #
+    # 5. Double-cleanup idempotence                                           #
     # ----------------------------------------------------------------------- #
-    def test_double_dispose(self):
+    def test_double_cleanup(self):
         lock   = FlowRegulator(value=0)
         wakies = []
 
@@ -262,7 +262,7 @@ class TestFlowRegulatorEdgeCases(unittest.TestCase):
 
         with ExitStack() as stack:
             for _ in range(2):
-                killer = threading.Thread(target=lock.dispose)
+                killer = threading.Thread(target=lock.cleanup)
                 killer.start()
                 stack.callback(killer.join)
 

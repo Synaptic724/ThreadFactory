@@ -523,10 +523,10 @@ class HighPerformanceConcurrentCollectionTest(unittest.TestCase):
         self.assertGreaterEqual(len(self.collection), 0)
 
 
-    def test_dispose(self):
+    def test_cleanup(self):
         """
-        Test that dispose() on ConcurrentCollection:
-            - Disposes all shards properly
+        Test that cleanup() on ConcurrentCollection:
+            - cleanups all shards properly
             - Resets the shared length array
             - Sets the cleaned flag
             - Is idempotent (safe to call multiple times)
@@ -538,8 +538,8 @@ class HighPerformanceConcurrentCollectionTest(unittest.TestCase):
         self.assertFalse(collection.cleaned)
         self.assertTrue(all(isinstance(s, collection._shards[0].__class__) for s in collection._shards))
 
-        # Dispose once
-        collection.dispose()
+        # cleanup once
+        collection.cleanup()
         self.assertEqual(len(collection), 0)
         self.assertTrue(collection.cleaned)
         self.assertTrue(all(v == 0 for v in collection._length_array))
@@ -548,12 +548,12 @@ class HighPerformanceConcurrentCollectionTest(unittest.TestCase):
         for shard in collection._shards:
             self.assertTrue(shard.cleaned)
 
-        # Dispose again (should not raise)
+        # cleanup again (should not raise)
         try:
-            collection.dispose()
+            collection.cleanup()
         except Exception as e:
-            self.fail(f"Calling dispose() twice raised an exception: {e}")
+            self.fail(f"Calling cleanup() twice raised an exception: {e}")
 
-        # Optional: if you allow post-disposal usage, test it here:
+        # Optional: if you allow post-cleaning usage, test it here:
         collection.add('grape')
         self.assertIn('grape', list(collection))

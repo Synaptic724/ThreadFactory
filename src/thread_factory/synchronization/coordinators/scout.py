@@ -74,10 +74,10 @@ class Scout(Cleanable):
 
     def cleanup(self) -> None:
         """
-        Disposes the Scout instance. This makes it permanently unusable.
-        All resources are released. Does NOT call super().dispose().
+        cleanups the Scout instance. This makes it permanently unusable.
+        All resources are released. Does NOT call super().cleanup().
         """
-        # Per user request, do not call super().dispose()
+        # Per user request, do not call super().cleanup()
         if self._cleaned:
             return  # Already cleaned, do nothing
 

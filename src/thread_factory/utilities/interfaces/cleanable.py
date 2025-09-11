@@ -57,7 +57,7 @@ class Cleanable(ABC):
         self.cleanup()
 
     def __del__(self):
-        """Best-effort safety: try to dispose on garbage collection."""
+        """Best-effort safety: try to cleanup on garbage collection."""
         try:
             self.cleanup()
         except Exception:
@@ -67,7 +67,7 @@ class Cleanable(ABC):
     @abstractmethod
     def cleanup(self):
         """
-        Dispose must be implemented by subclasses.
+        cleanup must be implemented by subclasses.
 
         Must:
         -----

@@ -61,7 +61,7 @@ class _Shard(Generic[_T], Cleanable):
 
     def cleanup(self) -> None:
         """
-        Dispose of this shard by clearing all items and marking it as unusable.
+        cleanup of this shard by clearing all items and marking it as unusable.
 
         Notes:
             - Safe to call multiple times (idempotent).
@@ -186,9 +186,9 @@ class _Shard(Generic[_T], Cleanable):
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
         Exit the runtime context related to this object.
-        Automatically disposes of the shard.
+        Automatically cleanups of the shard.
         """
-        self.dispose()
+        self.cleanup()
 
 
 class ConcurrentBuffer(Generic[_T], Cleanable):
@@ -211,7 +211,7 @@ class ConcurrentBuffer(Generic[_T], Cleanable):
     The rule of thumb is to use half as many shards as total runtime (producer + consumer).
     e.g., 10 runtime => 5 shards.
 
-    This class now implements a Disposable pattern, allowing you to dispose
+    This class now implements a Disposable pattern, allowing you to cleanup
     of it explicitly or via a `with` statement when it's no longer needed.
     """
     __slots__ = Cleanable.__slots__ + ["_shards", "_length_array", "_time_array", "_num_shards", "_mid", "_left_range", "_right_range", "_shard_indices"]
@@ -268,20 +268,20 @@ class ConcurrentBuffer(Generic[_T], Cleanable):
 
     def cleanup(self) -> None:
         """
-        Disposes of this ConcurrentBuffer, releasing all internal resources.
+        cleanups of this ConcurrentBuffer, releasing all internal resources.
 
         Responsibilities:
-          - Disposes each internal shard by clearing their queues and resetting their counters.
+          - cleanups each internal shard by clearing their queues and resetting their counters.
           - Resets the shared `_length_array` and `_time_array` used for shard coordination.
           - Marks this object as cleaned (`self.cleaned = True`).
 
         Behavior:
           - This method is idempotent: multiple calls will have no adverse effects after the first.
           - Once cleaned, the buffer should be considered permanently invalid.
-          - No post-disposal protection is enforced — correct usage is left to the caller's responsibility.
+          - No post-cleaning protection is enforced — correct usage is left to the caller's responsibility.
 
         Notes:
-          - A warning is emitted when disposal occurs to signal that the buffer has been destroyed.
+          - A warning is emitted when cleaning occurs to signal that the buffer has been destroyed.
           - This follows the explicit resource control philosophy common in high-performance and systems programming.
 
         Example:
@@ -290,9 +290,9 @@ class ConcurrentBuffer(Generic[_T], Cleanable):
             # buffer is automatically cleaned here
         """
         if not self._cleaned:
-            # Dispose all shards and reset internal arrays
+            # cleanup all shards and reset internal arrays
             for shard in self._shards:
-                shard.dispose()
+                shard.cleanup()
             self._length_array = array("Q", [0] * self._num_shards)
             self._time_array = array("Q", [0] * self._num_shards)
             self._cleaned = True
@@ -622,11 +622,11 @@ class ConcurrentBuffer(Generic[_T], Cleanable):
 
         Behavior:
           - Simply returns `self`.
-          - Disposal will automatically be triggered upon exiting the `with` block.
+          - cleaning will automatically be triggered upon exiting the `with` block.
 
         Notes:
           - Unlike some concurrency objects, this context manager does not acquire
-            or manage locks. It is purely for deterministic disposal.
+            or manage locks. It is purely for deterministic cleaning.
           - This keeps it lightweight and composable.
 
         """
@@ -637,7 +637,7 @@ class ConcurrentBuffer(Generic[_T], Cleanable):
         Exit the runtime context for this ConcurrentBuffer.
 
         Responsibilities:
-          - Automatically calls `dispose()` upon exiting, regardless of whether
+          - Automatically calls `cleanup()` upon exiting, regardless of whether
             the block exits normally or via an exception.
           - Guarantees that internal resources are released exactly once.
 
@@ -655,4 +655,4 @@ class ConcurrentBuffer(Generic[_T], Cleanable):
                 ... # safe usage
             # cleaned automatically here
         """
-        self.dispose()
+        self.cleanup()

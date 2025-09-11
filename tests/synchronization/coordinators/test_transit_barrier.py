@@ -415,7 +415,7 @@ class TestTransitBarrier(unittest.TestCase):
 
         self.assertEqual(len(counter), 4)
 
-    def test_dispose_interrupts_waiters(self):
+    def test_cleanup_interrupts_waiters(self):
         barrier = TransitBarrier(threshold=3)
         result = []
 
@@ -426,7 +426,7 @@ class TestTransitBarrier(unittest.TestCase):
         t = threading.Thread(target=waiter)
         t.start()
         time.sleep(0.1)
-        barrier.dispose()
+        barrier.cleanup()
         t.join()
 
         self.assertFalse(result[0])

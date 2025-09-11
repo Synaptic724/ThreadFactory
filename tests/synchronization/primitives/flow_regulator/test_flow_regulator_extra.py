@@ -145,7 +145,7 @@ class TestFlowRegulatorExtra(unittest.TestCase):
         self.assertFalse(starved, f"Starvation detected: {starved}")
 
 
-    def test_dispose_wakes_waiters(self):
+    def test_cleanup_wakes_waiters(self):
         """
         When FlowRegulator is cleaned while threads are waiting, all waiters
         must be woken immediately. This test confirms proper wake-up behavior.
@@ -158,17 +158,17 @@ class TestFlowRegulatorExtra(unittest.TestCase):
             woke_evt.set()
 
         agent = self.center.create_agent(target=Pack(waiter))
-        agent.name = "DisposeWaiter"
+        agent.name = "cleanupWaiter"
         agent.start()
 
         wait_for_waiters(lock, 1)
 
-        # Dispose from a different thread
-        threading.Thread(target=lock.dispose, name="Disposer").start()
+        # cleanup from a different thread
+        threading.Thread(target=lock.cleanup, name="cleanupr").start()
 
-        self.assertTrue(woke_evt.wait(2), "Waiter was not released by dispose()")
+        self.assertTrue(woke_evt.wait(2), "Waiter was not released by cleanup()")
         agent.join(timeout=1)
-        self.assertFalse(agent.is_alive(), "Agent did not terminate after dispose")
+        self.assertFalse(agent.is_alive(), "Agent did not terminate after cleanup")
 
 
     def test_duplicate_factory_id_targeted_notify(self):

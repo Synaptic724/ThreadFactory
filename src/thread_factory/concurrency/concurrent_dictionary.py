@@ -61,11 +61,11 @@ class ConcurrentDict(Generic[_K, _V], Cleanable):
 
     def cleanup(self) -> None:
         """
-        Dispose (clear) this ConcurrentDict, releasing its contents.
+        cleanup (clear) this ConcurrentDict, releasing its contents.
 
         Once cleaned, `cleaned` becomes True and the internal dict is cleared.
         No further usage checks are enforced, so the user must avoid calling
-        other methods after disposal.
+        other methods after cleaning.
 
         This method is idempotent — multiple calls won't cause errors.
         """
@@ -628,7 +628,7 @@ class ConcurrentDict(Generic[_K, _V], Cleanable):
 
         Responsibilities:
           - Releases the internal lock acquired in `__enter__()`.
-          - Automatically calls `dispose()` to ensure the object is cleaned up.
+          - Automatically calls `cleanup()` to ensure the object is cleaned up.
           - This pattern ensures the object is safely cleaned even if an exception
             occurs within the `with` block.
 
@@ -636,7 +636,7 @@ class ConcurrentDict(Generic[_K, _V], Cleanable):
           - The object should be considered invalid after exiting the context.
           - This design mimics resource safety patterns seen in systems like C#'s `Cleanable`
             and C++ RAII.
-          - Users are free to manage `dispose()` manually if they choose not to use the
+          - Users are free to manage `cleanup()` manually if they choose not to use the
             context manager.
 
         Args:
@@ -645,4 +645,4 @@ class ConcurrentDict(Generic[_K, _V], Cleanable):
             exc_tb: Exception traceback (if raised).
         """
         self._lock.release()
-        self.dispose()
+        self.cleanup()

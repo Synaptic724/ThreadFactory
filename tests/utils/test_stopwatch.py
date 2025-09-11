@@ -9,7 +9,7 @@ class TestStopwatch(unittest.TestCase):
         self.stopwatch = Stopwatch()
 
     def tearDown(self):
-        self.stopwatch.dispose()
+        self.stopwatch.cleanup()
 
     def test_initial_state(self):
         self.assertEqual(self.stopwatch.elapsed(), 0.0)
@@ -47,10 +47,10 @@ class TestStopwatch(unittest.TestCase):
 
         self.assertGreater(second_elapsed, first_elapsed)
 
-    def test_dispose_resets_state(self):
+    def test_cleanup_resets_state(self):
         self.stopwatch.start()
         time.sleep(0.02)
-        self.stopwatch.dispose()
+        self.stopwatch.cleanup()
         self.assertEqual(self.stopwatch.elapsed_time, 0.0)
         self.assertIsNone(self.stopwatch.start_time)
         self.assertIsNone(self.stopwatch._clock)

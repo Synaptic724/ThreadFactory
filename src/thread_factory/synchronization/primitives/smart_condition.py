@@ -94,7 +94,7 @@ class SmartCondition(Cleanable):
 
     def cleanup(self) -> None:
         """
-        Disposes the SmartCondition, releasing all waiters and clearing internal registries.
+        cleanups the SmartCondition, releasing all waiters and clearing internal registries.
 
         This method:
         - Marks the condition as cleaned.
@@ -118,10 +118,10 @@ class SmartCondition(Cleanable):
                 pass
 
         # Clear all registries
-        self._waiters.dispose()
+        self._waiters.cleanup()
         self._waiters = None
         self._callback_registry.clear()
-        self._callback_registry.dispose()
+        self._callback_registry.cleanup()
         self._callback_registry = None
         self._default_callback = None
 

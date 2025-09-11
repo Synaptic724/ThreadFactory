@@ -20,7 +20,7 @@ class Outcome(Cleanable):
 
     def cleanup(self):
         """
-        Disposes of the Outcome, unblocking any waiting threads with an error.
+        cleanups of the Outcome, unblocking any waiting threads with an error.
         """
         if self.cleaned:
             return
@@ -29,10 +29,10 @@ class Outcome(Cleanable):
 
         if self._condition: # Ensure condition exists before using
             with self._condition:
-                # Only set disposal exception if the outcome was NOT already completed by a result/exception
+                # Only set cleaning exception if the outcome was NOT already completed by a result/exception
                 if not self._is_done:
                     self._exception = RuntimeError("Outcome was cleaned.") # Standardized error message
-                    self._is_done = True # Mark as done due to disposal
+                    self._is_done = True # Mark as done due to cleaning
                     self._condition.notify_all()
 
         # Purge the result reference regardless of prior state, as per user's requirement.
@@ -83,13 +83,13 @@ class Outcome(Cleanable):
         If the timeout is reached, it raises a TimeoutError.
         """
         # If cleaned, _result is purged. So, accessing result() means
-        # either an original exception or a disposal error.
+        # either an original exception or a cleaning error.
         if self.cleaned:
             if self._exception is not None:
                 raise self._exception
-            raise RuntimeError("Outcome was cleaned.") # If no specific exception, raise generic disposal error
+            raise RuntimeError("Outcome was cleaned.") # If no specific exception, raise generic cleaning error
 
-        # If _condition is None, it implies disposal.
+        # If _condition is None, it implies cleaning.
         if self._condition is None:
             if self._exception is not None:
                 raise self._exception
@@ -100,7 +100,7 @@ class Outcome(Cleanable):
                 if not self._condition.wait_for(lambda: self._is_done or self.cleaned, timeout=timeout):
                     raise TimeoutError(f"Timed out after {timeout}s waiting for outcome.")
 
-            # After waiting, if cleaned and not completed by a task, raise disposal error
+            # After waiting, if cleaned and not completed by a task, raise cleaning error
             if self.cleaned and not self._is_done:
                 if self._exception is not None:
                     raise self._exception
@@ -109,7 +109,7 @@ class Outcome(Cleanable):
             # If done by task completion (and not cleaned, or cleaned after completion but _result was not purged)
             if self._exception is not None:
                 raise self._exception
-            return self._result # This will return the result if it was set and not purged by dispose.
+            return self._result # This will return the result if it was set and not purged by cleanup.
 
     @property
     def done(self) -> bool:
@@ -123,7 +123,7 @@ class Outcome(Cleanable):
 
     def exception(self) -> Optional[Exception]:
         """Returns the exception object if the task failed, otherwise None."""
-        # If cleaned, return the stored exception (if any) or the disposal error.
+        # If cleaned, return the stored exception (if any) or the cleaning error.
         if self.cleaned:
             return self._exception or RuntimeError("Outcome was cleaned.")
 

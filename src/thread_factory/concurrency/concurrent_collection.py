@@ -38,8 +38,8 @@ class _Shard(Generic[_T], Cleanable):
     than one global lock. There is no guarantee of global ordering across shards,
     only FIFO within each shard.
 
-    Disposal:
-      - `dispose()` clears the deque and zeroes out the associated entry
+    cleaning:
+      - `cleanup()` clears the deque and zeroes out the associated entry
         in the shared length array. Once cleaned, the shard should not be reused.
     """
 
@@ -169,9 +169,9 @@ class _Shard(Generic[_T], Cleanable):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
-        Calls dispose upon exiting the context manager scope.
+        Calls cleanup upon exiting the context manager scope.
         """
-        self.dispose()
+        self.cleanup()
 
 
 class ConcurrentCollection(Generic[_T], Cleanable):
@@ -195,10 +195,10 @@ class ConcurrentCollection(Generic[_T], Cleanable):
       - The actual number of shards used is set in the constructor, defaulting to
         the `total_thread_count` parameter if provided.
 
-    Disposal:
-      - Implemented via `dispose()`, which disposes all shards and clears shared data.
+    cleaning:
+      - Implemented via `cleanup()`, which cleanups all shards and clears shared data.
       - Refrain from using the collection once cleaned.
-      - `with ConcurrentCollection(...) as cc:` usage automatically calls `dispose()` on exit.
+      - `with ConcurrentCollection(...) as cc:` usage automatically calls `cleanup()` on exit.
     """
 
     def __init__(
@@ -535,25 +535,25 @@ class ConcurrentCollection(Generic[_T], Cleanable):
     # -----------------------------------------------------------------------------------
     def cleanup(self) -> None:
         """
-        Disposes of this ConcurrentCollection and releases its resources.
+        cleanups of this ConcurrentCollection and releases its resources.
 
         Responsibilities:
-          - Disposes all internal shards, which will clear their internal queues and reset their length counters.
+          - cleanups all internal shards, which will clear their internal queues and reset their length counters.
           - Resets the internal `_length_array` to zeroed values.
           - Marks the collection as cleaned via the `self.cleaned` flag.
 
         Behavior:
-          - This method is idempotent. Calling `dispose()` multiple times is safe and will have no effect after the first call.
+          - This method is idempotent. Calling `cleanup()` multiple times is safe and will have no effect after the first call.
           - Once cleaned, the collection is considered invalid and should not be used further.
-          - This follows a typical deterministic disposal pattern (inspired by .NET's `Cleanable`), ensuring explicit control over resource lifetime.
+          - This follows a typical deterministic cleaning pattern (inspired by .NET's `Cleanable`), ensuring explicit control over resource lifetime.
 
         Notes:
-          - Unlike some patterns, this implementation does NOT prevent method calls after disposal.
+          - Unlike some patterns, this implementation does NOT prevent method calls after cleaning.
             It is the user's responsibility to ensure that no further use is made of the object after it is cleaned.
         """
         if not self._cleaned:
             for shard in self._shards:
-                shard.dispose()
+                shard.cleanup()
             self._length_array = array("Q", [0] * self._num_shards)
             self._cleaned = True
 
@@ -573,11 +573,11 @@ class ConcurrentCollection(Generic[_T], Cleanable):
 
         Behavior:
           - Returns `self` to be used inside the `with` block.
-          - Context blocks are optional and purely syntactic sugar if you want deterministic disposal.
+          - Context blocks are optional and purely syntactic sugar if you want deterministic cleaning.
 
         Notes:
           - Entering the context does NOT acquire or release any locks by itself (unlike some other concurrent structures).
-          - Disposal will still be automatically invoked on exit (via `__exit__()`).
+          - cleaning will still be automatically invoked on exit (via `__exit__()`).
           - You are expected to manually manage thread safety through the collection's own thread-safe methods.
         """
         return self
@@ -587,10 +587,10 @@ class ConcurrentCollection(Generic[_T], Cleanable):
         Exits the context manager for this ConcurrentCollection.
 
         Responsibilities:
-          - Automatically calls `dispose()` to ensure cleanup of internal resources,
+          - Automatically calls `cleanup()` to ensure cleanup of internal resources,
             even if an exception was raised inside the `with` block.
           - This guarantees that the collection and all its shards are safely released
-            without requiring explicit calls to `dispose()`.
+            without requiring explicit calls to `cleanup()`.
 
         Args:
             exc_type (type): The exception type (if an exception was raised).
@@ -600,6 +600,6 @@ class ConcurrentCollection(Generic[_T], Cleanable):
         Notes:
           - This pattern guarantees deterministic cleanup.
           - After exiting the context, the collection is no longer valid.
-          - You can still call `dispose()` manually outside the context if preferred.
+          - You can still call `cleanup()` manually outside the context if preferred.
         """
-        self.dispose()
+        self.cleanup()

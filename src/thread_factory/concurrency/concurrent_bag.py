@@ -52,7 +52,7 @@ class ConcurrentBag(Generic[_T], Cleanable):
 
     def cleanup(self) -> None:
         """
-        Disposes of this ConcurrentBag, releasing all internal resources.
+        cleanups of this ConcurrentBag, releasing all internal resources.
 
         Responsibilities:
           - Clears the internal bag, removing all items.
@@ -61,13 +61,13 @@ class ConcurrentBag(Generic[_T], Cleanable):
 
         Behavior:
           - This method is idempotent: subsequent calls have no effect after the first.
-          - No automatic usage checks are enforced after disposal; it is the user's responsibility
+          - No automatic usage checks are enforced after cleaning; it is the user's responsibility
             to avoid further operations.
 
         Notes:
           - Designed for consistency with deterministic resource management patterns
             seen in systems programming (e.g., RAII, Cleanable).
-          - Disposal does NOT release the lock itself since locks are acquired per operation.
+          - cleaning does NOT release the lock itself since locks are acquired per operation.
 
         Example:
             with ConcurrentBag(...) as bag:
@@ -380,11 +380,11 @@ class ConcurrentBag(Generic[_T], Cleanable):
 
         Responsibilities:
           - Simply returns `self` to allow use inside a `with` block.
-          - Prepares the object for deterministic disposal via `__exit__()`.
+          - Prepares the object for deterministic cleaning via `__exit__()`.
 
         Notes:
           - Does NOT acquire the lock globally.
-          - Recommended only if you want automatic disposal after the block.
+          - Recommended only if you want automatic cleaning after the block.
         """
         return self
 
@@ -393,7 +393,7 @@ class ConcurrentBag(Generic[_T], Cleanable):
         Exit the runtime context for this ConcurrentBag.
 
         Responsibilities:
-          - Automatically calls `dispose()` when leaving the `with` block.
+          - Automatically calls `cleanup()` when leaving the `with` block.
           - Ensures the bag is cleared and marked as cleaned even if an exception is raised.
 
         Parameters:
@@ -405,4 +405,4 @@ class ConcurrentBag(Generic[_T], Cleanable):
           - Guarantees deterministic cleanup of the bag.
           - After this call, the object should be treated as invalid.
         """
-        self.dispose()
+        self.cleanup()

@@ -463,7 +463,7 @@ class TestSmartCondition(unittest.TestCase):
         self.assertTrue(1 in results and 3 in results, "Targeted threads should have woken up")
         self.assertTrue(2 in results and 4 in results, "Other threads should have woken up eventually")
 
-    def test_dispose_clears_waiters_and_callbacks(self):
+    def test_cleanup_clears_waiters_and_callbacks(self):
         cond = SmartCondition()
 
         # Setup: register some fake waiters and callbacks
@@ -478,14 +478,14 @@ class TestSmartCondition(unittest.TestCase):
             w = Waiter(factory_id=fid, lock=threading.Lock(), thread=threading.current_thread())
             cond._waiters.enqueue(w)
 
-        self.assertGreater(len(cond.get_all_waiters()), 0, "Waiters should be registered before dispose")
-        self.assertGreater(len(cond._callback_registry), 0, "Callbacks should be registered before dispose")
-        self.assertIsNotNone(cond._default_callback, "Default callback should be set before dispose")
+        self.assertGreater(len(cond.get_all_waiters()), 0, "Waiters should be registered before cleanup")
+        self.assertGreater(len(cond._callback_registry), 0, "Callbacks should be registered before cleanup")
+        self.assertIsNotNone(cond._default_callback, "Default callback should be set before cleanup")
 
-        cond.dispose()
+        cond.cleanup()
 
         self.assertTrue(cond._cleaned, "SmartCondition should be marked as cleaned")
-        self.assertIsNone(cond._default_callback, "Default callback should be cleared after dispose")
+        self.assertIsNone(cond._default_callback, "Default callback should be cleared after cleanup")
 
 
     def test_get_all_waiters_returns_correct_ids(self):

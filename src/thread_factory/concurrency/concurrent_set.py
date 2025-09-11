@@ -34,7 +34,7 @@ class ConcurrentSet(Generic[_T], Cleanable):
       that the operations are performed safely under the lock and respect the frozen state.
     • **Disposable / context‑manager**: The class implements the `Cleanable` interface,
       following a pattern where resources (in this case, the internal set's data) can
-      be explicitly cleaned up using the `dispose()` method. It also supports the
+      be explicitly cleaned up using the `cleanup()` method. It also supports the
       context manager protocol (`with ConcurrentSet(...) as cs:`), although using the
       context manager is strongly discouraged for normal operations as it exposes the
       raw internal set, bypassing the thread-safe interface. Its primary intended use
@@ -94,7 +94,7 @@ class ConcurrentSet(Generic[_T], Cleanable):
                 # Mark the set as cleaned. This flag is checked in the outer `if`.
                 self._cleaned = True
             # Issue a warning to inform the user that the set has been cleaned.
-            # This is a helpful indicator if the set is accidentally used after disposal.
+            # This is a helpful indicator if the set is accidentally used after cleaning.
             warnings.warn("Your ConcurrentSet has been cleaned and should not be used further.", UserWarning)
 # endregion
 # region Freeze control
@@ -902,21 +902,21 @@ class ConcurrentSet(Generic[_T], Cleanable):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit. Releases the internal lock and disposes the set.
+        """Context manager exit. Releases the internal lock and cleanups the set.
 
         This method is called when exiting the `with` block, either normally or
         due to an exception. It is crucial for releasing the acquired resource
         (the lock).
 
-        It also calls `dispose()` to clean up the set's contents, reinforcing
+        It also calls `cleanup()` to clean up the set's contents, reinforcing
         the idea that using the context manager might be tied to a resource's
         lifecycle management.
         """
         # Release the internal lock, allowing other threads to acquire it.
         self._lock.release()
-        # Call the dispose method to clean up the set's internal state.
-        # Note that dispose() itself is idempotent and thread-safe.
-        self.dispose()
+        # Call the cleanup method to clean up the set's internal state.
+        # Note that cleanup() itself is idempotent and thread-safe.
+        self.cleanup()
 
 #endregion
 #endregion

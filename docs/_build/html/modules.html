@@ -87,9 +87,9 @@ High-performance concurrency collections and parallel operations for Python 3.13
 <li><p>Timer runs as a daemon by default.</p></li>
 </ul>
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.AutoResetTimer.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/utilities/timing_tools/auto_reset_timer.html#AutoResetTimer.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.AutoResetTimer.dispose" title="Link to this definition"></a></dt>
-<dd><p>Dispose of the timer and stop any scheduled execution.
+<dt class="sig sig-object py" id="thread_factory.AutoResetTimer.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/utilities/timing_tools/auto_reset_timer.html#AutoResetTimer.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.AutoResetTimer.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanup of the timer and stop any scheduled execution.
 This should be called to clean up the timer when no longer needed.</p>
 </dd></dl>
 
@@ -190,9 +190,9 @@ This can be triggered manually or after the final stage completes.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.BypassConductor.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/execution/bypass_conductor.html#BypassConductor.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.BypassConductor.dispose" title="Link to this definition"></a></dt>
-<dd><p>Disposes internal structures and clears all state.</p>
+<dt class="sig sig-object py" id="thread_factory.BypassConductor.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/execution/bypass_conductor.html#BypassConductor.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.BypassConductor.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanups internal structures and clears all state.</p>
 <dl class="simple">
 <dt>Behavior:</dt><dd><ul class="simple">
 <li><p>Disables further access.</p></li>
@@ -341,12 +341,12 @@ preventing late arrivals from extending the wait time.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.ClockBarrier.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/clock_barrier.html#ClockBarrier.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ClockBarrier.dispose" title="Link to this definition"></a></dt>
-<dd><p>Dispose of the ClockBarrier, marking it as cleaned and breaking the barrier permanently.
+<dt class="sig sig-object py" id="thread_factory.ClockBarrier.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/clock_barrier.html#ClockBarrier.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ClockBarrier.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanup of the ClockBarrier, marking it as cleaned and breaking the barrier permanently.
 Once cleaned, the barrier can no longer be used, and any waiting threads will raise a <cite>BrokenBarrierError</cite>.</p>
 <p class="rubric">Notes</p>
-<p>After disposal, the barrier is no longer usable. Calls to <cite>wait()</cite> will raise <cite>BrokenBarrierError</cite>.
+<p>After cleaning, the barrier is no longer usable. Calls to <cite>wait()</cite> will raise <cite>BrokenBarrierError</cite>.
 The controller reference is cleared before emitting events to avoid cascading notifications during shutdown.</p>
 </dd></dl>
 
@@ -380,7 +380,7 @@ for <em>this</em> generation.</p>
 <dt class="sig sig-object py" id="thread_factory.ClockBarrier.is_broken">
 <span class="sig-name descname"><span class="pre">is_broken</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/clock_barrier.html#ClockBarrier.is_broken"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ClockBarrier.is_broken" title="Link to this definition"></a></dt>
 <dd><p>Returns <cite>True</cite> if the <strong>current generation</strong> has entered a
-broken state (timeout or dispose).</p>
+broken state (timeout or cleanup).</p>
 <p>Thread-safe – acquires the internal lock.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
@@ -518,9 +518,9 @@ but do nothing if the item is not in the bag.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.ConcurrentBag.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_bag.html#ConcurrentBag.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentBag.dispose" title="Link to this definition"></a></dt>
-<dd><p>Disposes of this ConcurrentBag, releasing all internal resources.</p>
+<dt class="sig sig-object py" id="thread_factory.ConcurrentBag.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_bag.html#ConcurrentBag.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentBag.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanups of this ConcurrentBag, releasing all internal resources.</p>
 <dl class="simple">
 <dt>Responsibilities:</dt><dd><ul class="simple">
 <li><p>Clears the internal bag, removing all items.</p></li>
@@ -530,7 +530,7 @@ but do nothing if the item is not in the bag.</p>
 </dd>
 <dt>Behavior:</dt><dd><ul class="simple">
 <li><p>This method is idempotent: subsequent calls have no effect after the first.</p></li>
-<li><p>No automatic usage checks are enforced after disposal; it is the user’s responsibility
+<li><p>No automatic usage checks are enforced after cleaning; it is the user’s responsibility
 to avoid further operations.</p></li>
 </ul>
 </dd>
@@ -539,7 +539,7 @@ to avoid further operations.</p></li>
 <ul class="simple">
 <li><p>Designed for consistency with deterministic resource management patterns
 seen in systems programming (e.g., RAII, Cleanable).</p></li>
-<li><p>Disposal does NOT release the lock itself since locks are acquired per operation.</p></li>
+<li><p>cleaning does NOT release the lock itself since locks are acquired per operation.</p></li>
 </ul>
 <p class="rubric">Example</p>
 <dl class="simple">
@@ -702,7 +702,7 @@ ConcurrentQueue or ConcurrentStack outperform this object in heavy contention.
 DO NOT EXCEED 20 THREADS OVERALL (for producer and consumer pattern) WHEN USING THIS OBJECT.</p>
 <p>The rule of thumb is to use half as many shards as total runtime (producer + consumer).
 e.g., 10 runtime =&gt; 5 shards.</p>
-<p>This class now implements a Disposable pattern, allowing you to dispose
+<p>This class now implements a Disposable pattern, allowing you to cleanup
 of it explicitly or via a <cite>with</cite> statement when it’s no longer needed.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="thread_factory.ConcurrentBuffer.batch_update">
@@ -755,12 +755,12 @@ at the head of each shard.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.ConcurrentBuffer.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_buffer.html#ConcurrentBuffer.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentBuffer.dispose" title="Link to this definition"></a></dt>
-<dd><p>Disposes of this ConcurrentBuffer, releasing all internal resources.</p>
+<dt class="sig sig-object py" id="thread_factory.ConcurrentBuffer.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_buffer.html#ConcurrentBuffer.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentBuffer.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanups of this ConcurrentBuffer, releasing all internal resources.</p>
 <dl class="simple">
 <dt>Responsibilities:</dt><dd><ul class="simple">
-<li><p>Disposes each internal shard by clearing their queues and resetting their counters.</p></li>
+<li><p>cleanups each internal shard by clearing their queues and resetting their counters.</p></li>
 <li><p>Resets the shared <cite>_length_array</cite> and <cite>_time_array</cite> used for shard coordination.</p></li>
 <li><p>Marks this object as cleaned (<cite>self.cleaned = True</cite>).</p></li>
 </ul>
@@ -768,13 +768,13 @@ at the head of each shard.</p>
 <dt>Behavior:</dt><dd><ul class="simple">
 <li><p>This method is idempotent: multiple calls will have no adverse effects after the first.</p></li>
 <li><p>Once cleaned, the buffer should be considered permanently invalid.</p></li>
-<li><p>No post-disposal protection is enforced — correct usage is left to the caller’s responsibility.</p></li>
+<li><p>No post-cleaning protection is enforced — correct usage is left to the caller’s responsibility.</p></li>
 </ul>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
 <ul class="simple">
-<li><p>A warning is emitted when disposal occurs to signal that the buffer has been destroyed.</p></li>
+<li><p>A warning is emitted when cleaning occurs to signal that the buffer has been destroyed.</p></li>
 <li><p>This follows the explicit resource control philosophy common in high-performance and systems programming.</p></li>
 </ul>
 <p class="rubric">Example</p>
@@ -953,10 +953,10 @@ consider <cite>ConcurrentQueue</cite> or <cite>ConcurrentStack</cite> instead.</
 the <cite>total_thread_count</cite> parameter if provided.</p></li>
 </ul>
 </dd>
-<dt>Disposal:</dt><dd><ul class="simple">
-<li><p>Implemented via <cite>dispose()</cite>, which disposes all shards and clears shared data.</p></li>
+<dt>cleaning:</dt><dd><ul class="simple">
+<li><p>Implemented via <cite>cleanup()</cite>, which cleanups all shards and clears shared data.</p></li>
 <li><p>Refrain from using the collection once cleaned.</p></li>
-<li><p><cite>with ConcurrentCollection(…) as cc:</cite> usage automatically calls <cite>dispose()</cite> on exit.</p></li>
+<li><p><cite>with ConcurrentCollection(…) as cc:</cite> usage automatically calls <cite>cleanup()</cite> on exit.</p></li>
 </ul>
 </dd>
 </dl>
@@ -1008,26 +1008,26 @@ copies of the current items.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.ConcurrentCollection.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_collection.html#ConcurrentCollection.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentCollection.dispose" title="Link to this definition"></a></dt>
-<dd><p>Disposes of this ConcurrentCollection and releases its resources.</p>
+<dt class="sig sig-object py" id="thread_factory.ConcurrentCollection.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_collection.html#ConcurrentCollection.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentCollection.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanups of this ConcurrentCollection and releases its resources.</p>
 <dl class="simple">
 <dt>Responsibilities:</dt><dd><ul class="simple">
-<li><p>Disposes all internal shards, which will clear their internal queues and reset their length counters.</p></li>
+<li><p>cleanups all internal shards, which will clear their internal queues and reset their length counters.</p></li>
 <li><p>Resets the internal <cite>_length_array</cite> to zeroed values.</p></li>
 <li><p>Marks the collection as cleaned via the <cite>self.cleaned</cite> flag.</p></li>
 </ul>
 </dd>
 <dt>Behavior:</dt><dd><ul class="simple">
-<li><p>This method is idempotent. Calling <cite>dispose()</cite> multiple times is safe and will have no effect after the first call.</p></li>
+<li><p>This method is idempotent. Calling <cite>cleanup()</cite> multiple times is safe and will have no effect after the first call.</p></li>
 <li><p>Once cleaned, the collection is considered invalid and should not be used further.</p></li>
-<li><p>This follows a typical deterministic disposal pattern (inspired by .NET’s <cite>Cleanable</cite>), ensuring explicit control over resource lifetime.</p></li>
+<li><p>This follows a typical deterministic cleaning pattern (inspired by .NET’s <cite>Cleanable</cite>), ensuring explicit control over resource lifetime.</p></li>
 </ul>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
 <ul class="simple">
-<li><p>Unlike some patterns, this implementation does NOT prevent method calls after disposal.
+<li><p>Unlike some patterns, this implementation does NOT prevent method calls after cleaning.
 It is the user’s responsibility to ensure that no further use is made of the object after it is cleaned.</p></li>
 </ul>
 </dd></dl>
@@ -1216,12 +1216,12 @@ The function should perform all necessary mutations.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.ConcurrentDict.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_dictionary.html#ConcurrentDict.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentDict.dispose" title="Link to this definition"></a></dt>
-<dd><p>Dispose (clear) this ConcurrentDict, releasing its contents.</p>
+<dt class="sig sig-object py" id="thread_factory.ConcurrentDict.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_dictionary.html#ConcurrentDict.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentDict.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanup (clear) this ConcurrentDict, releasing its contents.</p>
 <p>Once cleaned, <cite>cleaned</cite> becomes True and the internal dict is cleared.
 No further usage checks are enforced, so the user must avoid calling
-other methods after disposal.</p>
+other methods after cleaning.</p>
 <p>This method is idempotent — multiple calls won’t cause errors.</p>
 </dd></dl>
 
@@ -1552,12 +1552,12 @@ The function should perform all necessary mutations.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.ConcurrentList.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_list.html#ConcurrentList.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentList.dispose" title="Link to this definition"></a></dt>
-<dd><p>Dispose (clear) this ConcurrentList, releasing its contents.</p>
+<dt class="sig sig-object py" id="thread_factory.ConcurrentList.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_list.html#ConcurrentList.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentList.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanup (clear) this ConcurrentList, releasing its contents.</p>
 <p>Once cleaned, <cite>_cleaned</cite> becomes True and the internal dict is cleared.
 No further usage checks are enforced, so the user must avoid calling
-other methods after disposal.</p>
+other methods after cleaning.</p>
 <p>This method is idempotent — multiple calls won’t cause errors.</p>
 </dd></dl>
 
@@ -1843,12 +1843,12 @@ The function should perform all necessary mutations.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.ConcurrentQueue.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_queue.html#ConcurrentQueue.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentQueue.dispose" title="Link to this definition"></a></dt>
-<dd><p>Dispose (clear) this ConcurrentQueue, releasing its contents.</p>
+<dt class="sig sig-object py" id="thread_factory.ConcurrentQueue.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_queue.html#ConcurrentQueue.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentQueue.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanup (clear) this ConcurrentQueue, releasing its contents.</p>
 <p>Once cleaned, <cite>_cleaned</cite> becomes True and the internal dict is cleared.
 No further usage checks are enforced, so the user must avoid calling
-other methods after disposal.</p>
+other methods after cleaning.</p>
 <p>This method is idempotent — multiple calls won’t cause errors.</p>
 </dd></dl>
 
@@ -2049,7 +2049,7 @@ are implemented or forwarded to internal helpers. These implementations ensure
 that the operations are performed safely under the lock and respect the frozen state.</p></li>
 <li><p><strong>Disposable / context‑manager</strong>: The class implements the <cite>Cleanable</cite> interface,
 following a pattern where resources (in this case, the internal set’s data) can
-be explicitly cleaned up using the <cite>dispose()</cite> method. It also supports the
+be explicitly cleaned up using the <cite>cleanup()</cite> method. It also supports the
 context manager protocol (<cite>with ConcurrentSet(…) as cs:</cite>), although using the
 context manager is strongly discouraged for normal operations as it exposes the
 raw internal set, bypassing the thread-safe interface. Its primary intended use
@@ -2129,8 +2129,8 @@ then acquires the internal lock before attempting the discard.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.ConcurrentSet.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_set.html#ConcurrentSet.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentSet.dispose" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="thread_factory.ConcurrentSet.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_set.html#ConcurrentSet.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentSet.cleanup" title="Link to this definition"></a></dt>
 <dd><p>Clear internal data and mark the ConcurrentSet as cleaned.</p>
 <p>This method releases the resources held by the set, primarily by clearing
 the underlying built-in set. Once cleaned, the set should not be used
@@ -2402,12 +2402,12 @@ The function should perform all necessary mutations.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.ConcurrentStack.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_stack.html#ConcurrentStack.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentStack.dispose" title="Link to this definition"></a></dt>
-<dd><p>Dispose (clear) this ConcurrentStack, releasing its contents.</p>
+<dt class="sig sig-object py" id="thread_factory.ConcurrentStack.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_stack.html#ConcurrentStack.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentStack.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanup (clear) this ConcurrentStack, releasing its contents.</p>
 <p>Once cleaned, <cite>_cleaned</cite> becomes True and the internal dict is cleared.
 No further usage checks are enforced, so the user must avoid calling
-other methods after disposal.</p>
+other methods after cleaning.</p>
 <p>This method is idempotent — multiple calls won’t cause errors.</p>
 </dd></dl>
 
@@ -2713,9 +2713,9 @@ monitoring and external coordination based on its internal state, such as when
 the barrier is passed, when task execution begins, or when it is reset or
 cleaned.</p>
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.Conductor.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/conductor.html#Conductor.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Conductor.dispose" title="Link to this definition"></a></dt>
-<dd><p>Disposes of the Conductor, cleaning up all associated resources.</p>
+<dt class="sig sig-object py" id="thread_factory.Conductor.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/conductor.html#Conductor.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Conductor.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanups of the Conductor, cleaning up all associated resources.</p>
 <p>This method performs a full teardown of the Conductor. It marks the
 instance as cleaned, notifies the controller (if any), and releases all
 internal synchronization primitives (barriers, locks, events). This action
@@ -2730,7 +2730,7 @@ is thread-safe.</p>
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">exceptions</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Exception</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#thread_factory.Conductor.exceptions" title="Link to this definition"></a></dt>
 <dd><p>A list of all exceptions captured from executed tasks.</p>
 <p>This property iterates through all collected outcomes and returns the
-exception objects for each task that failed. It filters out disposal-related
+exception objects for each task that failed. It filters out cleaning-related
 <cite>RuntimeError</cite> exceptions to only report on application-level errors.</p>
 <p>The returned list is a snapshot of the exceptions at the time of the call.
 If the Conductor is cleaned, it returns an empty list.</p>
@@ -2951,8 +2951,8 @@ dyn.increase_permits(3)
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.Dynaphore.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/dynaphore.html#Dynaphore.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Dynaphore.dispose" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="thread_factory.Dynaphore.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/dynaphore.html#Dynaphore.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Dynaphore.cleanup" title="Link to this definition"></a></dt>
 <dd><p>Cleans up the Dynaphore and notifies all waiting threads.</p>
 <p>This method should be called when the Dynaphore is no longer needed
 to ensure no threads remain blocked on the internal condition.</p>
@@ -3043,7 +3043,7 @@ to ensure no threads remain blocked on the internal condition.</p>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>functionality by allowing runtime adjustment of available permits,
 targeted thread awakening using unique identifiers (ULIDs), and
-robust disposal mechanisms.</p>
+robust cleaning mechanisms.</p>
 <p>This lock is designed for scenarios requiring flexible synchronization,
 such as managing access to limited resources where the resource count
 can change, or coordinating groups of threads with specific needs.</p>
@@ -3086,7 +3086,7 @@ ideal for controlled concurrency and thread orchestration.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="thread_factory.FlowRegulator.acquire">
 <span class="sig-name descname"><span class="pre">acquire</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">blocking</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/flow_regulator.html#FlowRegulator.acquire"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.FlowRegulator.acquire" title="Link to this definition"></a></dt>
-<dd><p>Acquire one permit (returns True) or time-out / dispose (returns False).</p>
+<dd><p>Acquire one permit (returns True) or time-out / cleanup (returns False).</p>
 <dl>
 <dt>Bias rules:</dt><dd><p>– If bias_threshold is None → ordinary semaphore.
 – While bias is active, newly released permits are buffered; they are</p>
@@ -3158,11 +3158,11 @@ if attempting to decrease more permits than are currently available.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.FlowRegulator.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/flow_regulator.html#FlowRegulator.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.FlowRegulator.dispose" title="Link to this definition"></a></dt>
-<dd><p>Disposes of the FlowRegulator, releasing all its resources and
+<dt class="sig sig-object py" id="thread_factory.FlowRegulator.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/flow_regulator.html#FlowRegulator.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.FlowRegulator.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanups of the FlowRegulator, releasing all its resources and
 waking up any threads currently waiting to acquire a permit.
-After disposal, the lock should no longer be used. This method is idempotent.</p>
+After cleaning, the lock should no longer be used. This method is idempotent.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -3461,11 +3461,11 @@ under high contention.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.Fork.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/fork.html#Fork.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Fork.dispose" title="Link to this definition"></a></dt>
-<dd><p>Disposes the Fork instance, releasing all resources and marking
+<dt class="sig sig-object py" id="thread_factory.Fork.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/fork.html#Fork.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Fork.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanups the Fork instance, releasing all resources and marking
 it as unusable. This method is idempotent and safe to call multiple times.</p>
-<p>After disposal:
+<p>After cleaning:
 - All future calls to <cite>use_fork()</cite> will raise a RuntimeError.
 - All internal ForkUnits are marked as cleaned (callable cleared).</p>
 </dd></dl>
@@ -3516,9 +3516,9 @@ it as unusable. This method is idempotent and safe to call multiple times.</p>
 <dd></dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.Group.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/utilities/coordination/group.html#Group.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Group.dispose" title="Link to this definition"></a></dt>
-<dd><p>Fully dispose the Group and its Outcomes. Clears all state and makes the object unusable.</p>
+<dt class="sig sig-object py" id="thread_factory.Group.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/utilities/coordination/group.html#Group.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Group.cleanup" title="Link to this definition"></a></dt>
+<dd><p>Fully cleanup the Group and its Outcomes. Clears all state and makes the object unusable.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -3637,8 +3637,8 @@ Returns True if the latch is open, False if it timed out.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.Latch.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/latch.html#Latch.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Latch.dispose" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="thread_factory.Latch.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/latch.html#Latch.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Latch.cleanup" title="Link to this definition"></a></dt>
 <dd><p>Releases all waiting threads and marks the latch as cleaned.
 After this, the latch cannot be used again.</p>
 </dd></dl>
@@ -3780,15 +3780,15 @@ has been reached.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.MultiConductor.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/multi_conductor.html#MultiConductor.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.MultiConductor.dispose" title="Link to this definition"></a></dt>
-<dd><p>Disposes of the MultiConductor and all associated resources.</p>
-<p>This method releases all synchronization primitives, disposes of any barriers and groups,
+<dt class="sig sig-object py" id="thread_factory.MultiConductor.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/multi_conductor.html#MultiConductor.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.MultiConductor.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanups of the MultiConductor and all associated resources.</p>
+<p>This method releases all synchronization primitives, cleanups of any barriers and groups,
 and marks the conductor as cleaned. Once cleaned, the conductor is no longer usable.</p>
 <p>The following actions occur:
 - Releases all waiters to prevent deadlocks.
 - Notifies the controller (if provided) that the conductor has been cleaned.
-- Disposes of any internal barriers such as the <cite>ClockBarrier</cite>, <cite>SignalBarrier</cite>, and <cite>Dynaphore</cite>.
+- cleanups of any internal barriers such as the <cite>ClockBarrier</cite>, <cite>SignalBarrier</cite>, and <cite>Dynaphore</cite>.
 - Clears the groups and outcomes data structures, ensuring no references remain.</p>
 <p>If called multiple times, this method will safely exit without performing any additional work.</p>
 </dd></dl>
@@ -4000,9 +4000,9 @@ the conductor will wait indefinitely until the threshold is reached.</p>
 result or exception to a unit of work.</p>
 <p>This object is thread-safe.</p>
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.Outcome.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/utilities/coordination/outcome.html#Outcome.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Outcome.dispose" title="Link to this definition"></a></dt>
-<dd><p>Disposes of the Outcome, unblocking any waiting threads with an error.</p>
+<dt class="sig sig-object py" id="thread_factory.Outcome.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/utilities/coordination/outcome.html#Outcome.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Outcome.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanups of the Outcome, unblocking any waiting threads with an error.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -4137,9 +4137,9 @@ A ConcurrentList of Package instances if the input was an iterable.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.Package.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/utilities/coordination/package.html#Package.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Package.dispose" title="Link to this definition"></a></dt>
-<dd><p>Dispose of the Package, releasing any resources.
+<dt class="sig sig-object py" id="thread_factory.Package.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/utilities/coordination/package.html#Package.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Package.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanup of the Package, releasing any resources.
 This is a no-op for Package since it does not hold resources.</p>
 </dd></dl>
 
@@ -4239,10 +4239,10 @@ requiring explicit <cite>reset()</cite> for reuse. Defaults to False.</p></li>
 </dd>
 </dl>
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.Scout.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/scout.html#Scout.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Scout.dispose" title="Link to this definition"></a></dt>
-<dd><p>Disposes the Scout instance. This makes it permanently unusable.
-All resources are released. Does NOT call super().dispose().</p>
+<dt class="sig sig-object py" id="thread_factory.Scout.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/scout.html#Scout.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Scout.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanups the Scout instance. This makes it permanently unusable.
+All resources are released. Does NOT call super().cleanup().</p>
 </dd></dl>
 
 <dl class="py method">
@@ -4353,7 +4353,7 @@ Instead, a manual call to <cite>release()</cite> is required to proceed.</p>
 <ul class="simple">
 <li><dl class="simple">
 <dt>Supports command-based control via:</dt><dd><ul>
-<li><p><cite>release()</cite>, <cite>reset()</cite>, <cite>set_threshold()</cite>, <cite>is_spent()</cite>, <cite>notify_all_override()</cite>, <cite>dispose()</cite></p></li>
+<li><p><cite>release()</cite>, <cite>reset()</cite>, <cite>set_threshold()</cite>, <cite>is_spent()</cite>, <cite>notify_all_override()</cite>, <cite>cleanup()</cite></p></li>
 </ul>
 </dd>
 </dl>
@@ -4400,8 +4400,8 @@ for _ in range(5):</p>
 </div></blockquote>
 </div></blockquote>
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.SignalBarrier.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/signal_barrier.html#SignalBarrier.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalBarrier.dispose" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="thread_factory.SignalBarrier.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/signal_barrier.html#SignalBarrier.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalBarrier.cleanup" title="Link to this definition"></a></dt>
 <dd><p>Releases all resources and unblocks waiting threads.</p>
 <p>This method marks the semaphore as cleaned and removes references
 to callbacks and controllers. All currently waiting threads are notified
@@ -4584,7 +4584,7 @@ and values are the corresponding callable methods or functions exposed by the ob
 <li><p><strong>Subscription-based Event Notification</strong>: Enables external components to subscribe to
 events emitted by registered objects, facilitating reactive programming patterns.</p></li>
 <li><p><strong>Lifecycle Management</strong>: Provides methods for registering, unregistering, and disposing
-of objects, including a comprehensive dispose mechanism for the controller itself.</p></li>
+of objects, including a comprehensive cleanup mechanism for the controller itself.</p></li>
 <li><p><strong>Pre/Post Hook Injection</strong>: Supports the injection of custom functions (hooks) that
 execute before and after command invocations, useful for diagnostics, logging, or
 implementing cross-cutting concerns.</p></li>
@@ -4633,11 +4633,11 @@ and <cite>command</cite> (the name of the command being invoked).</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.SignalController.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/controllers/signal_controller.html#SignalController.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalController.dispose" title="Link to this definition"></a></dt>
-<dd><p>Dispose of all registered objects and the controller itself.</p>
+<dt class="sig sig-object py" id="thread_factory.SignalController.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/controllers/signal_controller.html#SignalController.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalController.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanup of all registered objects and the controller itself.</p>
 <p>This method iterates through all registered objects and attempts to call their
-<cite>dispose()</cite> method (if available and implemented). It then cleans up all
+<cite>cleanup()</cite> method (if available and implemented). It then cleans up all
 internal data structures to release resources and marks the controller as cleaned.
 Subsequent operations on a cleaned controller may behave unexpectedly or raise errors.
 This method is idempotent and thread-safe.</p>
@@ -4838,15 +4838,15 @@ and <cite>data</cite> (Optional[Dict]).</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="thread_factory.SignalController.unregister">
-<span class="sig-name descname"><span class="pre">unregister</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">object_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dispose_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/controllers/signal_controller.html#SignalController.unregister"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalController.unregister" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">unregister</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">object_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cleanup_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/controllers/signal_controller.html#SignalController.unregister"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalController.unregister" title="Link to this definition"></a></dt>
 <dd><p>Unregister a previously registered object from the SignalController.</p>
 <p>This method removes the object’s entry from the registry, clears any associated
-active waits or subscriptions, and optionally calls the object’s <cite>dispose()</cite> method.</p>
+active waits or subscriptions, and optionally calls the object’s <cite>cleanup()</cite> method.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>object_id</strong> (<em>str</em>) – The unique ID of the object to unregister.</p></li>
-<li><p><strong>dispose_object</strong> (<em>bool</em>) – If <cite>True</cite>, the object’s <cite>dispose()</cite> method will be called
+<li><p><strong>cleanup_object</strong> (<em>bool</em>) – If <cite>True</cite>, the object’s <cite>cleanup()</cite> method will be called
 (if it exists and is callable) before removal from the
 controller’s registry. Defaults to <cite>True</cite>.</p></li>
 </ul>
@@ -4888,7 +4888,7 @@ when the total capacity has been exhausted.</p>
 <li><p>Optional round-robin or randomized selection of execution slots.</p></li>
 <li><p>Optional callback executed once when all fork units are fully used.</p></li>
 <li><p>Optional controller notification via <cite>.notify(id, “FORK_COMPLETED”)</cite>.</p></li>
-<li><p>Reusable via <cite>.reset()</cite> and disposable via <cite>.dispose()</cite>.</p></li>
+<li><p>Reusable via <cite>.reset()</cite> and disposable via <cite>.cleanup()</cite>.</p></li>
 </ul>
 </section>
 <section id="usage">
@@ -4965,12 +4965,12 @@ If provided, it will receive a <cite>“FORK_COMPLETED”</cite> notification wh
 </dd>
 </dl>
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.SignalFork.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/signal_fork.html#SignalFork.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalFork.dispose" title="Link to this definition"></a></dt>
-<dd><p>Fully disposes the SignalFork instance.</p>
+<dt class="sig sig-object py" id="thread_factory.SignalFork.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/signal_fork.html#SignalFork.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalFork.cleanup" title="Link to this definition"></a></dt>
+<dd><p>Fully cleanups the SignalFork instance.</p>
 <p>This method performs complete teardown of the fork, including:
 • Marking the object as cleaned to prevent further usage.
-• Releasing all held ForkUnit resources by invoking their <cite>dispose()</cite> methods.
+• Releasing all held ForkUnit resources by invoking their <cite>cleanup()</cite> methods.
 • Clearing the internal list of forks.
 • Unregistering from the controller (if registered).</p>
 <p class="rubric">Notes</p>
@@ -5106,8 +5106,8 @@ with latch:</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.SignalLatch.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/signal_latch.html#SignalLatch.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalLatch.dispose" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="thread_factory.SignalLatch.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/signal_latch.html#SignalLatch.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalLatch.cleanup" title="Link to this definition"></a></dt>
 <dd><p>Release all blocked threads <strong>permanently</strong>; further operations raise.</p>
 <p class="rubric">Notes</p>
 <ul class="simple">
@@ -5204,9 +5204,9 @@ It should take no arguments and return None.</p></li>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.SmartCondition.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/smart_condition.html#SmartCondition.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SmartCondition.dispose" title="Link to this definition"></a></dt>
-<dd><p>Disposes the SmartCondition, releasing all waiters and clearing internal registries.</p>
+<dt class="sig sig-object py" id="thread_factory.SmartCondition.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/smart_condition.html#SmartCondition.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SmartCondition.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanups the SmartCondition, releasing all waiters and clearing internal registries.</p>
 <p>This method:
 - Marks the condition as cleaned.
 - Wakes all waiting threads without executing callbacks.
@@ -5479,9 +5479,9 @@ to become true. If <cite>None</cite>, the thread waits indefinitely.</p></li>
 </dd>
 </dl>
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.Stopwatch.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/utilities/timing_tools/stopwatch.html#Stopwatch.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Stopwatch.dispose" title="Link to this definition"></a></dt>
-<dd><p>Dispose of internal state. Frees stopwatch references.</p>
+<dt class="sig sig-object py" id="thread_factory.Stopwatch.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/utilities/timing_tools/stopwatch.html#Stopwatch.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Stopwatch.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanup of internal state. Frees stopwatch references.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -5786,11 +5786,11 @@ batches of concurrent tasks.</p>
 &gt;&gt;&gt; # Call use_fork() from 4 threads
 &gt;&gt;&gt; # After completion, call fork.reset() to reuse for another batch.</p>
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.SyncFork.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/sync_fork.html#SyncFork.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SyncFork.dispose" title="Link to this definition"></a></dt>
-<dd><p>Disposes the SyncFork instance. Releases all resources and makes it unusable.
+<dt class="sig sig-object py" id="thread_factory.SyncFork.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/sync_fork.html#SyncFork.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SyncFork.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanups the SyncFork instance. Releases all resources and makes it unusable.
 Idempotent: safe to call multiple times.</p>
-<p>After disposal:
+<p>After cleaning:
 - All future use of <cite>use_fork()</cite> raises RuntimeError.
 - All <a href="#id40"><span class="problematic" id="id41">`</span></a>ForkUnit`s are explicitly cleaned (clearing their callables).
 - The internal threading event is triggered to release any waiting threads.
@@ -6336,7 +6336,7 @@ timeout raises <code class="xref py py-class docutils literal notranslate"><span
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">release</span></code> – Manual release (only honoured when <em>manual_release=True</em>).</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">reset</span></code>   – Prepare the fork for the next cohort.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">dispose</span></code> – Tear everything down.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cleanup</span></code> – Tear everything down.</p></li>
 </ul>
 <dl class="field-list simple">
 <dt class="field-odd">param number_of_forks<span class="colon">:</span></dt>
@@ -6366,14 +6366,14 @@ timeout raises <code class="xref py py-class docutils literal notranslate"><span
 </dd>
 </dl>
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.SyncSignalFork.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/sync_signal_fork.html#SyncSignalFork.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SyncSignalFork.dispose" title="Link to this definition"></a></dt>
-<dd><p>Dispose the SyncSignalFork instance and release all held resources.</p>
+<dt class="sig sig-object py" id="thread_factory.SyncSignalFork.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/sync_signal_fork.html#SyncSignalFork.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SyncSignalFork.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanup the SyncSignalFork instance and release all held resources.</p>
 <p>This method:
 • Sets <cite>_cleaned = True</cite> to block future usage.
 • Releases all waiting threads via <cite>_threading_event</cite>.
-• Disposes all ForkUnits by clearing their callables.
-• Disposes the Scout (if active).
+• cleanups all ForkUnits by clearing their callables.
+• cleanups the Scout (if active).
 • Unregisters from the controller (if provided).</p>
 <p>This method is idempotent and can be safely called multiple times.</p>
 </dd></dl>
@@ -6876,10 +6876,10 @@ waits for a command to proceed. The barrier can also trigger a custom action (re
 <li><p><strong>Reusability</strong> allows the barrier to reset and be reused after a full release cycle, but is ignored when <cite>manual_release=True</cite>.</p></li>
 </ul>
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.TransitBarrier.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/transit_barrier.html#TransitBarrier.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.TransitBarrier.dispose" title="Link to this definition"></a></dt>
-<dd><p>Disposes the TransitBarrier and unblocks all waiting threads.</p>
-<p>After disposal:
+<dt class="sig sig-object py" id="thread_factory.TransitBarrier.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/transit_barrier.html#TransitBarrier.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.TransitBarrier.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanups the TransitBarrier and unblocks all waiting threads.</p>
+<p>After cleaning:
 - All future <cite>wait()</cite> calls will immediately return False.
 - The internal controller reference is cleared.
 - All pending threads are notified and released.
@@ -6998,9 +6998,9 @@ logic and the waiting thread executes it — cleanly and safely.</p>
 <dd></dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="thread_factory.TransitCondition.dispose">
-<span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/transit_condition.html#TransitCondition.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.TransitCondition.dispose" title="Link to this definition"></a></dt>
-<dd><p>Dispose of this SignalCondition safely.</p>
+<dt class="sig sig-object py" id="thread_factory.TransitCondition.cleanup">
+<span class="sig-name descname"><span class="pre">cleanup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/transit_condition.html#TransitCondition.cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.TransitCondition.cleanup" title="Link to this definition"></a></dt>
+<dd><p>cleanup of this SignalCondition safely.</p>
 <dl class="simple">
 <dt>This method will:</dt><dd><ul class="simple">
 <li><p>Mark the instance as cleaned.</p></li>

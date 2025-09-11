@@ -552,12 +552,12 @@ class HighPerformanceConcurrentQueueTest(unittest.TestCase):
         print(f"\n[Batch Stealing Test] {num_consumers * items_per_consumer} items stolen in {end - start:.2f}s")
 
 
-    def test_dispose(self):
+    def test_cleanup(self):
         """
         Ensures that:
-            - dispose() clears all queue contents.
-            - dispose() sets the cleaned flag.
-            - dispose() is idempotent (calling it multiple times is safe).
+            - cleanup() clears all queue contents.
+            - cleanup() sets the cleaned flag.
+            - cleanup() is idempotent (calling it multiple times is safe).
         """
         queue = ConcurrentQueue([1, 2, 3])
 
@@ -566,18 +566,18 @@ class HighPerformanceConcurrentQueueTest(unittest.TestCase):
         self.assertIn(1, queue)
         self.assertFalse(queue.cleaned)
 
-        # First disposal
-        queue.dispose()
+        # First cleaning
+        queue.cleanup()
 
-        # State after disposal
+        # State after cleaning
         self.assertEqual(len(queue), 0)
         self.assertTrue(queue.cleaned)
         self.assertNotIn(1, queue)
         self.assertNotIn(2, queue)
         self.assertNotIn(3, queue)
 
-        # Ensure idempotency (no exception on second dispose)
+        # Ensure idempotency (no exception on second cleanup)
         try:
-            queue.dispose()
+            queue.cleanup()
         except Exception as e:
-            self.fail(f"Calling dispose() twice raised an exception: {e}")
+            self.fail(f"Calling cleanup() twice raised an exception: {e}")

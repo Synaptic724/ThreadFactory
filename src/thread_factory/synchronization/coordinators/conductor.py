@@ -159,7 +159,7 @@ class Conductor(Cleanable):
 
     def cleanup(self):
         """
-        Disposes of the Conductor, cleaning up all associated resources.
+        cleanups of the Conductor, cleaning up all associated resources.
 
         This method performs a full teardown of the Conductor. It marks the
         instance as cleaned, notifies the controller (if any), and releases all
@@ -174,31 +174,31 @@ class Conductor(Cleanable):
         with self._lock:
             self._cleaned = True
             if self._clock_barrier:
-                self._clock_barrier.dispose()
+                self._clock_barrier.cleanup()
                 self._clock_barrier = None
             if self._signal_barrier:
-                self._signal_barrier.dispose()
+                self._signal_barrier.cleanup()
                 self._signal_barrier = None
             if self._internal_threshold_barrier:
-                self._internal_threshold_barrier.dispose()
+                self._internal_threshold_barrier.cleanup()
                 self._internal_threshold_barrier = None
             if self._dynaphore:
-                self._dynaphore.dispose()
+                self._dynaphore.cleanup()
                 self._dynaphore = None
             if self._manual_release_gate:
                 self._manual_release_gate.set()
                 self._manual_release_gate = None
             if self.outcomes:
                 for value in self.outcomes.values():
-                    outcomes_to_dispose = value if self._multiple_outcomes_per_task else [value]
-                    for obj in outcomes_to_dispose: obj.dispose()
+                    outcomes_to_cleanup = value if self._multiple_outcomes_per_task else [value]
+                    for obj in outcomes_to_cleanup: obj.cleanup()
 
-            self.outcomes.dispose()
+            self.outcomes.cleanup()
             self.outcomes = None
             if isinstance(self.tasks, list):
                 self.tasks.clear()
             elif isinstance(self.tasks, ConcurrentList):
-                    self.tasks.dispose()
+                    self.tasks.cleanup()
             self.tasks = None
             self._broken = True
             self._released = True
@@ -247,7 +247,7 @@ class Conductor(Cleanable):
         return ConcurrentDict({
             'name': 'conductor',
             'commands': ConcurrentDict({
-                'dispose': self.dispose, 'reset': self.reset, 'release': self.release,
+                'cleanup': self.cleanup, 'reset': self.reset, 'release': self.release,
                 'notify_all_override': self.notify_all_override, 'is_spent': self.is_spent,
             })
         })
@@ -272,8 +272,8 @@ class Conductor(Cleanable):
         with self._lock:
             if self.outcomes:
                 for value in self.outcomes.values():
-                    outcomes_to_dispose = value if self._multiple_outcomes_per_task else [value]
-                    for obj in outcomes_to_dispose: obj.dispose()
+                    outcomes_to_cleanup = value if self._multiple_outcomes_per_task else [value]
+                    for obj in outcomes_to_cleanup: obj.cleanup()
             self.outcomes.clear()
             self._released = False
             self._broken = False
@@ -328,7 +328,7 @@ class Conductor(Cleanable):
         """List[Exception]: A list of all exceptions captured from executed tasks.
 
         This property iterates through all collected outcomes and returns the
-        exception objects for each task that failed. It filters out disposal-related
+        exception objects for each task that failed. It filters out cleaning-related
         `RuntimeError` exceptions to only report on application-level errors.
 
         The returned list is a snapshot of the exceptions at the time of the call.

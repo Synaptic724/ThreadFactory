@@ -187,10 +187,10 @@ class TestBypassConductor(unittest.TestCase):
         self.assertEqual(self.call_count, 2)
         self.assertEqual(len(gate.outcomes()), 1)  # outcomes cleared on reset
 
-    def test_dispose(self):
+    def test_cleanup(self):
         gate = BypassConductor(func=[lambda: "x"], limit=1)
         t = threading.Thread(target=gate.transit); t.start(); time.sleep(0.1)
-        gate.dispose(); t.join(timeout=1)
+        gate.cleanup(); t.join(timeout=1)
         self.assertTrue(gate._cleaned)
         self.assertIsNone(gate._dynaphore)
         self.assertIsNone(gate._threshold_sema)

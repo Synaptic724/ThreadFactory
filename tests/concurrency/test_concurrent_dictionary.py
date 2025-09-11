@@ -465,9 +465,9 @@ class HighPerformanceConcurrentDictTest(unittest.TestCase):
         self.assertGreaterEqual(len(d), 0)
         print(f"Final dictionary length: {len(d)}")
 
-    def test_dispose(self):
+    def test_cleanup(self):
         """
-        Ensures that dispose:
+        Ensures that cleanup:
             - Clears all data.
             - Marks the dictionary as cleaned.
             - Is idempotent (can be called multiple times without error).
@@ -479,8 +479,8 @@ class HighPerformanceConcurrentDictTest(unittest.TestCase):
         self.assertEqual(len(d), 2)
         self.assertFalse(d.cleaned)
 
-        # Dispose it
-        d.dispose()
+        # cleanup it
+        d.cleanup()
 
         # It should be marked as cleaned
         self.assertTrue(d.cleaned)
@@ -490,11 +490,11 @@ class HighPerformanceConcurrentDictTest(unittest.TestCase):
         self.assertNotIn('a', d)
         self.assertNotIn('b', d)
 
-        # Calling dispose again should not fail
+        # Calling cleanup again should not fail
         try:
-            d.dispose()
+            d.cleanup()
         except Exception as e:
-            self.fail(f"Calling dispose() a second time raised an exception: {e}")
+            self.fail(f"Calling cleanup() a second time raised an exception: {e}")
 
     def test_is_frozen_property(self):
         d = ConcurrentDict[str, int]()

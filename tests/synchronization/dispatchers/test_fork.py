@@ -378,8 +378,8 @@ class TestFork(unittest.TestCase):
         for t in threads: t.join(timeout=5)
         for t in threads: self.assertFalse(t.is_alive())
 
-        outer_fork.dispose()  # Clean up
-        inner_fork.dispose()  # Clean up
+        outer_fork.cleanup()  # Clean up
+        inner_fork.cleanup()  # Clean up
 
 
     def test_reset_partially_used_fork(self):

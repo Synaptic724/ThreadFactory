@@ -33,7 +33,7 @@ class AutoResetTimer(Cleanable):
 
     def cleanup(self):
         """
-        Dispose of the timer and stop any scheduled execution.
+        cleanup of the timer and stop any scheduled execution.
         This should be called to clean up the timer when no longer needed.
         """
         if self._cleaned:

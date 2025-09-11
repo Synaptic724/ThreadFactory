@@ -8,7 +8,7 @@
 
 - **`Work` object introduced:**
   - Awaitable wrapper over `Future` with lifecycle hooks  
-  - Manual disposal, metadata, and thread-safe operation  
+  - Manual cleaning, metadata, and thread-safe operation  
 
 - **`QueueAllocator` added:**
   - Efficient ticket-based ID pool manager  

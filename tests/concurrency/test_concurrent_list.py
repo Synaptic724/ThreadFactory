@@ -161,11 +161,11 @@ class TestConcurrentList(unittest.TestCase):
         with self.assertWarns(UserWarning):
             with clist as internal_list:
                 internal_list.append(3)
-        # Using the context manager bypasses dispose() on exit, the list is *not* cleared automatically here.
-        # The Dispose implementation is called by __exit__, which *does* clear the list.
+        # Using the context manager bypasses cleanup() on exit, the list is *not* cleared automatically here.
+        # The cleanup implementation is called by __exit__, which *does* clear the list.
         # The previous version of the test description for context manager was inaccurate.
         # Let's update the test to reflect the ConcurrentDict __exit__ behavior.
-        # The __exit__ method calls dispose, which clears the list.
+        # The __exit__ method calls cleanup, which clears the list.
         self.assertEqual(len(clist), 0)
 
 
@@ -558,9 +558,9 @@ class TestConcurrentList(unittest.TestCase):
         except TypeError:
             self.fail("Unfreezing multiple times should keep it mutable.")
 
-    def test_dispose(self):
+    def test_cleanup(self):
         """
-        Ensures that dispose:
+        Ensures that cleanup:
             - Clears all data.
             - Marks the list as cleaned.
             - Is idempotent (can be called multiple times without error).
@@ -572,8 +572,8 @@ class TestConcurrentList(unittest.TestCase):
         self.assertEqual(len(clist), 2)
         self.assertFalse(clist.cleaned)
 
-        # Dispose it
-        clist.dispose()
+        # cleanup it
+        clist.cleanup()
 
         # It should be marked as cleaned
         self.assertTrue(clist.cleaned)
@@ -583,20 +583,20 @@ class TestConcurrentList(unittest.TestCase):
         self.assertNotIn(1, clist)
         self.assertNotIn(2, clist)
 
-        # Calling dispose again should not fail
+        # Calling cleanup again should not fail
         try:
-            clist.dispose()
+            clist.cleanup()
         except Exception as e:
-            self.fail(f"Calling dispose() a second time raised an exception: {e}")
+            self.fail(f"Calling cleanup() a second time raised an exception: {e}")
 
-    def test_dispose_clears_frozen_list(self):
-        """Ensures dispose still clears the list even if it's frozen."""
+    def test_cleanup_clears_frozen_list(self):
+        """Ensures cleanup still clears the list even if it's frozen."""
         clist = ConcurrentList([1, 2, 3])
         clist.freeze()
         self.assertTrue(clist.is_frozen)
         self.assertEqual(len(clist), 3)
 
-        clist.dispose()
+        clist.cleanup()
 
         self.assertTrue(clist.cleaned)
         self.assertEqual(len(clist), 0)

@@ -190,7 +190,7 @@ ThreadFactory goes beyond collections, offering finely engineered synchronizatio
     * **`register()` / `unregister()`**: Dynamically add or remove managed objects.
     * **`invoke()` with pre/post hooks**: Trigger operations across registered components with custom logic before and after.
     * **Event notification (`notify`)**: Broadcast events to all interested managed objects.
-    * **Full-thread-safe `dispose()`**: Recursively and safely tears down all managed objects, ensuring proper resource release and preventing leaks in complex systems.
+    * **Full-thread-safe `cleanup()`**: Recursively and safely tears down all managed objects, ensuring proper resource release and preventing leaks in complex systems.
     The `SignalController` forms the foundation for global coordination, status tracking, and command dispatch, providing a powerful hub for your concurrency architecture.
 ---
 

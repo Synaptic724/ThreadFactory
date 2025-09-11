@@ -120,10 +120,10 @@ class SyncFork(Cleanable):  # SyncFork now inherits from Cleanable
 
     def cleanup(self) -> None:
         """
-        Disposes the SyncFork instance. Releases all resources and makes it unusable.
+        cleanups the SyncFork instance. Releases all resources and makes it unusable.
         Idempotent: safe to call multiple times.
 
-        After disposal:
+        After cleaning:
         - All future use of `use_fork()` raises RuntimeError.
         - All `ForkUnit`s are explicitly cleaned (clearing their callables).
         - The internal threading event is triggered to release any waiting threads.
@@ -137,14 +137,14 @@ class SyncFork(Cleanable):  # SyncFork now inherits from Cleanable
             self._forks_closed = True
             self._threading_event.set()  # Wake anything waiting
 
-            # Dispose Scout if present
+            # cleanup Scout if present
             if self._scout:
-                self._scout.dispose()
+                self._scout.cleanup()
                 self._scout = None
 
-            # Dispose all ForkUnits to clear callables
+            # cleanup all ForkUnits to clear callables
             for unit in self._list_of_forks:
-                unit.dispose()
+                unit.cleanup()
 
             self._list_of_forks.clear()
 

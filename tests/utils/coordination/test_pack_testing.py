@@ -259,12 +259,12 @@ class TestPackageAdvancedScenarios(unittest.TestCase):
         with self.assertRaises(TypeError, msg="Should reject non-Package items"):
             Package.merge_many([Pack(int), "not a package"])
 
-    def test_dispose_prevents_further_calls(self):
+    def test_cleanup_prevents_further_calls(self):
         """Verifies that a cleaned Package cannot be called."""
         p = Pack(int, "10")
-        self.assertEqual(p(), 10)  # Works before dispose
+        self.assertEqual(p(), 10)  # Works before cleanup
 
-        p.dispose()
+        p.cleanup()
         self.assertTrue(p.cleaned)
 
         # Calling a cleaned package should fail because its _func is None

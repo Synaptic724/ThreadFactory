@@ -16,7 +16,7 @@ class TestOutcome(unittest.TestCase):
     def tearDown(self):
         # Ensure the outcome is always cleaned, even if a test fails mid-execution
         if not self.outcome.cleaned:
-            self.outcome.dispose()
+            self.outcome.cleanup()
 
     # --- Initialization Tests ---
     def test_initial_state(self):
@@ -45,7 +45,7 @@ class TestOutcome(unittest.TestCase):
         self.assertIsInstance(self.outcome.exception(), ValueError)
 
     def test_set_result_on_cleaned_outcome(self):
-        self.outcome.dispose()
+        self.outcome.cleanup()
         with self.assertRaises(RuntimeError) as cm:
             self.outcome.set_result("Result")
         self.assertIn("Cannot set result on a cleaned Outcome.", str(cm.exception))
@@ -76,7 +76,7 @@ class TestOutcome(unittest.TestCase):
         self.assertIsNone(self.outcome.exception())
 
     def test_set_exception_on_cleaned_outcome(self):
-        self.outcome.dispose()
+        self.outcome.cleanup()
         with self.assertRaises(RuntimeError) as cm:
             self.outcome.set_exception(ValueError("Error"))
         self.assertIn("Cannot set exception on a cleaned Outcome.", str(cm.exception))
@@ -114,11 +114,11 @@ class TestOutcome(unittest.TestCase):
         self.assertFalse(self.outcome.done)
 
     def test_result_cleaned_while_waiting(self):
-        def dispose_in_thread():
+        def cleanup_in_thread():
             time.sleep(0.05)
-            self.outcome.dispose()
+            self.outcome.cleanup()
 
-        t = threading.Thread(target=dispose_in_thread)
+        t = threading.Thread(target=cleanup_in_thread)
         t.start()
         with self.assertRaises(RuntimeError) as cm:
             self.outcome.result()
@@ -127,7 +127,7 @@ class TestOutcome(unittest.TestCase):
         t.join()
 
     def test_result_cleaned_before_waiting(self):
-        self.outcome.dispose()
+        self.outcome.cleanup()
         with self.assertRaises(RuntimeError) as cm:
             self.outcome.result()
         self.assertIn("Outcome was cleaned", str(cm.exception))
@@ -143,7 +143,7 @@ class TestOutcome(unittest.TestCase):
         self.outcome.set_exception(Exception())
         self.assertTrue(self.outcome.done)
         self.setUp() # Reset outcome
-        self.outcome.dispose()
+        self.outcome.cleanup()
         self.assertTrue(self.outcome.done)
 
     # --- exception() Tests ---
@@ -171,11 +171,11 @@ class TestOutcome(unittest.TestCase):
         t.join()
 
     def test_exception_cleaned_while_waiting(self):
-        def dispose_in_thread():
+        def cleanup_in_thread():
             time.sleep(0.05)
-            self.outcome.dispose()
+            self.outcome.cleanup()
 
-        t = threading.Thread(target=dispose_in_thread)
+        t = threading.Thread(target=cleanup_in_thread)
         t.start()
         ex = self.outcome.exception()
         self.assertIsInstance(ex, RuntimeError)
@@ -184,25 +184,25 @@ class TestOutcome(unittest.TestCase):
         t.join()
 
     def test_exception_cleaned_before_waiting(self):
-        self.outcome.dispose()
+        self.outcome.cleanup()
         ex = self.outcome.exception()
         self.assertIsInstance(ex, RuntimeError)
         self.assertIn("Outcome was cleaned", str(ex))
         self.assertTrue(self.outcome.cleaned)
 
-    # --- dispose() Tests ---
-    def test_dispose_idempotency(self):
+    # --- cleanup() Tests ---
+    def test_cleanup_idempotency(self):
         self.assertFalse(self.outcome.cleaned)
-        self.outcome.dispose()
+        self.outcome.cleanup()
         self.assertTrue(self.outcome.cleaned)
-        self.outcome.dispose()
+        self.outcome.cleanup()
         self.assertTrue(self.outcome.cleaned)
 
-    def test_dispose_clears_references(self):
+    def test_cleanup_clears_references(self):
         # Test case 1: Result was set, then cleaned. _result should be None. _exception should be None.
         self.outcome.set_result("data")
-        self.outcome.dispose()
-        self.assertIsNone(self.outcome._result) # Now asserts None, as per dispose logic
+        self.outcome.cleanup()
+        self.assertIsNone(self.outcome._result) # Now asserts None, as per cleanup logic
         self.assertIsNone(self.outcome._exception) # Should be None as no exception was set
         self.assertIsNone(self.outcome._condition)
 
@@ -210,14 +210,14 @@ class TestOutcome(unittest.TestCase):
         self.setUp() # Reset for new test case
         original_ex = ValueError("Test Exception")
         self.outcome.set_exception(original_ex)
-        self.outcome.dispose()
-        self.assertIsNone(self.outcome._result) # Should be None, as per dispose logic
+        self.outcome.cleanup()
+        self.assertIsNone(self.outcome._result) # Should be None, as per cleanup logic
         self.assertEqual(self.outcome._exception, original_ex) # Should be original exception
         self.assertIsNone(self.outcome._condition)
 
-    def test_dispose_sets_runtime_error_if_not_done(self):
+    def test_cleanup_sets_runtime_error_if_not_done(self):
         self.assertFalse(self.outcome.done)
-        self.outcome.dispose()
+        self.outcome.cleanup()
         self.assertTrue(self.outcome.done)
         with self.assertRaises(RuntimeError) as cm:
             self.outcome.result()
@@ -251,7 +251,7 @@ class TestOutcome(unittest.TestCase):
             final_result = self.outcome.result()
             self.assertIn(final_result, [f"Result {i}" for i in range(5)])
         except RuntimeError as e:
-            # If dispose somehow won the race, result() might raise RuntimeError
+            # If cleanup somehow won the race, result() might raise RuntimeError
             self.assertIn("Outcome was cleaned", str(e))
         except Exception as e:
             self.fail(f"Unexpected exception: {e}")
@@ -309,19 +309,19 @@ class TestOutcome(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.outcome.result()
 
-    def test_dispose_during_concurrent_set_operations(self):
+    def test_cleanup_during_concurrent_set_operations(self):
         def set_result_worker():
             try:
                 self.outcome.set_result("Result")
             except RuntimeError:
                 pass
 
-        def dispose_worker():
+        def cleanup_worker():
             time.sleep(0.01)
-            self.outcome.dispose()
+            self.outcome.cleanup()
 
         t1 = threading.Thread(target=set_result_worker)
-        t2 = threading.Thread(target=dispose_worker)
+        t2 = threading.Thread(target=cleanup_worker)
 
         t1.start()
         t2.start()
@@ -333,7 +333,7 @@ class TestOutcome(unittest.TestCase):
 
         try:
             # If set_result won, result() might return "Result"
-            # If dispose won, result() will raise RuntimeError
+            # If cleanup won, result() will raise RuntimeError
             result_val = self.outcome.result(timeout=0.01)
             self.assertEqual(result_val, "Result")
             self.assertIsNone(self.outcome.exception())
@@ -345,12 +345,12 @@ class TestOutcome(unittest.TestCase):
         except Exception as e:
             self.fail(f"Unexpected exception raised: {e}")
 
-    def test_result_with_timeout_and_concurrent_dispose(self):
-        def dispose_worker():
+    def test_result_with_timeout_and_concurrent_cleanup(self):
+        def cleanup_worker():
             time.sleep(0.05)
-            self.outcome.dispose()
+            self.outcome.cleanup()
 
-        t = threading.Thread(target=dispose_worker)
+        t = threading.Thread(target=cleanup_worker)
         t.start()
 
         start_time = time.monotonic()
@@ -365,12 +365,12 @@ class TestOutcome(unittest.TestCase):
 
         t.join()
 
-    def test_exception_with_timeout_and_concurrent_dispose(self):
-        def dispose_worker():
+    def test_exception_with_timeout_and_concurrent_cleanup(self):
+        def cleanup_worker():
             time.sleep(0.05)
-            self.outcome.dispose()
+            self.outcome.cleanup()
 
-        t = threading.Thread(target=dispose_worker)
+        t = threading.Thread(target=cleanup_worker)
         t.start()
 
         start_time = time.monotonic()
@@ -384,30 +384,30 @@ class TestOutcome(unittest.TestCase):
 
         t.join()
 
-    def test_dispose_clears_result_if_exception_was_set_first(self):
+    def test_cleanup_clears_result_if_exception_was_set_first(self):
         original_exception = ValueError("Original Error")
         self.outcome.set_exception(original_exception)
-        self.outcome.dispose()
+        self.outcome.cleanup()
         # _result is None. So result() will raise original exception.
         with self.assertRaises(ValueError):
             self.outcome.result()
         # _exception should still be the original exception.
         self.assertEqual(self.outcome.exception(), original_exception)
 
-    def test_result_access_after_set_and_dispose(self):
+    def test_result_access_after_set_and_cleanup(self):
         self.outcome.set_result("Final Value")
-        self.outcome.dispose()
-        # After dispose, _result is None. So result() will raise RuntimeError.
+        self.outcome.cleanup()
+        # After cleanup, _result is None. So result() will raise RuntimeError.
         with self.assertRaises(RuntimeError) as cm:
             self.outcome.result()
         self.assertIn("Outcome was cleaned.", str(cm.exception))
         self.assertTrue(self.outcome.done)
         self.assertTrue(self.outcome.cleaned)
 
-    def test_exception_access_after_set_and_dispose(self):
+    def test_exception_access_after_set_and_cleanup(self):
         original_ex = TypeError("Specific Error")
         self.outcome.set_exception(original_ex)
-        self.outcome.dispose()
+        self.outcome.cleanup()
         # _exception should still be the original exception.
         self.assertEqual(self.outcome.exception(), original_ex)
         self.assertTrue(self.outcome.done)

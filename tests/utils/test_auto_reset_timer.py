@@ -46,9 +46,9 @@ class TestAutoResetTimer(unittest.TestCase):
         self.assertFalse(self.timer.is_running())
 
 
-    def test_dispose(self):
+    def test_cleanup(self):
         self.timer.start()
-        self.timer.dispose()
+        self.timer.cleanup()
         self.assertFalse(self.timer.is_running())
         self.assertIsNone(self.timer._timer, "Timer should be cleaned and timer reference should be None.")
 

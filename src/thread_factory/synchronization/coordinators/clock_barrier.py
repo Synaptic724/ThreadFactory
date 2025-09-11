@@ -44,7 +44,7 @@ class ClockBarrier(Cleanable):
         Args:
             threshold (int): Number of threads required to trip the barrier. Must be ≥ 1.
             timeout (float): Global timeout in seconds from the first thread arrival to the deadline. Must be > 0.
-            on_broken (Optional[Union[Callable[..., None], Pack]]): Optional callback invoked after the barrier breaks (timeout or dispose).
+            on_broken (Optional[Union[Callable[..., None], Pack]]): Optional callback invoked after the barrier breaks (timeout or cleanup).
             controller (Optional["Controller"]): Optional controller instance to register the barrier and emit events.
 
         Raises:
@@ -86,11 +86,11 @@ class ClockBarrier(Cleanable):
 
     def cleanup(self) -> None:
         """
-        Dispose of the ClockBarrier, marking it as cleaned and breaking the barrier permanently.
+        cleanup of the ClockBarrier, marking it as cleaned and breaking the barrier permanently.
         Once cleaned, the barrier can no longer be used, and any waiting threads will raise a `BrokenBarrierError`.
 
         Notes:
-            After disposal, the barrier is no longer usable. Calls to `wait()` will raise `BrokenBarrierError`.
+            After cleaning, the barrier is no longer usable. Calls to `wait()` will raise `BrokenBarrierError`.
             The controller reference is cleared before emitting events to avoid cascading notifications during shutdown.
         """
         if self._cleaned:
@@ -126,12 +126,12 @@ class ClockBarrier(Cleanable):
         Ensures a clean teardown when exiting a context manager block.
 
         If the barrier is already cleaned or broken, this method is a no-op.
-        Otherwise, it calls `dispose()` to clean up resources.
+        Otherwise, it calls `cleanup()` to clean up resources.
 
         See Also:
-            dispose
+            cleanup
         """
-        self.dispose()
+        self.cleanup()
 
     @property
     def id(self) -> str:
@@ -181,7 +181,7 @@ class ClockBarrier(Cleanable):
     def is_broken(self) -> bool:
         """
         Returns `True` if the **current generation** has entered a
-        broken state (timeout or dispose).
+        broken state (timeout or cleanup).
 
         Thread-safe – acquires the internal lock.
 

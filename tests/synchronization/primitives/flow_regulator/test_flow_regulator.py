@@ -192,7 +192,7 @@ class TestFlowRegulator(unittest.TestCase):
         self.assertEqual(len(results), 4)
 
 
-    # def test_dispose_wakes_waiters(self):
+    # def test_cleanup_wakes_waiters(self):
     #     lock  = FlowRegulator(value=0)
     #     done  = [threading.Event(), threading.Event()]
     #
@@ -205,7 +205,7 @@ class TestFlowRegulator(unittest.TestCase):
     #         t.start()
     #
     #     wait_for_waiters(lock, 2)
-    #     lock.dispose()
+    #     lock.cleanup()
     #
     #     for e in done:
     #         self.assertTrue(e.wait(timeout=1))
@@ -398,7 +398,7 @@ class TestFlowRegulator(unittest.TestCase):
         t.join(timeout=1)
         self.assertFalse(t.is_alive())
 
-    # def test_dispose_during_acquire_returns_false(self):
+    # def test_cleanup_during_acquire_returns_false(self):
     #     lock = FlowRegulator(value=0)
     #
     #     result = []
@@ -411,7 +411,7 @@ class TestFlowRegulator(unittest.TestCase):
     #     t.start()
     #     wait_for_waiters(lock, 1)
     #     time.sleep(0.1)
-    #     lock.dispose()
+    #     lock.cleanup()
     #     t.join(timeout=2)
     #     self.assertIn(False, result)
 

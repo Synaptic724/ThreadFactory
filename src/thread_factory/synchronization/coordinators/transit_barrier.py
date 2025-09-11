@@ -88,9 +88,9 @@ class TransitBarrier(Cleanable):
                 pass
     def cleanup(self):
         """
-        Disposes the TransitBarrier and unblocks all waiting threads.
+        cleanups the TransitBarrier and unblocks all waiting threads.
 
-        After disposal:
+        After cleaning:
         - All future `wait()` calls will immediately return False.
         - The internal controller reference is cleared.
         - All pending threads are notified and released.
@@ -106,7 +106,7 @@ class TransitBarrier(Cleanable):
         with self._condition:
             self._condition.notify_all()
 
-        self._condition.dispose()
+        self._condition.cleanup()
         self._condition = None
 
         # Null out any strong reference types

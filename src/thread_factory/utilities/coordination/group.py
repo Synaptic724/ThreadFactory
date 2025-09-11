@@ -57,16 +57,16 @@ class Group(Cleanable):
 
     def cleanup(self):
         """
-        Fully dispose the Group and its Outcomes. Clears all state and makes the object unusable.
+        Fully cleanup the Group and its Outcomes. Clears all state and makes the object unusable.
         """
         if self.cleaned:
             return
 
         for bucket in self.outcomes.values():
-            outcomes_to_dispose = bucket if self._multiple_outcomes_per_task else [bucket]
-            for outcome in outcomes_to_dispose:
+            outcomes_to_cleanup = bucket if self._multiple_outcomes_per_task else [bucket]
+            for outcome in outcomes_to_cleanup:
                 if outcome:
-                    outcome.dispose()
+                    outcome.cleanup()
 
         self.outcomes.clear()
         self.tasks.clear()
@@ -133,22 +133,22 @@ class Group(Cleanable):
         if self.cleaned:
             return
 
-        self._dispose_outcomes()
+        self._cleanup_outcomes()
 
         if self._multiple_outcomes_per_task:
             self.outcomes = ConcurrentDict({i: ConcurrentList() for i in range(len(self.tasks))})
         else:
             self.outcomes = ConcurrentDict({i: Outcome() for i in range(len(self.tasks))})
 
-    def _dispose_outcomes(self):
+    def _cleanup_outcomes(self):
         """
-        Internal helper to dispose of outcomes without touching the task list.
+        Internal helper to cleanup of outcomes without touching the task list.
         """
         for bucket in self.outcomes.values():
-            outcomes_to_dispose = bucket if self._multiple_outcomes_per_task else [bucket]
-            for outcome in outcomes_to_dispose:
+            outcomes_to_cleanup = bucket if self._multiple_outcomes_per_task else [bucket]
+            for outcome in outcomes_to_cleanup:
                 if outcome:
-                    outcome.dispose()
+                    outcome.cleanup()
         self.outcomes.clear()
 
     def _iter_outcomes(self) -> Iterable[Outcome]:

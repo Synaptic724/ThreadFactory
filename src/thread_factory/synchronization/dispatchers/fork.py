@@ -132,10 +132,10 @@ class Fork(Cleanable):
 
     def cleanup(self) -> None:
         """
-        Disposes the Fork instance, releasing all resources and marking
+        cleanups the Fork instance, releasing all resources and marking
         it as unusable. This method is idempotent and safe to call multiple times.
 
-        After disposal:
+        After cleaning:
         - All future calls to `use_fork()` will raise a RuntimeError.
         - All internal ForkUnits are marked as cleaned (callable cleared).
         """
@@ -147,9 +147,9 @@ class Fork(Cleanable):
             self._forks_closed = True  # Prevent future unit acquisition
 
             for unit in self._list_of_forks:
-                unit.dispose()
+                unit.cleanup()
 
-            self._list_of_forks.dispose()
+            self._list_of_forks.cleanup()
             self._list_of_forks = None
 
 

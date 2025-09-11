@@ -100,7 +100,7 @@ class TestDynaphore(unittest.TestCase):
         sema.release_permit(5)              # over-release (never acquired)
         self.assertEqual(sema._value, 5)
 
-    def test_dispose_unblocks_waiters(self):
+    def test_cleanup_unblocks_waiters(self):
         sema = Dynaphore(0)
         released = []
 
@@ -111,7 +111,7 @@ class TestDynaphore(unittest.TestCase):
         t = threading.Thread(target=w)
         t.start()
         time.sleep(0.1)
-        sema.dispose()          # should wake waiter with False
+        sema.cleanup()          # should wake waiter with False
         t.join(timeout=1)
         self.assertEqual(len(released), 0)  # waiter exits without permit
 

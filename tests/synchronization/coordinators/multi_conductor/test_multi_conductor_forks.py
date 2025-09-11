@@ -60,7 +60,7 @@ class TestForkAndSyncFork(unittest.TestCase):
         group = Group(name="dist_group", tasks=tasks)
 
         mc = MultiConductor(threshold=num_workers, groups=[group], distributed_execution=True)
-        self.addCleanup(mc.dispose)
+        self.addCleanup(mc.cleanup)
 
         threads = _spawn(num_workers, mc.start)
         for t in threads:
@@ -96,7 +96,7 @@ class TestForkAndSyncFork(unittest.TestCase):
             distributed_execution=True,
             multiple_outcomes_per_task=True  # This is the key
         )
-        self.addCleanup(mc.dispose)
+        self.addCleanup(mc.cleanup)
 
         threads = _spawn(num_workers, mc.start)
         for t in threads:
@@ -114,7 +114,7 @@ class TestForkAndSyncFork(unittest.TestCase):
         tasks = [self.make_logging_task(f"task_{i}") for i in range(num_tasks)]
         group = Group(name="reusable_dist", tasks=tasks)
         mc = MultiConductor(threshold=num_workers, groups=[group], distributed_execution=True, reusable=True)
-        self.addCleanup(mc.dispose)
+        self.addCleanup(mc.cleanup)
 
         # First Run
         _spawn(num_workers, mc.start)
@@ -151,7 +151,7 @@ class TestForkAndSyncFork(unittest.TestCase):
             sync_distributed_execution=True,
             multiple_outcomes_per_task=True
         )
-        self.addCleanup(mc.dispose)
+        self.addCleanup(mc.cleanup)
 
         threads = _spawn(num_workers, mc.start)
         for t in threads: t.join(timeout=3)
@@ -193,7 +193,7 @@ class TestForkAndSyncFork(unittest.TestCase):
             sync_distributed_execution=True,
             multiple_outcomes_per_task=True
         )
-        self.addCleanup(mc.dispose)
+        self.addCleanup(mc.cleanup)
 
         # The check correctly fails when 4 < 5.
         with self.assertRaisesRegex(RuntimeError, "More workers are required"):
@@ -214,7 +214,7 @@ class TestForkAndSyncFork(unittest.TestCase):
             groups=[group],
             distributed_execution=True
         )
-        self.addCleanup(mc.dispose)
+        self.addCleanup(mc.cleanup)
 
         # FIX: The conductor now raises a ValueError when _execute_operations is called.
         # We test for this specific error and message.

@@ -15,7 +15,7 @@ class FlowRegulator(Cleanable):
     over permits and thread notifications. It extends standard semaphore
     functionality by allowing runtime adjustment of available permits,
     targeted thread awakening using unique identifiers (ULIDs), and
-    robust disposal mechanisms.
+    robust cleaning mechanisms.
 
     This lock is designed for scenarios requiring flexible synchronization,
     such as managing access to limited resources where the resource count
@@ -83,20 +83,20 @@ class FlowRegulator(Cleanable):
 
     def cleanup(self):
         """
-        Disposes of the FlowRegulator, releasing all its resources and
+        cleanups of the FlowRegulator, releasing all its resources and
         waking up any threads currently waiting to acquire a permit.
-        After disposal, the lock should no longer be used. This method is idempotent.
+        After cleaning, the lock should no longer be used. This method is idempotent.
         """
         if self.cleaned:  # Check if the lock has already been cleaned
             return
-        # Acquire the internal condition lock before performing disposal operations
+        # Acquire the internal condition lock before performing cleaning operations
         with self._cond:
             self._cleaned = True  # Mark the lock as cleaned
             self._cond.notify_all() # Now this is called with the lock acquired
-            self._cond.dispose()
-            self._cond = None # Set to None after disposal
+            self._cond.cleanup()
+            self._cond = None # Set to None after cleaning
             self._log_ids.clear()
-            self._log_ids.dispose()
+            self._log_ids.cleanup()
             self._log_ids = None
 
     @property
@@ -303,7 +303,7 @@ class FlowRegulator(Cleanable):
 
     def acquire(self, blocking: bool = True, timeout: Optional[float] = None) -> bool:
         """
-        Acquire one permit (returns True) or time-out / dispose (returns False).
+        Acquire one permit (returns True) or time-out / cleanup (returns False).
 
         Bias rules:
           – If bias_threshold is None → ordinary semaphore.
@@ -329,7 +329,7 @@ class FlowRegulator(Cleanable):
                 return False
 
             while True:
-                ### 1 — did someone call dispose() while we were asleep?
+                ### 1 — did someone call cleanup() while we were asleep?
                 if self._cleaned:  # ← RE-CHECK EACH ITERATION
                     return False
 

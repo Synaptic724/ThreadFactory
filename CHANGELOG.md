@@ -110,7 +110,7 @@ Central registry for lifecycle-managed objects. Supports:
 - `register()` / `unregister()`
 - `invoke()` with pre/post hooks
 - Event notification (`notify`)
-- Full-thread-safe `dispose()` that recursively tears down all managed objects
+- Full-thread-safe `cleanup()` that recursively tears down all managed objects
 
 It forms the backbone for global coordination, status tracking, and command dispatch.
 
@@ -195,7 +195,7 @@ Each category maps directly to purpose:
   - A thread-safe set implementation designed for high-read and concurrent modification environments.
   - Supports standard set operations (`union`, `intersection`, `difference`, `symmetric_difference`) with both standard and in-place variants.
   - Includes a `freeze()` method that disables mutation and enables lock-free reads for optimal performance under read-heavy workloads.
-  - Fully compatible with context managers and implements `IDispose` for lifecycle control.
+  - Fully compatible with context managers and implements `Icleanup` for lifecycle control.
 
 ### ➕ Features
 
@@ -226,7 +226,7 @@ Each category maps directly to purpose:
   - Updated `peek()` to use `try/finally` to ensure the lock is always released properly, even when exceptions occur.
 
 - **Comment Improvements**
-  - Clarified `concurrent_core` comments explaining the internal lock handling, dispose behavior, and access lifecycle.
+  - Clarified `concurrent_core` comments explaining the internal lock handling, cleanup behavior, and access lifecycle.
 
 ### 🔄 Changes
 
@@ -237,9 +237,9 @@ Each category maps directly to purpose:
 - **NOTICE File**
   - Updated to include formal attribution for all bundled third-party libraries in compliance with Apache 2.0.
 
-- **Standardized Disposal**
-  - Introduced `IDispose` base class.
-  - All classes implementing disposal now include a consistent `cleaned` flag and thread-safe `dispose()` method.
+- **Standardized cleaning**
+  - Introduced `Icleanup` base class.
+  - All classes implementing cleaning now include a consistent `cleaned` flag and thread-safe `cleanup()` method.
 
 ### 📌 Notes for Developers
 
@@ -249,7 +249,7 @@ Each category maps directly to purpose:
 
 - Use `freeze()` when you no longer plan to mutate the set — it allows lock-free reads and improves performance dramatically.
 
-- All new concurrent collections now support `IDispose` and can be used safely with `with` statements or explicit cleanup logic.
+- All new concurrent collections now support `Icleanup` and can be used safely with `with` statements or explicit cleanup logic.
 
 
 ### ✅ Suggested Actions

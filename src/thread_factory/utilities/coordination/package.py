@@ -80,16 +80,16 @@ class Package(Cleanable):
 
     def cleanup(self) -> None:
         """
-        Dispose of the Package, releasing any resources.
+        cleanup of the Package, releasing any resources.
         This is a no-op for Package since it does not hold resources.
         """
         if self.cleaned:
             return
         with self._lock:
             self._func = None
-            self._args.dispose()
+            self._args.cleanup()
             self._args = None
-            self._kwargs.dispose()
+            self._kwargs.cleanup()
             self._kwargs = None
             self._signature_cache = None
             self._cleaned = True

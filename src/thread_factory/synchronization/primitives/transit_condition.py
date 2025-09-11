@@ -70,7 +70,7 @@ class TransitCondition(Cleanable):
 
     def cleanup(self) -> None:
         """
-        Dispose of this SignalCondition safely.
+        cleanup of this SignalCondition safely.
 
         This method will:
           - Mark the instance as cleaned.
@@ -90,7 +90,7 @@ class TransitCondition(Cleanable):
 
         self.acquire = None
         self.release = None
-        self._waiters.dispose()
+        self._waiters.cleanup()
         self._default_callback = None
 
     @property

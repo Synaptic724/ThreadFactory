@@ -128,7 +128,7 @@ class TestTransitConditionBasic(unittest.TestCase):
         self.assertEqual(results.count("inline_cb"), 3)
         self.assertEqual(sum(r.startswith("woken_") for r in results), 3)
 
-    def test_dispose_clears_waiters_and_disallows_future_use(self):
+    def test_cleanup_clears_waiters_and_disallows_future_use(self):
         cond = TransitCondition()
         results = []
 
@@ -145,11 +145,11 @@ class TestTransitConditionBasic(unittest.TestCase):
         t.start()
         time.sleep(0.05)
 
-        cond.dispose()
+        cond.cleanup()
         t.join(timeout=1)
 
-        # ✅ The thread is allowed to wake up cleanly from dispose
-        self.assertIn("woken", results, "Thread should wake and proceed after dispose")
+        # ✅ The thread is allowed to wake up cleanly from cleanup
+        self.assertIn("woken", results, "Thread should wake and proceed after cleanup")
         self.assertEqual(cond.find_waiter_count(), 0)
 
         # 🧨 But new waiters are not allowed

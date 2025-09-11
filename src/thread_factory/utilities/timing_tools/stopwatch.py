@@ -75,7 +75,7 @@ class Stopwatch(Cleanable):
 
     def cleanup(self):
         """
-        Dispose of internal state. Frees stopwatch references.
+        cleanup of internal state. Frees stopwatch references.
         """
         if self._cleaned:
             return
