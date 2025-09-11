@@ -50,7 +50,7 @@ class TestAutoResetTimer(unittest.TestCase):
         self.timer.start()
         self.timer.dispose()
         self.assertFalse(self.timer.is_running())
-        self.assertIsNone(self.timer._timer, "Timer should be disposed and timer reference should be None.")
+        self.assertIsNone(self.timer._timer, "Timer should be cleaned and timer reference should be None.")
 
 if __name__ == '__main__':
     unittest.main()

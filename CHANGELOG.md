@@ -239,7 +239,7 @@ Each category maps directly to purpose:
 
 - **Standardized Disposal**
   - Introduced `IDispose` base class.
-  - All classes implementing disposal now include a consistent `disposed` flag and thread-safe `dispose()` method.
+  - All classes implementing disposal now include a consistent `cleaned` flag and thread-safe `dispose()` method.
 
 ### 📌 Notes for Developers
 

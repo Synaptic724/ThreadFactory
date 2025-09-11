@@ -260,14 +260,14 @@ class TestPackageAdvancedScenarios(unittest.TestCase):
             Package.merge_many([Pack(int), "not a package"])
 
     def test_dispose_prevents_further_calls(self):
-        """Verifies that a disposed Package cannot be called."""
+        """Verifies that a cleaned Package cannot be called."""
         p = Pack(int, "10")
         self.assertEqual(p(), 10)  # Works before dispose
 
         p.dispose()
-        self.assertTrue(p.disposed)
+        self.assertTrue(p.cleaned)
 
-        # Calling a disposed package should fail because its _func is None
+        # Calling a cleaned package should fail because its _func is None
         with self.assertRaises(TypeError):
             p()
 

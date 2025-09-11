@@ -236,19 +236,19 @@ class TestConcurrentBag(unittest.TestCase):
 
     def test_dispose(self):
         """
-        Test that dispose() correctly clears the bag, marks it as disposed,
+        Test that dispose() correctly clears the bag, marks it as cleaned,
         and is idempotent.
         """
         bag = ConcurrentBag(['apple', 'banana', 'banana'])
 
         # Pre-condition
         self.assertTrue(len(bag) > 0)
-        self.assertFalse(bag.disposed)
+        self.assertFalse(bag.cleaned)
 
         # First dispose
         bag.dispose()
         self.assertEqual(len(bag), 0)
-        self.assertTrue(bag.disposed)
+        self.assertTrue(bag.cleaned)
 
         # Second dispose (should be harmless)
         try:

@@ -191,7 +191,7 @@ class TestBypassConductor(unittest.TestCase):
         gate = BypassConductor(func=[lambda: "x"], limit=1)
         t = threading.Thread(target=gate.transit); t.start(); time.sleep(0.1)
         gate.dispose(); t.join(timeout=1)
-        self.assertTrue(gate._disposed)
+        self.assertTrue(gate._cleaned)
         self.assertIsNone(gate._dynaphore)
         self.assertIsNone(gate._threshold_sema)
         self.assertFalse(t.is_alive())

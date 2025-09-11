@@ -147,7 +147,7 @@ class TestFlowRegulatorExtra(unittest.TestCase):
 
     def test_dispose_wakes_waiters(self):
         """
-        When FlowRegulator is disposed while threads are waiting, all waiters
+        When FlowRegulator is cleaned while threads are waiting, all waiters
         must be woken immediately. This test confirms proper wake-up behavior.
         """
         lock = FlowRegulator(value=0)

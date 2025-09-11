@@ -4,7 +4,7 @@ from typing import Optional, Callable, Any, List, Union
 from dataclasses import dataclass
 import ulid
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.utilities.coordination.package import Pack
 
 
@@ -23,7 +23,7 @@ class Waiter:
     callback: Optional[Union[Callable[..., None], Pack]] = None
 
 
-class TransitCondition(IDisposable):
+class TransitCondition(Cleanable):
     """
     TransitCondition
     ----------------
@@ -47,7 +47,7 @@ class TransitCondition(IDisposable):
     Performance Tradeoff:
     - Approximately 6.4x slower than bare `RLock` due to user logic hooks, but massively safer and clearer.
     """
-    __slots__ = IDisposable.__slots__ + [
+    __slots__ = Cleanable.__slots__ + [
         "_lock", "acquire", "release", "_waiters", "_default_callback", "_id",
     ]
     def __init__(self, lock = None, default_callback: Optional[Union[Callable[..., None], Pack]] = None):
@@ -68,18 +68,18 @@ class TransitCondition(IDisposable):
             Pack.bundle(default_callback) if default_callback is not None else None
         )
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
         Dispose of this SignalCondition safely.
 
         This method will:
-          - Mark the instance as disposed.
+          - Mark the instance as cleaned.
           - Wake all remaining waiters to prevent deadlocks.
           - Clear internal references to allow GC.
         """
-        if self._disposed:
+        if self._cleaned:
             return
-        self._disposed = True
+        self._cleaned = True
 
         while not self._waiters.is_empty():
             waiter = self._waiters.dequeue()
@@ -199,8 +199,8 @@ class TransitCondition(IDisposable):
         Raises:
             RuntimeError: If the internal lock is not acquired prior to calling.
         """
-        if self._disposed:
-            raise RuntimeError("SignalCondition has been disposed")
+        if self._cleaned:
+            raise RuntimeError("SignalCondition has been cleaned")
         if not self._is_owned():
             raise RuntimeError("cannot wait on un-acquired lock")
 

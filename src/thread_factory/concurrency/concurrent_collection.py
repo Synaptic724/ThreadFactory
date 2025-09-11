@@ -17,14 +17,14 @@ from typing import (
 )
 from array import array
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.utilities.exceptions import Empty
 
 _T = TypeVar("_T")
 
 #TODO : Implement per object locks to see if we can distribute contention between each call for arrays and deques
 
-class _Shard(Generic[_T], IDisposable):
+class _Shard(Generic[_T], Cleanable):
     """
     Internal shard class for storing items in a local deque with its own lock.
 
@@ -40,10 +40,10 @@ class _Shard(Generic[_T], IDisposable):
 
     Disposal:
       - `dispose()` clears the deque and zeroes out the associated entry
-        in the shared length array. Once disposed, the shard should not be reused.
+        in the shared length array. Once cleaned, the shard should not be reused.
     """
 
-    __slots__ = IDisposable.__slots__ + ['_lock', '_queue', '_length_array', '_index']
+    __slots__ = Cleanable.__slots__ + ['_lock', '_queue', '_length_array', '_index']
 
     def __init__(self, len_array: array, index: int) -> None:
         """
@@ -68,17 +68,17 @@ class _Shard(Generic[_T], IDisposable):
         # Index in the shared length array for this particular shard.
         self._index = index
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
-        Clears the shard's data and marks it as disposed.
+        Clears the shard's data and marks it as cleaned.
 
         This method is idempotent; multiple calls have no further effect.
         """
         with self._lock:
-            if not self._disposed:
+            if not self._cleaned:
                 self._queue.clear()
                 self._length_array[self._index] = 0
-                self._disposed = True
+                self._cleaned = True
 
     def _increase_length_value(self) -> None:
         """
@@ -155,7 +155,7 @@ class _Shard(Generic[_T], IDisposable):
         """
         Empties the shard's deque and resets its length count to 0.
 
-        Future operations (add/push) may still occur if the shard isn't disposed.
+        Future operations (add/push) may still occur if the shard isn't cleaned.
         """
         with self._lock:
             self._queue.clear()
@@ -174,7 +174,7 @@ class _Shard(Generic[_T], IDisposable):
         self.dispose()
 
 
-class ConcurrentCollection(Generic[_T], IDisposable):
+class ConcurrentCollection(Generic[_T], Cleanable):
     """
     A thread-safe, high-level collection that distributes items across multiple
     internal shards (lock-protected deques). Each shard is independently locked,
@@ -197,7 +197,7 @@ class ConcurrentCollection(Generic[_T], IDisposable):
 
     Disposal:
       - Implemented via `dispose()`, which disposes all shards and clears shared data.
-      - Refrain from using the collection once disposed.
+      - Refrain from using the collection once cleaned.
       - `with ConcurrentCollection(...) as cc:` usage automatically calls `dispose()` on exit.
     """
 
@@ -533,32 +533,32 @@ class ConcurrentCollection(Generic[_T], IDisposable):
     # -----------------------------------------------------------------------------------
     # Disposable Implementation
     # -----------------------------------------------------------------------------------
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
         Disposes of this ConcurrentCollection and releases its resources.
 
         Responsibilities:
           - Disposes all internal shards, which will clear their internal queues and reset their length counters.
           - Resets the internal `_length_array` to zeroed values.
-          - Marks the collection as disposed via the `self.disposed` flag.
+          - Marks the collection as cleaned via the `self.cleaned` flag.
 
         Behavior:
           - This method is idempotent. Calling `dispose()` multiple times is safe and will have no effect after the first call.
-          - Once disposed, the collection is considered invalid and should not be used further.
-          - This follows a typical deterministic disposal pattern (inspired by .NET's `IDisposable`), ensuring explicit control over resource lifetime.
+          - Once cleaned, the collection is considered invalid and should not be used further.
+          - This follows a typical deterministic disposal pattern (inspired by .NET's `Cleanable`), ensuring explicit control over resource lifetime.
 
         Notes:
           - Unlike some patterns, this implementation does NOT prevent method calls after disposal.
-            It is the user's responsibility to ensure that no further use is made of the object after it is disposed.
+            It is the user's responsibility to ensure that no further use is made of the object after it is cleaned.
         """
-        if not self._disposed:
+        if not self._cleaned:
             for shard in self._shards:
                 shard.dispose()
             self._length_array = array("Q", [0] * self._num_shards)
-            self._disposed = True
+            self._cleaned = True
 
         warnings.warn(
-            "Your ConcurrentCollection has been disposed and should not be used further. ",
+            "Your ConcurrentCollection has been cleaned and should not be used further. ",
             UserWarning
         )
 

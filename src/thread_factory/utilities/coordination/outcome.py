@@ -1,8 +1,8 @@
 import threading
 from typing import Any, Optional, Type
 import ulid
-from thread_factory.utilities.interfaces.disposable import IDisposable
-class Outcome(IDisposable):
+from thread_factory.utilities.interfaces.cleanable import Cleanable
+class Outcome(Cleanable):
     """
     A lightweight, self-contained, Future-like object to hold the eventual
     result or exception to a unit of work.
@@ -18,27 +18,27 @@ class Outcome(IDisposable):
         self._is_done: bool = False
         self._condition = threading.Condition()
 
-    def dispose(self):
+    def cleanup(self):
         """
         Disposes of the Outcome, unblocking any waiting threads with an error.
         """
-        if self.disposed:
+        if self.cleaned:
             return
 
-        self._disposed = True # Mark as disposed immediately
+        self._cleaned = True # Mark as cleaned immediately
 
         if self._condition: # Ensure condition exists before using
             with self._condition:
                 # Only set disposal exception if the outcome was NOT already completed by a result/exception
                 if not self._is_done:
-                    self._exception = RuntimeError("Outcome was disposed.") # Standardized error message
+                    self._exception = RuntimeError("Outcome was cleaned.") # Standardized error message
                     self._is_done = True # Mark as done due to disposal
                     self._condition.notify_all()
 
         # Purge the result reference regardless of prior state, as per user's requirement.
         self._result = None
         # _exception is NOT set to None here if it was set by set_exception,
-        # but it IS set to RuntimeError("Outcome was disposed.") if not _is_done.
+        # but it IS set to RuntimeError("Outcome was cleaned.") if not _is_done.
         self._condition = None # Clear the condition object LAST
 
     def set_result(self, result: Any) -> None:
@@ -46,10 +46,10 @@ class Outcome(IDisposable):
         Sets the successful result for this outcome and notifies waiting threads.
 
         Raises:
-            RuntimeError: If the outcome has already been set or disposed.
+            RuntimeError: If the outcome has already been set or cleaned.
         """
-        if self.disposed:
-            raise RuntimeError("Cannot set result on a disposed Outcome.")
+        if self.cleaned:
+            raise RuntimeError("Cannot set result on a cleaned Outcome.")
 
         with self._condition:
             if self._is_done:
@@ -63,10 +63,10 @@ class Outcome(IDisposable):
         Sets the exception for this outcome and notifies waiting threads.
 
         Raises:
-            RuntimeError: If the outcome has already been set or disposed.
+            RuntimeError: If the outcome has already been set or cleaned.
         """
-        if self.disposed:
-            raise RuntimeError("Cannot set exception on a disposed Outcome.")
+        if self.cleaned:
+            raise RuntimeError("Cannot set exception on a cleaned Outcome.")
 
         with self._condition:
             if self._is_done:
@@ -82,31 +82,31 @@ class Outcome(IDisposable):
         If the task failed, this method re-raises the exception that occurred.
         If the timeout is reached, it raises a TimeoutError.
         """
-        # If disposed, _result is purged. So, accessing result() means
+        # If cleaned, _result is purged. So, accessing result() means
         # either an original exception or a disposal error.
-        if self.disposed:
+        if self.cleaned:
             if self._exception is not None:
                 raise self._exception
-            raise RuntimeError("Outcome was disposed.") # If no specific exception, raise generic disposal error
+            raise RuntimeError("Outcome was cleaned.") # If no specific exception, raise generic disposal error
 
         # If _condition is None, it implies disposal.
         if self._condition is None:
             if self._exception is not None:
                 raise self._exception
-            raise RuntimeError("Outcome was disposed.")
+            raise RuntimeError("Outcome was cleaned.")
 
         with self._condition:
             if not self._is_done:
-                if not self._condition.wait_for(lambda: self._is_done or self.disposed, timeout=timeout):
+                if not self._condition.wait_for(lambda: self._is_done or self.cleaned, timeout=timeout):
                     raise TimeoutError(f"Timed out after {timeout}s waiting for outcome.")
 
-            # After waiting, if disposed and not completed by a task, raise disposal error
-            if self.disposed and not self._is_done:
+            # After waiting, if cleaned and not completed by a task, raise disposal error
+            if self.cleaned and not self._is_done:
                 if self._exception is not None:
                     raise self._exception
-                raise RuntimeError("Outcome was disposed.")
+                raise RuntimeError("Outcome was cleaned.")
 
-            # If done by task completion (and not disposed, or disposed after completion but _result was not purged)
+            # If done by task completion (and not cleaned, or cleaned after completion but _result was not purged)
             if self._exception is not None:
                 raise self._exception
             return self._result # This will return the result if it was set and not purged by dispose.
@@ -114,7 +114,7 @@ class Outcome(IDisposable):
     @property
     def done(self) -> bool:
         """Returns True if the outcome has been set."""
-        if self.disposed:
+        if self.cleaned:
             return True
         if self._condition is None:
             return True
@@ -123,12 +123,12 @@ class Outcome(IDisposable):
 
     def exception(self) -> Optional[Exception]:
         """Returns the exception object if the task failed, otherwise None."""
-        # If disposed, return the stored exception (if any) or the disposal error.
-        if self.disposed:
-            return self._exception or RuntimeError("Outcome was disposed.")
+        # If cleaned, return the stored exception (if any) or the disposal error.
+        if self.cleaned:
+            return self._exception or RuntimeError("Outcome was cleaned.")
 
         if self._condition is None:
-            return self._exception or RuntimeError("Outcome was disposed.")
+            return self._exception or RuntimeError("Outcome was cleaned.")
 
         with self._condition:
             if not self._is_done:

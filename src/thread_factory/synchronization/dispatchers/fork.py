@@ -2,7 +2,7 @@ import dataclasses, threading, time, ulid
 from typing import Callable, List, Optional, Tuple, Union
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.utilities.coordination.package import Pack
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 
 @dataclasses.dataclass(slots=True)
 class ForkUnit:
@@ -27,14 +27,14 @@ class ForkUnit:
     gate: bool = False
     gate_uses: int = 0
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
-        Marks this ForkUnit as disposed by sealing the gate and clearing callable.
+        Marks this ForkUnit as cleaned by sealing the gate and clearing callable.
         """
         self.fork_callable = None
 
 
-class Fork(IDisposable):
+class Fork(Cleanable):
     """
     A concurrent fork dispatcher for routing threads across multiple callables.
 
@@ -130,20 +130,20 @@ class Fork(IDisposable):
         self._selector_step_counter = 0
         self._selector_lock = threading.RLock()
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
         Disposes the Fork instance, releasing all resources and marking
         it as unusable. This method is idempotent and safe to call multiple times.
 
         After disposal:
         - All future calls to `use_fork()` will raise a RuntimeError.
-        - All internal ForkUnits are marked as disposed (callable cleared).
+        - All internal ForkUnits are marked as cleaned (callable cleared).
         """
-        if self._disposed:
+        if self._cleaned:
             return
 
         with self._selector_lock:
-            self._disposed = True
+            self._cleaned = True
             self._forks_closed = True  # Prevent future unit acquisition
 
             for unit in self._list_of_forks:

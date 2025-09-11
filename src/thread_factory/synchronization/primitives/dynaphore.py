@@ -1,8 +1,8 @@
 import threading
 import ulid
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 
-class Dynaphore(threading.Semaphore, IDisposable):
+class Dynaphore(threading.Semaphore, Cleanable):
     """
     Dynaphore
     ---------
@@ -42,12 +42,12 @@ class Dynaphore(threading.Semaphore, IDisposable):
         re_entrant (bool): If True (default), uses an RLock in the internal Condition.
 
     """
-    __slots__ = IDisposable.__slots__ + [
+    __slots__ = Cleanable.__slots__ + [
         "_cond", "_id",
     ]
     def __init__(self, value: int = 1, re_entrant: bool = True):
         super().__init__(value)
-        IDisposable.__init__(self)
+        Cleanable.__init__(self)
 
         self._id = str(ulid.ULID())
         if re_entrant:
@@ -55,18 +55,18 @@ class Dynaphore(threading.Semaphore, IDisposable):
         else:
             self._cond = threading.Condition(threading.Lock())
 
-    def dispose(self):
+    def cleanup(self):
         """
         Cleans up the Dynaphore and notifies all waiting threads.
 
         This method should be called when the Dynaphore is no longer needed
         to ensure no threads remain blocked on the internal condition.
         """
-        if self._disposed:
+        if self._cleaned:
             return
         with self._cond:
             self._cond.notify_all()
-        self._disposed = True
+        self._cleaned = True
         self._cond = None
 
     @property
@@ -148,7 +148,7 @@ class Dynaphore(threading.Semaphore, IDisposable):
         Behavior:
             This method blocks the thread until a permit becomes available or timeout occurs.
         """
-        if self._disposed:
+        if self._cleaned:
             return False
 
         with self._cond:

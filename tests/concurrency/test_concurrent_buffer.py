@@ -520,18 +520,18 @@ class HighPerformanceConcurrentBufferTest(unittest.TestCase):
 def test_dispose(self):
     """
     Test that dispose() correctly clears the buffer, resets arrays,
-    marks it as disposed, and is idempotent.
+    marks it as cleaned, and is idempotent.
     """
     buffer = ConcurrentBuffer(number_of_shards=4, initial=['apple', 'banana', 'banana'])
 
     # Pre-condition
     self.assertTrue(len(buffer) > 0)
-    self.assertFalse(buffer.disposed)
+    self.assertFalse(buffer.cleaned)
 
     # First dispose
     buffer.dispose()
     self.assertEqual(len(buffer), 0)
-    self.assertTrue(buffer.disposed)
+    self.assertTrue(buffer.cleaned)
     self.assertTrue(all(v == 0 for v in buffer._length_array))
     self.assertTrue(all(v == 0 for v in buffer._time_array))
 
@@ -542,5 +542,5 @@ def test_dispose(self):
         self.fail(f"Calling dispose() twice raised an exception: {e}")
 
     # Optional: still allows operations if the user calls them (up to you)
-    buffer.enqueue('apple')  # You allow this since you do not enforce disposed checks
+    buffer.enqueue('apple')  # You allow this since you do not enforce cleaned checks
     self.assertIn('apple', list(buffer))

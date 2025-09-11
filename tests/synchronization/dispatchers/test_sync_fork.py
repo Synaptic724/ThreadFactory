@@ -48,7 +48,7 @@ class TestSyncFork(unittest.TestCase):
     def tearDown(self):
         # Clean up any SyncFork instances to avoid resource leaks in tests
         # This assumes test methods create their own 'fork' instance.
-        # If a test method stores `self.fork`, it should be disposed here.
+        # If a test method stores `self.fork`, it should be cleaned here.
         pass
 
     # --- Existing Tests (Adjusted for removed 'reusable' and updated error messages) ---
@@ -451,7 +451,7 @@ class TestSyncFork(unittest.TestCase):
         # Use a timeout duration to ensure Scout is initialized by use_fork
         fork = SyncFork(number_of_forks=1, callables=callables_list, timeout_duration=0.1)
 
-        self.assertFalse(fork._disposed)
+        self.assertFalse(fork._cleaned)
 
         # Trigger Scout initialization by getting the first thread in.
         # This thread will block in scout.monitor() if timeout_duration is active.
@@ -465,26 +465,26 @@ class TestSyncFork(unittest.TestCase):
         # At this point, fork._scout should exist, and it should be active in monitor()
         self.assertIsNotNone(fork._scout)
         self.assertTrue(fork._scout.is_active())
-        self.assertFalse(fork._scout._disposed)  # Scout should not be disposed yet
+        self.assertFalse(fork._scout._cleaned)  # Scout should not be cleaned yet
 
         # Capture the Scout instance before SyncFork disposes it
         captured_scout = fork._scout
 
         fork.dispose()  # Dispose the SyncFork, which should also dispose the Scout
-        self.assertTrue(fork._disposed)
+        self.assertTrue(fork._cleaned)
 
-        # Verify the captured Scout instance is now disposed
-        self.assertTrue(captured_scout._disposed)
+        # Verify the captured Scout instance is now cleaned
+        self.assertTrue(captured_scout._cleaned)
         # And that SyncFork's reference to it is cleared
         self.assertIsNone(fork._scout)
 
         # Attempt to use SyncFork after dispose
-        t_after_dispose = threading.Thread(target=thread_use_fork, args=(fork, self.log, "DisposedThread"))
+        t_after_dispose = threading.Thread(target=thread_use_fork, args=(fork, self.log, "cleanedThread"))
         t_after_dispose.start()
         t_after_dispose.join(timeout=5)
         self.assertFalse(t_after_dispose.is_alive())
 
-        self.assertIn("DisposedThread raised RuntimeError: Cannot use a disposed SyncFork.", self.log)
+        self.assertIn("cleanedThread raised RuntimeError: Cannot use a cleaned SyncFork.", self.log)
         # We might have a timeout error from the scout init thread if it timed out before dispose,
         # but no 'A' should be in the log from the callable.
         self.assertEqual(self.log.count("A"), 0)
@@ -580,7 +580,7 @@ class TestSyncFork(unittest.TestCase):
 
         t_blocked.join(timeout=5)
         self.assertFalse(t_blocked.is_alive())
-        self.assertIn("Blocked raised RuntimeError: Cannot use a disposed SyncFork.", self.log)
+        self.assertIn("Blocked raised RuntimeError: Cannot use a cleaned SyncFork.", self.log)
         self.assertEqual(self.log.count("D"), 0)
 
     def test_near_timeout_race_success(self):

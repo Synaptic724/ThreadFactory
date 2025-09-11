@@ -4,11 +4,11 @@ from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.synchronization.primitives.dynaphore import Dynaphore
 from thread_factory.synchronization.primitives.signal_barrier import SignalBarrier
 from thread_factory.utilities.coordination.package import Pack
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.utilities.coordination.outcome import Outcome
 
 
-class BypassConductor(IDisposable):
+class BypassConductor(Cleanable):
     """
     BypassConductor
     -----------
@@ -38,7 +38,7 @@ class BypassConductor(IDisposable):
     >>> outcome = conductor.transit()
     """
 
-    __slots__ = IDisposable.__slots__ + [
+    __slots__ = Cleanable.__slots__ + [
         "_limit", "_count", "_lock", "_collapsed", "_outcomes", "_func",
         "_dynaphore", "_threshold_sema", "_outcome_set", "_id"
     ]
@@ -72,7 +72,7 @@ class BypassConductor(IDisposable):
         self._outcomes: ConcurrentList[Outcome] = ConcurrentList()
 
 
-    def dispose(self):
+    def cleanup(self):
         """
         Disposes internal structures and clears all state.
 
@@ -81,9 +81,9 @@ class BypassConductor(IDisposable):
             - Frees the dynaphore and threshold barrier.
             - Clears the outcomes list.
         """
-        if self._disposed:
+        if self._cleaned:
             return
-        self._disposed = True
+        self._cleaned = True
         with self._lock:
             self._collapsed = True
             self._outcomes.clear()
@@ -126,7 +126,7 @@ class BypassConductor(IDisposable):
             - A thread waits at a barrier between steps to ensure all threads sync up before moving forward.
             - After the final step, the gate is collapsed.
         """
-        if self._disposed:
+        if self._cleaned:
             return None
 
         # Atomically check and claim a slot. If it fails, we bypass.

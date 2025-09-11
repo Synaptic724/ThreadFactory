@@ -1,9 +1,9 @@
 import threading
 import time
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 
 
-class Stopwatch(IDisposable):
+class Stopwatch(Cleanable):
     """
     Stopwatch
     ---------
@@ -73,17 +73,17 @@ class Stopwatch(IDisposable):
         """
         return self.start_time is not None
 
-    def dispose(self):
+    def cleanup(self):
         """
         Dispose of internal state. Frees stopwatch references.
         """
-        if self._disposed:
+        if self._cleaned:
             return
         with self._lock:
             self.start_time = None
             self.elapsed_time = 0.0
             self._clock = None
-            self._disposed = True
+            self._cleaned = True
 
     def __repr__(self):
         """

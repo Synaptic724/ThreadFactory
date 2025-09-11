@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.concurrent_queue import ConcurrentQueue
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.utilities.coordination.package import Pack
 
 @dataclass
@@ -34,7 +34,7 @@ class Waiter:
     callback: Optional[Union[Callable[..., None], Pack]] = None
 
 
-class SmartCondition(IDisposable):
+class SmartCondition(Cleanable):
     """
     SmartCondition
     ---------------
@@ -60,7 +60,7 @@ class SmartCondition(IDisposable):
     with minimal overhead and clean callback integration.
     """
 
-    __slots__ = IDisposable.__slots__ + [
+    __slots__ = Cleanable.__slots__ + [
     "_lock", "acquire", "release", "_waiters", "_callback_registry", "_default_callback", "_id",
     ]
     def __init__(self, lock: Optional[threading.Lock] = None, default_callback: Optional[Union[Callable[..., None], Pack]] = None):
@@ -92,12 +92,12 @@ class SmartCondition(IDisposable):
             Pack.bundle(default_callback) if default_callback is not None else None
         )
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
         Disposes the SmartCondition, releasing all waiters and clearing internal registries.
 
         This method:
-        - Marks the condition as disposed.
+        - Marks the condition as cleaned.
         - Wakes all waiting threads without executing callbacks.
         - Clears the waiters queue.
         - Clears callback registries.
@@ -105,9 +105,9 @@ class SmartCondition(IDisposable):
 
         This is safe to call multiple times.
         """
-        if self._disposed:
+        if self._cleaned:
             return
-        self._disposed = True
+        self._cleaned = True
 
         # Clear all waiters
         while not self._waiters.is_empty():
@@ -322,8 +322,8 @@ class SmartCondition(IDisposable):
             RuntimeError: If the internal lock (`self._lock`) is not held by the
                           calling thread when `wait()` is invoked.
         """
-        if self._disposed:
-            raise RuntimeError("SmartCondition has been disposed and cannot be used")
+        if self._cleaned:
+            raise RuntimeError("SmartCondition has been cleaned and cannot be used")
         # Ensure the current thread has a factory_id for tracking and potential targeted notifications.
         factory_id = self._ensure_factory_id()
 

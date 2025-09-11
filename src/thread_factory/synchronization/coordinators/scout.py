@@ -1,11 +1,11 @@
 import threading
 from typing import Callable, Optional, Union
 import ulid
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.utilities.coordination.package import Pack
 
 
-class Scout(IDisposable):
+class Scout(Cleanable):
     """
     Scout
     -----
@@ -32,7 +32,7 @@ class Scout(IDisposable):
                                   (success or timeout). If False, it completes one cycle and becomes latched,
                                   requiring explicit `reset()` for reuse. Defaults to False.
     """
-    __slots__ = IDisposable.__slots__ + [
+    __slots__ = Cleanable.__slots__ + [
         "_id", "_predicate", "_timeout_duration", "_on_timeout_callable",
         "_on_success_callable", "_autoreset_on_exit", "_condition",
         "_is_active_monitoring", "_monitoring_cycle_completed", "_id",
@@ -49,7 +49,7 @@ class Scout(IDisposable):
         """
 
         """
-        super().__init__()  # Initialize _disposed = False
+        super().__init__()  # Initialize _cleaned = False
         if not isinstance(timeout_duration, (int, float)) or timeout_duration <= 0:
             raise ValueError("timeout_duration must be a positive number.")
         if not callable(on_timeout_callable):
@@ -59,7 +59,7 @@ class Scout(IDisposable):
         if on_success_callable is not None and not callable(on_success_callable):
             raise TypeError("on_success_callable must be a callable function or None.")
 
-        self._exit_monitoring = False  # True if the Scout is disposed
+        self._exit_monitoring = False  # True if the Scout is cleaned
         self._id = str(ulid.ULID())
         self._predicate = Pack.bundle(predicate) if predicate else None
         self._timeout_duration = timeout_duration
@@ -72,31 +72,31 @@ class Scout(IDisposable):
         self._is_active_monitoring = False  # True if a thread is currently inside monitor()
         self._monitoring_cycle_completed = False  # True if a cycle has finished (latch state)
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
         Disposes the Scout instance. This makes it permanently unusable.
         All resources are released. Does NOT call super().dispose().
         """
         # Per user request, do not call super().dispose()
-        if self._disposed:
-            return  # Already disposed, do nothing
+        if self._cleaned:
+            return  # Already cleaned, do nothing
 
         with self._condition:
-            self._disposed = True
+            self._cleaned = True
             # Clear internal state and references
             self._is_active_monitoring = False
             self._monitoring_cycle_completed = False
             self._predicate = None  # Release reference
             self._on_timeout_callable = None  # Release reference
             self._on_success_callable = None  # Release reference
-            # The Condition object itself can't be truly 'disposed' but references are cleared.
-            self._condition.notify_all()  # Notify any waiting threads that it's disposed
+            # The Condition object itself can't be truly 'cleaned' but references are cleared.
+            self._condition.notify_all()  # Notify any waiting threads that it's cleaned
             # No need to acquire/release lock again for the final cleanup within the with block.
 
 
     def exit_monitor(self):
         """
-        Marks the Scout as disposed, effectively exiting any ongoing monitoring.
+        Marks the Scout as cleaned, effectively exiting any ongoing monitoring.
         """
         with self._condition:
             self._is_active_monitoring = True
@@ -113,11 +113,11 @@ class Scout(IDisposable):
         Returns:
             bool: True if monitoring started and the predicate became True.
                   False if monitoring started and timeout occurred.
-                  False if the Scout was already active, disposed, or latched.
+                  False if the Scout was already active, cleaned, or latched.
         """
         success = False
         with self._condition:  # Acquire lock to manage entry and state
-            if self._disposed:
+            if self._cleaned:
                 return False
 
             if self._is_active_monitoring:
@@ -173,8 +173,8 @@ class Scout(IDisposable):
         and a previous `monitor()` call completed.
         """
         with self._condition:
-            if self._disposed:
-                raise RuntimeError("Cannot reset a disposed Scout.")
+            if self._cleaned:
+                raise RuntimeError("Cannot reset a cleaned Scout.")
 
             # Reset all flags that control entry and cycle state
             self._is_active_monitoring = False
@@ -205,8 +205,8 @@ class Scout(IDisposable):
 
     def __repr__(self):
         status = "Active" if self.is_active() else "Idle"
-        if self._disposed:
-            status = "Disposed"
+        if self._cleaned:
+            status = "cleaned"
         elif self.is_latched():
             status = "Latched"
 

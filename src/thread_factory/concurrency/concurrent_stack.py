@@ -14,12 +14,12 @@ from typing import (
     TypeVar,
 )
 from thread_factory.concurrency import ConcurrentList
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.utilities.exceptions import Empty
 
 _T = TypeVar("_T")
 
-class ConcurrentStack(Generic[_T], IDisposable):
+class ConcurrentStack(Generic[_T], Cleanable):
     """
     A thread-safe LIFO stack implementation using an underlying deque,
     a reentrant lock for synchronization, and an atomic counter for fast
@@ -29,7 +29,7 @@ class ConcurrentStack(Generic[_T], IDisposable):
     It is designed for Python 3.13+ No-GIL environments (though it will
     work fine in standard Python as well).
     """
-    __slots__ = IDisposable.__slots__ + ["_lock", "_deque"]
+    __slots__ = Cleanable.__slots__ + ["_lock", "_deque"]
     def __init__(
             self,
             initial: Optional[Iterable[_T]] = None
@@ -47,22 +47,22 @@ class ConcurrentStack(Generic[_T], IDisposable):
         self._lock: threading.RLock = threading.RLock()
         self._deque: Deque[_T] = deque(initial)
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
         Dispose (clear) this ConcurrentStack, releasing its contents.
 
-        Once disposed, `_disposed` becomes True and the internal dict is cleared.
+        Once cleaned, `_cleaned` becomes True and the internal dict is cleared.
         No further usage checks are enforced, so the user must avoid calling
         other methods after disposal.
 
         This method is idempotent — multiple calls won't cause errors.
         """
-        if not self._disposed:
+        if not self._cleaned:
             with self._lock:
                 self._deque.clear()
-            self._disposed = True
+            self._cleaned = True
         warnings.warn(
-            "Your ConcurrentStack has been disposed and should not be used further. ",
+            "Your ConcurrentStack has been cleaned and should not be used further. ",
             UserWarning
         )
 
@@ -353,12 +353,12 @@ class ConcurrentStack(Generic[_T], IDisposable):
         Responsibilities:
           - Releases the internal lock acquired in `__enter__()`.
           - Automatically calls `dispose()` to ensure the object is cleaned up.
-          - This pattern ensures the object is safely disposed even if an exception
+          - This pattern ensures the object is safely cleaned even if an exception
             occurs within the `with` block.
 
         Notes:
           - The object should be considered invalid after exiting the context.
-          - This design mimics resource safety patterns seen in systems like C#'s `IDisposable`
+          - This design mimics resource safety patterns seen in systems like C#'s `Cleanable`
             and C++ RAII.
           - Users are free to manage `dispose()` manually if they choose not to use the
             context manager.

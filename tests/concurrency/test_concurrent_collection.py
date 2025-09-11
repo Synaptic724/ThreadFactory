@@ -528,25 +528,25 @@ class HighPerformanceConcurrentCollectionTest(unittest.TestCase):
         Test that dispose() on ConcurrentCollection:
             - Disposes all shards properly
             - Resets the shared length array
-            - Sets the disposed flag
+            - Sets the cleaned flag
             - Is idempotent (safe to call multiple times)
         """
         collection = ConcurrentCollection(total_thread_count=4, initial=['apple', 'banana', 'cherry'])
 
         # Pre-condition checks
         self.assertTrue(len(collection) > 0)
-        self.assertFalse(collection.disposed)
+        self.assertFalse(collection.cleaned)
         self.assertTrue(all(isinstance(s, collection._shards[0].__class__) for s in collection._shards))
 
         # Dispose once
         collection.dispose()
         self.assertEqual(len(collection), 0)
-        self.assertTrue(collection.disposed)
+        self.assertTrue(collection.cleaned)
         self.assertTrue(all(v == 0 for v in collection._length_array))
 
-        # All shards should also be disposed
+        # All shards should also be cleaned
         for shard in collection._shards:
-            self.assertTrue(shard.disposed)
+            self.assertTrue(shard.cleaned)
 
         # Dispose again (should not raise)
         try:

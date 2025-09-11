@@ -14,12 +14,12 @@ from typing import (
 )
 
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.utilities.exceptions import Empty
 
 _T = TypeVar("_T")
 
-class ConcurrentBag(Generic[_T], IDisposable):
+class ConcurrentBag(Generic[_T], Cleanable):
     """
     A thread-safe multiset ("bag") implementation using:
     - a dict from item -> integer count
@@ -29,7 +29,7 @@ class ConcurrentBag(Generic[_T], IDisposable):
     is designed for Python 3.13+ No-GIL environments (though it will
     work fine in standard Python as well).
     """
-    __slots__ =  IDisposable.__slots__ + ["_bag", "_lock"]
+    __slots__ =  Cleanable.__slots__ + ["_bag", "_lock"]
     def __init__(self, initial: Optional[List[_T]] = None) -> None:
         """
         Initialize the ConcurrentBag.
@@ -50,14 +50,14 @@ class ConcurrentBag(Generic[_T], IDisposable):
         for item in initial:
             self._bag[item] = self._bag.get(item, 0) + 1
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
         Disposes of this ConcurrentBag, releasing all internal resources.
 
         Responsibilities:
           - Clears the internal bag, removing all items.
-          - Sets the `disposed` flag to True, marking this object as no longer valid.
-          - Emits a warning to notify that the object has been disposed.
+          - Sets the `cleaned` flag to True, marking this object as no longer valid.
+          - Emits a warning to notify that the object has been cleaned.
 
         Behavior:
           - This method is idempotent: subsequent calls have no effect after the first.
@@ -66,21 +66,21 @@ class ConcurrentBag(Generic[_T], IDisposable):
 
         Notes:
           - Designed for consistency with deterministic resource management patterns
-            seen in systems programming (e.g., RAII, IDisposable).
+            seen in systems programming (e.g., RAII, Cleanable).
           - Disposal does NOT release the lock itself since locks are acquired per operation.
 
         Example:
             with ConcurrentBag(...) as bag:
                 bag.add(42)
-            # bag is now automatically disposed and cleared
+            # bag is now automatically cleaned and cleared
         """
         with self._lock:
-            if not self._disposed:
+            if not self._cleaned:
                 self._bag.clear()
-                self._disposed = True
+                self._cleaned = True
 
         warnings.warn(
-            "ConcurrentBag has been disposed and should not be used further.",
+            "ConcurrentBag has been cleaned and should not be used further.",
             UserWarning
         )
 
@@ -394,7 +394,7 @@ class ConcurrentBag(Generic[_T], IDisposable):
 
         Responsibilities:
           - Automatically calls `dispose()` when leaving the `with` block.
-          - Ensures the bag is cleared and marked as disposed even if an exception is raised.
+          - Ensures the bag is cleared and marked as cleaned even if an exception is raised.
 
         Parameters:
             exc_type (Optional[Type[BaseException]]): Exception type, if raised.

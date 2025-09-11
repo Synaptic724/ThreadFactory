@@ -48,7 +48,7 @@ def _collect_excs(outcomes: Dict) -> List[Exception]:
         for o in outcomes_to_check:
             if hasattr(o, 'done') and o.done:
                 exc = o.exception()
-                if exc is not None and not (isinstance(exc, RuntimeError) and "disposed" in str(exc)):
+                if exc is not None and not (isinstance(exc, RuntimeError) and "cleaned" in str(exc)):
                     errors.append(exc)
     return errors
 
@@ -261,7 +261,7 @@ class TestConductor(unittest.TestCase):
 
         self.assertFalse(any(t.is_alive() for t in waiting_threads), "Not all waiters were unblocked by dispose.")
     # 2 ─ exceptions() never returns disposals / internal runtime errors
-    def test_exceptions_property_ignores_disposed_noise(self):
+    def test_exceptions_property_ignores_cleaned_noise(self):
         def nop(): return None
 
         c = Conductor(threshold=1, tasks=[nop])
@@ -407,7 +407,7 @@ class TestConductor(unittest.TestCase):
         c.dispose()  # should unblock
         for t in ts: t.join(1)
         self.assertTrue(all(not t.is_alive() for t in ts))
-        self.assertTrue(c._disposed)
+        self.assertTrue(c._cleaned)
 
     # 10 ─ notify_all_override emits BARRIER_BROKEN to controller exactly once
     def test_notify_all_override_broadcasts_once(self):
@@ -456,17 +456,17 @@ class TestConductor(unittest.TestCase):
         self.assertFalse(loop.is_spent())
         loop.dispose()
 
-    def test_start_on_disposed_conductor_is_noop(self):
+    def test_start_on_cleaned_conductor_is_noop(self):
         hits = {"n": 0}
         c = Conductor(threshold=1, tasks=lambda: hits.update(n=1))
         c.dispose()
         c.start()
         self.assertEqual(hits["n"], 0)
-        # FIX: Check the public properties, which are safe on a disposed object.
+        # FIX: Check the public properties, which are safe on a cleaned object.
         self.assertEqual(c.results, [])
         self.assertEqual(c.exceptions, [])
 
-    def test_reset_on_disposed_conductor_raises_error(self):
+    def test_reset_on_cleaned_conductor_raises_error(self):
         c = Conductor(threshold=1, reusable=True)
         c.dispose()
         with self.assertRaises(RuntimeError):

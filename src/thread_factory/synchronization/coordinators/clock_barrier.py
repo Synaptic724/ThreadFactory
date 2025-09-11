@@ -1,10 +1,10 @@
 import threading, ulid, time
 from typing import Callable, Optional, Dict, Any, Union
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utilities.coordination.package import Pack
 
-class ClockBarrier(IDisposable):
+class ClockBarrier(Cleanable):
     """
     A reusable, generation-counted barrier that releases threads once:
 
@@ -16,7 +16,7 @@ class ClockBarrier(IDisposable):
 
     Events emitted when:
     - `BARRIER_PASSED`: Threshold is met.
-    - `BARRIER_BROKEN`: Timeout occurs or barrier is disposed.
+    - `BARRIER_BROKEN`: Timeout occurs or barrier is cleaned.
 
     Attributes:
         id (str): Unique identifier (ULID) for this barrier instance.
@@ -25,7 +25,7 @@ class ClockBarrier(IDisposable):
         on_broken (Optional[Callable]): Callback triggered when the barrier is broken.
         controller (Optional[Controller]): Controller instance to register and notify.
     """
-    __slots__ = IDisposable.__slots__ + [
+    __slots__ = Cleanable.__slots__ + [
         "_threshold", "_timeout", "_on_broken",
         "_lock", "_cond",
         "_count", "_start_time", "_broken", "_generation", "_id",
@@ -84,25 +84,25 @@ class ClockBarrier(IDisposable):
             except Exception:
                 pass
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
-        Dispose of the ClockBarrier, marking it as disposed and breaking the barrier permanently.
-        Once disposed, the barrier can no longer be used, and any waiting threads will raise a `BrokenBarrierError`.
+        Dispose of the ClockBarrier, marking it as cleaned and breaking the barrier permanently.
+        Once cleaned, the barrier can no longer be used, and any waiting threads will raise a `BrokenBarrierError`.
 
         Notes:
             After disposal, the barrier is no longer usable. Calls to `wait()` will raise `BrokenBarrierError`.
             The controller reference is cleared before emitting events to avoid cascading notifications during shutdown.
         """
-        if self._disposed:
+        if self._cleaned:
             return
 
-        self._disposed  = True
+        self._cleaned  = True
         with self._cond:
             self._break_barrier_locked()
             self._cond.notify_all()  # Wake all waiting threads
 
         if self._controller:
-            self._controller.notify(self.id, "DISPOSED")
+            self._controller.notify(self.id, "cleaned")
         if self._controller and hasattr(self._controller, 'unregister'):
             try:
                 self._controller.unregister(self.id)
@@ -125,7 +125,7 @@ class ClockBarrier(IDisposable):
         """
         Ensures a clean teardown when exiting a context manager block.
 
-        If the barrier is already disposed or broken, this method is a no-op.
+        If the barrier is already cleaned or broken, this method is a no-op.
         Otherwise, it calls `dispose()` to clean up resources.
 
         See Also:
@@ -169,10 +169,10 @@ class ClockBarrier(IDisposable):
         need to unblock waiters without disposing the entire barrier.
 
         This operation is idempotent; calling it on an already broken or
-        disposed barrier has no effect.
+        cleaned barrier has no effect.
         """
         with self._cond:
-            if self._broken or self._disposed:
+            if self._broken or self._cleaned:
                 return
 
             # Use the existing internal helper to perform the break logic.
@@ -235,13 +235,13 @@ class ClockBarrier(IDisposable):
         Raises
         ------
         threading.BrokenBarrierError
-            • The barrier was disposed.
+            • The barrier was cleaned.
             • The barrier is already broken for this generation.
             • The global timeout elapsed before enough threads arrived.
         """
         with self._cond:
-            if self._disposed:
-                raise threading.BrokenBarrierError("ClockBarrier is disposed")
+            if self._cleaned:
+                raise threading.BrokenBarrierError("ClockBarrier is cleaned")
             if self._broken:
                 raise threading.BrokenBarrierError("ClockBarrier is broken")
 

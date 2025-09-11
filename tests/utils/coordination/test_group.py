@@ -34,7 +34,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(len(group.tasks), 2)
         group.dispose()
 
-    def test_result_on_disposed_outcome(self):
+    def test_result_on_cleaned_outcome(self):
         g = Group("deadres", tasks=[lambda: "x"])
         g.outcomes[0] = Outcome()
         g.outcomes[0].set_result("y")
@@ -65,7 +65,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(g.exceptions, [])
         g.dispose()
 
-    def test_dispose_on_already_disposed_outcome(self):
+    def test_dispose_on_already_cleaned_outcome(self):
         g = Group("redead", tasks=[lambda: 1])
         g.outcomes[0].dispose()
         g.dispose()
@@ -98,7 +98,7 @@ class TestGroup(unittest.TestCase):
         self.assertTrue(isinstance(g.outcomes[0], ConcurrentList))
         g.dispose()
 
-    def test_result_not_disposed_not_done(self):
+    def test_result_not_cleaned_not_done(self):
         g = Group("pending2", tasks=[lambda: None])
         g.outcomes[0] = Outcome()
         self.assertEqual(g.results, [])
@@ -153,7 +153,7 @@ class TestGroup(unittest.TestCase):
         g = Group("afterreset", tasks=[lambda: 1])
         g.reset()
         g.dispose()
-        self.assertTrue(g.disposed)
+        self.assertTrue(g.cleaned)
 
     def test_init_with_multiple_tasks(self):
         def t1(): pass
@@ -178,10 +178,10 @@ class TestGroup(unittest.TestCase):
         g = Group(name="disposable", tasks=[lambda: "x"])
         g.outcomes[0] = Outcome()  # Assign first
         g.outcomes[0].set_result("x")
-        self.assertFalse(g.outcomes[0].disposed)
+        self.assertFalse(g.outcomes[0].cleaned)
         g.dispose()
         for o in g._iter_outcomes():
-            self.assertTrue(o.disposed)
+            self.assertTrue(o.cleaned)
 
     def test_dispose_idempotent(self):
         g = Group(name="idempotent", tasks=[lambda: 1])
@@ -197,14 +197,14 @@ class TestGroup(unittest.TestCase):
         new = g.outcomes[0]
         self.assertIsNot(old, new)
         self.assertFalse(new.done)
-        self.assertTrue(old.disposed)
+        self.assertTrue(old.cleaned)
         g.dispose()
 
-    def test_reset_does_nothing_if_disposed(self):
+    def test_reset_does_nothing_if_cleaned(self):
         g = Group(name="dead", tasks=[lambda: 1])
         g.dispose()
         g.reset()
-        self.assertTrue(g.disposed)
+        self.assertTrue(g.cleaned)
 
     def test_results_only_returns_success(self):
         g = Group(name="results", tasks=[lambda: 1, lambda: 2])
@@ -257,7 +257,7 @@ class TestGroup(unittest.TestCase):
         self.assertCountEqual(r, ["a", "b"])
         g.dispose()
 
-    def test_dispose_handles_disposed_outcome_gracefully(self):
+    def test_dispose_handles_cleaned_outcome_gracefully(self):
         g = Group(name="fragile", tasks=[lambda: "res"])
         g.outcomes[0] = Outcome()
         g.outcomes[0].dispose()

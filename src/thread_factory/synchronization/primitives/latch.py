@@ -1,8 +1,8 @@
 import threading
 import ulid
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 
-class Latch(IDisposable):
+class Latch(Cleanable):
     """
     Latch or Gate
     -----------
@@ -22,7 +22,7 @@ class Latch(IDisposable):
     >>> threading.Thread(target=task).start()
     >>> latch.open()
     """
-    __slots__ = IDisposable.__slots__ + ["_open", "_condition", "_id"]
+    __slots__ = Cleanable.__slots__ + ["_open", "_condition", "_id"]
     def __init__(self, open: bool = False):
         super().__init__()
 
@@ -31,9 +31,9 @@ class Latch(IDisposable):
         self._condition = threading.Condition()
 
 
-    def dispose(self):
+    def cleanup(self):
         """
-        Releases all waiting threads and marks the latch as disposed.
+        Releases all waiting threads and marks the latch as cleaned.
         After this, the latch cannot be used again.
         """
         with self._condition:

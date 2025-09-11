@@ -143,7 +143,7 @@ class TestConcurrentSet(unittest.TestCase):
         with self.assertWarns(UserWarning):
             with cs as raw:
                 raw.add(3)
-        self.assertTrue(cs.disposed)
+        self.assertTrue(cs.cleaned)
         self.assertEqual(len(cs), 0)
 
     def test_multithreaded_add(self):

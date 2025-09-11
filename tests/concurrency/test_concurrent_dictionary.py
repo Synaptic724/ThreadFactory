@@ -469,7 +469,7 @@ class HighPerformanceConcurrentDictTest(unittest.TestCase):
         """
         Ensures that dispose:
             - Clears all data.
-            - Marks the dictionary as disposed.
+            - Marks the dictionary as cleaned.
             - Is idempotent (can be called multiple times without error).
         """
         d = ConcurrentDict({'a': 1, 'b': 2})
@@ -477,13 +477,13 @@ class HighPerformanceConcurrentDictTest(unittest.TestCase):
         # Check initial state
         self.assertIn('a', d)
         self.assertEqual(len(d), 2)
-        self.assertFalse(d.disposed)
+        self.assertFalse(d.cleaned)
 
         # Dispose it
         d.dispose()
 
-        # It should be marked as disposed
-        self.assertTrue(d.disposed)
+        # It should be marked as cleaned
+        self.assertTrue(d.cleaned)
 
         # It should be cleared
         self.assertEqual(len(d), 0)

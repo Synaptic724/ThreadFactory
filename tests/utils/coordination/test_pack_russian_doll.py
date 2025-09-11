@@ -99,9 +99,9 @@ class TestPackRussianDoll(unittest.TestCase):
         pack_outermost.dispose()
         pack_middle.dispose()
         pack_innermost.dispose()
-        self.assertTrue(pack_outermost.disposed)
-        self.assertTrue(pack_middle.disposed)
-        self.assertTrue(pack_innermost.disposed)
+        self.assertTrue(pack_outermost.cleaned)
+        self.assertTrue(pack_middle.cleaned)
+        self.assertTrue(pack_innermost.cleaned)
 
     # Test 2: Two layers with positional args using wrapper
     def test_two_layers_positional_using_wrapper(self):
@@ -121,8 +121,8 @@ class TestPackRussianDoll(unittest.TestCase):
 
         pack_outer.dispose()
         pack_inner.dispose()
-        self.assertTrue(pack_outer.disposed)
-        self.assertTrue(pack_inner.disposed)
+        self.assertTrue(pack_outer.cleaned)
+        self.assertTrue(pack_inner.cleaned)
 
     # Test 3: Two layers with keyword args using wrapper
     def test_two_layers_keyword_using_wrapper(self):
@@ -142,8 +142,8 @@ class TestPackRussianDoll(unittest.TestCase):
 
         pack_outer.dispose()
         pack_inner.dispose()
-        self.assertTrue(pack_outer.disposed)
-        self.assertTrue(pack_inner.disposed)
+        self.assertTrue(pack_outer.cleaned)
+        self.assertTrue(pack_inner.cleaned)
 
     # Test 4: Deep nesting with mixed args using wrappers
     def test_deep_nesting_with_mixed_args_and_wrappers(self):
@@ -181,11 +181,11 @@ class TestPackRussianDoll(unittest.TestCase):
         pack3.dispose()
         pack2.dispose()
         pack1.dispose()
-        self.assertTrue(pack5.disposed)
-        self.assertTrue(pack4.disposed)
-        self.assertTrue(pack3.disposed)
-        self.assertTrue(pack2.disposed)
-        self.assertTrue(pack1.disposed)
+        self.assertTrue(pack5.cleaned)
+        self.assertTrue(pack4.cleaned)
+        self.assertTrue(pack3.cleaned)
+        self.assertTrue(pack2.cleaned)
+        self.assertTrue(pack1.cleaned)
 
     # Test 5: Nesting with a no-argument function
     def test_nested_pack_with_no_args_function(self):
@@ -206,8 +206,8 @@ class TestPackRussianDoll(unittest.TestCase):
 
         pack_middle.dispose()
         pack_no_arg.dispose()
-        self.assertTrue(pack_middle.disposed)
-        self.assertTrue(pack_no_arg.disposed)
+        self.assertTrue(pack_middle.cleaned)
+        self.assertTrue(pack_no_arg.cleaned)
 
     # Test 6: Error propagation through nested Packs
     def test_error_propagation_through_nested_packs(self):
@@ -239,9 +239,9 @@ class TestPackRussianDoll(unittest.TestCase):
         pack_outer_wrapper.dispose()
         pack_middle_wrapper.dispose()
         pack_failing_inner.dispose()
-        self.assertTrue(pack_outer_wrapper.disposed)
-        self.assertTrue(pack_middle_wrapper.disposed)
-        self.assertTrue(pack_failing_inner.disposed)
+        self.assertTrue(pack_outer_wrapper.cleaned)
+        self.assertTrue(pack_middle_wrapper.cleaned)
+        self.assertTrue(pack_failing_inner.cleaned)
 
     # Test 7: Nesting with default arguments
     def test_nested_packs_with_default_args(self):
@@ -264,9 +264,9 @@ class TestPackRussianDoll(unittest.TestCase):
         pack_outer.dispose()
         pack_middle.dispose()
         pack_inner.dispose()
-        self.assertTrue(pack_outer.disposed)
-        self.assertTrue(pack_middle.disposed)
-        self.assertTrue(pack_inner.disposed)
+        self.assertTrue(pack_outer.cleaned)
+        self.assertTrue(pack_middle.cleaned)
+        self.assertTrue(pack_inner.cleaned)
 
     # Test 8: 4-layer nesting with simple arithmetic wrappers
     def test_four_layer_arithmetic_nesting(self):
@@ -293,10 +293,10 @@ class TestPackRussianDoll(unittest.TestCase):
         pack3.dispose()
         pack2.dispose()
         pack1.dispose()
-        self.assertTrue(pack4.disposed)
-        self.assertTrue(pack3.disposed)
-        self.assertTrue(pack2.disposed)
-        self.assertTrue(pack1.disposed)
+        self.assertTrue(pack4.cleaned)
+        self.assertTrue(pack3.cleaned)
+        self.assertTrue(pack2.cleaned)
+        self.assertTrue(pack1.cleaned)
 
     # Test 9: Mixed positional and keyword args across 3 layers
     def test_mixed_args_three_layers(self):
@@ -318,9 +318,9 @@ class TestPackRussianDoll(unittest.TestCase):
         pack3.dispose()
         pack2.dispose()
         pack1.dispose()
-        self.assertTrue(pack3.disposed)
-        self.assertTrue(pack2.disposed)
-        self.assertTrue(pack1.disposed)
+        self.assertTrue(pack3.cleaned)
+        self.assertTrue(pack2.cleaned)
+        self.assertTrue(pack1.cleaned)
 
     # Test 10: Complex 5-layer chain with different wrappers
     def test_complex_five_layer_chain(self):
@@ -352,11 +352,11 @@ class TestPackRussianDoll(unittest.TestCase):
         pack3.dispose()
         pack2.dispose()
         pack1.dispose()
-        self.assertTrue(pack5.disposed)
-        self.assertTrue(pack4.disposed)
-        self.assertTrue(pack3.disposed)
-        self.assertTrue(pack2.disposed)
-        self.assertTrue(pack1.disposed)
+        self.assertTrue(pack5.cleaned)
+        self.assertTrue(pack4.cleaned)
+        self.assertTrue(pack3.cleaned)
+        self.assertTrue(pack2.cleaned)
+        self.assertTrue(pack1.cleaned)
 
 if __name__ == '__main__':
     unittest.main()

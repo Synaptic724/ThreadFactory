@@ -1,8 +1,8 @@
 import threading
 import traceback
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 
-class AutoResetTimer(IDisposable):
+class AutoResetTimer(Cleanable):
     """
     AutoResetTimer
     --------------
@@ -31,15 +31,15 @@ class AutoResetTimer(IDisposable):
         self._lock = threading.RLock()
         self._running = False
 
-    def dispose(self):
+    def cleanup(self):
         """
         Dispose of the timer and stop any scheduled execution.
         This should be called to clean up the timer when no longer needed.
         """
-        if self._disposed:
+        if self._cleaned:
             return
         with self._lock:
-            self._disposed = True
+            self._cleaned = True
             self.stop()
             self._timer = None
 

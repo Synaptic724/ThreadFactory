@@ -484,7 +484,7 @@ class TestSmartCondition(unittest.TestCase):
 
         cond.dispose()
 
-        self.assertTrue(cond._disposed, "SmartCondition should be marked as disposed")
+        self.assertTrue(cond._cleaned, "SmartCondition should be marked as cleaned")
         self.assertIsNone(cond._default_callback, "Default callback should be cleared after dispose")
 
 

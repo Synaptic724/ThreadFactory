@@ -14,16 +14,16 @@ from typing import (
     TypeVar,
     Union,
 )
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 
 _K = TypeVar("_K")
 _V = TypeVar("_V")
 
 
-# This class is copied from my other library ThreadFactory, I made my own implementation with freeze and updated the interface to IDisposable,
+# This class is copied from my other library ThreadFactory, I made my own implementation with freeze and updated the interface to Cleanable,
 # I also implemented tests for it to test freeze.
 
-class ConcurrentDict(Generic[_K, _V], IDisposable):
+class ConcurrentDict(Generic[_K, _V], Cleanable):
     """
     A thread-safe dictionary implementation using:
       - An underlying Python dict
@@ -36,7 +36,7 @@ class ConcurrentDict(Generic[_K, _V], IDisposable):
     The dictionary can be frozen to prevent further modifications unless
     internal contents of dictionary are objects that are mutable.
     """
-    __slots__ = IDisposable.__slots__ + ["_dict", "_lock", "_freeze"]
+    __slots__ = Cleanable.__slots__ + ["_dict", "_lock", "_freeze"]
     def __init__(
         self,
         initial: Optional[Union[Mapping[_K, _V], Iterable[Tuple[_K, _V]]]] = None
@@ -59,22 +59,22 @@ class ConcurrentDict(Generic[_K, _V], IDisposable):
         self._lock: threading.RLock = threading.RLock()
         self._freeze = False
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
         Dispose (clear) this ConcurrentDict, releasing its contents.
 
-        Once disposed, `disposed` becomes True and the internal dict is cleared.
+        Once cleaned, `cleaned` becomes True and the internal dict is cleared.
         No further usage checks are enforced, so the user must avoid calling
         other methods after disposal.
 
         This method is idempotent — multiple calls won't cause errors.
         """
-        if not self._disposed:
+        if not self._cleaned:
             with self._lock:
                 self._dict.clear()
-            self._disposed = True
+            self._cleaned = True
         warnings.warn(
-            "Your ConcurrentDictionary has been disposed and should not be used further. ",
+            "Your ConcurrentDictionary has been cleaned and should not be used further. ",
             UserWarning
         )
 
@@ -629,12 +629,12 @@ class ConcurrentDict(Generic[_K, _V], IDisposable):
         Responsibilities:
           - Releases the internal lock acquired in `__enter__()`.
           - Automatically calls `dispose()` to ensure the object is cleaned up.
-          - This pattern ensures the object is safely disposed even if an exception
+          - This pattern ensures the object is safely cleaned even if an exception
             occurs within the `with` block.
 
         Notes:
           - The object should be considered invalid after exiting the context.
-          - This design mimics resource safety patterns seen in systems like C#'s `IDisposable`
+          - This design mimics resource safety patterns seen in systems like C#'s `Cleanable`
             and C++ RAII.
           - Users are free to manage `dispose()` manually if they choose not to use the
             context manager.

@@ -19,8 +19,8 @@ class TestScout(unittest.TestCase):
         self.predicate = simple_predicate
 
     def tearDown(self):
-        # Ensure any leftover Scout instances are disposed
-        if hasattr(self, 'scout') and self.scout and not self.scout._disposed:
+        # Ensure any leftover Scout instances are cleaned
+        if hasattr(self, 'scout') and self.scout and not self.scout._cleaned:
             self.scout.dispose()
 
     # --- Initialization Tests ---
@@ -276,10 +276,10 @@ class TestScout(unittest.TestCase):
             timeout_duration=0.1,
             on_timeout_callable=self.mock_on_timeout
         )
-        self.assertFalse(self.scout._disposed)
+        self.assertFalse(self.scout._cleaned)
 
         self.scout.dispose()
-        self.assertTrue(self.scout._disposed)
+        self.assertTrue(self.scout._cleaned)
 
         # Attempt to monitor after dispose
         result = self.scout.monitor()

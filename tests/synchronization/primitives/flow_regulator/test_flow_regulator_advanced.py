@@ -268,7 +268,7 @@ class TestFlowRegulatorEdgeCases(unittest.TestCase):
 
         for t in threads: t.join(timeout=1)
         self.assertEqual(len(wakies), 10)
-        self.assertTrue(lock.disposed)
+        self.assertTrue(lock.cleaned)
 
     # ----------------------------------------------------------------------- #
     # 6. Permit-leak fuzzer                                                   #

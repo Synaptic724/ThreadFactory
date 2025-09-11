@@ -7,12 +7,12 @@ from threading import RLock
 from typing import Any, Callable, Dict, Tuple, Iterable, Union, Optional
 from types import SimpleNamespace
 from thread_factory import ConcurrentList
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 
 
-class Package(IDisposable):
+class Package(Cleanable):
     """
     A thread-safe, delegate-style callable wrapper that supports argument memory,
     currying, composition, introspection, and function-style combination.
@@ -50,7 +50,7 @@ class Package(IDisposable):
     Coroutine and generator functions are rejected. This class is strictly for sync callables.
     """
 
-    __slots__ = IDisposable.__slots__ + ["_func", "_args", "_kwargs", "_signature_cache", "_frozen", "_lock"]
+    __slots__ = Cleanable.__slots__ + ["_func", "_args", "_kwargs", "_signature_cache", "_frozen", "_lock"]
 
     def __init__(self, func: Callable[..., Any], *args: Any, **kwargs: Any):
         """
@@ -78,12 +78,12 @@ class Package(IDisposable):
         self._frozen: bool = False
         self._lock: RLock = RLock()
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
         Dispose of the Package, releasing any resources.
         This is a no-op for Package since it does not hold resources.
         """
-        if self.disposed:
+        if self.cleaned:
             return
         with self._lock:
             self._func = None
@@ -92,7 +92,7 @@ class Package(IDisposable):
             self._kwargs.dispose()
             self._kwargs = None
             self._signature_cache = None
-            self._disposed = True
+            self._cleaned = True
 
     @property
     def __doc__(self):

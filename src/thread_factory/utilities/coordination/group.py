@@ -1,13 +1,13 @@
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from typing import List, Any, Callable, Optional, Union, Iterable
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.utilities.coordination.outcome import Outcome
 from thread_factory.utilities.coordination.package import Pack
 import ulid
 
 
-class Group(IDisposable):
+class Group(Cleanable):
     """
     Group
     -----
@@ -16,7 +16,7 @@ class Group(IDisposable):
     Tracks outcomes per task and supports optional multi-outcome-per-task mode.
     """
 
-    __slots__ = IDisposable.__slots__ + [
+    __slots__ = Cleanable.__slots__ + [
         "threshold", "tasks", "outcomes", "count",
         "ready", "_released_once", "id", "name",
         "_multiple_outcomes_per_task"
@@ -55,11 +55,11 @@ class Group(IDisposable):
         self.outcomes: ConcurrentDict[int, Union[Outcome, ConcurrentList[Outcome]]] = ConcurrentDict()
         self.reset()
 
-    def dispose(self):
+    def cleanup(self):
         """
         Fully dispose the Group and its Outcomes. Clears all state and makes the object unusable.
         """
-        if self.disposed:
+        if self.cleaned:
             return
 
         for bucket in self.outcomes.values():
@@ -70,7 +70,7 @@ class Group(IDisposable):
 
         self.outcomes.clear()
         self.tasks.clear()
-        self._disposed = True
+        self._cleaned = True
 
 
     def __len__(self):
@@ -98,7 +98,7 @@ class Group(IDisposable):
         """
         Allow iteration over the group's tasks.
         """
-        if self.disposed:
+        if self.cleaned:
             return iter([])
         return iter(self.tasks)
 
@@ -130,7 +130,7 @@ class Group(IDisposable):
         """
         Resets the Group for reuse. Clears existing outcomes and rebuilds outcome storage.
         """
-        if self.disposed:
+        if self.cleaned:
             return
 
         self._dispose_outcomes()
@@ -171,7 +171,7 @@ class Group(IDisposable):
         Returns:
             A list of non-exceptional result values from completed outcomes.
         """
-        if self.disposed:
+        if self.cleaned:
             return ConcurrentList()
 
         successful = ConcurrentList()
@@ -191,13 +191,13 @@ class Group(IDisposable):
         Returns:
             A list of exceptions from completed outcomes that failed.
         """
-        if self.disposed:
+        if self.cleaned:
             return ConcurrentList()
 
         errors = ConcurrentList()
         for outcome in self._iter_outcomes():
             if outcome and outcome.done:
                 exc = outcome.exception()
-                if exc and not (isinstance(exc, RuntimeError) and "disposed" in str(exc)):
+                if exc and not (isinstance(exc, RuntimeError) and "cleaned" in str(exc)):
                     errors.append(exc)
         return errors

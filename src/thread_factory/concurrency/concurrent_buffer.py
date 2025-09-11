@@ -18,14 +18,14 @@ from typing import (
 from array import array
 
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.utilities.exceptions import Empty
 
 _T = TypeVar("_T")
 
 #TODO : Implement per object locks to see if we can distribute contention between each call for arrays and deques
 
-class _Shard(Generic[_T], IDisposable):
+class _Shard(Generic[_T], Cleanable):
     """
     _Shard is an internal component representing a lock-protected queue (deque)
     inside a sharded concurrent buffer.
@@ -39,7 +39,7 @@ class _Shard(Generic[_T], IDisposable):
     independently while still providing approximate global FIFO behavior.
     """
 
-    __slots__ =  IDisposable.__slots__ + ["_lock", "_queue", "_length_array", "_time_array", "_index"]
+    __slots__ =  Cleanable.__slots__ + ["_lock", "_queue", "_length_array", "_time_array", "_index"]
     def __init__(self, len_array: array, time_array: array, index: int) -> None:
         """
         Initialize a new shard.
@@ -59,7 +59,7 @@ class _Shard(Generic[_T], IDisposable):
         self._time_array = time_array
         self._index = index
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
         Dispose of this shard by clearing all items and marking it as unusable.
 
@@ -68,11 +68,11 @@ class _Shard(Generic[_T], IDisposable):
             - Required to release resources when integrated with a Disposable system.
         """
         with self._lock:
-            if not self._disposed:
+            if not self._cleaned:
                 self._queue.clear()
                 self._length_array[self._index] = 0
                 self._set_time_value(0)
-                self._disposed = True
+                self._cleaned = True
 
     def _increase_length_value(self) -> None:
         """
@@ -191,7 +191,7 @@ class _Shard(Generic[_T], IDisposable):
         self.dispose()
 
 
-class ConcurrentBuffer(Generic[_T], IDisposable):
+class ConcurrentBuffer(Generic[_T], Cleanable):
     """
     A thread-safe, *mostly* FIFO buffer implementation using multiple internal
     deques (shards). Items are tagged with a timestamp upon enqueue.
@@ -214,7 +214,7 @@ class ConcurrentBuffer(Generic[_T], IDisposable):
     This class now implements a Disposable pattern, allowing you to dispose
     of it explicitly or via a `with` statement when it's no longer needed.
     """
-    __slots__ = IDisposable.__slots__ + ["_shards", "_length_array", "_time_array", "_num_shards", "_mid", "_left_range", "_right_range", "_shard_indices"]
+    __slots__ = Cleanable.__slots__ + ["_shards", "_length_array", "_time_array", "_num_shards", "_mid", "_left_range", "_right_range", "_shard_indices"]
 
     def __init__(
         self,
@@ -266,18 +266,18 @@ class ConcurrentBuffer(Generic[_T], IDisposable):
         for item in initial:
             self.enqueue(item)
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
         Disposes of this ConcurrentBuffer, releasing all internal resources.
 
         Responsibilities:
           - Disposes each internal shard by clearing their queues and resetting their counters.
           - Resets the shared `_length_array` and `_time_array` used for shard coordination.
-          - Marks this object as disposed (`self.disposed = True`).
+          - Marks this object as cleaned (`self.cleaned = True`).
 
         Behavior:
           - This method is idempotent: multiple calls will have no adverse effects after the first.
-          - Once disposed, the buffer should be considered permanently invalid.
+          - Once cleaned, the buffer should be considered permanently invalid.
           - No post-disposal protection is enforced — correct usage is left to the caller's responsibility.
 
         Notes:
@@ -287,19 +287,19 @@ class ConcurrentBuffer(Generic[_T], IDisposable):
         Example:
             with ConcurrentBuffer(...) as buf:
                 ...
-            # buffer is automatically disposed here
+            # buffer is automatically cleaned here
         """
-        if not self._disposed:
+        if not self._cleaned:
             # Dispose all shards and reset internal arrays
             for shard in self._shards:
                 shard.dispose()
             self._length_array = array("Q", [0] * self._num_shards)
             self._time_array = array("Q", [0] * self._num_shards)
-            self._disposed = True
+            self._cleaned = True
 
             # Notify user that buffer is no longer valid
             warnings.warn(
-                "ConcurrentBuffer has been disposed and should not be used further.",
+                "ConcurrentBuffer has been cleaned and should not be used further.",
                 UserWarning
             )
 
@@ -448,8 +448,8 @@ class ConcurrentBuffer(Generic[_T], IDisposable):
         Returns:
             str: A string representation.
         """
-        if self._disposed:
-            return f"<{self.__class__.__name__} [DISPOSED]>"
+        if self._cleaned:
+            return f"<{self.__class__.__name__} [cleaned]>"
 
         total_len = len(self)
         valid_tags = [ts for ts in self._time_array if ts > 0]
@@ -463,8 +463,8 @@ class ConcurrentBuffer(Generic[_T], IDisposable):
         Returns:
             str: A string representation of the items.
         """
-        if self._disposed:
-            return f"<{self.__class__.__name__} [DISPOSED]>"
+        if self._cleaned:
+            return f"<{self.__class__.__name__} [cleaned]>"
         all_items = list(self)
         return str(all_items)
 
@@ -648,11 +648,11 @@ class ConcurrentBuffer(Generic[_T], IDisposable):
 
         Notes:
           - Once exited, the buffer is invalid and should not be used.
-          - This behavior is consistent with RAII and IDisposable patterns.
+          - This behavior is consistent with RAII and Cleanable patterns.
 
         Example:
             with ConcurrentBuffer(...) as buf:
                 ... # safe usage
-            # disposed automatically here
+            # cleaned automatically here
         """
         self.dispose()

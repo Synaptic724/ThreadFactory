@@ -562,7 +562,7 @@ class TestConcurrentList(unittest.TestCase):
         """
         Ensures that dispose:
             - Clears all data.
-            - Marks the list as disposed.
+            - Marks the list as cleaned.
             - Is idempotent (can be called multiple times without error).
         """
         clist = ConcurrentList([1, 2])
@@ -570,13 +570,13 @@ class TestConcurrentList(unittest.TestCase):
         # Check initial state
         self.assertIn(1, clist)
         self.assertEqual(len(clist), 2)
-        self.assertFalse(clist.disposed)
+        self.assertFalse(clist.cleaned)
 
         # Dispose it
         clist.dispose()
 
-        # It should be marked as disposed
-        self.assertTrue(clist.disposed)
+        # It should be marked as cleaned
+        self.assertTrue(clist.cleaned)
 
         # It should be cleared
         self.assertEqual(len(clist), 0)
@@ -598,7 +598,7 @@ class TestConcurrentList(unittest.TestCase):
 
         clist.dispose()
 
-        self.assertTrue(clist.disposed)
+        self.assertTrue(clist.cleaned)
         self.assertEqual(len(clist), 0)
         self.assertNotIn(1, clist)
 

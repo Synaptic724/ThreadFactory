@@ -86,8 +86,6 @@ __all__ = [
     "SyncString",
     "SyncRef",
     # Synchronization Classes
-    # Controllers
-    "SignalController",
     # Coordinators
     "ClockBarrier",
     "Conductor",
@@ -96,9 +94,7 @@ __all__ = [
     "TransitBarrier",
     # Dispatchers
     "Fork",
-    "SignalFork",
     "SyncFork",
-    "SyncSignalFork",
     # Execution
     "BypassConductor",
     # Primitives
@@ -106,7 +102,6 @@ __all__ = [
     "Dynaphore",
     "Latch",
     "SignalBarrier",
-    "SignalLatch",
     "SmartCondition",
     "Waiter",
     "TransitCondition",

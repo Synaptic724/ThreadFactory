@@ -2,12 +2,12 @@ import threading, ulid
 from typing import Optional, Callable, Any, Dict, Union
 
 from thread_factory.synchronization import SignalController
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.synchronization.primitives.transit_condition import TransitCondition
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utilities.coordination.package import Pack
 
-class TransitBarrier(IDisposable):
+class TransitBarrier(Cleanable):
     """
     TransitBarrier
     ------------------
@@ -46,7 +46,7 @@ class TransitBarrier(IDisposable):
     - **Reusability** allows the barrier to reset and be reused after a full release cycle, but is ignored when `manual_release=True`.
     """
 
-    __slots__ = IDisposable.__slots__ + [
+    __slots__ = Cleanable.__slots__ + [
         "_threshold", "_transit", "_reusable", "_manual_release",
         "_lock", "_condition", "_count", "_released", "_transit_fired",
         "_id", "_controller"
@@ -86,7 +86,7 @@ class TransitBarrier(IDisposable):
             except Exception:
                 # In a real app, you would log this failure.
                 pass
-    def dispose(self):
+    def cleanup(self):
         """
         Disposes the TransitBarrier and unblocks all waiting threads.
 
@@ -95,12 +95,12 @@ class TransitBarrier(IDisposable):
         - The internal controller reference is cleared.
         - All pending threads are notified and released.
         - Callable references (`_transit`) are nulled for GC friendliness.
-        - The object is marked as disposed and is no longer usable.
+        - The object is marked as cleaned and is no longer usable.
         """
-        if self._disposed:
+        if self._cleaned:
             return
 
-        self._disposed = True
+        self._cleaned = True
 
         # Clear all state under lock to avoid race conditions
         with self._condition:
@@ -159,7 +159,7 @@ class TransitBarrier(IDisposable):
             callback: Optional one-time callable to invoke upon release.
         """
         with self._lock:
-            if self._disposed or self._released:
+            if self._cleaned or self._released:
                 return
 
             self._released = True
@@ -176,7 +176,7 @@ class TransitBarrier(IDisposable):
         method is intended for emergency overrides or controller-level resets.
         """
         with self._lock:
-            if self._disposed or self._released:
+            if self._cleaned or self._released:
                 return
             self._released = True
             # The _transit_fired check ensures the main transit action
@@ -197,7 +197,7 @@ class TransitBarrier(IDisposable):
         waiting threads.
         """
         with self._condition:
-            if self._disposed:
+            if self._cleaned:
                 return
             if self._manual_release and self._count >= self._threshold and not self._released:
                 self._released = True
@@ -224,7 +224,7 @@ class TransitBarrier(IDisposable):
             timeout: Optional timeout (in seconds) to wait.
 
         Returns:
-            True if released successfully, False if disposed or timed out.
+            True if released successfully, False if cleaned or timed out.
         """
         if self.is_spent():
             return False
@@ -236,7 +236,7 @@ class TransitBarrier(IDisposable):
         with self._condition:
             if self._released:
                 return True
-            if self._disposed:
+            if self._cleaned:
                 return False
 
             self._count += 1
@@ -270,7 +270,7 @@ class TransitBarrier(IDisposable):
             # All other threads wait here
             released = self._condition.wait(timeout=timeout)
 
-            if self._disposed:
+            if self._cleaned:
                 return False
 
             if released and self._reusable:

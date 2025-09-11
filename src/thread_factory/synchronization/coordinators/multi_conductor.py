@@ -5,7 +5,7 @@ from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.synchronization.dispatchers.signal_fork import SignalFork
 from thread_factory.synchronization.dispatchers.sync_signal_fork import SyncSignalFork
 from thread_factory.utilities.coordination.package import Pack
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.utilities.coordination.group import Group
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.utilities.coordination.outcome import Outcome
@@ -15,7 +15,7 @@ from thread_factory.synchronization.primitives.signal_barrier import SignalBarri
 from thread_factory.concurrency.sync_types.sync_bool import SyncBool
 
 
-class MultiConductor(IDisposable):
+class MultiConductor(Cleanable):
     """
     MultiConductor
     --------------
@@ -88,7 +88,7 @@ class MultiConductor(IDisposable):
     >>> conductor.start()
     """
 
-    __slots__ = IDisposable.__slots__ + [
+    __slots__ = Cleanable.__slots__ + [
         "_threshold", "groups", "reusable", "manual_release",
         "_timeout", "_raise_on_timeout", "_multiple_outcomes_per_task", "_callback",
         "_controller", "_id", "_released", "_broken", "_main_barrier",
@@ -215,29 +215,29 @@ class MultiConductor(IDisposable):
             try: self._controller.register(self)
             except Exception: pass
 
-    def dispose(self):
+    def cleanup(self):
         """
         Disposes of the MultiConductor and all associated resources.
 
         This method releases all synchronization primitives, disposes of any barriers and groups,
-        and marks the conductor as disposed. Once disposed, the conductor is no longer usable.
+        and marks the conductor as cleaned. Once cleaned, the conductor is no longer usable.
 
         The following actions occur:
         - Releases all waiters to prevent deadlocks.
-        - Notifies the controller (if provided) that the conductor has been disposed.
+        - Notifies the controller (if provided) that the conductor has been cleaned.
         - Disposes of any internal barriers such as the `ClockBarrier`, `SignalBarrier`, and `Dynaphore`.
         - Clears the groups and outcomes data structures, ensuring no references remain.
 
         If called multiple times, this method will safely exit without performing any additional work.
         """
-        if self._disposed:
+        if self._cleaned:
             return
 
         with self._lock:
-            if self._disposed:  # Double-check inside lock
+            if self._cleaned:  # Double-check inside lock
                 return
 
-            self._disposed = True
+            self._cleaned = True
             self._broken = True
             self._released = True
             self._create_fork = None
@@ -272,7 +272,7 @@ class MultiConductor(IDisposable):
             # --- Step 2: Perform secondary cleanup of child objects and data ---
             # This is now safe to do because no threads are stuck waiting on us.
             if self._controller:
-                self._controller.notify(self.id, "DISPOSED")
+                self._controller.notify(self.id, "cleaned")
                 if self._controller and hasattr(self._controller, 'unregister'):
                     try:
                         self._controller.unregister(self.id)
@@ -379,7 +379,7 @@ class MultiConductor(IDisposable):
 
         if not self._enabled:
             self.enable()
-        if self._disposed or self._broken or self.is_spent():
+        if self._cleaned or self._broken or self.is_spent():
             return
         try:
             self._main_barrier.wait()
@@ -396,7 +396,7 @@ class MultiConductor(IDisposable):
                         return
                     self._execute_operations()
                 finally:
-                    if not self._disposed:
+                    if not self._cleaned:
                         self._dynaphore.release_permit()
 
         except Exception as e:
@@ -434,7 +434,7 @@ class MultiConductor(IDisposable):
             self._notify_group_started(group)
             for task_index, task in enumerate(group.tasks):
 
-                if self._broken or self._disposed: break
+                if self._broken or self._cleaned: break
 
                 self._execute_operation(task, group, task_index)
 
@@ -444,7 +444,7 @@ class MultiConductor(IDisposable):
                 # if self._callback:
                 #     self._execute_callback(group, task_index)
 
-            if self._broken or self._disposed: break
+            if self._broken or self._cleaned: break
 
     def _execute_operation(self, task: Union[Callable[..., None], Pack], group: Group, task_index: int):
         """Executes a single task and records its outcome in the correct group.
@@ -536,7 +536,7 @@ class MultiConductor(IDisposable):
         Executes tasks in a forked manner, using the Fork or SyncFork processor.
         """
         for group in self.groups:
-            if self._broken or self._disposed: break
+            if self._broken or self._cleaned: break
             with self._lock:
                 if not self._create_fork:
                     self._fork_processor = self._calculate_fork_processor(group)
@@ -559,7 +559,7 @@ class MultiConductor(IDisposable):
         the desired behavior.
 
         The method ensures that the task execution continues until all tasks from all groups have been executed,
-        or the conductor is disposed or broken.
+        or the conductor is cleaned or broken.
         """
         if self.groups:
             with self._lock:
@@ -573,7 +573,7 @@ class MultiConductor(IDisposable):
                 self._general_execution_loop()
 
             with self._lock:
-                if self._controller and not self._execution_completed_notified and not (self._broken or self._disposed):
+                if self._controller and not self._execution_completed_notified and not (self._broken or self._cleaned):
                     self._execution_completed_notified = True
                     self._controller.notify(self.id, "EXECUTION_COMPLETED")
 
@@ -658,9 +658,9 @@ class MultiConductor(IDisposable):
         clears all state flags, and reinitializes synchronization primitives.
 
         Raises:
-            RuntimeError: If the MultiConductor has already been disposed.
+            RuntimeError: If the MultiConductor has already been cleaned.
         """
-        if self._disposed: raise RuntimeError("Cannot reset a disposed MultiConductor.")
+        if self._cleaned: raise RuntimeError("Cannot reset a cleaned MultiConductor.")
         if not self.reusable: return
         with self._lock:
             for group in self.groups:
@@ -704,12 +704,12 @@ class MultiConductor(IDisposable):
         A flat list of all successful results from all tasks in all groups.
 
         This property extracts and returns all successful task results from every task in every group, concatenated
-        into a single, flat list. If the `MultiConductor` has been disposed, it will return an empty list.
+        into a single, flat list. If the `MultiConductor` has been cleaned, it will return an empty list.
 
         Returns:
             List[Any]: A list of all successful results collected from the tasks across all groups.
         """
-        if self._disposed: return []
+        if self._cleaned: return []
         return [res for group in self.groups for res in group.results]
 
     @property
@@ -718,12 +718,12 @@ class MultiConductor(IDisposable):
         A flat list of all exceptions from all tasks in all groups.
 
         This property extracts and returns all exceptions that occurred during the execution of tasks across all groups,
-        concatenated into a single, flat list. If the `MultiConductor` has been disposed, it will return an empty list.
+        concatenated into a single, flat list. If the `MultiConductor` has been cleaned, it will return an empty list.
 
         Returns:
             List[Exception]: A list of all exceptions collected from the tasks across all groups.
         """
-        if self._disposed: return []
+        if self._cleaned: return []
         return [exc for group in self.groups for exc in group.exceptions]
 
     def is_spent(self) -> bool:
@@ -750,10 +750,10 @@ class MultiConductor(IDisposable):
         If `manual_release` is not set to `True`, calling this method will have no effect.
 
         Raises:
-            RuntimeError: If the conductor is already disposed or broken, or if it's not in a manual release state.
+            RuntimeError: If the conductor is already cleaned or broken, or if it's not in a manual release state.
         """
         with self._lock:
-            if self._disposed or not self.manual_release or self._released: return
+            if self._cleaned or not self.manual_release or self._released: return
             self._released = True
             if self._manual_release_gate: self._manual_release_gate.set()
             if self._controller: self._controller.notify(self.id, "MANUALLY_RELEASED")
@@ -766,13 +766,13 @@ class MultiConductor(IDisposable):
         intended for emergency situations or when an external event requires immediate intervention. Calling this
         method will break the barrier and release all threads regardless of whether the threshold is met.
 
-        If the conductor has been disposed or is already released, this method has no effect.
+        If the conductor has been cleaned or is already released, this method has no effect.
 
         Raises:
-            RuntimeError: If the conductor is disposed or broken, preventing the barrier from being forcibly released.
+            RuntimeError: If the conductor is cleaned or broken, preventing the barrier from being forcibly released.
         """
         with self._lock:
-            if self._disposed or self._released: return
+            if self._cleaned or self._released: return
             self._broken = True
             self._released = True
             if self._main_barrier:

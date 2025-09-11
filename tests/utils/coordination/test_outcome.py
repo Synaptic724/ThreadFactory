@@ -14,8 +14,8 @@ class TestOutcome(unittest.TestCase):
         self.outcome = Outcome()
 
     def tearDown(self):
-        # Ensure the outcome is always disposed, even if a test fails mid-execution
-        if not self.outcome.disposed:
+        # Ensure the outcome is always cleaned, even if a test fails mid-execution
+        if not self.outcome.cleaned:
             self.outcome.dispose()
 
     # --- Initialization Tests ---
@@ -23,7 +23,7 @@ class TestOutcome(unittest.TestCase):
         self.assertFalse(self.outcome.done)
         self.assertIsNone(self.outcome._result)
         self.assertIsNone(self.outcome._exception)
-        self.assertFalse(self.outcome.disposed)
+        self.assertFalse(self.outcome.cleaned)
 
     # --- set_result Tests ---
     def test_set_result_success(self):
@@ -44,12 +44,12 @@ class TestOutcome(unittest.TestCase):
             self.outcome.result()
         self.assertIsInstance(self.outcome.exception(), ValueError)
 
-    def test_set_result_on_disposed_outcome(self):
+    def test_set_result_on_cleaned_outcome(self):
         self.outcome.dispose()
         with self.assertRaises(RuntimeError) as cm:
             self.outcome.set_result("Result")
-        self.assertIn("Cannot set result on a disposed Outcome.", str(cm.exception))
-        self.assertTrue(self.outcome.disposed)
+        self.assertIn("Cannot set result on a cleaned Outcome.", str(cm.exception))
+        self.assertTrue(self.outcome.cleaned)
 
     # --- set_exception Tests ---
     def test_set_exception_success(self):
@@ -75,12 +75,12 @@ class TestOutcome(unittest.TestCase):
         self.assertEqual(self.outcome.result(), "Result")
         self.assertIsNone(self.outcome.exception())
 
-    def test_set_exception_on_disposed_outcome(self):
+    def test_set_exception_on_cleaned_outcome(self):
         self.outcome.dispose()
         with self.assertRaises(RuntimeError) as cm:
             self.outcome.set_exception(ValueError("Error"))
-        self.assertIn("Cannot set exception on a disposed Outcome.", str(cm.exception))
-        self.assertTrue(self.outcome.disposed)
+        self.assertIn("Cannot set exception on a cleaned Outcome.", str(cm.exception))
+        self.assertTrue(self.outcome.cleaned)
 
     # --- result() Tests ---
     def test_result_blocks_until_set(self):
@@ -113,7 +113,7 @@ class TestOutcome(unittest.TestCase):
             self.outcome.result(timeout=0.05)
         self.assertFalse(self.outcome.done)
 
-    def test_result_disposed_while_waiting(self):
+    def test_result_cleaned_while_waiting(self):
         def dispose_in_thread():
             time.sleep(0.05)
             self.outcome.dispose()
@@ -122,16 +122,16 @@ class TestOutcome(unittest.TestCase):
         t.start()
         with self.assertRaises(RuntimeError) as cm:
             self.outcome.result()
-        self.assertIn("Outcome was disposed", str(cm.exception))
-        self.assertTrue(self.outcome.disposed)
+        self.assertIn("Outcome was cleaned", str(cm.exception))
+        self.assertTrue(self.outcome.cleaned)
         t.join()
 
-    def test_result_disposed_before_waiting(self):
+    def test_result_cleaned_before_waiting(self):
         self.outcome.dispose()
         with self.assertRaises(RuntimeError) as cm:
             self.outcome.result()
-        self.assertIn("Outcome was disposed", str(cm.exception))
-        self.assertTrue(self.outcome.disposed)
+        self.assertIn("Outcome was cleaned", str(cm.exception))
+        self.assertTrue(self.outcome.cleaned)
 
     # --- done property Tests ---
     def test_done_property(self):
@@ -170,7 +170,7 @@ class TestOutcome(unittest.TestCase):
         self.assertGreaterEqual(end_time - start_time, 0.1)
         t.join()
 
-    def test_exception_disposed_while_waiting(self):
+    def test_exception_cleaned_while_waiting(self):
         def dispose_in_thread():
             time.sleep(0.05)
             self.outcome.dispose()
@@ -179,34 +179,34 @@ class TestOutcome(unittest.TestCase):
         t.start()
         ex = self.outcome.exception()
         self.assertIsInstance(ex, RuntimeError)
-        self.assertIn("Outcome was disposed", str(ex))
-        self.assertTrue(self.outcome.disposed)
+        self.assertIn("Outcome was cleaned", str(ex))
+        self.assertTrue(self.outcome.cleaned)
         t.join()
 
-    def test_exception_disposed_before_waiting(self):
+    def test_exception_cleaned_before_waiting(self):
         self.outcome.dispose()
         ex = self.outcome.exception()
         self.assertIsInstance(ex, RuntimeError)
-        self.assertIn("Outcome was disposed", str(ex))
-        self.assertTrue(self.outcome.disposed)
+        self.assertIn("Outcome was cleaned", str(ex))
+        self.assertTrue(self.outcome.cleaned)
 
     # --- dispose() Tests ---
     def test_dispose_idempotency(self):
-        self.assertFalse(self.outcome.disposed)
+        self.assertFalse(self.outcome.cleaned)
         self.outcome.dispose()
-        self.assertTrue(self.outcome.disposed)
+        self.assertTrue(self.outcome.cleaned)
         self.outcome.dispose()
-        self.assertTrue(self.outcome.disposed)
+        self.assertTrue(self.outcome.cleaned)
 
     def test_dispose_clears_references(self):
-        # Test case 1: Result was set, then disposed. _result should be None. _exception should be None.
+        # Test case 1: Result was set, then cleaned. _result should be None. _exception should be None.
         self.outcome.set_result("data")
         self.outcome.dispose()
         self.assertIsNone(self.outcome._result) # Now asserts None, as per dispose logic
         self.assertIsNone(self.outcome._exception) # Should be None as no exception was set
         self.assertIsNone(self.outcome._condition)
 
-        # Test case 2: Exception was set, then disposed. _result should be None. _exception should be original.
+        # Test case 2: Exception was set, then cleaned. _result should be None. _exception should be original.
         self.setUp() # Reset for new test case
         original_ex = ValueError("Test Exception")
         self.outcome.set_exception(original_ex)
@@ -221,7 +221,7 @@ class TestOutcome(unittest.TestCase):
         self.assertTrue(self.outcome.done)
         with self.assertRaises(RuntimeError) as cm:
             self.outcome.result()
-        self.assertIn("Outcome was disposed.", str(cm.exception))
+        self.assertIn("Outcome was cleaned.", str(cm.exception))
         self.assertIsInstance(self.outcome.exception(), RuntimeError)
 
     # --- NEW TESTS BELOW ---
@@ -252,7 +252,7 @@ class TestOutcome(unittest.TestCase):
             self.assertIn(final_result, [f"Result {i}" for i in range(5)])
         except RuntimeError as e:
             # If dispose somehow won the race, result() might raise RuntimeError
-            self.assertIn("Outcome was disposed", str(e))
+            self.assertIn("Outcome was cleaned", str(e))
         except Exception as e:
             self.fail(f"Unexpected exception: {e}")
 
@@ -328,7 +328,7 @@ class TestOutcome(unittest.TestCase):
         t1.join()
         t2.join()
 
-        self.assertTrue(self.outcome.disposed)
+        self.assertTrue(self.outcome.cleaned)
         self.assertTrue(self.outcome.done)
 
         try:
@@ -338,7 +338,7 @@ class TestOutcome(unittest.TestCase):
             self.assertEqual(result_val, "Result")
             self.assertIsNone(self.outcome.exception())
         except RuntimeError as e:
-            self.assertIn("Outcome was disposed", str(e))
+            self.assertIn("Outcome was cleaned", str(e))
             self.assertIsInstance(self.outcome.exception(), RuntimeError)
         except TimeoutError:
             self.fail("Outcome did not complete within expected time.")
@@ -358,8 +358,8 @@ class TestOutcome(unittest.TestCase):
             self.outcome.result(timeout=0.5)
         end_time = time.monotonic()
 
-        self.assertIn("Outcome was disposed", str(cm.exception))
-        self.assertTrue(self.outcome.disposed)
+        self.assertIn("Outcome was cleaned", str(cm.exception))
+        self.assertTrue(self.outcome.cleaned)
         self.assertGreaterEqual(end_time - start_time, 0.05)
         self.assertLess(end_time - start_time, 0.5)
 
@@ -378,8 +378,8 @@ class TestOutcome(unittest.TestCase):
         end_time = time.monotonic()
 
         self.assertIsInstance(ex, RuntimeError)
-        self.assertIn("Outcome was disposed", str(ex))
-        self.assertTrue(self.outcome.disposed)
+        self.assertIn("Outcome was cleaned", str(ex))
+        self.assertTrue(self.outcome.cleaned)
         self.assertGreaterEqual(end_time - start_time, 0.05)
 
         t.join()
@@ -400,9 +400,9 @@ class TestOutcome(unittest.TestCase):
         # After dispose, _result is None. So result() will raise RuntimeError.
         with self.assertRaises(RuntimeError) as cm:
             self.outcome.result()
-        self.assertIn("Outcome was disposed.", str(cm.exception))
+        self.assertIn("Outcome was cleaned.", str(cm.exception))
         self.assertTrue(self.outcome.done)
-        self.assertTrue(self.outcome.disposed)
+        self.assertTrue(self.outcome.cleaned)
 
     def test_exception_access_after_set_and_dispose(self):
         original_ex = TypeError("Specific Error")
@@ -411,7 +411,7 @@ class TestOutcome(unittest.TestCase):
         # _exception should still be the original exception.
         self.assertEqual(self.outcome.exception(), original_ex)
         self.assertTrue(self.outcome.done)
-        self.assertTrue(self.outcome.disposed)
+        self.assertTrue(self.outcome.cleaned)
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 import threading
 from typing import Optional, Callable, Any, Dict, Union
 import ulid
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.utilities.coordination.package import Pack
 from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 
@@ -9,7 +9,7 @@ from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 # from thread_factory.controller import Controller
 
 
-class SignalBarrier(IDisposable):
+class SignalBarrier(Cleanable):
     """
     SignalBarrier
     ------------------
@@ -81,7 +81,7 @@ class SignalBarrier(IDisposable):
         for _ in range(5):
             threading.Thread(target=worker).start()
     """
-    __slots__ = IDisposable.__slots__ + [
+    __slots__ = Cleanable.__slots__ + [
         "_threshold", "_transit_callback", "_reusable", "_manual_release",
         "_lock", "_condition", "_count", "_released", "_id",
         "_controller", "_signal_callback", "_wait_notification"
@@ -125,20 +125,20 @@ class SignalBarrier(IDisposable):
                 # Fail silently if registration fails, maintaining standalone functionality.
                 pass
 
-    def dispose(self):
+    def cleanup(self):
         """
         Releases all resources and unblocks waiting threads.
 
-        This method marks the semaphore as disposed and removes references
+        This method marks the semaphore as cleaned and removes references
         to callbacks and controllers. All currently waiting threads are notified
         and allowed to exit.
 
         This method is idempotent and safe to call multiple times.
         """
         with self._lock:
-            if self._disposed:
+            if self._cleaned:
                 return
-            self._disposed = True
+            self._cleaned = True
             # Clean up references
             self._signal_callback = None
             self._transit_callback = None
@@ -146,7 +146,7 @@ class SignalBarrier(IDisposable):
         with self._condition:
             self._condition.notify_all()
         if self._controller:
-            self._controller.notify(self.id, "DISPOSED")
+            self._controller.notify(self.id, "cleaned")
         if self._controller and hasattr(self._controller, 'unregister'):
             try:
                 self._controller.unregister(self.id)
@@ -219,7 +219,7 @@ class SignalBarrier(IDisposable):
             If reusable=True, resets the counter after releasing.
         """
         with self._condition:
-            if self._disposed or self._released:
+            if self._cleaned or self._released:
                 return
 
             self._released = True
@@ -245,7 +245,7 @@ class SignalBarrier(IDisposable):
             count has reached the configured threshold.
         """
         with self._condition:
-            if self._disposed or self._released:
+            if self._cleaned or self._released:
                 return
 
             # Only release if in manual mode and the threshold has been met
@@ -273,7 +273,7 @@ class SignalBarrier(IDisposable):
             raise ValueError("Threshold must be greater than 0")
 
         with self._condition:
-            if self._disposed: return
+            if self._cleaned: return
             self._threshold = new_threshold
 
             if self._count >= self._threshold and not self._manual_release and not self._released:
@@ -308,7 +308,7 @@ class SignalBarrier(IDisposable):
 
         Returns:
             bool: True if the semaphore was released and the thread passed through.
-                  False if the wait timed out or the semaphore was disposed before release.
+                  False if the wait timed out or the semaphore was cleaned before release.
 
         Behavior:
             - Increments the internal count on entry.
@@ -321,7 +321,7 @@ class SignalBarrier(IDisposable):
 
         Notes:
             - If the semaphore has already been released and is not reusable, the call returns immediately.
-            - If disposed, the thread unblocks with a return value of False.
+            - If cleaned, the thread unblocks with a return value of False.
 
         Exceptions:
             - All internal exceptions in callbacks or controller logic are caught and logged silently.
@@ -335,7 +335,7 @@ class SignalBarrier(IDisposable):
                 self._controller.notify(self.id, "WAIT_STARTING")
 
         with self._condition:
-            if self._disposed:
+            if self._cleaned:
                 return False
 
             self._count += 1
@@ -362,7 +362,7 @@ class SignalBarrier(IDisposable):
                 except Exception:
                     pass
 
-            was_released = self._condition.wait_for(lambda: self._released or self._disposed, timeout=timeout)
+            was_released = self._condition.wait_for(lambda: self._released or self._cleaned, timeout=timeout)
 
             if was_released and self._reusable:
                 # Each thread decrements the counter as it passes the barrier.
@@ -373,4 +373,4 @@ class SignalBarrier(IDisposable):
                     self._wait_notification = False
                     self._released = False
 
-            return was_released and not self._disposed
+            return was_released and not self._cleaned

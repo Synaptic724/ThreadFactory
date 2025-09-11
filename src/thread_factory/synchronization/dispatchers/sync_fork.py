@@ -6,7 +6,7 @@ import inspect
 import ulid
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.utilities.coordination.package import Pack
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 
 # --------------------------------------------------------------------------- #
 #                               Support Structs                               #
@@ -34,9 +34,9 @@ class ForkUnit:
     gate_uses: int = 0
 
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
-        Marks this ForkUnit as disposed by sealing the gate and clearing callable.
+        Marks this ForkUnit as cleaned by sealing the gate and clearing callable.
         """
         self.fork_callable = None
 
@@ -45,7 +45,7 @@ class ForkUnit:
 #                                 SyncFork                                    #
 # --------------------------------------------------------------------------- #
 
-class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
+class SyncFork(Cleanable):  # SyncFork now inherits from Cleanable
     """
     A concurrent fork dispatcher with barrier semantics and optional timeout.
 
@@ -84,7 +84,7 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
             selector_step: int = 1,
             timeout_duration: Optional[float] = None,  # New optional timeout parameter
     ):
-        super().__init__()  # Initialize IDisposable
+        super().__init__()  # Initialize Cleanable
         # Validate input
         if number_of_forks != len(callables):
             raise ValueError("The number of forks must match the number of callables.")
@@ -118,22 +118,22 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
         self._scout: Optional['Scout'] = None  # Scout instance for barrier timeout
         self._detect_number_of_routes()
 
-    def dispose(self) -> None:
+    def cleanup(self) -> None:
         """
         Disposes the SyncFork instance. Releases all resources and makes it unusable.
         Idempotent: safe to call multiple times.
 
         After disposal:
         - All future use of `use_fork()` raises RuntimeError.
-        - All `ForkUnit`s are explicitly disposed (clearing their callables).
+        - All `ForkUnit`s are explicitly cleaned (clearing their callables).
         - The internal threading event is triggered to release any waiting threads.
-        - If a Scout was in use, it is also disposed.
+        - If a Scout was in use, it is also cleaned.
         """
-        if self._disposed:
+        if self._cleaned:
             return
 
         with self._selector_lock:
-            self._disposed = True
+            self._cleaned = True
             self._forks_closed = True
             self._threading_event.set()  # Wake anything waiting
 
@@ -238,8 +238,8 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
 
         This method is always available to reset the SyncFork for reuse.
         """
-        if self._disposed:
-            raise RuntimeError("Cannot reset a disposed SyncFork.")
+        if self._cleaned:
+            raise RuntimeError("Cannot reset a cleaned SyncFork.")
 
         for unit in self._list_of_forks:
             with unit.lock:
@@ -282,8 +282,8 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
         """
         from thread_factory.synchronization.coordinators.scout import Scout
 
-        if self._disposed:
-            raise RuntimeError("Cannot use a disposed SyncFork.")
+        if self._cleaned:
+            raise RuntimeError("Cannot use a cleaned SyncFork.")
         if self._timed_out:
             raise RuntimeError("SyncFork barrier timed out.")
         if self._forks_closed:
@@ -358,8 +358,8 @@ class SyncFork(IDisposable):  # SyncFork now inherits from IDisposable
 
         # STEP 5 ─ post-barrier checks
         with self._selector_lock:
-            if self._disposed:
-                raise RuntimeError("Cannot use a disposed SyncFork.")
+            if self._cleaned:
+                raise RuntimeError("Cannot use a cleaned SyncFork.")
             if self._timed_out:
                 raise RuntimeError("SyncFork barrier timed out.")
 

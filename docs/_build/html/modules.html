@@ -79,7 +79,7 @@ High-performance concurrency collections and parallel operations for Python 3.13
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.AutoResetTimer">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">AutoResetTimer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">interval_sec</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">daemon</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/utilities/timing_tools/auto_reset_timer.html#AutoResetTimer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.AutoResetTimer" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <ul class="simple">
 <li><p>Automatically restarts after each invocation.</p></li>
 <li><p>Thread-safe and supports graceful shutdown.</p></li>
@@ -131,7 +131,7 @@ If the timer is already stopped, this is a no-op.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.BypassConductor">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">BypassConductor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="concurrency/concurrent_list.html#thread_factory.concurrency.concurrent_list.ConcurrentList" title="thread_factory.concurrency.concurrent_list.ConcurrentList"><span class="pre">ConcurrentList</span></a><span class="p"><span class="pre">[</span></span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">limit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/execution/bypass_conductor.html#BypassConductor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.BypassConductor" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <section id="features">
 <h2>Features:<a class="headerlink" href="#features" title="Link to this heading"></a></h2>
 <ul class="simple">
@@ -274,7 +274,7 @@ This can be triggered manually or after the final stage completes.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.ClockBarrier">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">ClockBarrier</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_broken</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">controller</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Controller</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/clock_barrier.html#ClockBarrier"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ClockBarrier" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>A reusable, generation-counted barrier that releases threads once:</p>
 <ol class="arabic simple">
 <li><p><cite>threshold</cite> threads call <cite>wait</cite> within the same generation.</p></li>
@@ -284,7 +284,7 @@ This can be triggered manually or after the final stage completes.</p>
 preventing late arrivals from extending the wait time.</p>
 <p>Events emitted when:
 - <cite>BARRIER_PASSED</cite>: Threshold is met.
-- <cite>BARRIER_BROKEN</cite>: Timeout occurs or barrier is disposed.</p>
+- <cite>BARRIER_BROKEN</cite>: Timeout occurs or barrier is cleaned.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="thread_factory.ClockBarrier.id">
 <span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#thread_factory.ClockBarrier.id" title="Link to this definition"></a></dt>
@@ -343,8 +343,8 @@ preventing late arrivals from extending the wait time.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="thread_factory.ClockBarrier.dispose">
 <span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/clock_barrier.html#ClockBarrier.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ClockBarrier.dispose" title="Link to this definition"></a></dt>
-<dd><p>Dispose of the ClockBarrier, marking it as disposed and breaking the barrier permanently.
-Once disposed, the barrier can no longer be used, and any waiting threads will raise a <cite>BrokenBarrierError</cite>.</p>
+<dd><p>Dispose of the ClockBarrier, marking it as cleaned and breaking the barrier permanently.
+Once cleaned, the barrier can no longer be used, and any waiting threads will raise a <cite>BrokenBarrierError</cite>.</p>
 <p class="rubric">Notes</p>
 <p>After disposal, the barrier is no longer usable. Calls to <cite>wait()</cite> will raise <cite>BrokenBarrierError</cite>.
 The controller reference is cleared before emitting events to avoid cascading notifications during shutdown.</p>
@@ -398,7 +398,7 @@ currently waiting threads.</p>
 This is useful for administrative shutdown or error handling when you
 need to unblock waiters without disposing the entire barrier.</p>
 <p>This operation is idempotent; calling it on an already broken or
-disposed barrier has no effect.</p>
+cleaned barrier has no effect.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -428,7 +428,7 @@ timeout because an exception is raised.</p>
 </dd>
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>threading.BrokenBarrierError</strong> – <ul class="simple">
-<li><p>The barrier was disposed.
+<li><p>The barrier was cleaned.
     • The barrier is already broken for this generation.
     • The global timeout elapsed before enough threads arrived.</p></li>
 </ul>
@@ -442,7 +442,7 @@ timeout because an exception is raised.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.ConcurrentBag">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">ConcurrentBag</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">_T</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_bag.html#ConcurrentBag"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentBag" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>A thread-safe multiset (“bag”) implementation using:
 - a dict from item -&gt; integer count
 - an RLock for synchronization</p>
@@ -524,8 +524,8 @@ but do nothing if the item is not in the bag.</p>
 <dl class="simple">
 <dt>Responsibilities:</dt><dd><ul class="simple">
 <li><p>Clears the internal bag, removing all items.</p></li>
-<li><p>Sets the <cite>disposed</cite> flag to True, marking this object as no longer valid.</p></li>
-<li><p>Emits a warning to notify that the object has been disposed.</p></li>
+<li><p>Sets the <cite>cleaned</cite> flag to True, marking this object as no longer valid.</p></li>
+<li><p>Emits a warning to notify that the object has been cleaned.</p></li>
 </ul>
 </dd>
 <dt>Behavior:</dt><dd><ul class="simple">
@@ -538,7 +538,7 @@ to avoid further operations.</p></li>
 <p class="rubric">Notes</p>
 <ul class="simple">
 <li><p>Designed for consistency with deterministic resource management patterns
-seen in systems programming (e.g., RAII, IDisposable).</p></li>
+seen in systems programming (e.g., RAII, Cleanable).</p></li>
 <li><p>Disposal does NOT release the lock itself since locks are acquired per operation.</p></li>
 </ul>
 <p class="rubric">Example</p>
@@ -546,7 +546,7 @@ seen in systems programming (e.g., RAII, IDisposable).</p></li>
 <dt>with ConcurrentBag(…) as bag:</dt><dd><p>bag.add(42)</p>
 </dd>
 </dl>
-<p># bag is now automatically disposed and cleared</p>
+<p># bag is now automatically cleaned and cleared</p>
 </dd></dl>
 
 <dl class="py method">
@@ -688,7 +688,7 @@ wrapped in a ConcurrentDict.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.ConcurrentBuffer">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">ConcurrentBuffer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">number_of_shards</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">_T</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_buffer.html#ConcurrentBuffer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentBuffer" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>A thread-safe, <em>mostly</em> FIFO buffer implementation using multiple internal
 deques (shards). Items are tagged with a timestamp upon enqueue.</p>
 <p>This buffer aims to provide better concurrency than a single-lock queue
@@ -762,12 +762,12 @@ at the head of each shard.</p>
 <dt>Responsibilities:</dt><dd><ul class="simple">
 <li><p>Disposes each internal shard by clearing their queues and resetting their counters.</p></li>
 <li><p>Resets the shared <cite>_length_array</cite> and <cite>_time_array</cite> used for shard coordination.</p></li>
-<li><p>Marks this object as disposed (<cite>self.disposed = True</cite>).</p></li>
+<li><p>Marks this object as cleaned (<cite>self.cleaned = True</cite>).</p></li>
 </ul>
 </dd>
 <dt>Behavior:</dt><dd><ul class="simple">
 <li><p>This method is idempotent: multiple calls will have no adverse effects after the first.</p></li>
-<li><p>Once disposed, the buffer should be considered permanently invalid.</p></li>
+<li><p>Once cleaned, the buffer should be considered permanently invalid.</p></li>
 <li><p>No post-disposal protection is enforced — correct usage is left to the caller’s responsibility.</p></li>
 </ul>
 </dd>
@@ -782,7 +782,7 @@ at the head of each shard.</p>
 <dt>with ConcurrentBuffer(…) as buf:</dt><dd><p>…</p>
 </dd>
 </dl>
-<p># buffer is automatically disposed here</p>
+<p># buffer is automatically cleaned here</p>
 </dd></dl>
 
 <dl class="py method">
@@ -932,7 +932,7 @@ from left to right, to reduce the buffer to a single value.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.ConcurrentCollection">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">ConcurrentCollection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">total_thread_count</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">_T</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_collection.html#ConcurrentCollection"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentCollection" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>A thread-safe, high-level collection that distributes items across multiple
 internal shards (lock-protected deques). Each shard is independently locked,
 so multiple runtime can access different shards in parallel with minimal contention.</p>
@@ -955,7 +955,7 @@ the <cite>total_thread_count</cite> parameter if provided.</p></li>
 </dd>
 <dt>Disposal:</dt><dd><ul class="simple">
 <li><p>Implemented via <cite>dispose()</cite>, which disposes all shards and clears shared data.</p></li>
-<li><p>Refrain from using the collection once disposed.</p></li>
+<li><p>Refrain from using the collection once cleaned.</p></li>
 <li><p><cite>with ConcurrentCollection(…) as cc:</cite> usage automatically calls <cite>dispose()</cite> on exit.</p></li>
 </ul>
 </dd>
@@ -1015,20 +1015,20 @@ copies of the current items.</p>
 <dt>Responsibilities:</dt><dd><ul class="simple">
 <li><p>Disposes all internal shards, which will clear their internal queues and reset their length counters.</p></li>
 <li><p>Resets the internal <cite>_length_array</cite> to zeroed values.</p></li>
-<li><p>Marks the collection as disposed via the <cite>self.disposed</cite> flag.</p></li>
+<li><p>Marks the collection as cleaned via the <cite>self.cleaned</cite> flag.</p></li>
 </ul>
 </dd>
 <dt>Behavior:</dt><dd><ul class="simple">
 <li><p>This method is idempotent. Calling <cite>dispose()</cite> multiple times is safe and will have no effect after the first call.</p></li>
-<li><p>Once disposed, the collection is considered invalid and should not be used further.</p></li>
-<li><p>This follows a typical deterministic disposal pattern (inspired by .NET’s <cite>IDisposable</cite>), ensuring explicit control over resource lifetime.</p></li>
+<li><p>Once cleaned, the collection is considered invalid and should not be used further.</p></li>
+<li><p>This follows a typical deterministic disposal pattern (inspired by .NET’s <cite>Cleanable</cite>), ensuring explicit control over resource lifetime.</p></li>
 </ul>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
 <ul class="simple">
 <li><p>Unlike some patterns, this implementation does NOT prevent method calls after disposal.
-It is the user’s responsibility to ensure that no further use is made of the object after it is disposed.</p></li>
+It is the user’s responsibility to ensure that no further use is made of the object after it is cleaned.</p></li>
 </ul>
 </dd></dl>
 
@@ -1169,7 +1169,7 @@ a TypeError is raised (mirroring the built-in reduce behavior).</p></li>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.ConcurrentDict">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">ConcurrentDict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">_K</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">_V</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">_K</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">_V</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_dictionary.html#ConcurrentDict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentDict" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_K</span></code>, <code class="xref py py-obj docutils literal notranslate"><span class="pre">_V</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_K</span></code>, <code class="xref py py-obj docutils literal notranslate"><span class="pre">_V</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <dl class="simple">
 <dt>A thread-safe dictionary implementation using:</dt><dd><ul class="simple">
 <li><p>An underlying Python dict</p></li>
@@ -1219,7 +1219,7 @@ The function should perform all necessary mutations.</p>
 <dt class="sig sig-object py" id="thread_factory.ConcurrentDict.dispose">
 <span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_dictionary.html#ConcurrentDict.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentDict.dispose" title="Link to this definition"></a></dt>
 <dd><p>Dispose (clear) this ConcurrentDict, releasing its contents.</p>
-<p>Once disposed, <cite>disposed</cite> becomes True and the internal dict is cleared.
+<p>Once cleaned, <cite>cleaned</cite> becomes True and the internal dict is cleared.
 No further usage checks are enforced, so the user must avoid calling
 other methods after disposal.</p>
 <p>This method is idempotent — multiple calls won’t cause errors.</p>
@@ -1483,7 +1483,7 @@ or keyword arguments.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.ConcurrentList">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">ConcurrentList</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">_T</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_list.html#ConcurrentList"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentList" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>A thread-safe list implementation using an underlying Python list,
 a reentrant lock for synchronization, and an atomic counter for fast,
 lock-free retrieval of the length.</p>
@@ -1555,7 +1555,7 @@ The function should perform all necessary mutations.</p>
 <dt class="sig sig-object py" id="thread_factory.ConcurrentList.dispose">
 <span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_list.html#ConcurrentList.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentList.dispose" title="Link to this definition"></a></dt>
 <dd><p>Dispose (clear) this ConcurrentList, releasing its contents.</p>
-<p>Once disposed, <cite>_disposed</cite> becomes True and the internal dict is cleared.
+<p>Once cleaned, <cite>_cleaned</cite> becomes True and the internal dict is cleared.
 No further usage checks are enforced, so the user must avoid calling
 other methods after disposal.</p>
 <p>This method is idempotent — multiple calls won’t cause errors.</p>
@@ -1785,7 +1785,7 @@ This is useful for making the dictionary mutable again after being frozen.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.ConcurrentQueue">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">ConcurrentQueue</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">_T</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_queue.html#ConcurrentQueue"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentQueue" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>A thread-safe FIFO queue implementation using an underlying deque,
 a reentrant lock for synchronization, and an atomic counter for fast
 retrieval of the number of items.</p>
@@ -1846,7 +1846,7 @@ The function should perform all necessary mutations.</p>
 <dt class="sig sig-object py" id="thread_factory.ConcurrentQueue.dispose">
 <span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_queue.html#ConcurrentQueue.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentQueue.dispose" title="Link to this definition"></a></dt>
 <dd><p>Dispose (clear) this ConcurrentQueue, releasing its contents.</p>
-<p>Once disposed, <cite>_disposed</cite> becomes True and the internal dict is cleared.
+<p>Once cleaned, <cite>_cleaned</cite> becomes True and the internal dict is cleared.
 No further usage checks are enforced, so the user must avoid calling
 other methods after disposal.</p>
 <p>This method is idempotent — multiple calls won’t cause errors.</p>
@@ -2027,7 +2027,7 @@ tasks are reversed to maintain correct execution order (FIFO).</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.ConcurrentSet">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">ConcurrentSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">_T</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_set.html#ConcurrentSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentSet" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>Thread‑safe, optionally <em>freezeable</em> hash‑set implementation.</p>
 <p>This class provides a concurrent-safe wrapper around Python’s built-in <cite>set</cite>.
 It uses a reentrant lock (<cite>threading.RLock</cite>) to protect the underlying set
@@ -2047,7 +2047,7 @@ an incorrect state usage early in the development process.</p></li>
 (<cite>|</cite>, <cite>&amp;</cite>, <cite>-</cite>, <cite>^</cite>) and those modifying the set in-place (<cite>|=</cite>, <cite>&amp;=</cite>, <cite>-=</cite>, <cite>^=</cite>),
 are implemented or forwarded to internal helpers. These implementations ensure
 that the operations are performed safely under the lock and respect the frozen state.</p></li>
-<li><p><strong>Disposable / context‑manager</strong>: The class implements the <cite>IDisposable</cite> interface,
+<li><p><strong>Disposable / context‑manager</strong>: The class implements the <cite>Cleanable</cite> interface,
 following a pattern where resources (in this case, the internal set’s data) can
 be explicitly cleaned up using the <cite>dispose()</cite> method. It also supports the
 context manager protocol (<cite>with ConcurrentSet(…) as cs:</cite>), although using the
@@ -2131,13 +2131,13 @@ then acquires the internal lock before attempting the discard.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="thread_factory.ConcurrentSet.dispose">
 <span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_set.html#ConcurrentSet.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentSet.dispose" title="Link to this definition"></a></dt>
-<dd><p>Clear internal data and mark the ConcurrentSet as disposed.</p>
+<dd><p>Clear internal data and mark the ConcurrentSet as cleaned.</p>
 <p>This method releases the resources held by the set, primarily by clearing
-the underlying built-in set. Once disposed, the set should not be used
+the underlying built-in set. Once cleaned, the set should not be used
 further.</p>
 <p>This method is idempotent; calling it multiple times has no additional effect
 after the first call. It is also thread-safe, using the internal lock
-to protect the clearing operation and the <cite>disposed</cite> flag update.</p>
+to protect the clearing operation and the <cite>cleaned</cite> flag update.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -2361,7 +2361,7 @@ then acquires the internal lock before performing the update.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.ConcurrentStack">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">ConcurrentStack</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">_T</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_stack.html#ConcurrentStack"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentStack" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>A thread-safe LIFO stack implementation using an underlying deque,
 a reentrant lock for synchronization, and an atomic counter for fast
 retrieval of the number of items.</p>
@@ -2405,7 +2405,7 @@ The function should perform all necessary mutations.</p>
 <dt class="sig sig-object py" id="thread_factory.ConcurrentStack.dispose">
 <span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/concurrency/concurrent_stack.html#ConcurrentStack.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.ConcurrentStack.dispose" title="Link to this definition"></a></dt>
 <dd><p>Dispose (clear) this ConcurrentStack, releasing its contents.</p>
-<p>Once disposed, <cite>_disposed</cite> becomes True and the internal dict is cleared.
+<p>Once cleaned, <cite>_cleaned</cite> becomes True and the internal dict is cleared.
 No further usage checks are enforced, so the user must avoid calling
 other methods after disposal.</p>
 <p>This method is idempotent — multiple calls won’t cause errors.</p>
@@ -2697,7 +2697,7 @@ in the original order. Similar to built-in map, but parallelized.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.Conductor">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">Conductor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tasks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Pack</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Pack</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reusable</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">manual_release</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raise_on_timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiple_outcomes_per_task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">controller</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="s"><span class="pre">'SignalController'</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/conductor.html#Conductor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Conductor" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>A reusable, data-aware synchronization point and work executor.</p>
 <p>The Conductor acts as an advanced, thread-safe barrier that orchestrates the
 synchronization of multiple threads. It blocks callers of its <cite>start</cite> method
@@ -2711,16 +2711,16 @@ indefinite blocking, and centralized, thread-safe management of task outcomes
 <p>It can integrate with a <cite>SignalController</cite> to emit lifecycle events, enabling
 monitoring and external coordination based on its internal state, such as when
 the barrier is passed, when task execution begins, or when it is reset or
-disposed.</p>
+cleaned.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="thread_factory.Conductor.dispose">
 <span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/conductor.html#Conductor.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Conductor.dispose" title="Link to this definition"></a></dt>
 <dd><p>Disposes of the Conductor, cleaning up all associated resources.</p>
 <p>This method performs a full teardown of the Conductor. It marks the
-instance as disposed, notifies the controller (if any), and releases all
+instance as cleaned, notifies the controller (if any), and releases all
 internal synchronization primitives (barriers, locks, events). This action
 effectively unblocks any threads currently waiting on the Conductor.</p>
-<p>Once disposed, a Conductor cannot be used or reset. Any subsequent calls
+<p>Once cleaned, a Conductor cannot be used or reset. Any subsequent calls
 to its methods will have no effect or raise a <cite>RuntimeError</cite>. This method
 is thread-safe.</p>
 </dd></dl>
@@ -2733,7 +2733,7 @@ is thread-safe.</p>
 exception objects for each task that failed. It filters out disposal-related
 <cite>RuntimeError</cite> exceptions to only report on application-level errors.</p>
 <p>The returned list is a snapshot of the exceptions at the time of the call.
-If the Conductor is disposed, it returns an empty list.</p>
+If the Conductor is cleaned, it returns an empty list.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>List[Exception]</p>
@@ -2805,7 +2805,7 @@ does not hang indefinitely.</p>
 <p>If the Conductor was initialized with <cite>manual_release=True</cite>, calling this
 method will set the internal event that allows the <cite>start()</cite> method to
 finally complete and threads to be released. If <cite>manual_release</cite> is False,
-or if the Conductor is already released or disposed, this method has no
+or if the Conductor is already released or cleaned, this method has no
 effect.</p>
 <p>This is primarily used to signal that post-task cleanup or verification
 is complete and the synchronized operation can be considered fully finished.</p>
@@ -2823,7 +2823,7 @@ notifies the controller that a “RESET” event has occurred.</p>
 cycle. If the Conductor is not reusable, this method does nothing.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>RuntimeError</strong> – If the Conductor has already been disposed.</p>
+<dd class="field-odd"><p><strong>RuntimeError</strong> – If the Conductor has already been cleaned.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -2836,7 +2836,7 @@ cycle. If the Conductor is not reusable, this method does nothing.</p>
 actual result data for each task that completed successfully (i.e., did
 not raise an exception). The returned list is a snapshot of the results
 at the time of the call.</p>
-<p>If the Conductor is disposed, it returns an empty list.</p>
+<p>If the Conductor is cleaned, it returns an empty list.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>List[Any]</p>
@@ -2884,7 +2884,7 @@ cannot be acquired within this time, the method will return.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.Dynaphore">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">Dynaphore</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">re_entrant</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/dynaphore.html#Dynaphore"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Dynaphore" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Semaphore</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Semaphore</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>This class extends Python’s standard <cite>threading.Semaphore</cite> with the ability to
 dynamically scale the number of permits up or down at runtime.</p>
 <p>Unlike standard semaphores, Dynaphore provides:
@@ -3040,7 +3040,7 @@ to ensure no threads remain blocked on the internal condition.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.FlowRegulator">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">FlowRegulator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bias_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/flow_regulator.html#FlowRegulator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.FlowRegulator" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>functionality by allowing runtime adjustment of available permits,
 targeted thread awakening using unique identifiers (ULIDs), and
 robust disposal mechanisms.</p>
@@ -3190,7 +3190,7 @@ the waiting thread, including its <cite>factory_id</cite>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p><dl class="simple">
-<dt>A list of <cite>Waiter</cite> objects. Returns an empty list if the</dt><dd><p>lock is disposed or no threads are waiting.</p>
+<dt>A list of <cite>Waiter</cite> objects. Returns an empty list if the</dt><dd><p>lock is cleaned or no threads are waiting.</p>
 </dd>
 </dl>
 </p>
@@ -3210,7 +3210,7 @@ currently blocked and waiting to acquire a permit from this lock.</p>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p><dl class="simple">
 <dt>A list of string ULIDs (or “MainThread”) representing</dt><dd><p>the waiting threads. Returns an empty list if the lock
-is disposed or no threads are waiting.</p>
+is cleaned or no threads are waiting.</p>
 </dd>
 </dl>
 </p>
@@ -3396,7 +3396,7 @@ If None, wait indefinitely.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.Fork">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">Fork</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">number_of_forks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotate_selectors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">selector_step</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/fork.html#Fork"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Fork" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>A concurrent fork dispatcher for routing threads across multiple callables.</p>
 <p>This class creates a “fork” in thread execution. Each fork represents a
 callable with a usage cap (how many threads may execute it).</p>
@@ -3467,7 +3467,7 @@ under high contention.</p>
 it as unusable. This method is idempotent and safe to call multiple times.</p>
 <p>After disposal:
 - All future calls to <cite>use_fork()</cite> will raise a RuntimeError.
-- All internal ForkUnits are marked as disposed (callable cleared).</p>
+- All internal ForkUnits are marked as cleaned (callable cleared).</p>
 </dd></dl>
 
 <dl class="py method">
@@ -3508,7 +3508,7 @@ it as unusable. This method is idempotent and safe to call multiple times.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.Group">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">Group</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tasks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiple_outcomes_per_task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/utilities/coordination/group.html#Group"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Group" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>Tracks outcomes per task and supports optional multi-outcome-per-task mode.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="thread_factory.Group.count">
@@ -3595,7 +3595,7 @@ it as unusable. This method is idempotent and safe to call multiple times.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.Latch">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">Latch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">open</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/latch.html#Latch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Latch" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <section id="latch-or-gate">
 <h2>Latch or Gate<a class="headerlink" href="#latch-or-gate" title="Link to this heading"></a></h2>
 <p>A lightweight synchronization primitive that blocks threads until it is manually opened.</p>
@@ -3639,7 +3639,7 @@ Returns True if the latch is open, False if it timed out.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="thread_factory.Latch.dispose">
 <span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/latch.html#Latch.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Latch.dispose" title="Link to this definition"></a></dt>
-<dd><p>Releases all waiting threads and marks the latch as disposed.
+<dd><p>Releases all waiting threads and marks the latch as cleaned.
 After this, the latch cannot be used again.</p>
 </dd></dl>
 
@@ -3662,7 +3662,7 @@ Once opened, it remains open until explicitly reset.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.MultiConductor">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">MultiConductor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">groups</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#thread_factory.Group" title="thread_factory.Group"><span class="pre">Group</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#thread_factory.ConcurrentList" title="thread_factory.ConcurrentList"><span class="pre">ConcurrentList</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#thread_factory.Group" title="thread_factory.Group"><span class="pre">Group</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reusable</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">manual_release</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raise_on_timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiple_outcomes_per_task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distributed_execution</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sync_distributed_execution</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Pack</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">controller</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="s"><span class="pre">'SignalController'</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/multi_conductor.html#MultiConductor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.MultiConductor" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>The <cite>MultiConductor</cite> extends traditional synchronization primitives by enabling synchronized task execution
 across <strong>named groups</strong>, with rich lifecycle support, outcome collection, timeout enforcement, and manual gating.
 It is designed for high-control concurrent scenarios where coordinated thread behavior is critical.</p>
@@ -3784,10 +3784,10 @@ has been reached.</p>
 <span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/multi_conductor.html#MultiConductor.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.MultiConductor.dispose" title="Link to this definition"></a></dt>
 <dd><p>Disposes of the MultiConductor and all associated resources.</p>
 <p>This method releases all synchronization primitives, disposes of any barriers and groups,
-and marks the conductor as disposed. Once disposed, the conductor is no longer usable.</p>
+and marks the conductor as cleaned. Once cleaned, the conductor is no longer usable.</p>
 <p>The following actions occur:
 - Releases all waiters to prevent deadlocks.
-- Notifies the controller (if provided) that the conductor has been disposed.
+- Notifies the controller (if provided) that the conductor has been cleaned.
 - Disposes of any internal barriers such as the <cite>ClockBarrier</cite>, <cite>SignalBarrier</cite>, and <cite>Dynaphore</cite>.
 - Clears the groups and outcomes data structures, ensuring no references remain.</p>
 <p>If called multiple times, this method will safely exit without performing any additional work.</p>
@@ -3806,7 +3806,7 @@ call to <cite>start()</cite>), no more groups can be added or removed.</p>
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">exceptions</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Exception</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#thread_factory.MultiConductor.exceptions" title="Link to this definition"></a></dt>
 <dd><p>A flat list of all exceptions from all tasks in all groups.</p>
 <p>This property extracts and returns all exceptions that occurred during the execution of tasks across all groups,
-concatenated into a single, flat list. If the <cite>MultiConductor</cite> has been disposed, it will return an empty list.</p>
+concatenated into a single, flat list. If the <cite>MultiConductor</cite> has been cleaned, it will return an empty list.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>A list of all exceptions collected from the tasks across all groups.</p>
@@ -3893,10 +3893,10 @@ or if it has reached its end.</p>
 <p>This method immediately releases all waiting threads, bypassing the normal synchronization process. It is
 intended for emergency situations or when an external event requires immediate intervention. Calling this
 method will break the barrier and release all threads regardless of whether the threshold is met.</p>
-<p>If the conductor has been disposed or is already released, this method has no effect.</p>
+<p>If the conductor has been cleaned or is already released, this method has no effect.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>RuntimeError</strong> – If the conductor is disposed or broken, preventing the barrier from being forcibly released.</p>
+<dd class="field-odd"><p><strong>RuntimeError</strong> – If the conductor is cleaned or broken, preventing the barrier from being forcibly released.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -3916,7 +3916,7 @@ the conductor to notify the controller (if any) and proceed with task execution.
 <p>If <cite>manual_release</cite> is not set to <cite>True</cite>, calling this method will have no effect.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>RuntimeError</strong> – If the conductor is already disposed or broken, or if it’s not in a manual release state.</p>
+<dd class="field-odd"><p><strong>RuntimeError</strong> – If the conductor is already cleaned or broken, or if it’s not in a manual release state.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -3945,7 +3945,7 @@ the conductor to notify the controller (if any) and proceed with task execution.
 clears all state flags, and reinitializes synchronization primitives.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>RuntimeError</strong> – If the MultiConductor has already been disposed.</p>
+<dd class="field-odd"><p><strong>RuntimeError</strong> – If the MultiConductor has already been cleaned.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -3955,7 +3955,7 @@ clears all state flags, and reinitializes synchronization primitives.</p>
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">results</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#thread_factory.MultiConductor.results" title="Link to this definition"></a></dt>
 <dd><p>A flat list of all successful results from all tasks in all groups.</p>
 <p>This property extracts and returns all successful task results from every task in every group, concatenated
-into a single, flat list. If the <cite>MultiConductor</cite> has been disposed, it will return an empty list.</p>
+into a single, flat list. If the <cite>MultiConductor</cite> has been cleaned, it will return an empty list.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>A list of all successful results collected from the tasks across all groups.</p>
@@ -3995,7 +3995,7 @@ the conductor will wait indefinitely until the threshold is reached.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.Outcome">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">Outcome</span></span><a class="reference internal" href="_modules/thread_factory/utilities/coordination/outcome.html#Outcome"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Outcome" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>A lightweight, self-contained, Future-like object to hold the eventual
 result or exception to a unit of work.</p>
 <p>This object is thread-safe.</p>
@@ -4031,7 +4031,7 @@ If the timeout is reached, it raises a TimeoutError.</p>
 <dd><p>Sets the exception for this outcome and notifies waiting threads.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>RuntimeError</strong> – If the outcome has already been set or disposed.</p>
+<dd class="field-odd"><p><strong>RuntimeError</strong> – If the outcome has already been set or cleaned.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -4042,7 +4042,7 @@ If the timeout is reached, it raises a TimeoutError.</p>
 <dd><p>Sets the successful result for this outcome and notifies waiting threads.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>RuntimeError</strong> – If the outcome has already been set or disposed.</p>
+<dd class="field-odd"><p><strong>RuntimeError</strong> – If the outcome has already been set or cleaned.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -4058,7 +4058,7 @@ If the timeout is reached, it raises a TimeoutError.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.Package">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">Package</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/utilities/coordination/package.html#Package"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Package" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <dl class="py property">
 <dt class="sig sig-object py" id="thread_factory.Package.args">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">args</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#thread_factory.Package.args" title="Link to this definition"></a></dt>
@@ -4212,7 +4212,7 @@ WARNING: This modifies the original Package!</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.Scout">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">Scout</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">predicate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">bool</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout_duration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_timeout_callable</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_success_callable</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">autoreset_on_exit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/scout.html#Scout"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Scout" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>whether the predicate becomes True within the timeout or if the timeout
 is reached. It ensures only one thread can perform monitoring at a time.</p>
 <p>It acts as a ‘latch’: once a monitoring cycle completes (success or timeout),
@@ -4248,7 +4248,7 @@ All resources are released. Does NOT call super().dispose().</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="thread_factory.Scout.exit_monitor">
 <span class="sig-name descname"><span class="pre">exit_monitor</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/scout.html#Scout.exit_monitor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Scout.exit_monitor" title="Link to this definition"></a></dt>
-<dd><p>Marks the Scout as disposed, effectively exiting any ongoing monitoring.</p>
+<dd><p>Marks the Scout as cleaned, effectively exiting any ongoing monitoring.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -4291,7 +4291,7 @@ return False immediately, indicating it could not enter.</p>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p><dl class="simple">
 <dt>True if monitoring started and the predicate became True.</dt><dd><p>False if monitoring started and timeout occurred.
-False if the Scout was already active, disposed, or latched.</p>
+False if the Scout was already active, cleaned, or latched.</p>
 </dd>
 </dl>
 </p>
@@ -4315,7 +4315,7 @@ and a previous <cite>monitor()</cite> call completed.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.SignalBarrier">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">SignalBarrier</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">signal_callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reusable</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">manual_release</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">controller</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Controller</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transit_callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/signal_barrier.html#SignalBarrier"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalBarrier" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>waiting threads are released simultaneously. This release can occur automatically
 or be manually triggered, depending on the configuration.</p>
 <section id="core-features">
@@ -4403,7 +4403,7 @@ for _ in range(5):</p>
 <dt class="sig sig-object py" id="thread_factory.SignalBarrier.dispose">
 <span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/signal_barrier.html#SignalBarrier.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalBarrier.dispose" title="Link to this definition"></a></dt>
 <dd><p>Releases all resources and unblocks waiting threads.</p>
-<p>This method marks the semaphore as disposed and removes references
+<p>This method marks the semaphore as cleaned and removes references
 to callbacks and controllers. All currently waiting threads are notified
 and allowed to exit.</p>
 <p>This method is idempotent and safe to call multiple times.</p>
@@ -4514,7 +4514,7 @@ hasn’t been released.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p><dl class="simple">
-<dt>True if the semaphore was released and the thread passed through.</dt><dd><p>False if the wait timed out or the semaphore was disposed before release.</p>
+<dt>True if the semaphore was released and the thread passed through.</dt><dd><p>False if the wait timed out or the semaphore was cleaned before release.</p>
 </dd>
 </dl>
 </p>
@@ -4543,7 +4543,7 @@ hasn’t been released.</p>
 <p class="rubric">Notes</p>
 <ul class="simple">
 <li><p>If the semaphore has already been released and is not reusable, the call returns immediately.</p></li>
-<li><p>If disposed, the thread unblocks with a return value of False.</p></li>
+<li><p>If cleaned, the thread unblocks with a return value of False.</p></li>
 </ul>
 <dl class="simple">
 <dt>Exceptions:</dt><dd><ul class="simple">
@@ -4559,7 +4559,7 @@ hasn’t been released.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.SignalController">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">SignalController</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">controller_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">controller_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Logger</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/controllers/signal_controller.html#SignalController"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalController" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>SignalController: A management system for registering, invoking, and controlling objects
 that expose commands through a standardized interface.</p>
 <p>Objects managed by this controller must adhere to a specific contract:
@@ -4638,8 +4638,8 @@ and <cite>command</cite> (the name of the command being invoked).</p>
 <dd><p>Dispose of all registered objects and the controller itself.</p>
 <p>This method iterates through all registered objects and attempts to call their
 <cite>dispose()</cite> method (if available and implemented). It then cleans up all
-internal data structures to release resources and marks the controller as disposed.
-Subsequent operations on a disposed controller may behave unexpectedly or raise errors.
+internal data structures to release resources and marks the controller as cleaned.
+Subsequent operations on a cleaned controller may behave unexpectedly or raise errors.
 This method is idempotent and thread-safe.</p>
 </dd></dl>
 
@@ -4874,7 +4874,7 @@ controller’s registry. Defaults to <cite>True</cite>.</p></li>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.SignalFork">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">SignalFork</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">number_of_forks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotate_selectors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">selector_step</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">controller</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/signal_fork.html#SignalFork"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalFork" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>and emits a one-time completion callback and optional controller notification once all
 slots are fully claimed and executed.</p>
 <p>Unlike synchronization-based forks (e.g., barriers or gated dispatchers), this fork allows
@@ -4961,7 +4961,7 @@ If provided, it will receive a <cite>“FORK_COMPLETED”</cite> notification wh
 <dd class="field-even"><p>If a usage cap is not an integer or a callable is invalid.</p>
 </dd>
 <dt class="field-odd">raises RuntimeError:<span class="colon">:</span></dt>
-<dd class="field-odd"><p>If <cite>use_fork()</cite> is called after the fork is disposed or exhausted.</p>
+<dd class="field-odd"><p>If <cite>use_fork()</cite> is called after the fork is cleaned or exhausted.</p>
 </dd>
 </dl>
 <dl class="py method">
@@ -4969,7 +4969,7 @@ If provided, it will receive a <cite>“FORK_COMPLETED”</cite> notification wh
 <span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/signal_fork.html#SignalFork.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalFork.dispose" title="Link to this definition"></a></dt>
 <dd><p>Fully disposes the SignalFork instance.</p>
 <p>This method performs complete teardown of the fork, including:
-• Marking the object as disposed to prevent further usage.
+• Marking the object as cleaned to prevent further usage.
 • Releasing all held ForkUnit resources by invoking their <cite>dispose()</cite> methods.
 • Clearing the internal list of forks.
 • Unregistering from the controller (if registered).</p>
@@ -5008,7 +5008,7 @@ If provided, it will receive a <cite>“FORK_COMPLETED”</cite> notification wh
 • Clears the <cite>_callback_executed</cite> flag, enabling the callback to fire again if conditions are met.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>RuntimeError</strong> – If called on a disposed instance.</p>
+<dd class="field-odd"><p><strong>RuntimeError</strong> – If called on a cleaned instance.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -5026,7 +5026,7 @@ If provided, it will receive a <cite>“FORK_COMPLETED”</cite> notification wh
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>RuntimeError</strong> – <ul>
-<li><p>If the fork is disposed.
+<li><p>If the fork is cleaned.
     - If all ForkUnits are at capacity.</p></li>
 </ul>
 </p></li>
@@ -5042,7 +5042,7 @@ If provided, it will receive a <cite>“FORK_COMPLETED”</cite> notification wh
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.SignalLatch">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">SignalLatch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">signal_callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cond</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="synchronization/primitives/transit_condition.html#thread_factory.synchronization.primitives.transit_condition.TransitCondition" title="thread_factory.synchronization.primitives.transit_condition.TransitCondition"><span class="pre">TransitCondition</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">controller</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Controller</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/signal_latch.html#SignalLatch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalLatch" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <section id="signallatch-or-signalgate">
 <h2>SignalLatch or SignalGate<a class="headerlink" href="#signallatch-or-signalgate" title="Link to this heading"></a></h2>
 <p>A <em>one-shot</em> (but reusable) latch/gate that blocks threads until it is explicitly
@@ -5100,7 +5100,7 @@ with latch:</p>
 <dd class="field-odd"><p>bool</p>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>RuntimeError</strong> – If the latch has already been disposed.</p>
+<dd class="field-even"><p><strong>RuntimeError</strong> – If the latch has already been cleaned.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -5111,8 +5111,8 @@ with latch:</p>
 <dd><p>Release all blocked threads <strong>permanently</strong>; further operations raise.</p>
 <p class="rubric">Notes</p>
 <ul class="simple">
-<li><p>Once disposed, <a class="reference internal" href="#thread_factory.SignalLatch.open" title="thread_factory.SignalLatch.open"><code class="xref py py-meth docutils literal notranslate"><span class="pre">open()</span></code></a> and <a class="reference internal" href="#thread_factory.SignalLatch.reset" title="thread_factory.SignalLatch.reset"><code class="xref py py-meth docutils literal notranslate"><span class="pre">reset()</span></code></a> are ignored.</p></li>
-<li><p>The internal <a class="reference internal" href="#thread_factory.TransitCondition" title="thread_factory.TransitCondition"><code class="xref py py-class docutils literal notranslate"><span class="pre">TransitCondition</span></code></a> is also disposed to free
+<li><p>Once cleaned, <a class="reference internal" href="#thread_factory.SignalLatch.open" title="thread_factory.SignalLatch.open"><code class="xref py py-meth docutils literal notranslate"><span class="pre">open()</span></code></a> and <a class="reference internal" href="#thread_factory.SignalLatch.reset" title="thread_factory.SignalLatch.reset"><code class="xref py py-meth docutils literal notranslate"><span class="pre">reset()</span></code></a> are ignored.</p></li>
+<li><p>The internal <a class="reference internal" href="#thread_factory.TransitCondition" title="thread_factory.TransitCondition"><code class="xref py py-class docutils literal notranslate"><span class="pre">TransitCondition</span></code></a> is also cleaned to free
 resources.</p></li>
 </ul>
 </dd></dl>
@@ -5138,7 +5138,7 @@ resources.</p></li>
 <dt class="sig sig-object py" id="thread_factory.SignalLatch.open">
 <span class="sig-name descname"><span class="pre">open</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/signal_latch.html#SignalLatch.open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SignalLatch.open" title="Link to this definition"></a></dt>
 <dd><p>Idempotently open the latch and wake <strong>all</strong> waiting threads.</p>
-<p>If the latch is already open or disposed, this is a no-op.</p>
+<p>If the latch is already open or cleaned, this is a no-op.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -5147,7 +5147,7 @@ resources.</p></li>
 <dd><p>Close the latch again so it can be reused for a new cohort.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>RuntimeError</strong> – If you attempt to reset a disposed latch.</p>
+<dd class="field-odd"><p><strong>RuntimeError</strong> – If you attempt to reset a cleaned latch.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -5166,7 +5166,7 @@ This allows the CommandCenter to be controlled remotely.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.SmartCondition">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">SmartCondition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">lock</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/smart_condition.html#SmartCondition"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SmartCondition" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>Unlike standard <cite>threading.Condition</cite>, this implementation supports:</p>
 <ul class="simple">
 <li><p><strong>Thread-aware semantics</strong>: Each thread is tracked using a unique <cite>factory_id</cite> (usually a ULID),
@@ -5208,7 +5208,7 @@ It should take no arguments and return None.</p></li>
 <span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/smart_condition.html#SmartCondition.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SmartCondition.dispose" title="Link to this definition"></a></dt>
 <dd><p>Disposes the SmartCondition, releasing all waiters and clearing internal registries.</p>
 <p>This method:
-- Marks the condition as disposed.
+- Marks the condition as cleaned.
 - Wakes all waiting threads without executing callbacks.
 - Clears the waiters queue.
 - Clears callback registries.
@@ -5470,7 +5470,7 @@ to become true. If <cite>None</cite>, the thread waits indefinitely.</p></li>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.Stopwatch">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">Stopwatch</span></span><a class="reference internal" href="_modules/thread_factory/utilities/timing_tools/stopwatch.html#Stopwatch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.Stopwatch" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <dl class="simple">
 <dt>Features:</dt><dd><ul class="simple">
 <li><p>Start / Stop / Reset / Elapsed time</p></li>
@@ -5768,7 +5768,7 @@ e = SyncFloat.safe_pow(a, d, 2)  # Apply ternary pow safely (custom)</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.SyncFork">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">SyncFork</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">number_of_forks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">selector_step</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout_duration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/sync_fork.html#SyncFork"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SyncFork" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>A concurrent fork dispatcher with barrier semantics and optional timeout.</p>
 <p>Each thread claims a slot in a callable. Once the total number of slots across
 all callables is filled, all threads are released simultaneously to execute
@@ -5792,9 +5792,9 @@ batches of concurrent tasks.</p>
 Idempotent: safe to call multiple times.</p>
 <p>After disposal:
 - All future use of <cite>use_fork()</cite> raises RuntimeError.
-- All <a href="#id40"><span class="problematic" id="id41">`</span></a>ForkUnit`s are explicitly disposed (clearing their callables).
+- All <a href="#id40"><span class="problematic" id="id41">`</span></a>ForkUnit`s are explicitly cleaned (clearing their callables).
 - The internal threading event is triggered to release any waiting threads.
-- If a Scout was in use, it is also disposed.</p>
+- If a Scout was in use, it is also cleaned.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -6317,7 +6317,7 @@ Avoid reentrant calls to the same SyncRef within this function.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.SyncSignalFork">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">SyncSignalFork</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">number_of_forks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">selector_step</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout_duration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">manual_release</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">controller</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Controller</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">signal_callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/sync_signal_fork.html#SyncSignalFork"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SyncSignalFork" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>Threads <em>claim</em> slots in the provided <cite>(usage_cap, callable)</cite> list.  When
 <strong>all</strong> slots across <strong>all</strong> callables are claimed, the fork:</p>
 <ul class="simple">
@@ -6370,7 +6370,7 @@ timeout raises <code class="xref py py-class docutils literal notranslate"><span
 <span class="sig-name descname"><span class="pre">dispose</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/thread_factory/synchronization/dispatchers/sync_signal_fork.html#SyncSignalFork.dispose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.SyncSignalFork.dispose" title="Link to this definition"></a></dt>
 <dd><p>Dispose the SyncSignalFork instance and release all held resources.</p>
 <p>This method:
-• Sets <cite>_disposed = True</cite> to block future usage.
+• Sets <cite>_cleaned = True</cite> to block future usage.
 • Releases all waiting threads via <cite>_threading_event</cite>.
 • Disposes all ForkUnits by clearing their callables.
 • Disposes the Scout (if active).
@@ -6404,7 +6404,7 @@ and notifies the controller via <cite>“SEMAPHORE_RELEASED”</cite>.</p>
 • Scout state (if applicable)</p>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>RuntimeError</strong> – If called on a disposed instance.</p>
+<dd class="field-odd"><p><strong>RuntimeError</strong> – If called on a cleaned instance.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -6422,7 +6422,7 @@ and notifies the controller via <cite>“SEMAPHORE_RELEASED”</cite>.</p>
 • Executes the selected callable once the barrier is released.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>RuntimeError</strong> – If disposed, timed out, or fork is closed and released.</p>
+<dd class="field-odd"><p><strong>RuntimeError</strong> – If cleaned, timed out, or fork is closed and released.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -6839,7 +6839,7 @@ Thread-safe.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.TransitBarrier">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">TransitBarrier</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reusable</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">manual_release</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">controller</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="synchronization/controllers/signal_controller.html#thread_factory.synchronization.controllers.signal_controller.SignalController" title="thread_factory.synchronization.controllers.signal_controller.SignalController"><span class="pre">SignalController</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/coordinators/transit_barrier.html#TransitBarrier"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.TransitBarrier" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <p>When in manual mode and managed by a Controller, the barrier signals the Controller upon reaching its threshold and
 waits for a command to proceed. The barrier can also trigger a custom action (referred to as <cite>transit</cite>) once the threshold is met.</p>
 <section id="key-features">
@@ -6884,7 +6884,7 @@ waits for a command to proceed. The barrier can also trigger a custom action (re
 - The internal controller reference is cleared.
 - All pending threads are notified and released.
 - Callable references (<cite>_transit</cite>) are nulled for GC friendliness.
-- The object is marked as disposed and is no longer usable.</p>
+- The object is marked as cleaned and is no longer usable.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -6963,7 +6963,7 @@ but threads remain blocked until <cite>.release()</cite> is called externally.</
 <dd class="field-odd"><p><strong>timeout</strong> – Optional timeout (in seconds) to wait.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>True if released successfully, False if disposed or timed out.</p>
+<dd class="field-even"><p>True if released successfully, False if cleaned or timed out.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -6974,7 +6974,7 @@ but threads remain blocked until <cite>.release()</cite> is called externally.</
 <dl class="py class">
 <dt class="sig sig-object py" id="thread_factory.TransitCondition">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">thread_factory.</span></span><span class="sig-name descname"><span class="pre">TransitCondition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lock</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="utilities/coordination/package.html#thread_factory.utilities.coordination.package.Package" title="thread_factory.utilities.coordination.package.Package"><span class="pre">Package</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thread_factory/synchronization/primitives/transit_condition.html#TransitCondition"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#thread_factory.TransitCondition" title="Link to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">IDisposable</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Cleanable</span></code></p>
 <dl class="simple">
 <dt>Unlike <cite>threading.Condition</cite>, this primitive offers:</dt><dd><ol class="arabic simple">
 <li><p><strong>Callback Execution Inside the Woken Thread</strong> – ensures the notifier never runs arbitrary code.</p></li>
@@ -7003,7 +7003,7 @@ logic and the waiting thread executes it — cleanly and safely.</p>
 <dd><p>Dispose of this SignalCondition safely.</p>
 <dl class="simple">
 <dt>This method will:</dt><dd><ul class="simple">
-<li><p>Mark the instance as disposed.</p></li>
+<li><p>Mark the instance as cleaned.</p></li>
 <li><p>Wake all remaining waiters to prevent deadlocks.</p></li>
 <li><p>Clear internal references to allow GC.</p></li>
 </ul>

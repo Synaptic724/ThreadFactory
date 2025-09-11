@@ -1,13 +1,13 @@
 import threading, time, ulid
 from typing import Optional, Union, Iterable, Any, Callable
 from thread_factory.concurrency.concurrent_set import ConcurrentSet
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.synchronization.primitives.smart_condition import SmartCondition
 from thread_factory.utilities.coordination.package import Pack
 
 #FlowRegulator class
 
-class FlowRegulator(IDisposable):
+class FlowRegulator(Cleanable):
     """
     FlowRegulator
     ----------
@@ -56,7 +56,7 @@ class FlowRegulator(IDisposable):
         ideal for controlled concurrency and thread orchestration.
 
     """
-    __slots__ = IDisposable.__slots__ + [
+    __slots__ = Cleanable.__slots__ + [
     "_cond", "_value", "_log_ids", "_bias_threshold", "_pending_permits",
         "_id"
     ]
@@ -70,7 +70,7 @@ class FlowRegulator(IDisposable):
         Raises:
             ValueError: If the initial `value` is less than 0.
         """
-        super().__init__()  # Initialize the IDisposable base class
+        super().__init__()  # Initialize the Cleanable base class
         if value < 0:
             raise ValueError("FlowRegulator initial value must be >= 0")
 
@@ -81,17 +81,17 @@ class FlowRegulator(IDisposable):
         self._bias_threshold: Optional[int] = bias_threshold
         self._pending_permits: int = 0  # buffered until bias flush
 
-    def dispose(self):
+    def cleanup(self):
         """
         Disposes of the FlowRegulator, releasing all its resources and
         waking up any threads currently waiting to acquire a permit.
         After disposal, the lock should no longer be used. This method is idempotent.
         """
-        if self.disposed:  # Check if the lock has already been disposed
+        if self.cleaned:  # Check if the lock has already been cleaned
             return
         # Acquire the internal condition lock before performing disposal operations
         with self._cond:
-            self._disposed = True  # Mark the lock as disposed
+            self._cleaned = True  # Mark the lock as cleaned
             self._cond.notify_all() # Now this is called with the lock acquired
             self._cond.dispose()
             self._cond = None # Set to None after disposal
@@ -270,7 +270,7 @@ class FlowRegulator(IDisposable):
         """
         if n < 1:
             raise ValueError("n must be >= 1")
-        if self._disposed:
+        if self._cleaned:
             return
         if callback:
             callback = Pack(callback)  # Ensure callback is wrapped in Pack if provided
@@ -312,8 +312,8 @@ class FlowRegulator(IDisposable):
 
         The call honours return_home_on_block and per-thread worker-type checks.
         """
-        if self._disposed:
-            raise RuntimeError("FlowRegulator has been disposed and cannot be acquired.")
+        if self._cleaned:
+            raise RuntimeError("FlowRegulator has been cleaned and cannot be acquired.")
 
         if not blocking and timeout is not None:
             raise ValueError("Cannot give a timeout with blocking=False")
@@ -325,12 +325,12 @@ class FlowRegulator(IDisposable):
         endtime = None if timeout is None else time.time() + timeout
 
         with self._cond:
-            if self._disposed:  # disposed *before* we started
+            if self._cleaned:  # cleaned *before* we started
                 return False
 
             while True:
                 ### 1 — did someone call dispose() while we were asleep?
-                if self._disposed:  # ← RE-CHECK EACH ITERATION
+                if self._cleaned:  # ← RE-CHECK EACH ITERATION
                     return False
 
                 ### 2 — fast-path: permit available
@@ -407,7 +407,7 @@ class FlowRegulator(IDisposable):
         """
         if n < 1:
             raise ValueError("Number of permits/notifications (n) must be >= 1.")
-        if self._disposed:
+        if self._cleaned:
             return
         if callback:
             callback = Pack(callback)  # Ensure callback is wrapped in Pack if provided
@@ -435,7 +435,7 @@ class FlowRegulator(IDisposable):
                                                                 If None, all waiting threads are considered.
             awaited_caller (bool): If True, the waking thread will execute the callback; otherwise, the notifying thread will.
         """
-        if self._disposed:
+        if self._cleaned:
             return
         if callback:
             callback = Pack(callback)  # Ensure callback is wrapped in Pack if provided
@@ -489,9 +489,9 @@ class FlowRegulator(IDisposable):
 
         Returns:
             list[Any]: A list of `Waiter` objects. Returns an empty list if the
-                       lock is disposed or no threads are waiting.
+                       lock is cleaned or no threads are waiting.
         """
-        if self._disposed or self._cond is None:
+        if self._cleaned or self._cond is None:
             return []
         return self._cond.get_all_waiters()
 
@@ -586,8 +586,8 @@ class FlowRegulator(IDisposable):
         Returns:
             list[str]: A list of string ULIDs (or "MainThread") representing
                        the waiting threads. Returns an empty list if the lock
-                       is disposed or no threads are waiting.
+                       is cleaned or no threads are waiting.
         """
-        if self._disposed or self._cond is None:
+        if self._cleaned or self._cond is None:
             return []
         return self._cond.get_all_waiting_factory_ids()

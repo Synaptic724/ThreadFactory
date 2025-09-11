@@ -1,7 +1,7 @@
 from __future__ import annotations
 import ulid, threading
 from thread_factory.utilities.coordination.package import Pack
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 from thread_factory.synchronization.primitives import Dynaphore
 from typing import Optional, Callable, List, Union, Any, Dict, Iterable
 from thread_factory.synchronization.coordinators.clock_barrier import ClockBarrier
@@ -10,7 +10,7 @@ from thread_factory.concurrency.concurrent_dictionary import ConcurrentDict
 from thread_factory.concurrency.concurrent_list import ConcurrentList
 from thread_factory.utilities.coordination.outcome import Outcome
 
-class Conductor(IDisposable):
+class Conductor(Cleanable):
     """
     A reusable, data-aware synchronization point and work executor.
 
@@ -24,13 +24,8 @@ class Conductor(IDisposable):
     manual release triggers for fine-grained control, timeouts to prevent
     indefinite blocking, and centralized, thread-safe management of task outcomes
     (both results and exceptions).
-
-    It can integrate with a `SignalController` to emit lifecycle events, enabling
-    monitoring and external coordination based on its internal state, such as when
-    the barrier is passed, when task execution begins, or when it is reset or
-    disposed.
     """
-    __slots__ = IDisposable.__slots__ + [
+    __slots__ = Cleanable.__slots__ + [
         "_threshold", "tasks", "reusable", "manual_release", "_timeout", "_raise_on_timeout",
         "_id", "outcomes", "_released", "_broken", "_multiple_outcomes_per_task",
         "_lock", "_clock_barrier", "_signal_barrier", "_dynaphore", "_internal_threshold_barrier",
@@ -91,7 +86,7 @@ class Conductor(IDisposable):
             controller (Optional['SignalController']):
                 An optional `SignalController` instance to which this Conductor will
                 register. The controller will receive notifications about the
-                conductor's state changes (e.g., "DISPOSED", "RESET", "BARRIER_PASSED").
+                conductor's state changes (e.g., "cleaned", "RESET", "BARRIER_PASSED").
         """
         super().__init__()
         if threshold <= 0:
@@ -162,22 +157,22 @@ class Conductor(IDisposable):
         # Outcomes management
         self.outcomes: ConcurrentDict[int, Union[Outcome, ConcurrentList[Outcome]]] = ConcurrentDict()
 
-    def dispose(self):
+    def cleanup(self):
         """
         Disposes of the Conductor, cleaning up all associated resources.
 
         This method performs a full teardown of the Conductor. It marks the
-        instance as disposed, notifies the controller (if any), and releases all
+        instance as cleaned, notifies the controller (if any), and releases all
         internal synchronization primitives (barriers, locks, events). This action
         effectively unblocks any threads currently waiting on the Conductor.
 
-        Once disposed, a Conductor cannot be used or reset. Any subsequent calls
+        Once cleaned, a Conductor cannot be used or reset. Any subsequent calls
         to its methods will have no effect or raise a `RuntimeError`. This method
         is thread-safe.
         """
-        if self._disposed: return
+        if self._cleaned: return
         with self._lock:
-            self._disposed = True
+            self._cleaned = True
             if self._clock_barrier:
                 self._clock_barrier.dispose()
                 self._clock_barrier = None
@@ -208,7 +203,7 @@ class Conductor(IDisposable):
             self._broken = True
             self._released = True
             if self._controller:
-                self._controller.notify(self.id, "DISPOSED")
+                self._controller.notify(self.id, "cleaned")
             if self._controller and hasattr(self._controller, 'unregister'):
                 try:
                     self._controller.unregister(self.id)
@@ -270,9 +265,9 @@ class Conductor(IDisposable):
         cycle. If the Conductor is not reusable, this method does nothing.
 
         Raises:
-            RuntimeError: If the Conductor has already been disposed.
+            RuntimeError: If the Conductor has already been cleaned.
         """
-        if self._disposed: raise RuntimeError("Cannot reset a disposed Conductor.")
+        if self._cleaned: raise RuntimeError("Cannot reset a cleaned Conductor.")
         if not self.reusable: return
         with self._lock:
             if self.outcomes:
@@ -303,9 +298,9 @@ class Conductor(IDisposable):
         not raise an exception). The returned list is a snapshot of the results
         at the time of the call.
 
-        If the Conductor is disposed, it returns an empty list.
+        If the Conductor is cleaned, it returns an empty list.
         """
-        if self._disposed:
+        if self._cleaned:
             return []
 
         successful: List[Any] = []
@@ -337,9 +332,9 @@ class Conductor(IDisposable):
         `RuntimeError` exceptions to only report on application-level errors.
 
         The returned list is a snapshot of the exceptions at the time of the call.
-        If the Conductor is disposed, it returns an empty list.
+        If the Conductor is cleaned, it returns an empty list.
         """
-        if self._disposed:
+        if self._cleaned:
             return []
 
         errors: List[Exception] = []
@@ -355,7 +350,7 @@ class Conductor(IDisposable):
                 if o.done:
                     exc = o.exception()
                     if exc and not (
-                            isinstance(exc, RuntimeError) and "disposed" in str(exc)
+                            isinstance(exc, RuntimeError) and "cleaned" in str(exc)
                     ):
                         errors.append(exc)
 
@@ -378,14 +373,14 @@ class Conductor(IDisposable):
         If the Conductor was initialized with `manual_release=True`, calling this
         method will set the internal event that allows the `start()` method to
         finally complete and threads to be released. If `manual_release` is False,
-        or if the Conductor is already released or disposed, this method has no
+        or if the Conductor is already released or cleaned, this method has no
         effect.
 
         This is primarily used to signal that post-task cleanup or verification
         is complete and the synchronized operation can be considered fully finished.
         """
         with self._lock:
-            if self._disposed or not self.manual_release or self._released: return
+            if self._cleaned or not self.manual_release or self._released: return
             self._released = True
             if self._manual_release_gate: self._manual_release_gate.set()
             if self._controller: self._controller.notify(self.id, "MANUALLY_RELEASED")
@@ -403,7 +398,7 @@ class Conductor(IDisposable):
         does not hang indefinitely.
         """
         with self._lock:
-            if self._disposed or self._released:
+            if self._cleaned or self._released:
                 return
             self._broken = True
             self._released = True
@@ -458,7 +453,7 @@ class Conductor(IDisposable):
 
         It then iterates through the list of tasks, calling `_execute_operation`
         for each one. The loop includes a check to terminate early if the
-        Conductor has been broken or disposed. After each task, it handles the
+        Conductor has been broken or cleaned. After each task, it handles the
         execution of the optional, shared callback, ensuring the callback is
         invoked only once per task completion.
 
@@ -474,7 +469,7 @@ class Conductor(IDisposable):
                     self._controller.notify(self.id, "EXECUTION_STARTED")
 
             for index, task in enumerate(self.tasks):
-                if self._broken or self._disposed: break
+                if self._broken or self._cleaned: break
 
                 self._execute_operation(task, index)
                 self._internal_threshold_barrier.wait()
@@ -491,7 +486,7 @@ class Conductor(IDisposable):
 
 
             with self._lock:
-                if self._controller and not self._execution_completed_notified and not (self._broken or self._disposed):
+                if self._controller and not self._execution_completed_notified and not (self._broken or self._cleaned):
                     self._execution_completed_notified = True
                     self._controller.notify(self.id, "EXECUTION_COMPLETED")
 
@@ -589,7 +584,7 @@ class Conductor(IDisposable):
                 the main barrier wait times out. This is raised from the underlying
                 `BrokenBarrierError`.
         """
-        if self._disposed or self._broken or self.is_spent():
+        if self._cleaned or self._broken or self.is_spent():
             return
         try:
             self._main_barrier.wait()

@@ -4,14 +4,14 @@ import warnings
 from copy import deepcopy
 from typing import Any, Callable, Generic, Iterable, Iterator, Optional, Set, TypeVar
 from thread_factory.concurrency.concurrent_list import ConcurrentList
-from thread_factory.utilities.interfaces.disposable import IDisposable
+from thread_factory.utilities.interfaces.cleanable import Cleanable
 
 # Type variable _T is used for generic type hinting. This allows the ConcurrentSet
 # to hold elements of any single type, maintaining type safety.
 _T = TypeVar("_T")
 
 #region ConcurrentSet
-class ConcurrentSet(Generic[_T], IDisposable):
+class ConcurrentSet(Generic[_T], Cleanable):
     """Thread‑safe, optionally *freezeable* hash‑set implementation.
 
     This class provides a concurrent-safe wrapper around Python's built-in `set`.
@@ -32,7 +32,7 @@ class ConcurrentSet(Generic[_T], IDisposable):
       (`|`, `&`, `-`, `^`) and those modifying the set in-place (`|=`, `&=`, `-=`, `^=`),
       are implemented or forwarded to internal helpers. These implementations ensure
       that the operations are performed safely under the lock and respect the frozen state.
-    • **Disposable / context‑manager**: The class implements the `IDisposable` interface,
+    • **Disposable / context‑manager**: The class implements the `Cleanable` interface,
       following a pattern where resources (in this case, the internal set's data) can
       be explicitly cleaned up using the `dispose()` method. It also supports the
       context manager protocol (`with ConcurrentSet(...) as cs:`), although using the
@@ -41,7 +41,7 @@ class ConcurrentSet(Generic[_T], IDisposable):
       is for advanced scenarios or explicit resource management patterns.
     """
 
-    __slots__ = IDisposable.__slots__ + ["_lock", "_set", "_freeze"]
+    __slots__ = Cleanable.__slots__ + ["_lock", "_set", "_freeze"]
 # region Construction & state helpers
     def __init__(self, initial: Optional[Iterable[_T]] = None) -> None:
         """Initialize a new ConcurrentSet instance.
@@ -56,7 +56,7 @@ class ConcurrentSet(Generic[_T], IDisposable):
                      before any other operations can occur, so thread safety isn't a
                      concern within the `__init__` method itself.
         """
-        # Call the parent class constructor if applicable (e.g., IDisposable)
+        # Call the parent class constructor if applicable (e.g., Cleanable)
         super().__init__()
 
         self._lock = threading.RLock()
@@ -72,30 +72,30 @@ class ConcurrentSet(Generic[_T], IDisposable):
         # read operations can skip locking.
         self._freeze: bool = False
 
-    def dispose(self) -> None:
-        """Clear internal data and mark the ConcurrentSet as disposed.
+    def cleanup(self) -> None:
+        """Clear internal data and mark the ConcurrentSet as cleaned.
 
         This method releases the resources held by the set, primarily by clearing
-        the underlying built-in set. Once disposed, the set should not be used
+        the underlying built-in set. Once cleaned, the set should not be used
         further.
 
         This method is idempotent; calling it multiple times has no additional effect
         after the first call. It is also thread-safe, using the internal lock
-        to protect the clearing operation and the `disposed` flag update.
+        to protect the clearing operation and the `cleaned` flag update.
         """
-        # Check if the set has already been disposed. The `getattr` with a default
-        # handles the case where the `disposed` attribute might not exist yet
+        # Check if the set has already been cleaned. The `getattr` with a default
+        # handles the case where the `cleaned` attribute might not exist yet
         # during initialization or in error scenarios, although it's set in __init__.
-        if not getattr(self, "_disposed", False):
+        if not getattr(self, "_cleaned", False):
             # Acquire the lock before clearing the internal set and updating the flag.
             with self._lock:
                 # Clear the underlying built-in set, releasing references to its elements.
                 self._set.clear()
-                # Mark the set as disposed. This flag is checked in the outer `if`.
-                self._disposed = True
-            # Issue a warning to inform the user that the set has been disposed.
+                # Mark the set as cleaned. This flag is checked in the outer `if`.
+                self._cleaned = True
+            # Issue a warning to inform the user that the set has been cleaned.
             # This is a helpful indicator if the set is accidentally used after disposal.
-            warnings.warn("Your ConcurrentSet has been disposed and should not be used further.", UserWarning)
+            warnings.warn("Your ConcurrentSet has been cleaned and should not be used further.", UserWarning)
 # endregion
 # region Freeze control
     def freeze(self) -> None:

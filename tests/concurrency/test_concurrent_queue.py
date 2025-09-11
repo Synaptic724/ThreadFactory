@@ -556,7 +556,7 @@ class HighPerformanceConcurrentQueueTest(unittest.TestCase):
         """
         Ensures that:
             - dispose() clears all queue contents.
-            - dispose() sets the disposed flag.
+            - dispose() sets the cleaned flag.
             - dispose() is idempotent (calling it multiple times is safe).
         """
         queue = ConcurrentQueue([1, 2, 3])
@@ -564,14 +564,14 @@ class HighPerformanceConcurrentQueueTest(unittest.TestCase):
         # Initial state check
         self.assertEqual(len(queue), 3)
         self.assertIn(1, queue)
-        self.assertFalse(queue.disposed)
+        self.assertFalse(queue.cleaned)
 
         # First disposal
         queue.dispose()
 
         # State after disposal
         self.assertEqual(len(queue), 0)
-        self.assertTrue(queue.disposed)
+        self.assertTrue(queue.cleaned)
         self.assertNotIn(1, queue)
         self.assertNotIn(2, queue)
         self.assertNotIn(3, queue)
